@@ -1,8 +1,8 @@
 """Fair Value Gap detection.
 
 A 3-candle FVG forms when candle[0] and candle[2] don't overlap:
-- Bullish FVG: low[0] > high[2]  (gap = high[2] .. low[0])
-- Bearish FVG: high[0] < low[2]  (gap = high[0] .. low[2])
+- Bullish FVG (up displacement): low[2] > high[0]  -> gap from high[0] .. low[2]
+- Bearish FVG (down displacement): high[2] < low[0] -> gap from high[2] .. low[0]
 
 `candles` is ordered oldest -> newest. `candles[-1]` is the most recent closed bar.
 """
@@ -40,10 +40,10 @@ def detect_new_fvg(candles, symbol: str) -> FVG | None:
     pip = _pip_size(symbol)
     min_size = config.FVG_MIN_SIZE_PIPS * pip
 
-    if c0.Low > c2.High and (c0.Low - c2.High) >= min_size:
-        return FVG(+1, top=c0.Low, bottom=c2.High, bar_index=len(candles) - 2)
-    if c0.High < c2.Low and (c2.Low - c0.High) >= min_size:
-        return FVG(-1, top=c2.Low, bottom=c0.High, bar_index=len(candles) - 2)
+    if c2.Low > c0.High and (c2.Low - c0.High) >= min_size:
+        return FVG(+1, top=c2.Low, bottom=c0.High, bar_index=len(candles) - 2)
+    if c2.High < c0.Low and (c0.Low - c2.High) >= min_size:
+        return FVG(-1, top=c0.Low, bottom=c2.High, bar_index=len(candles) - 2)
     return None
 
 

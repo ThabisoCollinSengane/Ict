@@ -26,7 +26,10 @@ def position_size(equity: float, entry: float, stop: float, symbol: str) -> floa
 class TradeState:
     symbol: str
     direction: int                       # +1 long, -1 short
-    legs: list[dict] = field(default_factory=list)   # {entry, stop, units, leg_idx}
+    legs: list[dict] = field(default_factory=list)
+    # leg dict: {entry, stop, units, leg_idx, entry_id, sl_id, tp_id}
+    pending: dict = field(default_factory=dict)
+    # pending dict keyed by entry_order_id -> {stop, units, leg_idx}
     target: float = 0.0
     initial_stop: float = 0.0
 

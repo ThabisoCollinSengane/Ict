@@ -15,9 +15,13 @@ def _parse(hhmm: str) -> time:
 _KZ = [(name, _parse(s), _parse(e)) for name, s, e in config.KILLZONES]
 
 
+def _ensure_utc(dt):
+    return pytz.utc.localize(dt) if dt.tzinfo is None else dt
+
+
 def current_killzone(utc_dt) -> str | None:
     """Return killzone name if `utc_dt` falls inside one, else None."""
-    ny_t = utc_dt.astimezone(NY).time()
+    ny_t = _ensure_utc(utc_dt).astimezone(NY).time()
     for name, start, end in _KZ:
         if start <= ny_t < end:
             return name
@@ -26,7 +30,7 @@ def current_killzone(utc_dt) -> str | None:
 
 def minutes_until_killzone_end(utc_dt) -> int | None:
     """Minutes remaining in the active killzone, or None if outside."""
-    ny = utc_dt.astimezone(NY)
+    ny = _ensure_utc(utc_dt).astimezone(NY)
     for _, start, end in _KZ:
         if start <= ny.time() < end:
             end_minutes = end.hour * 60 + end.minute
