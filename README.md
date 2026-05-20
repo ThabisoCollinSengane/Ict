@@ -1,0 +1,2 @@
+# Ict
+Trading algo
