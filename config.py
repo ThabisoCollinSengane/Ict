@@ -37,6 +37,26 @@ EQ_HIGH_LOW_TOLERANCE_PIPS = 2     # max pip diff to call two highs "equal"
 FVG_MIN_SIZE_PIPS = 3              # ignore micro FVGs
 OB_LOOKBACK_BARS = 200             # how far back on HTF to scan for unmitigated OB
 
+# --- AMD (Accumulation / Manipulation / Distribution) on M15 ---
+# A consolidation range must satisfy ALL of:
+#   - at least AMD_MIN_RANGE_BARS consecutive M15 bars,
+#   - no wider than AMD_MAX_RANGE_PIPS (high - low),
+#   - both extremes touched at least AMD_MIN_TOUCHES times.
+# A manipulation = a sweep of one extreme + close back inside within the last
+# AMD_SWEEP_LOOKBACK bars after the range ended.
+AMD_MIN_RANGE_BARS = 8             # ~2 hours on M15
+AMD_MAX_RANGE_BARS = 96            # ~24 hours on M15
+AMD_MAX_RANGE_PIPS = 35            # tight-enough coil to qualify as accumulation
+AMD_MIN_TOUCHES = 2                # the high and low each tagged at least twice
+AMD_SWEEP_LOOKBACK = 4             # manipulation must occur within last N M15 bars
+
+# --- News data source ---
+# In backtest, the live ForexFactory "thisweek" XML is useless (it only returns
+# the current real-world week). Set NEWS_SOURCE = "csv" for backtests; the loader
+# reads NEWS_CSV_PATH from the algorithm bundle. "xml" hits FOREXFACTORY_XML_URL.
+NEWS_SOURCE = "csv"
+NEWS_CSV_PATH = "data/news_events.csv"
+
 # --- Symbols ---
 PAIRS = ("GBPUSD", "EURUSD")       # tradeable
 REF_EURGBP = "EURGBP"              # relative strength reference

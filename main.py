@@ -19,9 +19,10 @@ import config
 from ict.killzones import can_open_new_trade
 from ict.fvg import detect_new_fvg, nearest_unmitigated
 from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
-from ict.liquidity import detect_sweep, find_equal_highs, find_equal_lows
+from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
-from ict.dxy_synthetic import compute_dxy
+from ict.dxy_synthetic import compute_dxy, compute_dxy_range
+from ict.amd import detect_consolidation, detect_manipulation
 from intermarket import resolve as resolve_intermarket
 from news_filter import NewsCalendar
 from risk import position_size, pip_size, TradeState
@@ -93,12 +94,35 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         self.SubscriptionManager.AddConsolidator(qc_sym, cons)
 
     def _refresh_news(self):
+        if config.NEWS_SOURCE == "csv":
+            self._load_news_csv()
+            return
         try:
             xml = self.Download(config.FOREXFACTORY_XML_URL)
             n = self.news.load(xml)
-            self.Debug(f"News refreshed: {n} events kept")
+            self.Debug(f"News (XML) refreshed: {n} events kept")
         except Exception as exc:
-            self.Debug(f"News refresh failed: {exc}")
+            self.Debug(f"News XML refresh failed: {exc}")
+
+    def _load_news_csv(self):
+        # Only load once per session - the CSV is static historical data.
+        if self.news.events:
+            return
+        try:
+            text = self.ObjectStore.Read(config.NEWS_CSV_PATH) \
+                if self.ObjectStore.ContainsKey(config.NEWS_CSV_PATH) else None
+        except Exception:
+            text = None
+        if not text:
+            # QC Cloud also exposes uploaded files via the project filesystem.
+            try:
+                with open(config.NEWS_CSV_PATH, "r") as f:
+                    text = f.read()
+            except Exception as exc:
+                self.Debug(f"News CSV load failed ({config.NEWS_CSV_PATH}): {exc}")
+                return
+        n = self.news.load_csv(text)
+        self.Debug(f"News (CSV) loaded: {n} events kept")
 
     def OnData(self, data: Slice):
         # OnData fires every minute. We only update last_price here; entry/pyramid
@@ -135,11 +159,18 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if self._sym_bias(pair, self.bars_4h) != signal.direction:
             return
 
+        # --- AMD on M15: identify accumulation + manipulation in our direction ---
         bars15 = self._asc(self.bars_15m[pair])
-        sweep_price = detect_sweep(bars15, signal.direction)
-        if sweep_price is None:
+        rng = detect_consolidation(bars15, pair)
+        if rng is None:
             return
+        sweep_dir = detect_manipulation(bars15, rng)
+        if sweep_dir is None or sweep_dir != signal.direction:
+            return
+        # Stop sits beyond the manipulation extreme (which IS the swept range edge).
+        sweep_price = rng.low if signal.direction > 0 else rng.high
 
+        # --- M5 distribution trigger: fresh FVG in trade direction ---
         bars5 = self._asc(self.bars_5m[pair])
         fvg = detect_new_fvg(bars5, pair)
         if fvg is None or fvg.direction != signal.direction:
@@ -231,10 +262,14 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         series = []
         for i in range(-n, 0):
             close_px = {s: rolls[s][i].Close for s in config.DXY_CONSTITUENTS}
+            high_px  = {s: rolls[s][i].High  for s in config.DXY_CONSTITUENTS}
+            low_px   = {s: rolls[s][i].Low   for s in config.DXY_CONSTITUENTS}
             c = compute_dxy(close_px)
-            if c is None:
+            o = compute_dxy({s: rolls[s][i].Open for s in config.DXY_CONSTITUENTS})
+            h, l = compute_dxy_range(high_px, low_px)
+            if None in (c, o, h, l):
                 continue
-            series.append(_SynBar(c, c, c, c))
+            series.append(_SynBar(o, h, l, c))
         if len(series) < config.SWING_LOOKBACK + 2:
             return 0
         return htf_bias(series)

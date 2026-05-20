@@ -8,7 +8,22 @@ Designed for hands-off execution — the algorithm analyses, sizes, enters, pyra
 
 ## Strategy in one paragraph
 
-On each 5-minute bar inside a chosen ICT killzone (London Open / NY AM / London Close), the algorithm computes the **synthetic DXY** bias and **EURGBP** bias on 1H. The intermarket table picks one pair and one direction — never both pairs at once. The pair's own 4H + 1H bias must agree. It then waits for a **15m liquidity sweep** of the prior swing, a **5m Fair Value Gap** in trade direction, and a clear **HTF target** (FVG / Order Block / equal high or low on H4, Daily, or Weekly) at least **20 pips** away. Entry is a limit at the FVG midpoint, stop beyond the sweep, target the nearest valid HTF level. Up to **3 pyramid legs** are added on subsequent continuation FVGs, each leg trailing the previous to break-even. **High and medium impact USD/EUR/GBP news** within ±15 min blocks all new entries.
+Built around the ICT **Accumulation → Manipulation → Distribution** (AMD / Power-of-Three) cycle. The top-down ladder is **H4 → H1 → M15 → M5**: H4 and H1 must agree on direction with the intermarket model (synthetic DXY + EURGBP); M15 is where we identify the *consolidation range* and the *sweep* of one extreme (the manipulation); M5 is where we trigger entry via a fresh Fair Value Gap in the distribution direction. Killzones (London Open / NY AM / London Close) gate timing; the news filter (CSV in backtest, ForexFactory XML live) blocks entries around H/M USD/EUR/GBP releases. Targets are the nearest unmitigated HTF FVG / Order Block / equal H-L on H4, Daily, or Weekly, minimum 20 pips, minimum 2.0 R:R. Up to **3 pyramid legs** add on subsequent continuation FVGs, each leg promoting the previous stop to break-even via order update. Quality over frequency — a setup may take days to materialise.
+
+## AMD flow (every tradeable setup must pass this)
+
+```
+ACCUMULATION       MANIPULATION         DISTRIBUTION           our trigger
+---------------    ------------------   --------------------   --------------------
+M15 sideways  ->   M15 sweeps one    -> M5 FVG in the       -> Limit entry @ FVG
+range forms        extreme of that      *opposite* dir.        mid, SL beyond the
+(>= AMD_MIN bars,  range, closes        to the sweep           swept range edge,
+<= AMD_MAX pips,   back inside          (the real expansion)   TP @ nearest HTF
+both extremes      (Judas swing)                               target on H4/D/W
+touched >= 2x)
+```
+
+If no qualifying range exists, we skip — no setup, no trade. Ranges can persist for hours or days; that is expected.
 
 ---
 
