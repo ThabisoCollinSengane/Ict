@@ -75,62 +75,82 @@ class Backtester:
     def __init__(self, data_5m):
         self.data_5m = data_5m
         self.tf_dfs = {}
+        self.tf_bars = {}     # pre-built list[Bar] for fast slicing
+        self.tf_index = {}    # pandas DatetimeIndex per (sym, tf) for searchsorted
+        self.tf_pos = {}      # (sym, tf) -> dict[timestamp] -> position (for _bar_at)
         for sym, df in data_5m.items():
-            self.tf_dfs[(sym, "5T")]  = df
-            self.tf_dfs[(sym, "15T")] = resample(df, "15min")
-            self.tf_dfs[(sym, "60T")] = resample(df, "60min")
-            self.tf_dfs[(sym, "240T")] = resample(df, "240min")
-            self.tf_dfs[(sym, "D")]   = resample(df, "1D")
-            self.tf_dfs[(sym, "W")]   = resample(df, "1W")
+            for tf_name, rule in [("5T", None), ("15T", "15min"), ("60T", "60min"),
+                                   ("240T", "240min"), ("D", "1D"), ("W", "1W")]:
+                d = df if rule is None else resample(df, rule)
+                self.tf_dfs[(sym, tf_name)] = d
+                self.tf_bars[(sym, tf_name)] = df_to_bars(d)
+                self.tf_index[(sym, tf_name)] = d.index
 
         self.equity = config.STARTING_CASH
         self.start_equity = self.equity
-        self.active = {}      # pair -> {direction, target, legs:[{entry,stop,units,leg_idx,opened_at}]}
-        self.pending = {}     # pair -> {entry_price, stop, target, direction, units, leg_idx, placed_at}
+        self.active = {}
+        self.pending = {}
         self.trades = []
 
         self.news = NewsCalendar()
-        try:
-            with open("data/news_events.csv", "r") as f:
-                n = self.news.load_csv(f.read())
-                print(f"  News CSV: {n} events loaded")
-        except Exception as exc:
-            print(f"  News CSV: load skipped ({exc})")
+        for path in ("data/news_events.csv", "./data/news_events.csv"):
+            try:
+                with open(path, "r") as f:
+                    n = self.news.load_csv(f.read())
+                    print(f"  News CSV: {n} events loaded from {path}")
+                    break
+            except Exception:
+                continue
+        else:
+            print("  News CSV: not found (skipping news filter)")
 
     def bars_up_to(self, sym, tf, t):
-        df = self.tf_dfs.get((sym, tf))
-        if df is None:
+        idx = self.tf_index.get((sym, tf))
+        if idx is None:
             return []
-        pos = df.index.searchsorted(t, side="right")
+        pos = idx.searchsorted(t, side="right")
         if pos == 0:
             return []
-        return df_to_bars(df.iloc[:pos])
+        return self.tf_bars[(sym, tf)][:pos]
 
     def _bar_at(self, sym, tf, t):
-        df = self.tf_dfs.get((sym, tf))
-        if df is None or t not in df.index:
+        idx = self.tf_index.get((sym, tf))
+        if idx is None:
             return None
-        row = df.loc[t]
-        return Bar(row.Open, row.High, row.Low, row.Close)
+        try:
+            pos = idx.get_loc(t)
+        except KeyError:
+            return None
+        return self.tf_bars[(sym, tf)][pos]
 
     def run(self):
         if "GBPUSD" not in self.data_5m:
             raise SystemExit("GBPUSD data missing")
         timestamps = self.data_5m["GBPUSD"].index
 
-        # 5 days of warmup so HTF bars accumulate.
         warmup_end = timestamps[0] + pd.Timedelta(days=5)
+        total = len(timestamps)
+        print(f"  Iterating {total} 5-min bars...")
 
-        for t in timestamps:
+        for i, t in enumerate(timestamps):
             for pair in config.PAIRS:
                 self._update_orders(pair, t)
             if t < warmup_end:
                 continue
+
+            # Cheap killzone gate: skip heavy entry logic if not in any killzone.
+            now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+            in_kz = can_open_new_trade(now)
             for pair in config.PAIRS:
                 if pair in self.active:
                     self._maybe_pyramid(pair, t)
-                elif pair not in self.pending:
+                elif in_kz and pair not in self.pending:
                     self._maybe_open(pair, t)
+
+            if i % 1000 == 0 and i > 0:
+                print(f"    bar {i}/{total} ({t}) - active={len(self.active)} "
+                      f"pending={len(self.pending)} trades={len(self.trades)} "
+                      f"equity={self.equity:.0f}")
 
         # Close any remaining positions at last available 5m close.
         last_t = timestamps[-1]
