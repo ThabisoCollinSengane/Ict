@@ -91,6 +91,15 @@ class Backtester:
         self.active = {}
         self.pending = {}
         self.trades = []
+        # Diagnostic counters: how many times each gate was reached / rejected.
+        self.gate = {
+            "checks": 0, "in_killzone": 0, "news_clear": 0,
+            "intermarket_signal": 0, "pair_matches": 0,
+            "h1_bias_ok": 0, "h4_bias_ok": 0,
+            "consolidation_found": 0, "manipulation_correct_dir": 0,
+            "m5_fvg_correct_dir": 0, "target_found": 0,
+            "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
+        }
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -302,41 +311,55 @@ class Backtester:
         return out
 
     def _maybe_open(self, pair, t):
+        g = self.gate
+        g["checks"] += 1
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if not can_open_new_trade(now):
             return
+        g["in_killzone"] += 1
         if self.news.is_blocked(now):
             return
+        g["news_clear"] += 1
 
         dxy_bias = self._dxy_bias_1h(t)
         eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t)
         signal = resolve_intermarket(dxy_bias, eurgbp_bias)
-        if signal is None or signal.pair != pair:
+        if signal is None:
             return
+        g["intermarket_signal"] += 1
+        if signal.pair != pair:
+            return
+        g["pair_matches"] += 1
 
         if self._sym_bias(pair, "60T", t) != signal.direction:
             return
+        g["h1_bias_ok"] += 1
         if self._sym_bias(pair, "240T", t) != signal.direction:
             return
+        g["h4_bias_ok"] += 1
 
         bars15 = self.bars_up_to(pair, "15T", t)
         rng = detect_consolidation(bars15, pair)
         if rng is None:
             return
+        g["consolidation_found"] += 1
         sweep_dir = detect_manipulation(bars15, rng)
         if sweep_dir is None or sweep_dir != signal.direction:
             return
+        g["manipulation_correct_dir"] += 1
         sweep_price = rng.low if signal.direction > 0 else rng.high
 
         bars5 = self.bars_up_to(pair, "5T", t)
         fvg = detect_new_fvg(bars5, pair)
         if fvg is None or fvg.direction != signal.direction:
             return
+        g["m5_fvg_correct_dir"] += 1
 
         cur_price = bars5[-1].Close
         target = self._find_target(pair, signal.direction, t, cur_price)
         if target is None:
             return
+        g["target_found"] += 1
 
         pip = pip_size(pair)
         entry = fvg.mid
@@ -347,16 +370,19 @@ class Backtester:
             return
         if risk_pips <= 0 or (reward_pips / risk_pips) < config.MIN_RR:
             return
+        g["rr_ok"] += 1
 
         units = int(position_size(self.equity, entry, stop, pair))
         if units == 0:
             return
+        g["units_nonzero"] += 1
 
         self.pending[pair] = {
             "entry_price": entry, "stop": stop, "target": target,
             "direction": signal.direction, "units": units, "leg_idx": 1,
             "placed_at": t,
         }
+        g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
         st = self.active[pair]
@@ -439,6 +465,10 @@ def main():
     print("\nRunning backtest...")
     bt = Backtester(data)
     bt.run()
+
+    print("\n=== Gate funnel (how many times each filter let entries through) ===")
+    for k, v in bt.gate.items():
+        print(f"  {k:30s} {v}")
 
     print("\n=== Results ===")
     for k, v in summarize(bt).items():
