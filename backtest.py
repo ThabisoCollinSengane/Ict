@@ -112,6 +112,7 @@ class Backtester:
             "d1_bias_ok": 0,
             "h4_mss_ok": 0,
             "htf_zone_tap": 0,
+            "retail_pool_swept": 0,
             "sweep_validated": 0,
             "smt_confirmed": 0,
             "m5_fvg_trigger": 0,
@@ -378,26 +379,36 @@ class Backtester:
         bars_15 = tf_bars["15T"]
         if len(bars_15) < 4:
             return
-        recent_15 = bars_15[-3:]
+        # Look back ~2 hours of M15 (8 bars) for the manipulation leg.
+        recent_15 = bars_15[-8:]
         if direction > 0:
             sweep_extreme = min(b.Low for b in recent_15)
             cands = target_candidates(levels, cbdr_h, cbdr_l, direction=-1)
-            # Looking for a low (below price) that was swept by sweep_extreme.
+            # A recognized LOW pool was swept if its price sits ABOVE the
+            # sweep_extreme (price went below it) and below current price.
             swept = [(n, px) for n, px in cands if sweep_extreme < px <= cur_price]
         else:
             sweep_extreme = max(b.High for b in recent_15)
             cands = target_candidates(levels, cbdr_h, cbdr_l, direction=+1)
             swept = [(n, px) for n, px in cands if sweep_extreme > px >= cur_price]
-        swept_name, swept_price = (None, sweep_extreme)
-        if swept:
-            swept_name, swept_price = min(swept, key=lambda x: abs(x[1] - sweep_extreme))
 
-        # Sweep validation: M5 fake-run, M15 confirm.
+        # Per game-theory spec: skip unless a recognized retail pool was hunted.
+        if not swept:
+            return
+        if direction > 0:
+            # Deepest pool pierced = the LOWEST one (closest to sweep_extreme).
+            swept_name, swept_price = min(swept, key=lambda x: x[1])
+        else:
+            swept_name, swept_price = max(swept, key=lambda x: x[1])
+        g["retail_pool_swept"] += 1
+
+        # Sweep validation: M5 wick (High/Low) pierces, M15 confirm by Close.
         sweep = validate_sweep(
             entry_tf_bars=bars_5,
             confirm_tf_bars=bars_15,
             entry_tf="5T", symbol=pair,
             swept_level=swept_price, direction=direction,
+            pierce_lookback=12,   # ~60 min of M5 to catch the pierce wick
         )
         if not sweep.valid:
             return
