@@ -25,7 +25,8 @@ NY = ZoneInfo(config.NY_TZ)
 @dataclass
 class DayLevels:
     nyo_date: pd.Timestamp           # 00:00 NY of this trading day
-    nyo: float                       # the M5 Open at 00:00 NY
+    nyo: float                       # the M5 Open at 00:00 NY (True Day Open)
+    nwo: Optional[float] = None      # True Week Open: M5 Open at Monday 00:00 NY
     pdh: Optional[float] = None      # previous (NY) day's High
     pdl: Optional[float] = None      # previous day's Low
     pwh: Optional[float] = None      # previous week's High
@@ -116,13 +117,28 @@ def session_hl(df_5m: pd.DataFrame, ts, session: str) -> tuple[Optional[float], 
     return float(sl.High.max()), float(sl.Low.min())
 
 
+def nwo_for(df_5m: pd.DataFrame, ts) -> Optional[float]:
+    """True Week Open: the M5 Open at the first bar on or after Monday 00:00 NY
+    of the week containing `ts`. Higher-TF analog of the daily NYO.
+    """
+    now = pd.Timestamp(ts).tz_convert(NY)
+    monday_ny = (now - pd.Timedelta(days=now.weekday())).normalize()
+    monday_utc = monday_ny.tz_convert("UTC")
+    pos = df_5m.index.searchsorted(monday_utc, side="left")
+    if pos >= len(df_5m):
+        return None
+    return float(df_5m.iloc[pos].Open)
+
+
 def build_day_levels(df_5m: pd.DataFrame, ts) -> Optional[DayLevels]:
     nyo = nyo_for(df_5m, ts)
     if nyo is None:
         return None
+    nwo = nwo_for(df_5m, ts)
     pdh, pdl = prior_day_hl(df_5m, ts)
     pwh, pwl = prior_week_hl(df_5m, ts)
     ah, al = session_hl(df_5m, ts, "asia")
     lh, ll = session_hl(df_5m, ts, "london")
-    return DayLevels(nyo_date=nyo[0], nyo=nyo[1], pdh=pdh, pdl=pdl, pwh=pwh, pwl=pwl,
+    return DayLevels(nyo_date=nyo[0], nyo=nyo[1], nwo=nwo,
+                     pdh=pdh, pdl=pdl, pwh=pwh, pwl=pwl,
                      asia_high=ah, asia_low=al, london_high=lh, london_low=ll)

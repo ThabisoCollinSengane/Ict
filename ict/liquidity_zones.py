@@ -127,9 +127,15 @@ def _scan_breakers(bars, tf, direction) -> list[Zone]:
     return out
 
 
-def most_recent_tap(zones: list[Zone], price: float) -> Optional[Zone]:
-    """Highest-priority zone currently containing `price`."""
+def most_recent_tap(zones: list[Zone], recent_bars) -> Optional[Zone]:
+    """Highest-priority unmitigated zone whose range was entered by any of the
+    `recent_bars`' wicks (High/Low). Use the last 5-10 entry-TF bars so a tap
+    that just happened is still detectable.
+    """
+    if not recent_bars:
+        return None
     for z in zones:
-        if z.contains(price):
-            return z
+        for b in recent_bars:
+            if b.Low <= z.top and b.High >= z.bottom:
+                return z
     return None

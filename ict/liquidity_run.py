@@ -50,14 +50,19 @@ def validate(
     symbol: str,
     swept_level: float,
     direction: int,
+    pierce_lookback: int = 4,
 ) -> SweepResult:
-    """Validate that the most recent action on `entry_tf` is a fake run of
-    `swept_level` toward `direction`, confirmed by the matching candle on the
-    next higher TF.
+    """Validate that recent action on `entry_tf` is a fake run of `swept_level`
+    toward `direction`, confirmed by the next-higher-TF candle close.
 
-    `direction` is the EXPECTED reversal direction (+1 long, -1 short). For a
-    long, we expect the LOW (swept_level) to be pierced and price to close
-    back above it.
+    Per spec: use High/Low for the pierce, Close for the rejection.
+      - The pierce (wick beyond the level) may occur on ANY of the last
+        `pierce_lookback` entry-TF bars (defaults to 4 = ~20 min on M5).
+      - The MOST RECENT bar's CLOSE must be back inside the level (rejection).
+      - The next-higher-TF candle's CLOSE must NOT be beyond the level
+        (otherwise it's a real run, not a fake run).
+
+    `direction` = expected reversal direction (+1 long, -1 short).
     """
     pip = _pip(symbol)
     min_pips = _cfg_pips(config.SWEEP_MIN_PIPS, symbol)
@@ -67,15 +72,19 @@ def validate(
     if not entry_tf_bars:
         return SweepResult(False, direction, swept_level, 0.0, False, "no entry bars")
 
+    recent = entry_tf_bars[-pierce_lookback:]
     last = entry_tf_bars[-1]
 
     if direction > 0:
-        wick_depth = max(0.0, swept_level - last.Low) / pip
-        pierced = last.Low < swept_level
+        # Deepest wick BELOW the level across the window.
+        pierce_extreme = min(b.Low for b in recent)
+        wick_depth = max(0.0, swept_level - pierce_extreme) / pip
+        pierced = pierce_extreme < swept_level
         closed_back = last.Close > swept_level - tol
     else:
-        wick_depth = max(0.0, last.High - swept_level) / pip
-        pierced = last.High > swept_level
+        pierce_extreme = max(b.High for b in recent)
+        wick_depth = max(0.0, pierce_extreme - swept_level) / pip
+        pierced = pierce_extreme > swept_level
         closed_back = last.Close < swept_level + tol
 
     if not pierced:

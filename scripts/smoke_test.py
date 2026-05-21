@@ -94,8 +94,8 @@ def main():
     tf_bars = {"5T": bars, "15T": bars[::3], "240T": bars[::48], "D": bars[::288],
                "W": bars[::288 * 7] or bars, "60T": bars[::12]}
     zones = collect_zones(tf_bars, direction=+1)
-    print(f"  {len(zones)} bullish zones; recent tap @ {bars[-1].Close} -> "
-          f"{most_recent_tap(zones, bars[-1].Close)}")
+    print(f"  {len(zones)} bullish zones; recent tap (last 6 bars) -> "
+          f"{most_recent_tap(zones, bars[-6:])}")
 
     print("\n--- liquidity run (synthetic fake run) ---")
     fake_bars = bars[:-1] + [Bar(bars[-1].Open, bars[-1].High,
