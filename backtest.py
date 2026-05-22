@@ -27,6 +27,8 @@ from ict.liquidity_zones import collect_zones, most_recent_tap
 from ict.liquidity_run import validate as validate_sweep, confirm_tf_for
 from ict.smt import confirm as smt_confirm
 from ict.target import pick as pick_target, candidates as target_candidates
+from ict.liquidity import find_equal_highs, find_equal_lows
+from ict.swings import find_swings
 from ict.game_theory import score_setup, passes as gt_passes
 from ict.intermarket import resolve as resolve_intermarket
 from ict.entry import build as build_entry
@@ -381,26 +383,42 @@ class Backtester:
             return
         # Look back ~2 hours of M15 (8 bars) for the manipulation leg.
         recent_15 = bars_15[-8:]
+        # Build the recognized-pool list: PDH/PDL/PWH/PWL/session H-L/CBDR
+        # plus equal-H/L clusters and recent M15 swing extremes — these are
+        # the textbook retail-stop magnets institutions hunt.
+        equal_highs = find_equal_highs(bars_15, pair, lookback=120)
+        equal_lows = find_equal_lows(bars_15, pair, lookback=120)
+        m15_swings = find_swings(bars_15[-120:])
+        recent_swing_highs = [s.price for s in m15_swings if s.kind == +1]
+        recent_swing_lows = [s.price for s in m15_swings if s.kind == -1]
+
         if direction > 0:
             sweep_extreme = min(b.Low for b in recent_15)
             cands = target_candidates(levels, cbdr_h, cbdr_l, direction=-1)
-            # A recognized LOW pool was swept if its price sits ABOVE the
-            # sweep_extreme (price went below it) and below current price.
+            cands += [("EqualLows", p) for p in equal_lows]
+            cands += [("M15SwingLow", p) for p in recent_swing_lows]
             swept = [(n, px) for n, px in cands if sweep_extreme < px <= cur_price]
         else:
             sweep_extreme = max(b.High for b in recent_15)
             cands = target_candidates(levels, cbdr_h, cbdr_l, direction=+1)
+            cands += [("EqualHighs", p) for p in equal_highs]
+            cands += [("M15SwingHigh", p) for p in recent_swing_highs]
             swept = [(n, px) for n, px in cands if sweep_extreme > px >= cur_price]
 
-        # Per game-theory spec: skip unless a recognized retail pool was hunted.
-        if not swept:
-            return
-        if direction > 0:
-            # Deepest pool pierced = the LOWEST one (closest to sweep_extreme).
-            swept_name, swept_price = min(swept, key=lambda x: x[1])
+        if swept:
+            if direction > 0:
+                swept_name, swept_price = min(swept, key=lambda x: x[1])
+            else:
+                swept_name, swept_price = max(swept, key=lambda x: x[1])
+            g["retail_pool_swept"] += 1
+        elif zone.tf in ("D", "W"):
+            # D1/W1 FVG/OB tap acts as the institutional liquidity event in
+            # its own right (user spec: D1/W1 zones always provoke reaction).
+            swept_name = f"{zone.tf}{zone.kind.upper()}"
+            swept_price = zone.bottom if direction > 0 else zone.top
+            g["retail_pool_swept"] += 1
         else:
-            swept_name, swept_price = max(swept, key=lambda x: x[1])
-        g["retail_pool_swept"] += 1
+            return  # H4/M15 zone tap without a retail-pool sweep -> not enough
 
         # Sweep validation: M5 wick (High/Low) pierces, M15 confirm by Close.
         sweep = validate_sweep(
