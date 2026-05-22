@@ -316,7 +316,7 @@ class Backtester:
             age_min = (t - pe["placed_at"]).total_seconds() / 60.0
             if filled:
                 self._fill_entry(pair, t)
-            elif age_min > 25:
+            elif age_min > 60:        # cancel limit if unfilled after 1h
                 self.pending.pop(pair, None)
 
     def _fill_entry(self, pair, t):
