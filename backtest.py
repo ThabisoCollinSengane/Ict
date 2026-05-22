@@ -386,8 +386,13 @@ class Backtester:
             return
         g["d1_bias_ok"] += 1
 
-        # H4 MSS must be the latest structural event in this direction.
-        if mss_direction(self.bars_up_to(pair, "240T", t)) != direction:
+        # H4 confirmation: latest MSS in direction OR structural pull in direction.
+        # MSS events are sparse on 60d of H4 data; directional_pull is the
+        # broader structural read and stays in sync between MSS events.
+        h4_bars = self.bars_up_to(pair, "240T", t)
+        h4_mss = mss_direction(h4_bars)
+        h4_pull = directional_pull(h4_bars)
+        if h4_mss != direction and h4_pull != direction:
             return
         g["h4_mss_ok"] += 1
 
