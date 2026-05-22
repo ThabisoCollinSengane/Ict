@@ -37,6 +37,8 @@ from ict.target import pick as pick_target, pick_dol, candidates as target_candi
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.swings import find_swings
 from ict.game_theory import score_setup, passes as gt_passes
+from ict.context import time_in_zone_pre_event, dwell_at_level
+from ict.volatility import realized_vol, range_expansion, vol_regime
 from ict.intermarket import resolve as resolve_intermarket
 from ict.entry import build as build_entry
 from news_filter import NewsCalendar
@@ -400,7 +402,7 @@ class Backtester:
         if not can_enter_new_pipeline(now):
             return
         g["killzone+first_hour"] += 1
-        if self.news.is_blocked(now):
+        if config.NEWS_HARD_BLOCK_ENABLED and self.news.is_blocked(now):
             return
         g["news_clear"] += 1
 
@@ -597,6 +599,54 @@ class Backtester:
             return
         g["target_found"] += 1
 
+        # --- Continuous context features (new scoring) ---
+        # Consolidation before FVG: how many of the K bars *before* the FVG
+        # formed had ranges overlapping the FVG zone.
+        pre_fvg = bars_5[:fvg.bar_index] if fvg.bar_index > 0 else []
+        consolidation = time_in_zone_pre_event(
+            pre_fvg, fvg.top, fvg.bottom, config.GT_CONSOLIDATION_LOOKBACK_BARS,
+        )
+
+        # Dwell at swept level pre-sweep: how many recent M5 bars touched
+        # the level within tolerance.
+        dwell = dwell_at_level(
+            bars_5, swept_price, 2 * pip_p, config.GT_DWELL_LOOKBACK_BARS,
+        )
+
+        # Displacement strength of the FVG's middle candle.
+        disp_strength = None
+        if fvg.bar_index >= config.GT_DISPLACEMENT_LOOKBACK_BARS:
+            window = bars_5[fvg.bar_index - config.GT_DISPLACEMENT_LOOKBACK_BARS:fvg.bar_index]
+            ranges = sorted([b.High - b.Low for b in window])
+            if ranges:
+                med = ranges[len(ranges) // 2]
+                if med > 0:
+                    mid_bar = bars_5[fvg.bar_index]
+                    disp_strength = (mid_bar.High - mid_bar.Low) / med
+
+        # Range expansion at the most recent M5 bar (the entry bar).
+        rng_exp = range_expansion(bars_5, config.GT_DISPLACEMENT_LOOKBACK_BARS)
+
+        # Vol regime: build a short history of realized-vol values and
+        # classify the latest one.
+        rv_hist = []
+        window = config.GT_REALIZED_VOL_WINDOW
+        history = config.GT_REALIZED_VOL_HISTORY
+        for end in range(max(window + 1, len(bars_5) - history), len(bars_5) + 1):
+            rv_hist.append(realized_vol(bars_5[:end], window))
+        regime = vol_regime(rv_hist) if rv_hist else "NORMAL"
+
+        # News proximity (replaces the old hard block).
+        prox_min, prox_impact = self.news.proximity_minutes(now)
+
+        # Record the features on the FVG itself (useful for post-trade audit).
+        fvg.displacement_strength = disp_strength
+        fvg.time_in_zone_pre_formation = consolidation
+        fvg.range_expansion = rng_exp
+        fvg.news_proximity_minutes = prox_min
+        fvg.news_impact = prox_impact
+        fvg.formed_in_macro_window = in_macro_window(now)
+
         # Game-theory score.
         phases = cycle_phases(now)
         session_phase = "ny_am" if "ny_am" in phases else ("london" if "london" in phases else "other")
@@ -609,6 +659,13 @@ class Backtester:
             london_first_hour_dir=london_dir,
             trade_direction=direction,
             session_phase=session_phase,
+            consolidation_score=consolidation,
+            dwell_count=dwell,
+            displacement_strength=disp_strength,
+            range_expansion_ratio=rng_exp,
+            vol_regime_label=regime,
+            news_proximity_minutes=prox_min,
+            news_impact=prox_impact,
         )
         if not gt_passes(score):
             return
@@ -666,7 +723,7 @@ class Backtester:
         if pair in self.pending:
             return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-        if self.news.is_blocked(now):
+        if config.NEWS_HARD_BLOCK_ENABLED and self.news.is_blocked(now):
             return
         if not in_used_killzone(now):
             return

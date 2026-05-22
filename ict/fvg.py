@@ -18,6 +18,14 @@ class FVG:
     bottom: float
     bar_index: int          # index of middle (displacement) candle
     mitigated: bool = False
+    # Context fields populated lazily by the entry pipeline (None = not measured).
+    displacement_strength: float | None = None  # middle range / median(prev N)
+    time_in_zone_pre_formation: float | None = None  # [0, 1]
+    realized_vol_at_formation: float | None = None
+    range_expansion: float | None = None
+    news_proximity_minutes: int | None = None
+    news_impact: str | None = None
+    formed_in_macro_window: bool | None = None
 
     @property
     def mid(self) -> float:

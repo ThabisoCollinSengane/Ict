@@ -37,6 +37,14 @@ def score_setup(
     london_first_hour_dir: Optional[int],  # +1/-1/None
     trade_direction: int,
     session_phase: str,                    # "ny_am" | "london" | ...
+    # New continuous-feature inputs (all optional; None = not measured).
+    consolidation_score: Optional[float] = None,    # time_in_zone_pre_formation in [0,1]
+    dwell_count: Optional[int] = None,              # bars touching swept level pre-sweep
+    displacement_strength: Optional[float] = None,  # middle-bar range / median
+    range_expansion_ratio: Optional[float] = None,  # at FVG bar
+    vol_regime_label: Optional[str] = None,         # "DEAD" | "NORMAL" | "EXPANDING"
+    news_proximity_minutes: Optional[int] = None,   # signed minutes
+    news_impact: Optional[str] = None,              # "High" | "Medium" | None
 ) -> ScoreBreakdown:
     s = ScoreBreakdown()
 
@@ -68,6 +76,33 @@ def score_setup(
         and london_first_hour_dir == -trade_direction
     ):
         s.bonuses["judas"] = config.GT_JUDAS_BONUS
+
+    # --- New continuous-feature bonuses ---
+    if (consolidation_score is not None
+            and consolidation_score >= config.GT_CONSOLIDATION_THRESHOLD):
+        s.bonuses["consolidation"] = config.GT_CONSOLIDATION_BONUS
+
+    if (dwell_count is not None
+            and dwell_count >= config.GT_DWELL_THRESHOLD_BARS):
+        s.bonuses["dwell_at_sweep"] = config.GT_DWELL_BONUS
+
+    if (displacement_strength is not None
+            and displacement_strength >= config.GT_DISPLACEMENT_THRESHOLD):
+        s.bonuses["displacement"] = config.GT_DISPLACEMENT_BONUS
+
+    if (range_expansion_ratio is not None
+            and range_expansion_ratio >= config.GT_RANGE_EXPANSION_THRESHOLD):
+        s.bonuses["range_expansion"] = config.GT_RANGE_EXPANSION_BONUS
+
+    if vol_regime_label == "DEAD":
+        s.bonuses["vol_regime_dead"] = -abs(config.GT_DEAD_REGIME_PENALTY)
+    elif vol_regime_label == "EXPANDING":
+        s.bonuses["vol_regime_expanding"] = config.GT_EXPANDING_REGIME_BONUS
+
+    if (news_proximity_minutes is not None and news_impact is not None
+            and abs(news_proximity_minutes) <= config.GT_NEWS_PROXIMITY_MINUTES
+            and news_impact in ("High", "Medium")):
+        s.bonuses["news_proximity"] = config.GT_NEWS_PROXIMITY_BONUS
 
     return s
 

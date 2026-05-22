@@ -76,7 +76,10 @@ class NewsCalendar:
         return len(self.events)
 
     def is_blocked(self, utc_dt: datetime) -> bool:
-        """True if `utc_dt` is within block window of a relevant event."""
+        """Legacy hard-block check (deprecated — prefer proximity_minutes).
+
+        Retained so older entry points keep working until fully migrated.
+        """
         if utc_dt.tzinfo is None:
             utc_dt = UTC.localize(utc_dt)
         before = timedelta(minutes=config.NEWS_BLOCK_MINUTES_BEFORE)
@@ -85,3 +88,19 @@ class NewsCalendar:
             if ev_dt - before <= utc_dt <= ev_dt + after:
                 return True
         return False
+
+    def proximity_minutes(self, utc_dt: datetime) -> tuple[int, str | None]:
+        """Signed minutes from `utc_dt` to the nearest relevant news event.
+
+        Returns (minutes, impact). Negative minutes = event is in the past;
+        positive = event is upcoming. impact is None when no events loaded.
+        Distance is `abs(minutes)`; we return signed so the caller can tell
+        pre- vs post-event behavior apart.
+        """
+        if utc_dt.tzinfo is None:
+            utc_dt = UTC.localize(utc_dt)
+        if not self.events:
+            return (10**9, None)
+        nearest = min(self.events, key=lambda e: abs((e[0] - utc_dt).total_seconds()))
+        delta = (nearest[0] - utc_dt).total_seconds() / 60.0
+        return (int(round(delta)), nearest[2])

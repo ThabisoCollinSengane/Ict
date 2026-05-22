@@ -154,3 +154,43 @@ BIAS_CASCADE_STRICT_TFS = ("D", "240T")
 BIAS_CASCADE_SOFT_TFS   = ("60T", "15T")
 # If an HTF ITH/ITL is broken back through AFTER a trade is open, close it?
 CLOSE_ON_STRUCTURE_INVALIDATION = False
+
+# --- New continuous-feature scoring (Addendum: volume/time/volatility/news) ---
+# Pre-FVG consolidation: fraction of last N M5 bars whose range overlapped the
+# FVG zone before formation. Higher = institutional accumulation.
+GT_CONSOLIDATION_LOOKBACK_BARS = 12   # ~1h of M5
+GT_CONSOLIDATION_THRESHOLD     = 0.50
+GT_CONSOLIDATION_BONUS         = 0.4
+
+# Pre-sweep dwell: how many recent bars touched the swept level. High =
+# equal H/L stops accumulated before the sweep.
+GT_DWELL_LOOKBACK_BARS         = 12
+GT_DWELL_THRESHOLD_BARS        = 4
+GT_DWELL_BONUS                 = 0.3
+
+# Displacement strength: middle-bar range / median(prev N bar ranges).
+# Threshold of 2.0 = bar is twice the typical recent range.
+GT_DISPLACEMENT_LOOKBACK_BARS  = 10
+GT_DISPLACEMENT_THRESHOLD      = 2.0
+GT_DISPLACEMENT_BONUS          = 0.3
+
+# Range expansion at FVG bar — same threshold as displacement, but applied to
+# the bar containing the FVG formation rather than only the middle candle.
+GT_RANGE_EXPANSION_THRESHOLD   = 2.0
+GT_RANGE_EXPANSION_BONUS       = 0.2
+
+# Volatility regime: rolling realized-vol over the last N M5 bars classified
+# into DEAD/NORMAL/EXPANDING by percentile bands. Dead-regime entries get
+# penalised; expanding-regime get a bonus.
+GT_REALIZED_VOL_WINDOW         = 36   # ~3h of M5
+GT_REALIZED_VOL_HISTORY        = 288  # ~1 trading day of M5
+GT_DEAD_REGIME_PENALTY         = 0.5
+GT_EXPANDING_REGIME_BONUS      = 0.2
+
+# News proximity (REPLACES the old hard block). Entries within +/- N minutes
+# of a medium/high impact news event get a positive score contribution.
+GT_NEWS_PROXIMITY_MINUTES      = 30
+GT_NEWS_PROXIMITY_BONUS        = 0.5
+
+# Master switch: drop the hard news block in backtest.py and rely on scoring.
+NEWS_HARD_BLOCK_ENABLED        = False
