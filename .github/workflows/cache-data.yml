@@ -26,18 +26,26 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install yfinance pandas
+        run: pip install "yfinance>=0.2.40" "pandas>=2.0" "curl_cffi"
 
       - name: Download data
         run: python scripts/cache_yf_data.py
+
+      - name: List cached files
+        run: ls -la data/yf/ || echo "data/yf empty"
 
       - name: Commit cached CSVs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/yf/*.csv
+          if compgen -G "data/yf/*.csv" > /dev/null; then
+            git add data/yf/*.csv
+          else
+            echo "No CSVs were downloaded."
+            exit 1
+          fi
           if git diff --cached --quiet; then
-            echo "No data changes to commit."
+            echo "CSVs unchanged."
           else
             git commit -m "Refresh yfinance data cache"
             git push
