@@ -524,8 +524,18 @@ class Backtester:
             return
         g["m5_fvg_trigger"] += 1
 
-        # Target.
-        target = pick_target(pair, levels, cbdr_h, cbdr_l, direction, cur_price)
+        # Target — prefer the highest-TF pool that gives acceptable RR.
+        # We can pre-compute risk from the swept-price stop to feed the
+        # picker; this lets it prefer PWH/PDH over LondonHigh when the
+        # nearest pool gives sub-1.5R but the next pool up is reachable.
+        pip_p = pip_size(pair)
+        raw_entry_preview = fvg.mid
+        est_stop = (swept_price - pip_p) if direction > 0 else (swept_price + pip_p)
+        est_risk_pips = abs(raw_entry_preview - est_stop) / pip_p
+        target = pick_target(
+            pair, levels, cbdr_h, cbdr_l, direction, cur_price,
+            risk_pips=est_risk_pips, min_rr=config.MIN_RR,
+        )
         if target is None:
             return
         g["target_found"] += 1
