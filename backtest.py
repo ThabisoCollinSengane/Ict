@@ -114,6 +114,7 @@ class Backtester:
             "d1_bias_ok": 0,
             "h4_mss_ok": 0,
             "htf_zone_tap": 0,
+            "kz_swing_identified": 0,
             "retail_pool_swept": 0,
             "sweep_validated": 0,
             "smt_confirmed": 0,
@@ -176,6 +177,37 @@ class Backtester:
         if key not in self._cbdr_cache:
             self._cbdr_cache[key] = cbdr_hl(self.data_5m[sym], t)
         return self._cbdr_cache[key]
+
+    def _killzone_open_swings(self, sym, t):
+        """At the most recent killzone-open prior to `t`, snapshot the
+        CLOSEST M15 swing high (above the killzone-open price) and CLOSEST
+        M15 swing low (below it). Those are the immediate liquidity targets
+        the manipulation leg is most likely to hunt during this killzone.
+        Returns (closest_high_price | None, closest_low_price | None).
+        """
+        now_ny = pd.Timestamp(t).tz_convert("America/New_York")
+        today_ny = now_ny.normalize()
+        kz_starts_ny = []
+        for _, s, _ in config.KZ_USED:
+            h, m = (int(x) for x in s.split(":"))
+            start_ny = today_ny.replace(hour=h, minute=m)
+            if start_ny <= now_ny:
+                kz_starts_ny.append(start_ny)
+        if not kz_starts_ny:
+            return None, None
+        kz_open_ny = max(kz_starts_ny)
+        kz_open_utc = kz_open_ny.tz_convert("UTC")
+
+        bars_at_open = self.bars_up_to(sym, "15T", kz_open_utc)
+        if len(bars_at_open) < 10:
+            return None, None
+        price_at_open = bars_at_open[-1].Close
+        swings = find_swings(bars_at_open[-120:])
+        highs_above = [s.price for s in swings if s.kind == +1 and s.price > price_at_open]
+        lows_below = [s.price for s in swings if s.kind == -1 and s.price < price_at_open]
+        closest_high = min(highs_above) if highs_above else None
+        closest_low = max(lows_below) if lows_below else None
+        return closest_high, closest_low
 
     def _london_first_hour_dir(self, sym, t):
         """Direction of the London 02:00-03:00 NY hour. +1 if close > open, -1 if <."""
@@ -381,44 +413,61 @@ class Backtester:
         bars_15 = tf_bars["15T"]
         if len(bars_15) < 4:
             return
-        # Look back ~2 hours of M15 (8 bars) for the manipulation leg.
-        recent_15 = bars_15[-8:]
-        # Build the recognized-pool list: PDH/PDL/PWH/PWL/session H-L/CBDR
-        # plus equal-H/L clusters and recent M15 swing extremes — these are
-        # the textbook retail-stop magnets institutions hunt.
-        equal_highs = find_equal_highs(bars_15, pair, lookback=120)
-        equal_lows = find_equal_lows(bars_15, pair, lookback=120)
-        m15_swings = find_swings(bars_15[-120:])
-        recent_swing_highs = [s.price for s in m15_swings if s.kind == +1]
-        recent_swing_lows = [s.price for s in m15_swings if s.kind == -1]
-
+        recent_15 = bars_15[-8:]   # ~2h of manipulation
         if direction > 0:
             sweep_extreme = min(b.Low for b in recent_15)
-            cands = target_candidates(levels, cbdr_h, cbdr_l, direction=-1)
-            cands += [("EqualLows", p) for p in equal_lows]
-            cands += [("M15SwingLow", p) for p in recent_swing_lows]
-            swept = [(n, px) for n, px in cands if sweep_extreme < px <= cur_price]
         else:
             sweep_extreme = max(b.High for b in recent_15)
-            cands = target_candidates(levels, cbdr_h, cbdr_l, direction=+1)
-            cands += [("EqualHighs", p) for p in equal_highs]
-            cands += [("M15SwingHigh", p) for p in recent_swing_highs]
-            swept = [(n, px) for n, px in cands if sweep_extreme > px >= cur_price]
 
-        if swept:
+        # PRIMARY swept-level source: closest M15 swing extreme as of the
+        # most recent killzone-open. That's the visible liquidity the
+        # manipulation leg is most likely to hunt.
+        kz_high, kz_low = self._killzone_open_swings(pair, t)
+        kz_target = kz_low if direction > 0 else kz_high
+        if kz_target is not None:
+            g["kz_swing_identified"] += 1
+
+        swept_name = None
+        swept_price = None
+
+        # Was the killzone-open swing actually swept?
+        if kz_target is not None:
+            if direction > 0 and sweep_extreme < kz_target <= cur_price:
+                swept_name, swept_price = "KZSwingLow", kz_target
+            elif direction < 0 and sweep_extreme > kz_target >= cur_price:
+                swept_name, swept_price = "KZSwingHigh", kz_target
+
+        # Secondary: any other recognized retail pool in the M15 sweep range.
+        if swept_name is None:
+            equal_highs = find_equal_highs(bars_15, pair, lookback=120)
+            equal_lows = find_equal_lows(bars_15, pair, lookback=120)
+            m15_swings = find_swings(bars_15[-120:])
+            recent_swing_highs = [s.price for s in m15_swings if s.kind == +1]
+            recent_swing_lows = [s.price for s in m15_swings if s.kind == -1]
             if direction > 0:
-                swept_name, swept_price = min(swept, key=lambda x: x[1])
+                cands = target_candidates(levels, cbdr_h, cbdr_l, direction=-1)
+                cands += [("EqualLows", p) for p in equal_lows]
+                cands += [("M15SwingLow", p) for p in recent_swing_lows]
+                swept = [(n, px) for n, px in cands if sweep_extreme < px <= cur_price]
             else:
-                swept_name, swept_price = max(swept, key=lambda x: x[1])
-            g["retail_pool_swept"] += 1
-        elif zone.tf in ("D", "W"):
-            # D1/W1 FVG/OB tap acts as the institutional liquidity event in
-            # its own right (user spec: D1/W1 zones always provoke reaction).
+                cands = target_candidates(levels, cbdr_h, cbdr_l, direction=+1)
+                cands += [("EqualHighs", p) for p in equal_highs]
+                cands += [("M15SwingHigh", p) for p in recent_swing_highs]
+                swept = [(n, px) for n, px in cands if sweep_extreme > px >= cur_price]
+            if swept:
+                if direction > 0:
+                    swept_name, swept_price = min(swept, key=lambda x: x[1])
+                else:
+                    swept_name, swept_price = max(swept, key=lambda x: x[1])
+
+        # Tertiary: D1/W1 zone tap counts as institutional liquidity itself.
+        if swept_name is None and zone.tf in ("D", "W"):
             swept_name = f"{zone.tf}{zone.kind.upper()}"
             swept_price = zone.bottom if direction > 0 else zone.top
-            g["retail_pool_swept"] += 1
-        else:
-            return  # H4/M15 zone tap without a retail-pool sweep -> not enough
+
+        if swept_name is None:
+            return
+        g["retail_pool_swept"] += 1
 
         # Sweep validation: M5 wick (High/Low) pierces, M15 confirm by Close.
         sweep = validate_sweep(
