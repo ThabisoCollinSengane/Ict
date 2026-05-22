@@ -2,6 +2,10 @@ name: Cache yfinance data
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "scripts/cache_yf_data.py"
+      - ".github/workflows/cache-data.yml"
   schedule:
     # Weekly refresh, Sunday 22:00 UTC (after week's close)
     - cron: "0 22 * * 0"
