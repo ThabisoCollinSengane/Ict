@@ -20,7 +20,7 @@ from ict.killzones import (
     in_used_killzone, minutes_into_killzone, can_enter_new_pipeline,
 )
 from ict.structure import directional_pull
-from ict.mss import mss_direction
+from ict.mss import mss_direction, structural_direction
 from ict.levels import build_day_levels
 from ict.cls_cycles import cbdr_hl, cycle_phases, in_macro_window
 from ict.liquidity_zones import collect_zones, most_recent_tap
@@ -386,12 +386,14 @@ class Backtester:
             return
         g["d1_bias_ok"] += 1
 
-        # LTF MSS confirmation: MSS is reliable on H1 / M15 / M5 (per spec —
-        # NOT on H4 / D1 / W1, which are used purely for liquidity targets).
-        # Accept H1 or M15 MSS in trade direction.
-        h1_mss = mss_direction(self.bars_up_to(pair, "60T", t))
-        m15_mss = mss_direction(self.bars_up_to(pair, "15T", t))
-        if h1_mss != direction and m15_mss != direction:
+        # LTF structural confirmation: H1 or M15 BOS (reversal CHoCH OR
+        # continuation BOS) in the trade direction. Pure MSS-reversal
+        # detection silently returns 0 inside continuous trends, so we
+        # use structural_direction which falls back to last-close-vs-
+        # last-swing for continuation BOS.
+        h1_dir = structural_direction(self.bars_up_to(pair, "60T", t))
+        m15_dir = structural_direction(self.bars_up_to(pair, "15T", t))
+        if h1_dir != direction and m15_dir != direction:
             return
         g["ltf_mss_ok"] += 1
 
@@ -554,6 +556,22 @@ class Backtester:
             htf_zone_kind=zone.kind, htf_zone_tf=zone.tf,
         )
         if signal is None:
+            # Diagnostic: show why RR was rejected so we can tune floors.
+            from risk import pip_size as _pip
+            pip = _pip(pair)
+            raw_entry = fvg.mid
+            est_stop = (swept_price - pip) if direction > 0 else (swept_price + pip)
+            est_risk = abs(raw_entry - est_stop) / pip
+            est_reward = abs(target.price - raw_entry) / pip
+            est_rr = est_reward / est_risk if est_risk > 0 else 0.0
+            if not hasattr(self, "_rr_misses"):
+                self._rr_misses = []
+            self._rr_misses.append({
+                "t": t, "pair": pair, "dir": direction,
+                "swept": swept_name, "target": target.name,
+                "risk_p": round(est_risk, 1), "reward_p": round(est_reward, 1),
+                "rr": round(est_rr, 2),
+            })
             return
         g["rr_ok"] += 1
 
@@ -667,6 +685,14 @@ def main():
     print("\n=== Gate funnel (how many bars survive each filter) ===")
     for k, v in bt.gate.items():
         print(f"  {k:24s} {v}")
+
+    misses = getattr(bt, "_rr_misses", [])
+    if misses:
+        print(f"\n=== RR-rejected setups ({len(misses)}) ===")
+        for m in misses:
+            print(f"  {m['t']} {m['pair']} dir={m['dir']:+d} "
+                  f"swept={m['swept']} -> target={m['target']} "
+                  f"risk={m['risk_p']}p reward={m['reward_p']}p rr={m['rr']}")
 
     print("\n=== Results ===")
     for k, v in summarize(bt).items():

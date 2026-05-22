@@ -22,24 +22,24 @@ class MSSEvent:
 
 
 def latest_mss(candles) -> Optional[MSSEvent]:
+    """Latest MSS-CHoCH event (reversal): last 2 highs descending then a
+    close breaks the most recent, or last 2 lows ascending then a close
+    breaks the most recent. Detects ONLY reversal events; use
+    structural_direction() for either reversal or continuation BOS.
+    """
     swings = find_swings(candles)
     if len(swings) < 4:
         return None
 
-    # Identify recent trend by the last 4 swings.
     highs = [s for s in swings if s.kind == +1]
     lows = [s for s in swings if s.kind == -1]
 
-    # Bearish-trend → bullish MSS: last 2 highs are descending AND a later
-    # candle closes above the most recent of those descending highs.
     if len(highs) >= 2 and highs[-1].price < highs[-2].price:
         ref = highs[-1]
         for j in range(ref.index + 1, len(candles)):
             if candles[j].Close > ref.price:
                 return MSSEvent(j, +1, ref.price)
 
-    # Bullish-trend → bearish MSS: last 2 lows ascending AND a later close
-    # breaks the most recent of them.
     if len(lows) >= 2 and lows[-1].price > lows[-2].price:
         ref = lows[-1]
         for j in range(ref.index + 1, len(candles)):
@@ -52,3 +52,32 @@ def latest_mss(candles) -> Optional[MSSEvent]:
 def mss_direction(candles) -> int:
     ev = latest_mss(candles)
     return ev.direction if ev else 0
+
+
+def structural_direction(candles) -> int:
+    """LTF structural direction: returns +1 / -1 / 0 based on the most
+    recent break of structure (whether reversal CHoCH or continuation BOS).
+
+    A bullish read is any of:
+      - latest_mss returns +1 (reversal CHoCH)
+      - last close is above the most recent unbroken swing high (continuation BOS)
+    Mirror for bearish.
+
+    This is the LTF "is structure with us?" check the user-spec asks for
+    on H1/M15/M5 — works in trending AND reversing markets, where pure
+    MSS-reversal detection silently returns 0.
+    """
+    mss = mss_direction(candles)
+    if mss != 0:
+        return mss
+    swings = find_swings(candles)
+    if not swings or not candles:
+        return 0
+    highs = [s for s in swings if s.kind == +1]
+    lows = [s for s in swings if s.kind == -1]
+    last_close = candles[-1].Close
+    if highs and last_close > highs[-1].price:
+        return +1
+    if lows and last_close < lows[-1].price:
+        return -1
+    return 0
