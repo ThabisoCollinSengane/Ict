@@ -26,14 +26,14 @@ from ict.fvg import enumerate_fvgs, first_fvg_after, detect_new_fvg
 from ict.killzones import (
     in_used_killzone, minutes_into_killzone, can_enter_new_pipeline,
 )
-from ict.structure import directional_pull
+from ict.structure import directional_pull, bias_holds_on_tf
 from ict.mss import mss_direction, structural_direction
 from ict.levels import build_day_levels
 from ict.cls_cycles import cbdr_hl, cycle_phases, in_macro_window
 from ict.liquidity_zones import collect_zones, most_recent_tap
 from ict.liquidity_run import validate as validate_sweep, confirm_tf_for
 from ict.smt import confirm as smt_confirm
-from ict.target import pick as pick_target, candidates as target_candidates
+from ict.target import pick as pick_target, pick_dol, candidates as target_candidates
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.swings import find_swings
 from ict.game_theory import score_setup, passes as gt_passes
@@ -145,8 +145,10 @@ class Backtester:
             "news_clear": 0,
             "intermarket": 0,
             "pair_match": 0,
-            "d1_bias_ok": 0,
-            "ltf_mss_ok": 0,
+            "bias_cascade_d1_ok": 0,
+            "bias_cascade_h4_ok": 0,
+            "bias_cascade_h1_ok": 0,
+            "bias_cascade_m15_ok": 0,
             "htf_zone_tap": 0,
             "kz_swing_identified": 0,
             "retail_pool_swept": 0,
@@ -414,22 +416,37 @@ class Backtester:
         g["pair_match"] += 1
         direction = sig.direction
 
-        # D1 directional pull must agree.
+        # Fractal bias cascade: D1 -> H4 -> H1 -> M15.
+        # D1 requires the directional pull (most-recent unmitigated ITH vs
+        # ITL: whichever is fresher) to match the trade direction — this is
+        # the active draw on liquidity. H4/H1/M15 require structure to be
+        # "not invalidated": price still on the correct side of the most
+        # recent unmitigated ITH (shorts) / ITL (longs). Strict TFs
+        # (config.BIAS_CASCADE_STRICT_TFS) block on fail; soft TFs are
+        # counted in the funnel but pass-through.
+        bars_5_pre = self.bars_up_to(pair, "5T", t)
+        if not bars_5_pre:
+            return
+        cur_price_cascade = bars_5_pre[-1].Close
         d1_bars = self.bars_up_to(pair, "D", t)
         if directional_pull(d1_bars) != direction:
-            return
-        g["d1_bias_ok"] += 1
+            if "D" in config.BIAS_CASCADE_STRICT_TFS:
+                return
+        else:
+            g["bias_cascade_d1_ok"] += 1
 
-        # LTF structural confirmation: H1 or M15 BOS (reversal CHoCH OR
-        # continuation BOS) in the trade direction. Pure MSS-reversal
-        # detection silently returns 0 inside continuous trends, so we
-        # use structural_direction which falls back to last-close-vs-
-        # last-swing for continuation BOS.
-        h1_dir = structural_direction(self.bars_up_to(pair, "60T", t))
-        m15_dir = structural_direction(self.bars_up_to(pair, "15T", t))
-        if h1_dir != direction and m15_dir != direction:
+        cascade_pass = True
+        for tf, gate_key in (("240T", "bias_cascade_h4_ok"),
+                             ("60T",  "bias_cascade_h1_ok"),
+                             ("15T",  "bias_cascade_m15_ok")):
+            tf_bars_now = self.bars_up_to(pair, tf, t)
+            if bias_holds_on_tf(tf_bars_now, direction, cur_price_cascade):
+                g[gate_key] += 1
+            elif tf in config.BIAS_CASCADE_STRICT_TFS:
+                cascade_pass = False
+                break
+        if not cascade_pass:
             return
-        g["ltf_mss_ok"] += 1
 
         # HTF liquidity zone tap.
         tf_bars = self._bars_by_tf(pair, t)
@@ -566,8 +583,14 @@ class Backtester:
         raw_entry_preview = fvg.mid
         est_stop = (swept_price - pip_p) if direction > 0 else (swept_price + pip_p)
         est_risk_pips = abs(raw_entry_preview - est_stop) / pip_p
-        target = pick_target(
-            pair, levels, cbdr_h, cbdr_l, direction, cur_price,
+        # Structural DOL — anchored to most recent unmitigated HTF ITH/ITL
+        # with rank-based pool list (PWH/PDH/session/CBDR) as fallback.
+        htf_for_dol = {
+            "D":    self.bars_up_to(pair, "D", t),
+            "240T": self.bars_up_to(pair, "240T", t),
+        }
+        target = pick_dol(
+            pair, htf_for_dol, levels, cbdr_h, cbdr_l, direction, cur_price,
             risk_pips=est_risk_pips, min_rr=config.MIN_RR,
         )
         if target is None:

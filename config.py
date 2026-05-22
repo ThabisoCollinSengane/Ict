@@ -145,3 +145,12 @@ CBDR_END_NY   = "20:00"
 # --- Pyramiding ---
 PYRAMID_LEG_RISK_FRAC = (1.0, 0.5, 0.5)  # leg1, leg2, leg3 risk fractions
 PYRAMID_MIN_FAVOUR_PIPS = 10       # prior leg must be this many pips in profit
+
+# --- Fractal bias cascade ---
+# Every higher TF must show price still on the correct side of its most recent
+# unmitigated ITH/ITL. Strict TFs MUST hold for an entry to fire; soft TFs are
+# checked + reported via gate funnel but don't block.
+BIAS_CASCADE_STRICT_TFS = ("D", "240T")
+BIAS_CASCADE_SOFT_TFS   = ("60T", "15T")
+# If an HTF ITH/ITL is broken back through AFTER a trade is open, close it?
+CLOSE_ON_STRUCTURE_INVALIDATION = False

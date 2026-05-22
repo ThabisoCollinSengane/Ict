@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ict.levels import DayLevels
+from ict.structure import classify_intermediates, last_unmitigated
 
 
 @dataclass
@@ -87,3 +88,47 @@ def pick(
 
     name, px = valid[0]
     return Target(name=name, price=px, distance_pips=abs(px - current_price) / pip)
+
+
+def pick_dol(
+    symbol: str,
+    htf_candles_by_tf: dict,
+    levels: DayLevels,
+    cbdr_high: Optional[float],
+    cbdr_low: Optional[float],
+    direction: int,
+    current_price: float,
+    risk_pips: Optional[float] = None,
+    min_rr: Optional[float] = None,
+) -> Optional[Target]:
+    """Structural Draw-on-Liquidity picker.
+
+    Walks HTF (D1, then H4) for the most recent unmitigated opposite-side
+    ITH/ITL — this is the structural anchor the market is being drawn toward.
+    Falls back to the static rank picker (PWH/PWL/PDH/PDL/session/CBDR) if
+    no structural anchor is found in the trade direction.
+
+    `htf_candles_by_tf`: { "D": [Bar,...], "240T": [Bar,...] }
+    """
+    target_kind = -1 if direction < 0 else +1  # shorts target ITLs below
+    for tf in ("D", "240T"):
+        bars = htf_candles_by_tf.get(tf)
+        if not bars:
+            continue
+        ints = classify_intermediates(bars)
+        lvl = last_unmitigated(ints, target_kind)
+        if lvl is None:
+            continue
+        if direction < 0 and lvl.price < current_price:
+            pip = _pip(symbol)
+            dist = abs(lvl.price - current_price) / pip
+            if risk_pips is None or min_rr is None or (dist / risk_pips) >= min_rr:
+                return Target(name=f"{tf}_ITL", price=lvl.price, distance_pips=dist)
+        if direction > 0 and lvl.price > current_price:
+            pip = _pip(symbol)
+            dist = abs(lvl.price - current_price) / pip
+            if risk_pips is None or min_rr is None or (dist / risk_pips) >= min_rr:
+                return Target(name=f"{tf}_ITH", price=lvl.price, distance_pips=dist)
+
+    return pick(symbol, levels, cbdr_high, cbdr_low, direction, current_price,
+                risk_pips=risk_pips, min_rr=min_rr)

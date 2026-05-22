@@ -64,6 +64,28 @@ def last_unmitigated(levels: list[IntermediateLevel], kind: int) -> Optional[Int
     return None
 
 
+def bias_holds_on_tf(candles, direction: int, current_price: float,
+                     left=None, right=None) -> bool:
+    """True if the most recent unmitigated ITH/ITL on this TF still
+    structurally supports `direction`.
+
+    For shorts (-1): an unmitigated ITH must exist and sit above current_price
+      (price is still below the ITH that anchored the bearish leg).
+    For longs (+1): an unmitigated ITL must exist and sit below current_price.
+
+    Returns False if no qualifying unmitigated level exists — structure on
+    this TF gives no read for that side.
+    """
+    if direction == 0:
+        return False
+    levels = classify_intermediates(candles, left, right)
+    kind = +1 if direction < 0 else -1
+    lvl = last_unmitigated(levels, kind)
+    if lvl is None:
+        return False
+    return (lvl.price > current_price) if direction < 0 else (lvl.price < current_price)
+
+
 def directional_pull(candles, left=None, right=None) -> int:
     """+1 if the last unmitigated structural pull is up (toward a fresh ITH),
     -1 if down (toward a fresh ITL), 0 if undetermined.
