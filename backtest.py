@@ -461,21 +461,24 @@ class Backtester:
                     swept_name, swept_price = max(swept, key=lambda x: x[1])
 
         # Tertiary: D1/W1 zone tap counts as institutional liquidity itself.
+        # Use the OUTER boundary (the edge price crossed first to enter the
+        # zone) as the swept level — that's what gets "swept" semantically.
         if swept_name is None and zone.tf in ("D", "W"):
             swept_name = f"{zone.tf}{zone.kind.upper()}"
-            swept_price = zone.bottom if direction > 0 else zone.top
+            swept_price = zone.top if direction > 0 else zone.bottom
 
         if swept_name is None:
             return
         g["retail_pool_swept"] += 1
 
         # Sweep validation: M5 wick (High/Low) pierces, M15 confirm by Close.
+        # KZ manipulation can take up to ~3h, so pierce window = 36 M5 bars.
         sweep = validate_sweep(
             entry_tf_bars=bars_5,
             confirm_tf_bars=bars_15,
             entry_tf="5T", symbol=pair,
             swept_level=swept_price, direction=direction,
-            pierce_lookback=12,   # ~60 min of M5 to catch the pierce wick
+            pierce_lookback=36,
         )
         if not sweep.valid:
             return
