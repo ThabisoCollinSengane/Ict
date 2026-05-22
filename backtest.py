@@ -6,11 +6,18 @@ Plan: /root/.claude/plans/here-is-my-strategy-elegant-squid.md
 Usage: python backtest.py
 """
 
+import os
 import sys
 from collections import namedtuple
 
 import pandas as pd
-import yfinance as yf
+
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
+
+CSV_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "yf")
 
 import config
 from ict.bias import htf_bias
@@ -52,23 +59,50 @@ Bar = namedtuple("Bar", "Open High Low Close")
 SynBar = namedtuple("SynBar", "Open High Low Close")
 
 
+def _load_csv_cache(name, interval):
+    """Read a pre-cached CSV for `name` at `interval` (e.g. '5m') if present.
+
+    Expected path: data/yf/{NAME}_{interval}.csv with a DatetimeIndex and
+    Open/High/Low/Close columns. Returns None if the file is missing.
+    """
+    path = os.path.join(CSV_CACHE_DIR, f"{name}_{interval}.csv")
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path, index_col=0, parse_dates=True)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df = df[["Open", "High", "Low", "Close"]].dropna()
+    if df.index.tz is None:
+        df.index = df.index.tz_localize("UTC")
+    else:
+        df.index = df.index.tz_convert("UTC")
+    return df
+
+
 def fetch_data(period="60d", interval="5m"):
     out = {}
     for name, ticker in YF_TICKERS.items():
-        df = yf.download(ticker, period=period, interval=interval,
-                         progress=False, auto_adjust=False)
-        if df is None or df.empty:
-            print(f"  WARN: no data for {name} ({ticker})")
-            continue
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df = df[["Open", "High", "Low", "Close"]].dropna()
-        if df.index.tz is None:
-            df.index = df.index.tz_localize("UTC")
-        else:
-            df.index = df.index.tz_convert("UTC")
+        df = _load_csv_cache(name, interval)
+        source = "csv"
+        if df is None:
+            if yf is None:
+                print(f"  WARN: no CSV cache for {name} and yfinance not installed")
+                continue
+            df = yf.download(ticker, period=period, interval=interval,
+                             progress=False, auto_adjust=False)
+            source = "yf"
+            if df is None or df.empty:
+                print(f"  WARN: no data for {name} ({ticker})")
+                continue
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            df = df[["Open", "High", "Low", "Close"]].dropna()
+            if df.index.tz is None:
+                df.index = df.index.tz_localize("UTC")
+            else:
+                df.index = df.index.tz_convert("UTC")
         out[name] = df
-        print(f"  {name}: {len(df)} bars, {df.index.min()} -> {df.index.max()}")
+        print(f"  {name} [{source}]: {len(df)} bars, {df.index.min()} -> {df.index.max()}")
     return out
 
 
