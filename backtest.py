@@ -1,30 +1,48 @@
-"""Pandas-based backtester for the ICT intermarket strategy.
+"""Pandas-based backtester — ICT rewrite (NYO-SMT, AMD, fake-run sweep,
+hierarchical liquidity targets, D1/W1 FVGs, M15/H4 breakers, ICT macros).
 
-Fetches free 5-minute forex data from Yahoo Finance for the last ~60 days,
-runs the strategy through the same `ict/` modules used by the QC version,
-and reports trades + summary stats. No QuantConnect dependency.
+Plan: /root/.claude/plans/here-is-my-strategy-elegant-squid.md
 
-Usage:  python backtest.py
+Usage: python backtest.py
 """
 
+import os
 import sys
 from collections import namedtuple
-from datetime import timedelta
 
 import pandas as pd
-import yfinance as yf
+
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
+
+CSV_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "yf")
 
 import config
-from ict.killzones import can_open_new_trade
-from ict.fvg import detect_new_fvg, nearest_unmitigated
-from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
-from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
-from ict.amd import detect_consolidation, detect_manipulation
-from intermarket import resolve as resolve_intermarket
+from ict.fvg import enumerate_fvgs, first_fvg_after, detect_new_fvg
+from ict.killzones import (
+    in_used_killzone, minutes_into_killzone, can_enter_new_pipeline,
+)
+from ict.structure import directional_pull
+from ict.mss import mss_direction, structural_direction
+from ict.levels import build_day_levels
+from ict.cls_cycles import cbdr_hl, cycle_phases, in_macro_window
+from ict.liquidity_zones import collect_zones, most_recent_tap
+from ict.liquidity_run import validate as validate_sweep, confirm_tf_for
+from ict.smt import confirm as smt_confirm
+from ict.target import pick as pick_target, candidates as target_candidates
+from ict.liquidity import find_equal_highs, find_equal_lows
+from ict.swings import find_swings
+from ict.game_theory import score_setup, passes as gt_passes
+from ict.intermarket import resolve as resolve_intermarket
+from ict.entry import build as build_entry
 from news_filter import NewsCalendar
-from risk import position_size, pip_size
+from risk import (
+    position_size, pip_size, adjust_exit,
+)
 
 
 YF_TICKERS = {
@@ -41,23 +59,50 @@ Bar = namedtuple("Bar", "Open High Low Close")
 SynBar = namedtuple("SynBar", "Open High Low Close")
 
 
+def _load_csv_cache(name, interval):
+    """Read a pre-cached CSV for `name` at `interval` (e.g. '5m') if present.
+
+    Expected path: data/yf/{NAME}_{interval}.csv with a DatetimeIndex and
+    Open/High/Low/Close columns. Returns None if the file is missing.
+    """
+    path = os.path.join(CSV_CACHE_DIR, f"{name}_{interval}.csv")
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path, index_col=0, parse_dates=True)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df = df[["Open", "High", "Low", "Close"]].dropna()
+    if df.index.tz is None:
+        df.index = df.index.tz_localize("UTC")
+    else:
+        df.index = df.index.tz_convert("UTC")
+    return df
+
+
 def fetch_data(period="60d", interval="5m"):
     out = {}
     for name, ticker in YF_TICKERS.items():
-        df = yf.download(ticker, period=period, interval=interval,
-                         progress=False, auto_adjust=False)
-        if df is None or df.empty:
-            print(f"  WARN: no data for {name} ({ticker})")
-            continue
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df = df[["Open", "High", "Low", "Close"]].dropna()
-        if df.index.tz is None:
-            df.index = df.index.tz_localize("UTC")
-        else:
-            df.index = df.index.tz_convert("UTC")
+        df = _load_csv_cache(name, interval)
+        source = "csv"
+        if df is None:
+            if yf is None:
+                print(f"  WARN: no CSV cache for {name} and yfinance not installed")
+                continue
+            df = yf.download(ticker, period=period, interval=interval,
+                             progress=False, auto_adjust=False)
+            source = "yf"
+            if df is None or df.empty:
+                print(f"  WARN: no data for {name} ({ticker})")
+                continue
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            df = df[["Open", "High", "Low", "Close"]].dropna()
+            if df.index.tz is None:
+                df.index = df.index.tz_localize("UTC")
+            else:
+                df.index = df.index.tz_convert("UTC")
         out[name] = df
-        print(f"  {name}: {len(df)} bars, {df.index.min()} -> {df.index.max()}")
+        print(f"  {name} [{source}]: {len(df)} bars, {df.index.min()} -> {df.index.max()}")
     return out
 
 
@@ -71,16 +116,19 @@ def df_to_bars(df):
     return [Bar(r.Open, r.High, r.Low, r.Close) for r in df.itertuples(index=False)]
 
 
+# Direction: which pair OTHERS sit on the opposite side of NYO.
+OTHER = {"EURUSD": "GBPUSD", "GBPUSD": "EURUSD"}
+
+
 class Backtester:
     def __init__(self, data_5m):
         self.data_5m = data_5m
         self.tf_dfs = {}
-        self.tf_bars = {}     # pre-built list[Bar] for fast slicing
-        self.tf_index = {}    # pandas DatetimeIndex per (sym, tf) for searchsorted
-        self.tf_pos = {}      # (sym, tf) -> dict[timestamp] -> position (for _bar_at)
+        self.tf_bars = {}
+        self.tf_index = {}
         for sym, df in data_5m.items():
             for tf_name, rule in [("5T", None), ("15T", "15min"), ("60T", "60min"),
-                                   ("240T", "240min"), ("D", "1D"), ("W", "1W")]:
+                                  ("240T", "240min"), ("D", "1D"), ("W", "1W")]:
                 d = df if rule is None else resample(df, rule)
                 self.tf_dfs[(sym, tf_name)] = d
                 self.tf_bars[(sym, tf_name)] = df_to_bars(d)
@@ -91,15 +139,29 @@ class Backtester:
         self.active = {}
         self.pending = {}
         self.trades = []
-        # Diagnostic counters: how many times each gate was reached / rejected.
         self.gate = {
-            "checks": 0, "in_killzone": 0, "news_clear": 0,
-            "intermarket_signal": 0, "pair_matches": 0,
-            "h1_bias_ok": 0, "h4_bias_ok": 0,
-            "consolidation_found": 0, "manipulation_correct_dir": 0,
-            "m5_fvg_correct_dir": 0, "target_found": 0,
-            "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
+            "checks": 0,
+            "killzone+first_hour": 0,
+            "news_clear": 0,
+            "intermarket": 0,
+            "pair_match": 0,
+            "d1_bias_ok": 0,
+            "ltf_mss_ok": 0,
+            "htf_zone_tap": 0,
+            "kz_swing_identified": 0,
+            "retail_pool_swept": 0,
+            "sweep_validated": 0,
+            "smt_confirmed": 0,
+            "m5_fvg_trigger": 0,
+            "target_found": 0,
+            "game_theory_pass": 0,
+            "rr_ok": 0,
+            "limit_placed": 0,
         }
+
+        self._levels_cache = {}
+        self._cbdr_cache = {}
+        self._london_first_hour_cache = {}
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -113,14 +175,14 @@ class Backtester:
         else:
             print("  News CSV: not found (skipping news filter)")
 
+    # -- data slicing ---------------------------------------------------------
+
     def bars_up_to(self, sym, tf, t):
         idx = self.tf_index.get((sym, tf))
         if idx is None:
             return []
         pos = idx.searchsorted(t, side="right")
-        if pos == 0:
-            return []
-        return self.tf_bars[(sym, tf)][:pos]
+        return self.tf_bars[(sym, tf)][:pos] if pos else []
 
     def _bar_at(self, sym, tf, t):
         idx = self.tf_index.get((sym, tf))
@@ -132,119 +194,73 @@ class Backtester:
             return None
         return self.tf_bars[(sym, tf)][pos]
 
-    def run(self):
-        if "GBPUSD" not in self.data_5m:
-            raise SystemExit("GBPUSD data missing")
-        timestamps = self.data_5m["GBPUSD"].index
+    def _bars_by_tf(self, sym, t) -> dict:
+        return {tf: self.bars_up_to(sym, tf, t)
+                for tf in ("5T", "15T", "60T", "240T", "D", "W")}
 
-        warmup_end = timestamps[0] + pd.Timedelta(days=5)
-        total = len(timestamps)
-        print(f"  Iterating {total} 5-min bars...")
+    # -- caches: levels, CBDR, London first-hour direction -------------------
 
-        for i, t in enumerate(timestamps):
-            for pair in config.PAIRS:
-                self._update_orders(pair, t)
-            if t < warmup_end:
-                continue
+    def _day_levels(self, sym, t):
+        key = (sym, pd.Timestamp(t).tz_convert("America/New_York").normalize())
+        if key not in self._levels_cache:
+            self._levels_cache[key] = build_day_levels(self.data_5m[sym], t)
+        return self._levels_cache[key]
 
-            # Cheap killzone gate: skip heavy entry logic if not in any killzone.
-            now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-            in_kz = can_open_new_trade(now)
-            for pair in config.PAIRS:
-                if pair in self.active:
-                    self._maybe_pyramid(pair, t)
-                elif in_kz and pair not in self.pending:
-                    self._maybe_open(pair, t)
+    def _cbdr(self, sym, t):
+        key = (sym, pd.Timestamp(t).tz_convert("America/New_York").normalize())
+        if key not in self._cbdr_cache:
+            self._cbdr_cache[key] = cbdr_hl(self.data_5m[sym], t)
+        return self._cbdr_cache[key]
 
-            if i % 1000 == 0 and i > 0:
-                print(f"    bar {i}/{total} ({t}) - active={len(self.active)} "
-                      f"pending={len(self.pending)} trades={len(self.trades)} "
-                      f"equity={self.equity:.0f}")
+    def _killzone_open_swings(self, sym, t):
+        """At the most recent killzone-open prior to `t`, snapshot the
+        CLOSEST M15 swing high (above the killzone-open price) and CLOSEST
+        M15 swing low (below it). Those are the immediate liquidity targets
+        the manipulation leg is most likely to hunt during this killzone.
+        Returns (closest_high_price | None, closest_low_price | None).
+        """
+        now_ny = pd.Timestamp(t).tz_convert("America/New_York")
+        today_ny = now_ny.normalize()
+        kz_starts_ny = []
+        for _, s, _ in config.KZ_USED:
+            h, m = (int(x) for x in s.split(":"))
+            start_ny = today_ny.replace(hour=h, minute=m)
+            if start_ny <= now_ny:
+                kz_starts_ny.append(start_ny)
+        if not kz_starts_ny:
+            return None, None
+        kz_open_ny = max(kz_starts_ny)
+        kz_open_utc = kz_open_ny.tz_convert("UTC")
 
-        # Close any remaining positions at last available 5m close.
-        last_t = timestamps[-1]
-        for pair in list(self.active.keys()):
-            last_close = self.data_5m[pair].iloc[-1].Close
-            self._force_close(pair, last_close, last_t, "end_of_data")
+        bars_at_open = self.bars_up_to(sym, "15T", kz_open_utc)
+        if len(bars_at_open) < 10:
+            return None, None
+        price_at_open = bars_at_open[-1].Close
+        swings = find_swings(bars_at_open[-120:])
+        highs_above = [s.price for s in swings if s.kind == +1 and s.price > price_at_open]
+        lows_below = [s.price for s in swings if s.kind == -1 and s.price < price_at_open]
+        closest_high = min(highs_above) if highs_above else None
+        closest_low = max(lows_below) if lows_below else None
+        return closest_high, closest_low
 
-    def _update_orders(self, pair, t):
-        bar = self._bar_at(pair, "5T", t)
-        if bar is None:
-            return
-
-        # Position exits.
-        if pair in self.active:
-            st = self.active[pair]
-            direction = st["direction"]
-            target = st["target"]
-            for leg in list(st["legs"]):
-                sl = leg["stop"]
-                if direction > 0:
-                    sl_hit = bar.Low <= sl
-                    tp_hit = bar.High >= target
-                else:
-                    sl_hit = bar.High >= sl
-                    tp_hit = bar.Low <= target
-                if sl_hit:                       # worst-case: SL first
-                    self._exit_leg(pair, leg, sl, t, "stop")
-                elif tp_hit:
-                    self._exit_leg(pair, leg, target, t, "target")
-            if not self.active.get(pair, {}).get("legs"):
-                self.active.pop(pair, None)
-
-        # Pending limit entry fills.
-        if pair in self.pending:
-            pe = self.pending[pair]
-            entry = pe["entry_price"]
-            direction = pe["direction"]
-            filled = (direction > 0 and bar.Low <= entry) or \
-                     (direction < 0 and bar.High >= entry)
-            age_min = (t - pe["placed_at"]).total_seconds() / 60.0
-            if filled:
-                self._fill_entry(pair, t)
-            elif age_min > 25:               # cancel stale limit after 5 bars
-                self.pending.pop(pair, None)
-
-    def _fill_entry(self, pair, t):
-        pe = self.pending.pop(pair)
-        leg = {
-            "entry": pe["entry_price"], "stop": pe["stop"],
-            "units": pe["units"], "leg_idx": pe["leg_idx"], "opened_at": t,
-        }
-        if pair not in self.active:
-            self.active[pair] = {
-                "direction": pe["direction"],
-                "target": pe["target"],
-                "legs": [leg],
-            }
+    def _london_first_hour_dir(self, sym, t):
+        """Direction of the London 02:00-03:00 NY hour. +1 if close > open, -1 if <."""
+        day = pd.Timestamp(t).tz_convert("America/New_York").normalize()
+        key = (sym, day)
+        if key in self._london_first_hour_cache:
+            return self._london_first_hour_cache[key]
+        s = day.replace(hour=2).tz_convert("UTC")
+        e = day.replace(hour=3).tz_convert("UTC")
+        df = self.data_5m[sym]
+        sl = df.loc[(df.index >= s) & (df.index < e)]
+        if sl.empty:
+            res = None
         else:
-            # Pyramid: promote prior leg to BE.
-            prior = self.active[pair]["legs"][-1]
-            prior["stop"] = prior["entry"]
-            self.active[pair]["legs"].append(leg)
+            res = +1 if sl.iloc[-1].Close > sl.iloc[0].Open else -1
+        self._london_first_hour_cache[key] = res
+        return res
 
-    def _exit_leg(self, pair, leg, exit_price, t, reason):
-        st = self.active[pair]
-        direction = st["direction"]
-        pnl = (exit_price - leg["entry"]) * leg["units"] * direction
-        self.equity += pnl
-        self.trades.append({
-            "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
-            "entry": leg["entry"], "exit": exit_price, "units": leg["units"],
-            "pnl": pnl, "opened_at": leg["opened_at"], "closed_at": t,
-            "reason": reason,
-        })
-        st["legs"].remove(leg)
-        if not st["legs"]:
-            self.active.pop(pair, None)
-
-    def _force_close(self, pair, price, t, reason):
-        for leg in list(self.active[pair]["legs"]):
-            self._exit_leg(pair, leg, price, t, reason)
-
-    def _sym_bias(self, sym, tf, t):
-        bars = self.bars_up_to(sym, tf, t)
-        return htf_bias(bars)
+    # -- biases --------------------------------------------------------------
 
     def _dxy_bias_1h(self, t):
         rolls = {s: self.bars_up_to(s, "60T", t) for s in config.DXY_CONSTITUENTS}
@@ -257,8 +273,7 @@ class Backtester:
             high_px = {s: rolls[s][i].High for s in config.DXY_CONSTITUENTS}
             low_px = {s: rolls[s][i].Low for s in config.DXY_CONSTITUENTS}
             open_px = {s: rolls[s][i].Open for s in config.DXY_CONSTITUENTS}
-            c = compute_dxy(close_px)
-            o = compute_dxy(open_px)
+            c = compute_dxy(close_px); o = compute_dxy(open_px)
             h, l = compute_dxy_range(high_px, low_px)
             if None in (c, o, h, l):
                 continue
@@ -267,120 +282,357 @@ class Backtester:
             return 0
         return htf_bias(series)
 
-    def _find_target(self, pair, direction, t, price):
-        candidates = []
-        for tf in ("240T", "D", "W"):
-            bars = self.bars_up_to(pair, tf, t)
-            if len(bars) < 5:
-                continue
-            candidates += self._targets_in_series(bars, pair, direction, price)
-        if direction > 0:
-            candidates = [c for c in candidates if c > price]
-        else:
-            candidates = [c for c in candidates if c < price]
-        if not candidates:
-            return None
-        return min(candidates, key=lambda x: abs(x - price))
+    # -- run loop ------------------------------------------------------------
 
-    @staticmethod
-    def _targets_in_series(bars, pair, direction, price):
-        fvgs = []
-        for i in range(2, len(bars)):
-            g = detect_new_fvg(bars[: i + 1], pair)
-            if g is not None:
-                fvgs.append(g)
-        for g in fvgs:
-            for c in bars[g.bar_index + 1:]:
-                if g.direction > 0 and c.Low <= g.top:
-                    g.mitigated = True
-                    break
-                if g.direction < 0 and c.High >= g.bottom:
-                    g.mitigated = True
-                    break
-        out = []
-        tgt_fvg = nearest_unmitigated(fvgs, price, direction)
-        if tgt_fvg is not None:
-            out.append(tgt_fvg.mid)
-        tgt_ob = nearest_unmitigated_ob(detect_order_blocks(bars), price, direction)
-        if tgt_ob is not None:
-            out.append(tgt_ob.mid)
-        if direction > 0:
-            out += find_equal_highs(bars, pair, lookback=200)
+    def run(self):
+        if "GBPUSD" not in self.data_5m:
+            raise SystemExit("GBPUSD data missing")
+        timestamps = self.data_5m["GBPUSD"].index
+        warmup_end = timestamps[0] + pd.Timedelta(days=7)
+        total = len(timestamps)
+        print(f"  Iterating {total} 5-min bars...")
+
+        for i, t in enumerate(timestamps):
+            for pair in config.PAIRS:
+                self._update_orders(pair, t)
+            if t < warmup_end:
+                continue
+
+            now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+            in_kz = in_used_killzone(now)
+            for pair in config.PAIRS:
+                if pair in self.active:
+                    self._maybe_pyramid(pair, t)
+                elif in_kz and pair not in self.pending:
+                    self._maybe_open(pair, t)
+
+            if i % 1000 == 0 and i > 0:
+                print(f"    bar {i}/{total} ({t}) active={len(self.active)} "
+                      f"pending={len(self.pending)} trades={len(self.trades)} "
+                      f"equity={self.equity:.0f}")
+
+        last_t = timestamps[-1]
+        for pair in list(self.active.keys()):
+            last_close = self.data_5m[pair].iloc[-1].Close
+            self._force_close(pair, last_close, last_t, "end_of_data")
+
+    # -- fills + exits -------------------------------------------------------
+
+    def _update_orders(self, pair, t):
+        bar = self._bar_at(pair, "5T", t)
+        if bar is None:
+            return
+        if pair in self.active:
+            st = self.active[pair]
+            direction = st["direction"]
+            target = st["target"]
+            for leg in list(st["legs"]):
+                sl = leg["stop"]
+                if direction > 0:
+                    sl_hit = bar.Low <= sl
+                    tp_hit = bar.High >= target
+                else:
+                    sl_hit = bar.High >= sl
+                    tp_hit = bar.Low <= target
+                if sl_hit:
+                    self._exit_leg(pair, leg, sl, t, "stop")
+                elif tp_hit:
+                    self._exit_leg(pair, leg, target, t, "target")
+            if not self.active.get(pair, {}).get("legs"):
+                self.active.pop(pair, None)
+
+        if pair in self.pending:
+            pe = self.pending[pair]
+            entry = pe["entry_price"]
+            direction = pe["direction"]
+            filled = (direction > 0 and bar.Low <= entry) or \
+                     (direction < 0 and bar.High >= entry)
+            age_min = (t - pe["placed_at"]).total_seconds() / 60.0
+            if filled:
+                self._fill_entry(pair, t)
+            elif age_min > 60:        # cancel limit if unfilled after 1h
+                self.pending.pop(pair, None)
+
+    def _fill_entry(self, pair, t):
+        pe = self.pending.pop(pair)
+        leg = {"entry": pe["entry_price"], "stop": pe["stop"],
+               "units": pe["units"], "leg_idx": pe["leg_idx"], "opened_at": t}
+        if pair not in self.active:
+            self.active[pair] = {
+                "direction": pe["direction"], "target": pe["target"],
+                "legs": [leg], "opened_at": t,
+            }
         else:
-            out += find_equal_lows(bars, pair, lookback=200)
-        return out
+            prior = self.active[pair]["legs"][-1]
+            prior["stop"] = prior["entry"]   # BE on add
+            self.active[pair]["legs"].append(leg)
+
+    def _exit_leg(self, pair, leg, exit_price, t, reason):
+        st = self.active[pair]
+        direction = st["direction"]
+        # Apply exit-side spread + slippage.
+        exit_adj = adjust_exit(exit_price, direction, pair)
+        pnl = (exit_adj - leg["entry"]) * leg["units"] * direction
+        self.equity += pnl
+        self.trades.append({
+            "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
+            "entry": leg["entry"], "exit": exit_adj, "units": leg["units"],
+            "pnl": pnl, "opened_at": leg["opened_at"], "closed_at": t,
+            "reason": reason,
+        })
+        st["legs"].remove(leg)
+        if not st["legs"]:
+            self.active.pop(pair, None)
+
+    def _force_close(self, pair, price, t, reason):
+        for leg in list(self.active[pair]["legs"]):
+            self._exit_leg(pair, leg, price, t, reason)
+
+    # -- new entry pipeline --------------------------------------------------
 
     def _maybe_open(self, pair, t):
         g = self.gate
         g["checks"] += 1
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-        if not can_open_new_trade(now):
+
+        if not can_enter_new_pipeline(now):
             return
-        g["in_killzone"] += 1
+        g["killzone+first_hour"] += 1
         if self.news.is_blocked(now):
             return
         g["news_clear"] += 1
 
-        dxy_bias = self._dxy_bias_1h(t)
-        eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t)
-        signal = resolve_intermarket(dxy_bias, eurgbp_bias)
-        if signal is None:
+        # Intermarket pair selection.
+        dxy_b = self._dxy_bias_1h(t)
+        eurgbp_b = htf_bias(self.bars_up_to(config.REF_EURGBP, "60T", t))
+        sig = resolve_intermarket(dxy_b, eurgbp_b)
+        if sig is None:
             return
-        g["intermarket_signal"] += 1
-        if signal.pair != pair:
+        g["intermarket"] += 1
+        if sig.pair != pair:
             return
-        g["pair_matches"] += 1
+        g["pair_match"] += 1
+        direction = sig.direction
 
-        if self._sym_bias(pair, "60T", t) != signal.direction:
+        # D1 directional pull must agree.
+        d1_bars = self.bars_up_to(pair, "D", t)
+        if directional_pull(d1_bars) != direction:
             return
-        g["h1_bias_ok"] += 1
-        if self._sym_bias(pair, "240T", t) != signal.direction:
-            return
-        g["h4_bias_ok"] += 1
+        g["d1_bias_ok"] += 1
 
-        bars15 = self.bars_up_to(pair, "15T", t)
-        rng = detect_consolidation(bars15, pair)
-        if rng is None:
+        # LTF structural confirmation: H1 or M15 BOS (reversal CHoCH OR
+        # continuation BOS) in the trade direction. Pure MSS-reversal
+        # detection silently returns 0 inside continuous trends, so we
+        # use structural_direction which falls back to last-close-vs-
+        # last-swing for continuation BOS.
+        h1_dir = structural_direction(self.bars_up_to(pair, "60T", t))
+        m15_dir = structural_direction(self.bars_up_to(pair, "15T", t))
+        if h1_dir != direction and m15_dir != direction:
             return
-        g["consolidation_found"] += 1
-        sweep_dir = detect_manipulation(bars15, rng)
-        if sweep_dir is None or sweep_dir != signal.direction:
-            return
-        g["manipulation_correct_dir"] += 1
-        sweep_price = rng.low if signal.direction > 0 else rng.high
+        g["ltf_mss_ok"] += 1
 
-        bars5 = self.bars_up_to(pair, "5T", t)
-        fvg = detect_new_fvg(bars5, pair)
-        if fvg is None or fvg.direction != signal.direction:
+        # HTF liquidity zone tap.
+        tf_bars = self._bars_by_tf(pair, t)
+        zones = collect_zones(tf_bars, direction)
+        bars_5 = tf_bars["5T"]
+        if not bars_5:
             return
-        g["m5_fvg_correct_dir"] += 1
+        cur_price = bars_5[-1].Close
+        # Tap = any of the last ~30 min of M5 wicks entered an unmitigated zone.
+        zone = most_recent_tap(zones, bars_5[-6:])
+        if zone is None:
+            return
+        g["htf_zone_tap"] += 1
 
-        cur_price = bars5[-1].Close
-        target = self._find_target(pair, signal.direction, t, cur_price)
+        # What level got swept? Take the nearest recognized retail pool that
+        # the most recent extreme on M15 went beyond.
+        levels = self._day_levels(pair, t)
+        cbdr_h, cbdr_l = self._cbdr(pair, t)
+        if levels is None:
+            return
+        bars_15 = tf_bars["15T"]
+        if len(bars_15) < 4:
+            return
+        recent_15 = bars_15[-8:]   # ~2h of manipulation
+        if direction > 0:
+            sweep_extreme = min(b.Low for b in recent_15)
+        else:
+            sweep_extreme = max(b.High for b in recent_15)
+
+        # PRIMARY swept-level source: closest M15 swing extreme as of the
+        # most recent killzone-open. That's the visible liquidity the
+        # manipulation leg is most likely to hunt.
+        kz_high, kz_low = self._killzone_open_swings(pair, t)
+        kz_target = kz_low if direction > 0 else kz_high
+        if kz_target is not None:
+            g["kz_swing_identified"] += 1
+
+        swept_name = None
+        swept_price = None
+
+        # Was the killzone-open swing actually swept?
+        if kz_target is not None:
+            if direction > 0 and sweep_extreme < kz_target <= cur_price:
+                swept_name, swept_price = "KZSwingLow", kz_target
+            elif direction < 0 and sweep_extreme > kz_target >= cur_price:
+                swept_name, swept_price = "KZSwingHigh", kz_target
+
+        # Secondary: any other recognized retail pool in the M15 sweep range.
+        if swept_name is None:
+            equal_highs = find_equal_highs(bars_15, pair, lookback=120)
+            equal_lows = find_equal_lows(bars_15, pair, lookback=120)
+            m15_swings = find_swings(bars_15[-120:])
+            recent_swing_highs = [s.price for s in m15_swings if s.kind == +1]
+            recent_swing_lows = [s.price for s in m15_swings if s.kind == -1]
+            if direction > 0:
+                cands = target_candidates(levels, cbdr_h, cbdr_l, direction=-1)
+                cands += [("EqualLows", p) for p in equal_lows]
+                cands += [("M15SwingLow", p) for p in recent_swing_lows]
+                swept = [(n, px) for n, px in cands if sweep_extreme < px <= cur_price]
+            else:
+                cands = target_candidates(levels, cbdr_h, cbdr_l, direction=+1)
+                cands += [("EqualHighs", p) for p in equal_highs]
+                cands += [("M15SwingHigh", p) for p in recent_swing_highs]
+                swept = [(n, px) for n, px in cands if sweep_extreme > px >= cur_price]
+            if swept:
+                if direction > 0:
+                    swept_name, swept_price = min(swept, key=lambda x: x[1])
+                else:
+                    swept_name, swept_price = max(swept, key=lambda x: x[1])
+
+        # Tertiary: D1/W1 zone tap counts as institutional liquidity itself.
+        # Use the OUTER boundary (the edge price crossed first to enter the
+        # zone) as the swept level — that's what gets "swept" semantically.
+        if swept_name is None and zone.tf in ("D", "W"):
+            swept_name = f"{zone.tf}{zone.kind.upper()}"
+            swept_price = zone.top if direction > 0 else zone.bottom
+
+        if swept_name is None:
+            return
+        g["retail_pool_swept"] += 1
+
+        # Sweep validation: M5 wick (High/Low) pierces, M15 confirm by Close.
+        # KZ manipulation can take up to ~3h, so pierce window = 36 M5 bars.
+        sweep = validate_sweep(
+            entry_tf_bars=bars_5,
+            confirm_tf_bars=bars_15,
+            entry_tf="5T", symbol=pair,
+            swept_level=swept_price, direction=direction,
+            pierce_lookback=36,
+        )
+        if not sweep.valid:
+            return
+        g["sweep_validated"] += 1
+
+        # SMT vs NYO on both pairs.
+        other = OTHER[pair]
+        other_levels = self._day_levels(other, t)
+        other_bars_5 = self.bars_up_to(other, "5T", t)
+        if other_levels is None or not other_bars_5:
+            return
+        smt = smt_confirm(
+            traded_symbol=pair, traded_price=cur_price, traded_nyo=levels.nyo,
+            other_symbol=other, other_price=other_bars_5[-1].Close,
+            other_nyo=other_levels.nyo, direction=direction,
+        )
+        if smt is None:
+            return
+        g["smt_confirmed"] += 1
+
+        # Trigger: first M5 FVG after first-hour mark, aligned with direction.
+        mins_in = minutes_into_killzone(now) or 0
+        # First-hour bars = bars from killzone start to killzone-start + 60 min.
+        first_hour_bar_count = config.KZ_FIRST_HOUR_MIN // 5
+        kz_open_bar_idx = len(bars_5) - (mins_in // 5)
+        after_idx = kz_open_bar_idx + first_hour_bar_count
+        fvg = first_fvg_after(bars_5, pair, after_idx, direction)
+        if fvg is None:
+            # Fallback: a return into an FVG that formed during the first hour.
+            for g_obj in enumerate_fvgs(bars_5, pair):
+                if (g_obj.direction == direction
+                    and kz_open_bar_idx <= g_obj.bar_index < after_idx
+                    and not g_obj.mitigated):
+                    fvg = g_obj
+                    break
+        if fvg is None:
+            return
+        g["m5_fvg_trigger"] += 1
+
+        # Target — prefer the highest-TF pool that gives acceptable RR.
+        # We can pre-compute risk from the swept-price stop to feed the
+        # picker; this lets it prefer PWH/PDH over LondonHigh when the
+        # nearest pool gives sub-1.5R but the next pool up is reachable.
+        pip_p = pip_size(pair)
+        raw_entry_preview = fvg.mid
+        est_stop = (swept_price - pip_p) if direction > 0 else (swept_price + pip_p)
+        est_risk_pips = abs(raw_entry_preview - est_stop) / pip_p
+        target = pick_target(
+            pair, levels, cbdr_h, cbdr_l, direction, cur_price,
+            risk_pips=est_risk_pips, min_rr=config.MIN_RR,
+        )
         if target is None:
             return
         g["target_found"] += 1
 
-        pip = pip_size(pair)
-        entry = fvg.mid
-        stop = (sweep_price - pip) if signal.direction > 0 else (sweep_price + pip)
-        risk_pips = abs(entry - stop) / pip
-        reward_pips = abs(target - entry) / pip
-        if reward_pips < config.MIN_PIPS_TARGET:
+        # Game-theory score.
+        phases = cycle_phases(now)
+        session_phase = "ny_am" if "ny_am" in phases else ("london" if "london" in phases else "other")
+        london_dir = self._london_first_hour_dir(pair, t)
+        score = score_setup(
+            swept_level_name=swept_name,
+            sweep_strong=sweep.strong,
+            htf_zone_kind=zone.kind, htf_zone_tf=zone.tf,
+            timestamp=t,
+            london_first_hour_dir=london_dir,
+            trade_direction=direction,
+            session_phase=session_phase,
+        )
+        if not gt_passes(score):
             return
-        if risk_pips <= 0 or (reward_pips / risk_pips) < config.MIN_RR:
+        g["game_theory_pass"] += 1
+
+        # Build entry signal (applies spread+slippage to entry).
+        signal = build_entry(
+            pair=pair, direction=direction, trigger_fvg=fvg,
+            swept_price=swept_price, target=target,
+            confluence_score=score.total,
+            swept_level_name=swept_name,
+            htf_zone_kind=zone.kind, htf_zone_tf=zone.tf,
+        )
+        if signal is None:
+            # Diagnostic: show why RR was rejected so we can tune floors.
+            from risk import pip_size as _pip
+            pip = _pip(pair)
+            raw_entry = fvg.mid
+            est_stop = (swept_price - pip) if direction > 0 else (swept_price + pip)
+            est_risk = abs(raw_entry - est_stop) / pip
+            est_reward = abs(target.price - raw_entry) / pip
+            est_rr = est_reward / est_risk if est_risk > 0 else 0.0
+            if not hasattr(self, "_rr_misses"):
+                self._rr_misses = []
+            self._rr_misses.append({
+                "t": t, "pair": pair, "dir": direction,
+                "swept": swept_name, "target": target.name,
+                "risk_p": round(est_risk, 1), "reward_p": round(est_reward, 1),
+                "rr": round(est_rr, 2),
+            })
             return
         g["rr_ok"] += 1
 
-        units = int(position_size(self.equity, entry, stop, pair))
+        units = int(position_size(self.equity, signal.entry, signal.stop, pair)
+                    * config.PYRAMID_LEG_RISK_FRAC[0])
         if units == 0:
             return
-        g["units_nonzero"] += 1
 
         self.pending[pair] = {
-            "entry_price": entry, "stop": stop, "target": target,
-            "direction": signal.direction, "units": units, "leg_idx": 1,
+            "entry_price": signal.entry, "stop": signal.stop, "target": signal.target.price,
+            "direction": direction, "units": units, "leg_idx": 1,
             "placed_at": t,
+            "meta": {
+                "score": signal.confluence_score, "swept": swept_name,
+                "zone": f"{zone.kind}/{zone.tf}", "rr": round(signal.rr, 2),
+                "target": target.name,
+            },
         }
         g["limit_placed"] += 1
 
@@ -393,32 +645,41 @@ class Backtester:
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if self.news.is_blocked(now):
             return
+        if not in_used_killzone(now):
+            return
 
         bars5 = self.bars_up_to(pair, "5T", t)
         fvg = detect_new_fvg(bars5, pair)
         if fvg is None or fvg.direction != st["direction"]:
             return
 
-        cur_price = bars5[-1].Close
         pip = pip_size(pair)
         last_entry = st["legs"][-1]["entry"]
+        cur_price = bars5[-1].Close
         favour_pips = (cur_price - last_entry) * st["direction"] / pip
-        if favour_pips < 10:
+        if favour_pips < config.PYRAMID_MIN_FAVOUR_PIPS:
             return
 
-        entry = fvg.mid
+        from risk import adjust_entry as _adj
+        leg_idx = len(st["legs"]) + 1
+        entry = _adj(fvg.mid, st["direction"], pair)
         stop = st["legs"][-1]["entry"]
-        units = int(position_size(self.equity, entry, stop, pair))
-        if units == 0:
+        if abs(entry - stop) <= 0:
             return
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
 
+        risk_frac = config.PYRAMID_LEG_RISK_FRAC[min(leg_idx - 1, len(config.PYRAMID_LEG_RISK_FRAC) - 1)]
+        units = int(position_size(self.equity, entry, stop, pair) * risk_frac)
+        if units == 0:
+            return
+
         self.pending[pair] = {
             "entry_price": entry, "stop": stop, "target": st["target"],
             "direction": st["direction"], "units": units,
-            "leg_idx": len(st["legs"]) + 1, "placed_at": t,
+            "leg_idx": leg_idx, "placed_at": t,
+            "meta": {"add": True},
         }
 
 
@@ -435,8 +696,7 @@ def summarize(bt):
     wins = df[df.pnl > 0]
     losses = df[df.pnl <= 0]
     win_rate = len(wins) / n * 100
-    gp = wins.pnl.sum()
-    gl = -losses.pnl.sum()
+    gp = wins.pnl.sum(); gl = -losses.pnl.sum()
     pf = gp / gl if gl > 0 else float("inf")
     eq = bt.start_equity + df.pnl.cumsum()
     rmax = eq.cummax()
@@ -466,9 +726,17 @@ def main():
     bt = Backtester(data)
     bt.run()
 
-    print("\n=== Gate funnel (how many times each filter let entries through) ===")
+    print("\n=== Gate funnel (how many bars survive each filter) ===")
     for k, v in bt.gate.items():
-        print(f"  {k:30s} {v}")
+        print(f"  {k:24s} {v}")
+
+    misses = getattr(bt, "_rr_misses", [])
+    if misses:
+        print(f"\n=== RR-rejected setups ({len(misses)}) ===")
+        for m in misses:
+            print(f"  {m['t']} {m['pair']} dir={m['dir']:+d} "
+                  f"swept={m['swept']} -> target={m['target']} "
+                  f"risk={m['risk_p']}p reward={m['reward_p']}p rr={m['rr']}")
 
     print("\n=== Results ===")
     for k, v in summarize(bt).items():
@@ -479,7 +747,6 @@ def main():
         df = pd.DataFrame(bt.trades)
         cols = ["opened_at", "closed_at", "pair", "direction", "leg_idx",
                 "entry", "exit", "units", "pnl", "reason"]
-        # Show all trades (likely few given strict AMD gating).
         print(df[cols].to_string(index=False))
 
 

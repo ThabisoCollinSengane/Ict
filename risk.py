@@ -8,6 +8,31 @@ def pip_size(symbol: str) -> float:
     return 0.01 if symbol.endswith("JPY") else 0.0001
 
 
+def _cfg_pips(d: dict, symbol: str) -> float:
+    return d.get(symbol, d.get("DEFAULT", 0.0))
+
+
+def spread_cost(symbol: str) -> float:
+    """Half-spread in price units. Applied to BOTH entry and exit (one half each)."""
+    return _cfg_pips(config.SPREAD_PIPS, symbol) * pip_size(symbol) / 2.0
+
+
+def slippage_cost(symbol: str) -> float:
+    return _cfg_pips(config.SLIPPAGE_PIPS, symbol) * pip_size(symbol)
+
+
+def adjust_entry(price: float, direction: int, symbol: str) -> float:
+    """Worst-case fill: buys pay ask (+half spread + slippage), sells pay bid (-)."""
+    cost = spread_cost(symbol) + slippage_cost(symbol)
+    return price + cost * direction
+
+
+def adjust_exit(price: float, direction: int, symbol: str) -> float:
+    """Symmetric cost on exit: longs sell at bid (-cost), shorts cover at ask (+cost)."""
+    cost = spread_cost(symbol) + slippage_cost(symbol)
+    return price - cost * direction
+
+
 def position_size(equity: float, entry: float, stop: float, symbol: str) -> float:
     """Units to trade so that |entry - stop| equals RISK_PER_TRADE_PCT of equity.
 

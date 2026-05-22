@@ -6,8 +6,8 @@ RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg
 MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Targets ---
-MIN_PIPS_TARGET = 20               # skip trade if nearest valid target < 20 pips
-MIN_RR = 2.0                       # minimum reward:risk on initial entry
+MIN_PIPS_TARGET = 15               # skip trade if nearest valid target < this many pips
+MIN_RR = 1.5                       # minimum reward:risk on initial entry
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
@@ -62,3 +62,86 @@ PAIRS = ("GBPUSD", "EURUSD")       # tradeable
 REF_EURGBP = "EURGBP"              # relative strength reference
 # DXY synthetic uses these (all available on OANDA):
 DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
+
+# ============================================================================
+# NEW STRATEGY (ICT rewrite) — additions below
+# Plan: /root/.claude/plans/here-is-my-strategy-elegant-squid.md
+# ============================================================================
+
+# --- True Day Open ---
+# Captured once per day at 00:00 New York time. zoneinfo handles DST.
+NY_TZ = "America/New_York"
+NYO_HOUR_NY = 0                    # 00:00 NY local
+
+# --- New killzones (NY time, 24h) — first hour is manipulation, no entries ---
+# Entry only AFTER first_hour_minutes inside the killzone.
+KZ_LONDON   = ("London",  "02:00", "05:00")
+KZ_NY_AM    = ("NY AM",   "07:00", "10:00")
+KZ_FIRST_HOUR_MIN = 60             # block entries during first 60 min of killzone
+KZ_USED = (KZ_LONDON, KZ_NY_AM)    # only trade these in new pipeline
+
+# --- Swing pivot ---
+PIVOT_LEFT  = 2                    # bars to the left a pivot must dominate
+PIVOT_RIGHT = 2                    # bars to the right (confirmation lag)
+
+# --- Liquidity sweep / fake-run validation ---
+# Wick depth in pips: piercing >= MIN qualifies; >= STRONG gets a score multiplier.
+SWEEP_MIN_PIPS    = {"EURUSD": 2.0, "GBPUSD": 3.0, "DEFAULT": 2.0}
+SWEEP_STRONG_PIPS = {"EURUSD": 6.0, "GBPUSD": 8.0, "DEFAULT": 6.0}
+# Fake-run validation: the confirm-TF candle closes inside the level (not beyond).
+# Tolerance for "closed back inside" expressed in pips of slack past the level.
+FAKE_RUN_CLOSE_TOL_PIPS = 1.0
+
+# --- Breakers ---
+# Only M15 and H4 breakers are tradable (user spec).
+BREAKER_TFS = ("15T", "240T")
+
+# --- HTF FVG hierarchy for liquidity zone tap ---
+# D1/W1 FVGs are first-class HTF zones. Order = preference for tap detection.
+HTF_FVG_TFS = ("W", "D", "240T")
+HTF_OB_TFS  = ("D", "240T")
+
+# --- SMT ---
+# Both pair_price and other_pair_price compared to their NYO; require strict
+# opposite-side relationship.
+SMT_MIN_DISTANCE_PIPS = 0.5        # min pip distance from NYO to count as divergent
+
+# --- Realism: spread + slippage (per-pair, in pips) ---
+SPREAD_PIPS   = {"EURUSD": 0.5, "GBPUSD": 0.8, "DEFAULT": 1.0}
+SLIPPAGE_PIPS = {"EURUSD": 0.3, "GBPUSD": 0.5, "DEFAULT": 0.5}
+
+# --- Game-theory scoring ---
+GT_MIN_SCORE = 1.0                 # below this, skip
+GT_RETAIL_POOL_BONUS = 0.5         # sweep took out a recognizable retail level
+GT_STRONG_WICK_BONUS = 0.4         # wick depth >= SWEEP_STRONG_PIPS
+GT_JUDAS_BONUS       = 0.3         # NY-AM reversing London's first-hour displacement
+GT_DAILY_FVG_BONUS   = 0.6         # manipulation tapped a D1/W1 FVG
+GT_MACRO_BONUS       = 0.5         # entry fires inside an ICT macro window
+GT_CBDR_SWEEP_BONUS  = 0.4         # manipulation swept CBDR high/low
+
+# --- CLS time cycles (NY local) ---
+CLS_CYCLES = (
+    ("asia",       "20:00", "02:00"),   # crosses midnight
+    ("london",     "02:00", "05:00"),
+    ("pre_ny",     "05:00", "07:00"),
+    ("ny_am",      "07:00", "11:00"),
+    ("lunch",      "11:00", "13:00"),
+    ("ny_pm",      "13:00", "16:00"),
+    ("cbdr",       "14:00", "20:00"),
+)
+# ICT macros — 20-min institutional delivery windows (NY local, hh:mm).
+ICT_MACROS = (
+    ("london_macro",    "02:33", "03:00"),
+    ("preopen_macro",   "04:03", "04:30"),
+    ("nyam_macro",      "08:50", "09:10"),
+    ("ten_am_macro",    "09:50", "10:10"),
+    ("nyam_close",      "10:50", "11:10"),
+    ("one_pm_macro",    "13:10", "13:50"),
+    ("close_macro",     "15:15", "16:00"),
+)
+CBDR_START_NY = "14:00"
+CBDR_END_NY   = "20:00"
+
+# --- Pyramiding ---
+PYRAMID_LEG_RISK_FRAC = (1.0, 0.5, 0.5)  # leg1, leg2, leg3 risk fractions
+PYRAMID_MIN_FAVOUR_PIPS = 10       # prior leg must be this many pips in profit

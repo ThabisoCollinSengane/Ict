@@ -58,6 +58,32 @@ def update_mitigation(fvgs: list[FVG], last_candle) -> None:
             g.mitigated = True
 
 
+def enumerate_fvgs(candles, symbol: str) -> list[FVG]:
+    """Find every FVG in the series; mark mitigated state from later bars."""
+    out: list[FVG] = []
+    for i in range(2, len(candles)):
+        g = detect_new_fvg(candles[: i + 1], symbol)
+        if g is not None:
+            out.append(g)
+    for g in out:
+        for c in candles[g.bar_index + 1:]:
+            if g.direction > 0 and c.Low <= g.bottom:
+                g.mitigated = True
+                break
+            if g.direction < 0 and c.High >= g.top:
+                g.mitigated = True
+                break
+    return out
+
+
+def first_fvg_after(candles, symbol: str, after_index: int, direction: int) -> FVG | None:
+    """First FVG whose displacement candle index >= `after_index` in `direction`."""
+    for g in enumerate_fvgs(candles, symbol):
+        if g.bar_index >= after_index and g.direction == direction and not g.mitigated:
+            return g
+    return None
+
+
 def nearest_unmitigated(fvgs: list[FVG], price: float, direction: int) -> FVG | None:
     """Closest unmitigated FVG above (direction +1) or below (direction -1) price."""
     candidates = [
