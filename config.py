@@ -104,7 +104,7 @@ HTF_OB_TFS  = ("D", "240T")
 # --- SMT ---
 # Both pair_price and other_pair_price compared to their NYO; require strict
 # opposite-side relationship.
-SMT_MIN_DISTANCE_PIPS = 1.0        # ignore micro distances from NYO
+SMT_MIN_DISTANCE_PIPS = 0.5        # min pip distance from NYO to count as divergent
 
 # --- Realism: spread + slippage (per-pair, in pips) ---
 SPREAD_PIPS   = {"EURUSD": 0.5, "GBPUSD": 0.8, "DEFAULT": 1.0}
