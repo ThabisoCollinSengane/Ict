@@ -39,6 +39,8 @@ from ict.swings import find_swings
 from ict.game_theory import score_setup, passes as gt_passes
 from ict.context import time_in_zone_pre_event, dwell_at_level
 from ict.volatility import realized_vol, range_expansion, vol_regime
+from ict.amd import classify_phase as classify_amd_phase
+from ict.risk_overlay import RiskOverlay
 from ict.intermarket import resolve as resolve_intermarket
 from ict.entry import build as build_entry
 from news_filter import NewsCalendar
@@ -141,6 +143,7 @@ class Backtester:
         self.active = {}
         self.pending = {}
         self.trades = []
+        self.risk = RiskOverlay(start_equity=self.equity, equity=self.equity)
         self.gate = {
             "checks": 0,
             "killzone+first_hour": 0,
@@ -360,7 +363,11 @@ class Backtester:
     def _fill_entry(self, pair, t):
         pe = self.pending.pop(pair)
         leg = {"entry": pe["entry_price"], "stop": pe["stop"],
-               "units": pe["units"], "leg_idx": pe["leg_idx"], "opened_at": t}
+               "units": pe["units"], "leg_idx": pe["leg_idx"], "opened_at": t,
+               "risk_pct": pe.get("risk_pct", config.RISK_PER_TRADE_PCT)}
+        leg_id = f"{pair}-{pe['leg_idx']}-{int(t.timestamp())}"
+        leg["leg_id"] = leg_id
+        self.risk.note_entry(leg_id, pair, pe["direction"], leg["risk_pct"])
         if pair not in self.active:
             self.active[pair] = {
                 "direction": pe["direction"], "target": pe["target"],
@@ -378,6 +385,8 @@ class Backtester:
         exit_adj = adjust_exit(exit_price, direction, pair)
         pnl = (exit_adj - leg["entry"]) * leg["units"] * direction
         self.equity += pnl
+        if "leg_id" in leg:
+            self.risk.note_exit(leg["leg_id"])
         self.trades.append({
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
             "entry": leg["entry"], "exit": exit_adj, "units": leg["units"],
@@ -639,6 +648,12 @@ class Backtester:
         # News proximity (replaces the old hard block).
         prox_min, prox_impact = self.news.proximity_minutes(now)
 
+        # AMD phase on the setup TF (M15) — gates the consolidation bonus so
+        # we don't reward dwell that happened mid-distribution (which is
+        # institutional unloading, not accumulation).
+        bars_15 = self.bars_up_to(pair, "15T", t)
+        amd_label, _, _ = classify_amd_phase(bars_15, pair) if bars_15 else ("NONE", None, None)
+
         # Record the features on the FVG itself (useful for post-trade audit).
         fvg.displacement_strength = disp_strength
         fvg.time_in_zone_pre_formation = consolidation
@@ -660,6 +675,7 @@ class Backtester:
             trade_direction=direction,
             session_phase=session_phase,
             consolidation_score=consolidation,
+            amd_phase=amd_label,
             dwell_count=dwell,
             displacement_strength=disp_strength,
             range_expansion_ratio=rng_exp,
@@ -699,14 +715,25 @@ class Backtester:
             return
         g["rr_ok"] += 1
 
+        # Risk overlay: portfolio-level vetoes + correlation-aware sizing.
+        self.risk.update_equity(self.equity, now)
+        leg_risk_pct = config.RISK_PER_TRADE_PCT * config.PYRAMID_LEG_RISK_FRAC[0]
+        allowed, reason, size_mult = self.risk.can_enter(pair, direction, leg_risk_pct)
+        if not allowed:
+            g.setdefault(f"risk_veto_{reason}", 0)
+            g[f"risk_veto_{reason}"] += 1
+            return
+
         units = int(position_size(self.equity, signal.entry, signal.stop, pair)
-                    * config.PYRAMID_LEG_RISK_FRAC[0])
+                    * config.PYRAMID_LEG_RISK_FRAC[0]
+                    * size_mult)
         if units == 0:
             return
 
         self.pending[pair] = {
             "entry_price": signal.entry, "stop": signal.stop, "target": signal.target.price,
             "direction": direction, "units": units, "leg_idx": 1,
+            "risk_pct": leg_risk_pct * size_mult,
             "placed_at": t,
             "meta": {
                 "score": signal.confluence_score, "swept": swept_name,
@@ -751,7 +778,15 @@ class Backtester:
             return
 
         risk_frac = config.PYRAMID_LEG_RISK_FRAC[min(leg_idx - 1, len(config.PYRAMID_LEG_RISK_FRAC) - 1)]
-        units = int(position_size(self.equity, entry, stop, pair) * risk_frac)
+
+        # Risk overlay gates pyramids too — same daily cap, same group budget.
+        self.risk.update_equity(self.equity, t.to_pydatetime() if hasattr(t, "to_pydatetime") else t)
+        leg_risk_pct = config.RISK_PER_TRADE_PCT * risk_frac
+        allowed, reason, size_mult = self.risk.can_enter(pair, st["direction"], leg_risk_pct)
+        if not allowed:
+            return
+
+        units = int(position_size(self.equity, entry, stop, pair) * risk_frac * size_mult)
         if units == 0:
             return
 
@@ -759,6 +794,7 @@ class Backtester:
             "entry_price": entry, "stop": stop, "target": st["target"],
             "direction": st["direction"], "units": units,
             "leg_idx": leg_idx, "placed_at": t,
+            "risk_pct": leg_risk_pct * size_mult,
             "meta": {"add": True},
         }
 

@@ -39,6 +39,7 @@ def score_setup(
     session_phase: str,                    # "ny_am" | "london" | ...
     # New continuous-feature inputs (all optional; None = not measured).
     consolidation_score: Optional[float] = None,    # time_in_zone_pre_formation in [0,1]
+    amd_phase: Optional[str] = None,                # "ACCUMULATION"|"MANIPULATION"|"DISTRIBUTION"|"NONE"|None
     dwell_count: Optional[int] = None,              # bars touching swept level pre-sweep
     displacement_strength: Optional[float] = None,  # middle-bar range / median
     range_expansion_ratio: Optional[float] = None,  # at FVG bar
@@ -78,8 +79,17 @@ def score_setup(
         s.bonuses["judas"] = config.GT_JUDAS_BONUS
 
     # --- New continuous-feature bonuses ---
+    # Consolidation bonus only counts when AMD says we're in (or just left)
+    # accumulation -> the consolidation is institutional buildup, not the dead
+    # zone mid-distribution. If amd_phase is not provided, default to allowing
+    # the bonus (back-compat).
+    consolidation_in_accumulation = (
+        amd_phase is None
+        or amd_phase in ("ACCUMULATION", "MANIPULATION")
+    )
     if (consolidation_score is not None
-            and consolidation_score >= config.GT_CONSOLIDATION_THRESHOLD):
+            and consolidation_score >= config.GT_CONSOLIDATION_THRESHOLD
+            and consolidation_in_accumulation):
         s.bonuses["consolidation"] = config.GT_CONSOLIDATION_BONUS
 
     if (dwell_count is not None

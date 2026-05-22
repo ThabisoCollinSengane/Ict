@@ -194,3 +194,22 @@ GT_NEWS_PROXIMITY_BONUS        = 0.5
 
 # Master switch: drop the hard news block in backtest.py and rely on scoring.
 NEWS_HARD_BLOCK_ENABLED        = False
+
+# --- Risk overlay (portfolio-level vetoes + correlation-aware sizing) ---
+# Once realized PnL for the day reaches -RISK_DAILY_LOSS_CAP_PCT of the day-open
+# equity, all new entries blocked until the next UTC date rollover.
+RISK_DAILY_LOSS_CAP_PCT          = 2.0
+# When equity falls more than RISK_WEEKLY_DD_HALVE_PCT below the week's high
+# water mark, halve sizing on new entries (does not block).
+RISK_WEEKLY_DD_HALVE_PCT         = 4.0
+# Hard cap on simultaneous open legs across all pairs.
+RISK_MAX_CONCURRENT_LEGS         = 2
+# Pairs in the same group share a total-risk budget. EUR/GBP are ~85%
+# correlated; treating them as one position for sizing purposes prevents
+# accidentally taking double-exposure on a USD move.
+RISK_CORRELATED_GROUPS           = (("EURUSD", "GBPUSD"),)
+# Maximum total risk-pct that may be open simultaneously across a correlated
+# group. 1.0 means "one full-size leg's worth across the group".
+RISK_CORRELATED_GROUP_RISK_CAP_PCT = 1.0
+# Smallest risk-pct we'll bother placing (anything smaller becomes a veto).
+RISK_MIN_RISK_PCT                = 0.25
