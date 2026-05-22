@@ -112,7 +112,7 @@ class Backtester:
             "intermarket": 0,
             "pair_match": 0,
             "d1_bias_ok": 0,
-            "h4_mss_ok": 0,
+            "ltf_mss_ok": 0,
             "htf_zone_tap": 0,
             "kz_swing_identified": 0,
             "retail_pool_swept": 0,
@@ -386,15 +386,14 @@ class Backtester:
             return
         g["d1_bias_ok"] += 1
 
-        # H4 confirmation: latest MSS in direction OR structural pull in direction.
-        # MSS events are sparse on 60d of H4 data; directional_pull is the
-        # broader structural read and stays in sync between MSS events.
-        h4_bars = self.bars_up_to(pair, "240T", t)
-        h4_mss = mss_direction(h4_bars)
-        h4_pull = directional_pull(h4_bars)
-        if h4_mss != direction and h4_pull != direction:
+        # LTF MSS confirmation: MSS is reliable on H1 / M15 / M5 (per spec —
+        # NOT on H4 / D1 / W1, which are used purely for liquidity targets).
+        # Accept H1 or M15 MSS in trade direction.
+        h1_mss = mss_direction(self.bars_up_to(pair, "60T", t))
+        m15_mss = mss_direction(self.bars_up_to(pair, "15T", t))
+        if h1_mss != direction and m15_mss != direction:
             return
-        g["h4_mss_ok"] += 1
+        g["ltf_mss_ok"] += 1
 
         # HTF liquidity zone tap.
         tf_bars = self._bars_by_tf(pair, t)
