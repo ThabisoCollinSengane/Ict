@@ -114,7 +114,7 @@ SPREAD_PIPS   = {"EURUSD": 0.5, "GBPUSD": 0.8, "DEFAULT": 1.0}
 SLIPPAGE_PIPS = {"EURUSD": 0.3, "GBPUSD": 0.5, "DEFAULT": 0.5}
 
 # --- Game-theory scoring ---
-GT_MIN_SCORE = 1.0                 # below this, skip
+GT_MIN_SCORE = 1.4                 # raised from 1.0 — drops low-conviction noise
 GT_RETAIL_POOL_BONUS = 0.5         # sweep took out a recognizable retail level
 GT_STRONG_WICK_BONUS = 0.4         # wick depth >= SWEEP_STRONG_PIPS
 GT_JUDAS_BONUS       = 0.3         # NY-AM reversing London's first-hour displacement

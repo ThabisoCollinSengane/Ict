@@ -760,6 +760,15 @@ class Backtester:
             g.setdefault("smt_absent", 0)
             g["smt_absent"] += 1
 
+        # Hard veto on SMT divergence: 2/3 instruments aligned + 1 lagging
+        # IS the textbook ICT reversal warning. The diverging asset leads
+        # the next move against our trade direction. Per operator review of
+        # 6-trade sample: 3 of 4 losers had explicit divergence warnings.
+        if smt_struct.state == "divergence":
+            g.setdefault("smt_divergence_veto", 0)
+            g["smt_divergence_veto"] += 1
+            return
+
         # MSS-2-of-3 — required for ALL setups (operator decision: keep MSS
         # confluence even on HTF FVG entries; the volatility/PnL pattern
         # showed mss=0/3 setups were carrying most of the losers).
