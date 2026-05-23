@@ -84,17 +84,27 @@ def _load_csv_cache(name, interval):
 
 
 def fetch_data(period="60d", interval="5m"):
+    """Return {symbol: DataFrame[Open, High, Low, Close, (Volume)]} at M5.
+
+    Resolution order (per symbol):
+      1. data.loader.get_bars (M1 store -> resample, OR yf CSV fallback)
+      2. live yfinance download if loader returns None and yfinance is installed
+
+    Volume column is preserved if present (Dukascopy tick-count); absent for
+    yfinance bars.
+    """
+    from data import loader
     out = {}
     for name, ticker in YF_TICKERS.items():
-        df = _load_csv_cache(name, interval)
-        source = "csv"
-        if df is None:
+        df = loader.get_bars(name, tf="5T")
+        source = loader.source_for(name)
+        if df is None or df.empty:
             if yf is None:
-                print(f"  WARN: no CSV cache for {name} and yfinance not installed")
+                print(f"  WARN: no data for {name} (no store, no yfinance)")
                 continue
             df = yf.download(ticker, period=period, interval=interval,
                              progress=False, auto_adjust=False)
-            source = "yf"
+            source = "yf_live"
             if df is None or df.empty:
                 print(f"  WARN: no data for {name} ({ticker})")
                 continue

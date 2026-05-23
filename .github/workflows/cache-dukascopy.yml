@@ -1,0 +1,55 @@
+name: Cache Dukascopy M1 data
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated pairs"
+        default: "EURUSD,GBPUSD,EURGBP,USDJPY,USDCAD,USDCHF"
+      days:
+        description: "Days of M1 history"
+        default: "60"
+
+permissions:
+  contents: write
+
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install "pandas>=2.0" "requests>=2.31"
+
+      - name: Download Dukascopy M1
+        run: |
+          python scripts/import_dukascopy.py \
+            --symbols "${{ inputs.symbols }}" \
+            --days "${{ inputs.days }}"
+
+      - name: List store
+        run: ls -la data/store/ || echo "store empty"
+
+      - name: Commit cached M1
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if compgen -G "data/store/*_M1.csv.gz" > /dev/null; then
+            git add data/store/*_M1.csv.gz
+          else
+            echo "No M1 files were produced."
+            exit 1
+          fi
+          if git diff --cached --quiet; then
+            echo "M1 unchanged."
+          else
+            git commit -m "Refresh Dukascopy M1 cache"
+            git push
+          fi
