@@ -412,6 +412,28 @@ class Backtester:
             if filled:
                 self._fill_entry(pair, t)
             elif age_min > 60:        # cancel limit if unfilled after 1h
+                idx = pe.get("_setup_log_idx")
+                if idx is not None and hasattr(self, "_setup_log"):
+                    # Record price excursion during the limit's life.
+                    direction = pe["direction"]
+                    entry = pe["entry_price"]
+                    placed_at = pe["placed_at"]
+                    bars = self.tf_dfs[(pair, "5T")]
+                    # Fill check starts on the bar AFTER placement (the order
+                    # didn't exist during _update_orders on placed_at itself).
+                    mask = (bars.index > placed_at) & (bars.index <= t)
+                    window = bars[mask]
+                    if not window.empty:
+                        if direction > 0:
+                            best_offset_pips = (window.Low.min() - entry) / pip_size(pair)
+                        else:
+                            best_offset_pips = (entry - window.High.max()) / pip_size(pair)
+                    else:
+                        best_offset_pips = float("nan")
+                    self._setup_log[idx].update({
+                        "outcome": "expired",
+                        "best_offset_pips": round(best_offset_pips, 1) if best_offset_pips == best_offset_pips else None,
+                    })
                 self.pending.pop(pair, None)
 
     def _fill_entry(self, pair, t):
@@ -479,6 +501,8 @@ class Backtester:
         htf_for_dol = {
             "D":    self.bars_up_to(pair, "D", t),
             "240T": self.bars_up_to(pair, "240T", t),
+            "60T":  self.bars_up_to(pair, "60T", t),
+            "15T":  self.bars_up_to(pair, "15T", t),
         }
         new_target = pick_dol(
             pair, htf_for_dol, levels, cbdr_h, cbdr_l, direction, cur_price,
@@ -714,20 +738,27 @@ class Backtester:
             return
         g["sweep_validated"] += 1
 
-        # SMT vs NYO on both pairs.
+        # SMT vs NYO on both pairs — confluence, NOT a hard gate.
+        # config.SMT_REQUIRED=True restores the legacy block-on-no-divergence
+        # behaviour. Default is False: SMT contributes to the game-theory
+        # score; setups can still fire without it.
         other = OTHER[pair]
         other_levels = self._day_levels(other, t)
         other_bars_5 = self.bars_up_to(other, "5T", t)
-        if other_levels is None or not other_bars_5:
+        smt = None
+        if other_levels is not None and other_bars_5:
+            smt = smt_confirm(
+                traded_symbol=pair, traded_price=cur_price, traded_nyo=levels.nyo,
+                other_symbol=other, other_price=other_bars_5[-1].Close,
+                other_nyo=other_levels.nyo, direction=direction,
+            )
+        if config.SMT_REQUIRED and smt is None:
             return
-        smt = smt_confirm(
-            traded_symbol=pair, traded_price=cur_price, traded_nyo=levels.nyo,
-            other_symbol=other, other_price=other_bars_5[-1].Close,
-            other_nyo=other_levels.nyo, direction=direction,
-        )
-        if smt is None:
-            return
-        g["smt_confirmed"] += 1
+        if smt is not None:
+            g["smt_confirmed"] += 1
+        else:
+            g.setdefault("smt_absent", 0)
+            g["smt_absent"] += 1
 
         # Trigger: first M5 FVG after first-hour mark, aligned with direction.
         mins_in = minutes_into_killzone(now) or 0
@@ -761,6 +792,8 @@ class Backtester:
         htf_for_dol = {
             "D":    self.bars_up_to(pair, "D", t),
             "240T": self.bars_up_to(pair, "240T", t),
+            "60T":  self.bars_up_to(pair, "60T", t),
+            "15T":  self.bars_up_to(pair, "15T", t),
         }
         target = pick_dol(
             pair, htf_for_dol, levels, cbdr_h, cbdr_l, direction, cur_price,
@@ -844,6 +877,7 @@ class Backtester:
             vol_regime_label=regime,
             news_proximity_minutes=prox_min,
             news_impact=prox_impact,
+            smt_confirmed=(smt is not None),
         )
         if not gt_passes(score):
             return
@@ -892,10 +926,21 @@ class Backtester:
         if units == 0:
             return
 
+        # Diagnostic: per-setup detail so we can see what happens to each limit.
+        if not hasattr(self, "_setup_log"):
+            self._setup_log = []
+        self._setup_log.append({
+            "t": t, "pair": pair, "direction": direction,
+            "entry": signal.entry, "stop": signal.stop, "target": signal.target.price,
+            "swept": swept_name, "zone": f"{zone.kind}/{zone.tf}",
+            "rr": round(signal.rr, 2), "score": round(score.total, 2),
+            "outcome": "limit_placed",
+        })
         self.pending[pair] = {
             "entry_price": signal.entry, "stop": signal.stop, "target": signal.target.price,
             "direction": direction, "units": units, "leg_idx": 1,
             "risk_pct": leg_risk_pct * size_mult,
+            "_setup_log_idx": len(self._setup_log) - 1,
             "placed_at": t,
             "meta": {
                 "score": signal.confluence_score, "swept": swept_name,
@@ -1048,6 +1093,17 @@ def main():
     print("\n=== Results ===")
     for k, v in summarize(bt).items():
         print(f"  {k:20s} {v}")
+
+    setup_log = getattr(bt, "_setup_log", [])
+    if setup_log:
+        print(f"\n=== Setup detail ({len(setup_log)} limits placed) ===")
+        for s in setup_log:
+            best = s.get("best_offset_pips")
+            best_s = f" best_offset_pips={best}" if best is not None else ""
+            print(f"  {s['t']} {s['pair']} dir={s['direction']:+d} "
+                  f"entry={s['entry']:.5f} stop={s['stop']:.5f} target={s['target']:.5f} "
+                  f"swept={s['swept']} zone={s['zone']} rr={s['rr']} score={s['score']} "
+                  f"outcome={s['outcome']}{best_s}")
 
     print("\n=== Calibration (vs 2 trades/day, 3-5 tradable days/week) ===")
     for k, v in calibration_report(bt).items():

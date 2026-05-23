@@ -195,6 +195,12 @@ GT_NEWS_PROXIMITY_BONUS        = 0.5
 # Master switch: drop the hard news block in backtest.py and rely on scoring.
 NEWS_HARD_BLOCK_ENABLED        = False
 
+# SMT (NYO-based lag divergence). False = informational only; SMT
+# contributes to the game-theory score but doesn't gate trades.
+# True = legacy hard-gate behavior (no SMT divergence -> no trade).
+SMT_REQUIRED                   = False
+GT_SMT_BONUS                   = 0.4
+
 # --- Risk overlay (portfolio-level vetoes + correlation-aware sizing) ---
 # Once realized PnL for the day reaches -RISK_DAILY_LOSS_CAP_PCT of the day-open
 # equity, all new entries blocked until the next UTC date rollover.

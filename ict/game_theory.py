@@ -46,6 +46,7 @@ def score_setup(
     vol_regime_label: Optional[str] = None,         # "DEAD" | "NORMAL" | "EXPANDING"
     news_proximity_minutes: Optional[int] = None,   # signed minutes
     news_impact: Optional[str] = None,              # "High" | "Medium" | None
+    smt_confirmed: Optional[bool] = None,           # True when NYO lag-divergence confirms
 ) -> ScoreBreakdown:
     s = ScoreBreakdown()
 
@@ -113,6 +114,9 @@ def score_setup(
             and abs(news_proximity_minutes) <= config.GT_NEWS_PROXIMITY_MINUTES
             and news_impact in ("High", "Medium")):
         s.bonuses["news_proximity"] = config.GT_NEWS_PROXIMITY_BONUS
+
+    if smt_confirmed:
+        s.bonuses["smt"] = config.GT_SMT_BONUS
 
     return s
 

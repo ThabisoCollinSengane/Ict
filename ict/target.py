@@ -103,32 +103,37 @@ def pick_dol(
 ) -> Optional[Target]:
     """Structural Draw-on-Liquidity picker.
 
-    Walks HTF (D1, then H4) for the most recent unmitigated opposite-side
-    ITH/ITL — this is the structural anchor the market is being drawn toward.
-    Falls back to the static rank picker (PWH/PWL/PDH/PDL/session/CBDR) if
-    no structural anchor is found in the trade direction.
+    Walks HTFs (D1 -> H4 -> H1 -> M15) for the most recent unmitigated
+    opposite-side ITH/ITL — the structural anchor the market is being drawn
+    toward. If a higher TF has no qualifying unmitigated level, the search
+    descends to the next TF down (rather than abandoning structural targeting
+    entirely). Static rank picker (PWH/PWL/PDH/PDL/session/CBDR) remains the
+    final fallback if every TF is silent.
 
-    `htf_candles_by_tf`: { "D": [Bar,...], "240T": [Bar,...] }
+    `htf_candles_by_tf`: { "D": [Bar,...], "240T": [...], "60T": [...], "15T": [...] }
+    Missing keys are skipped silently.
     """
     target_kind = -1 if direction < 0 else +1  # shorts target ITLs below
-    for tf in ("D", "240T"):
+    for tf in ("D", "240T", "60T", "15T"):
         bars = htf_candles_by_tf.get(tf)
         if not bars:
             continue
         ints = classify_intermediates(bars)
-        lvl = last_unmitigated(ints, target_kind)
-        if lvl is None:
+        # Walk unmitigated levels of the target kind in reverse-chronological
+        # order, taking the first one that's beyond current_price (i.e., a
+        # genuine draw, not a level price already crossed).
+        candidates = [l for l in reversed(ints)
+                      if l.kind == target_kind and not l.mitigated
+                      and ((direction < 0 and l.price < current_price)
+                           or (direction > 0 and l.price > current_price))]
+        if not candidates:
             continue
-        if direction < 0 and lvl.price < current_price:
-            pip = _pip(symbol)
-            dist = abs(lvl.price - current_price) / pip
-            if risk_pips is None or min_rr is None or (dist / risk_pips) >= min_rr:
-                return Target(name=f"{tf}_ITL", price=lvl.price, distance_pips=dist)
-        if direction > 0 and lvl.price > current_price:
-            pip = _pip(symbol)
-            dist = abs(lvl.price - current_price) / pip
-            if risk_pips is None or min_rr is None or (dist / risk_pips) >= min_rr:
-                return Target(name=f"{tf}_ITH", price=lvl.price, distance_pips=dist)
+        lvl = candidates[0]
+        pip = _pip(symbol)
+        dist = abs(lvl.price - current_price) / pip
+        if risk_pips is None or min_rr is None or (dist / risk_pips) >= min_rr:
+            name = f"{tf}_{'ITL' if direction < 0 else 'ITH'}"
+            return Target(name=name, price=lvl.price, distance_pips=dist)
 
     return pick(symbol, levels, cbdr_high, cbdr_low, direction, current_price,
                 risk_pips=risk_pips, min_rr=min_rr)
