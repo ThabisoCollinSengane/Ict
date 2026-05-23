@@ -760,32 +760,32 @@ class Backtester:
             g.setdefault("smt_absent", 0)
             g["smt_absent"] += 1
 
-        # Trigger: first M5 FVG after first-hour mark, aligned with direction.
+        # Trigger: any unmitigated in-direction M5 FVG inside the killzone.
+        # (Used to require "after first hour" — restriction dropped because
+        # it cost most setups without measurable edge.)
         mins_in = minutes_into_killzone(now) or 0
-        # First-hour bars = bars from killzone start to killzone-start + 60 min.
-        first_hour_bar_count = config.KZ_FIRST_HOUR_MIN // 5
         kz_open_bar_idx = len(bars_5) - (mins_in // 5)
-        after_idx = kz_open_bar_idx + first_hour_bar_count
-        fvg = first_fvg_after(bars_5, pair, after_idx, direction)
-        if fvg is None:
-            # Fallback: a return into an FVG that formed during the first hour.
-            for g_obj in enumerate_fvgs(bars_5, pair):
-                if (g_obj.direction == direction
-                    and kz_open_bar_idx <= g_obj.bar_index < after_idx
-                    and not g_obj.mitigated):
-                    fvg = g_obj
-                    break
+        fvg = first_fvg_after(bars_5, pair, kz_open_bar_idx, direction)
         if fvg is None:
             return
         g["m5_fvg_trigger"] += 1
+
+        # Entry on first touch of the FVG's near edge (the side price reaches
+        # first as it retraces back into the gap). Bullish FVG: top = c2.Low.
+        # Bearish FVG: bottom = c2.High. Stop just beyond c0 (the candle
+        # whose unfilled order is what creates the gap on displacement).
+        c0_idx = max(0, fvg.bar_index - 1)
+        c0 = bars_5[c0_idx]
+        near_edge = fvg.top if direction > 0 else fvg.bottom
+        stop_raw = (c0.Low - pip_size(pair)) if direction > 0 else (c0.High + pip_size(pair))
 
         # Target — prefer the highest-TF pool that gives acceptable RR.
         # We can pre-compute risk from the swept-price stop to feed the
         # picker; this lets it prefer PWH/PDH over LondonHigh when the
         # nearest pool gives sub-1.5R but the next pool up is reachable.
         pip_p = pip_size(pair)
-        raw_entry_preview = fvg.mid
-        est_stop = (swept_price - pip_p) if direction > 0 else (swept_price + pip_p)
+        raw_entry_preview = near_edge
+        est_stop = stop_raw
         est_risk_pips = abs(raw_entry_preview - est_stop) / pip_p
         # Structural DOL — anchored to most recent unmitigated HTF ITH/ITL
         # with rank-based pool list (PWH/PDH/session/CBDR) as fallback.
@@ -890,6 +890,8 @@ class Backtester:
             confluence_score=score.total,
             swept_level_name=swept_name,
             htf_zone_kind=zone.kind, htf_zone_tf=zone.tf,
+            raw_entry_override=near_edge,
+            stop_override=stop_raw,
         )
         if signal is None:
             # Diagnostic: show why RR was rejected so we can tune floors.

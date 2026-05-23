@@ -44,12 +44,19 @@ def build(
     swept_level_name: Optional[str],
     htf_zone_kind: Optional[str],
     htf_zone_tf: Optional[str],
+    raw_entry_override: Optional[float] = None,
+    stop_override: Optional[float] = None,
 ) -> Optional[EntrySignal]:
     pip = pip_size(pair)
-    raw_entry = trigger_fvg.mid
-
-    # Stop beyond the swept extreme by 1 pip of structural slack (costs added separately).
-    stop = (swept_price - pip) if direction > 0 else (swept_price + pip)
+    # Default: enter at FVG mid, stop beyond the swept extreme. Caller can
+    # override either via raw_entry_override (e.g. FVG near edge for first-
+    # touch fills) and stop_override (e.g. beyond c0 of the FVG instead of
+    # the swept level).
+    raw_entry = raw_entry_override if raw_entry_override is not None else trigger_fvg.mid
+    if stop_override is not None:
+        stop = stop_override
+    else:
+        stop = (swept_price - pip) if direction > 0 else (swept_price + pip)
     entry = adjust_entry(raw_entry, direction, pair)
 
     risk = abs(entry - stop)

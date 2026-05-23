@@ -204,8 +204,10 @@ GT_SMT_BONUS                   = 0.4
 # Entry execution mode:
 #   "market" - fire immediately at the current M5 Close (after spread/slippage
 #              adjustment). Used to bypass FVG-mid limits that often go unfilled.
-#   "limit"  - legacy behavior: place a limit at the FVG mid, wait up to 60 min.
-ENTRY_MODE                     = "market"
+#   "limit"  - place a limit at the FVG near edge (top for longs, bottom
+#              for shorts), wait up to 60 min. Default — the near edge
+#              fills on first touch into the gap.
+ENTRY_MODE                     = "limit"
 
 # --- Risk overlay (portfolio-level vetoes + correlation-aware sizing) ---
 # Once realized PnL for the day reaches -RISK_DAILY_LOSS_CAP_PCT of the day-open
