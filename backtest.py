@@ -748,12 +748,29 @@ class Backtester:
         other_levels = self._day_levels(other, t)
         other_bars_5 = self.bars_up_to(other, "5T", t)
         smt = None
+        smt_warning = None
+        smt_dist_traded = None
+        smt_dist_other = None
         if other_levels is not None and other_bars_5:
             smt = smt_confirm(
                 traded_symbol=pair, traded_price=cur_price, traded_nyo=levels.nyo,
                 other_symbol=other, other_price=other_bars_5[-1].Close,
                 other_nyo=other_levels.nyo, direction=direction,
             )
+            # Also probe the OPPOSITE direction — if SMT divergence exists
+            # for the other side it's a real reversal warning, distinct from
+            # "no read either way".
+            smt_warning = smt_confirm(
+                traded_symbol=pair, traded_price=cur_price, traded_nyo=levels.nyo,
+                other_symbol=other, other_price=other_bars_5[-1].Close,
+                other_nyo=other_levels.nyo, direction=-direction,
+            )
+            pip_p_diag = pip_size(pair)
+            if levels.nyo is not None:
+                smt_dist_traded = round((cur_price - levels.nyo) / pip_p_diag, 1)
+            if other_levels.nyo is not None:
+                smt_dist_other = round(
+                    (other_bars_5[-1].Close - other_levels.nyo) / pip_size(other), 1)
         if config.SMT_REQUIRED and smt is None:
             return
         if smt is not None:
@@ -762,30 +779,27 @@ class Backtester:
             g.setdefault("smt_absent", 0)
             g["smt_absent"] += 1
 
-        # MSS-2-of-3 — primary directional gate for M5/M15-based setups.
-        # Skipped when the HTF zone we tapped is an H1+ FVG: per operator
-        # spec, HTF FVG taps stand on their own — MSS on the SAME timeframe
-        # as the entry-trigger (M5/M15) doesn't apply when the trade idea
-        # is sourced from H1+ structure.
+        # MSS-2-of-3 — required for ALL setups (operator decision: keep MSS
+        # confluence even on HTF FVG entries; the volatility/PnL pattern
+        # showed mss=0/3 setups were carrying most of the losers).
         is_htf_fvg_zone = (zone.kind == "fvg" and zone.tf in ("60T", "240T", "D", "W"))
         mss_hits = 0
+        mss_per_sym = {}
         for sym in ("EURUSD", "GBPUSD"):
             sb = self.bars_up_to(sym, "15T", t)
-            if sb and mss_direction(sb) == direction:
+            mss_per_sym[sym] = mss_direction(sb) if sb else 0
+            if sb and mss_per_sym[sym] == direction:
                 mss_hits += 1
         dxy_bars_15 = self.bars_up_to("DXY", "15T", t)
-        if dxy_bars_15 and mss_direction(dxy_bars_15) == -direction:
+        mss_per_sym["DXY"] = mss_direction(dxy_bars_15) if dxy_bars_15 else 0
+        if dxy_bars_15 and mss_per_sym["DXY"] == -direction:
             mss_hits += 1
-        if is_htf_fvg_zone:
-            g.setdefault("mss_skipped_htf_fvg", 0)
-            g["mss_skipped_htf_fvg"] += 1
-        else:
-            if mss_hits < 2:
-                g.setdefault("mss_2_of_3_fail", 0)
-                g["mss_2_of_3_fail"] += 1
-                return
-            g.setdefault("mss_2_of_3_pass", 0)
-            g["mss_2_of_3_pass"] += 1
+        if mss_hits < 2:
+            g.setdefault("mss_2_of_3_fail", 0)
+            g["mss_2_of_3_fail"] += 1
+            return
+        g.setdefault("mss_2_of_3_pass", 0)
+        g["mss_2_of_3_pass"] += 1
 
         # Trigger search: any unmitigated in-direction zone inside the
         # killzone, in operator-priority order:
@@ -1106,6 +1120,13 @@ class Backtester:
             "trigger": f"{trigger_kind}/{trigger_tf}",
             "target_name": signal.target.name,
             "mss_hits": mss_hits,
+            "mss_eur": mss_per_sym.get("EURUSD", 0),
+            "mss_gbp": mss_per_sym.get("GBPUSD", 0),
+            "mss_dxy": mss_per_sym.get("DXY", 0),
+            "smt_confirmed": smt is not None,
+            "smt_warning_opposite": smt_warning is not None,
+            "smt_dist_traded": smt_dist_traded,
+            "smt_dist_other": smt_dist_other,
             "outcome": "placed",
         })
         self.pending[pair] = {
@@ -1312,6 +1333,14 @@ def main():
                   f"rr={s['rr']} score={s['score']} mss={s.get('mss_hits','?')}/3 "
                   f"trigger={s.get('trigger','?')} swept={s['swept']} zone={s['zone']} "
                   f"outcome={s['outcome']}{best_s}")
+            smt_ok = s.get("smt_confirmed")
+            smt_warn = s.get("smt_warning_opposite")
+            smt_label = ("confirmed" if smt_ok
+                         else ("WARNING_OPPOSITE" if smt_warn else "absent"))
+            print(f"     SMT={smt_label}  dist_traded={s.get('smt_dist_traded')}p  "
+                  f"dist_other={s.get('smt_dist_other')}p  "
+                  f"mss(eur={s.get('mss_eur',0):+d}, gbp={s.get('mss_gbp',0):+d}, "
+                  f"dxy={s.get('mss_dxy',0):+d})")
 
     audit = pattern_audit(bt)
     if audit:
