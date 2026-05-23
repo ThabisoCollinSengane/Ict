@@ -1197,6 +1197,35 @@ def calibration_report(bt):
     }
 
 
+def pattern_audit(bt):
+    """Per-session, per-day pattern occurrence audit: how often did a high-
+    quality setup (HTF FVG tap + MSS 2-of-3) appear, regardless of whether
+    it eventually filled. Helps answer "does the algo see the trade in
+    every tradable session?".
+    """
+    setups = getattr(bt, "_setup_log", [])
+    if not setups:
+        return None
+    df = pd.DataFrame(setups)
+    df["t"] = pd.to_datetime(df["t"], utc=True)
+    df["date"] = df.t.dt.date
+    df["day_of_week"] = df.t.dt.day_name()
+    df["session"] = df.t.dt.hour.apply(
+        lambda h: "London" if 7 <= h < 12 else ("NY_AM" if 12 <= h < 17 else "Other")
+    )
+    htf_fvg_setups = df[df["zone"].str.startswith("fvg")]
+    return {
+        "total_setups": len(df),
+        "htf_fvg_zone_setups": len(htf_fvg_setups),
+        "htf_fvg_pct": round(len(htf_fvg_setups) / len(df) * 100, 1),
+        "by_session": df.groupby("session").size().to_dict(),
+        "htf_fvg_by_session": htf_fvg_setups.groupby("session").size().to_dict(),
+        "by_day_of_week": df.groupby("day_of_week").size().to_dict(),
+        "by_trigger_type": df["trigger"].value_counts().to_dict() if "trigger" in df else {},
+        "by_zone_kind": df["zone"].value_counts().to_dict(),
+    }
+
+
 def main():
     print("Fetching 60d of 5-min forex data from yfinance...")
     data = fetch_data()
@@ -1237,6 +1266,12 @@ def main():
                   f"rr={s['rr']} score={s['score']} mss={s.get('mss_hits','?')}/3 "
                   f"trigger={s.get('trigger','?')} swept={s['swept']} zone={s['zone']} "
                   f"outcome={s['outcome']}{best_s}")
+
+    audit = pattern_audit(bt)
+    if audit:
+        print("\n=== Pattern audit (HTF-FVG-tap setups across the run) ===")
+        for k, v in audit.items():
+            print(f"  {k:25s} {v}")
 
     print("\n=== Calibration (vs 2 trades/day, 3-5 tradable days/week) ===")
     for k, v in calibration_report(bt).items():

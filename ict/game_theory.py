@@ -63,9 +63,14 @@ def score_setup(
     if sweep_strong:
         s.bonuses["strong_wick"] = config.GT_STRONG_WICK_BONUS
 
-    # D1/W1 FVG tap.
-    if htf_zone_kind == "fvg" and htf_zone_tf in ("D", "W"):
-        s.bonuses["daily_fvg"] = config.GT_DAILY_FVG_BONUS
+    # HTF FVG tap is the highest-conviction zone class — Daily/Weekly get
+    # the strongest bonus, H4 / H1 a smaller but meaningful one (user-spec:
+    # HTF FVGs reliably react even when the LTF looks like noise).
+    if htf_zone_kind == "fvg":
+        if htf_zone_tf in ("D", "W"):
+            s.bonuses["daily_fvg"] = config.GT_DAILY_FVG_BONUS
+        elif htf_zone_tf in ("240T", "60T"):
+            s.bonuses["htf_fvg"] = config.GT_HTF_FVG_BONUS
 
     # ICT macro window.
     if in_macro_window(timestamp):

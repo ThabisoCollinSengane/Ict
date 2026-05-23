@@ -98,7 +98,10 @@ BREAKER_TFS = ("15T", "240T")
 
 # --- HTF FVG hierarchy for liquidity zone tap ---
 # D1/W1 FVGs are first-class HTF zones. Order = preference for tap detection.
-HTF_FVG_TFS = ("W", "D", "240T")
+# Per user-spec: H1 FVGs are critical institutional reaction zones — many
+# "M5 consolidation + sweep + reversal" setups are really just a tap of an
+# H1 FVG seen from the LTF. Add H1 to the HTF tap pool.
+HTF_FVG_TFS = ("W", "D", "240T", "60T")
 HTF_OB_TFS  = ("D", "240T")
 
 # --- SMT ---
@@ -116,6 +119,7 @@ GT_RETAIL_POOL_BONUS = 0.5         # sweep took out a recognizable retail level
 GT_STRONG_WICK_BONUS = 0.4         # wick depth >= SWEEP_STRONG_PIPS
 GT_JUDAS_BONUS       = 0.3         # NY-AM reversing London's first-hour displacement
 GT_DAILY_FVG_BONUS   = 0.6         # manipulation tapped a D1/W1 FVG
+GT_HTF_FVG_BONUS     = 0.4         # tap on H4/H1 FVG (per-user-spec: still high impact)
 GT_MACRO_BONUS       = 0.5         # entry fires inside an ICT macro window
 GT_CBDR_SWEEP_BONUS  = 0.4         # manipulation swept CBDR high/low
 
