@@ -201,6 +201,12 @@ NEWS_HARD_BLOCK_ENABLED        = False
 SMT_REQUIRED                   = False
 GT_SMT_BONUS                   = 0.4
 
+# Entry execution mode:
+#   "market" - fire immediately at the current M5 Close (after spread/slippage
+#              adjustment). Used to bypass FVG-mid limits that often go unfilled.
+#   "limit"  - legacy behavior: place a limit at the FVG mid, wait up to 60 min.
+ENTRY_MODE                     = "market"
+
 # --- Risk overlay (portfolio-level vetoes + correlation-aware sizing) ---
 # Once realized PnL for the day reaches -RISK_DAILY_LOSS_CAP_PCT of the day-open
 # equity, all new entries blocked until the next UTC date rollover.

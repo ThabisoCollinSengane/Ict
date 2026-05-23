@@ -926,18 +926,36 @@ class Backtester:
         if units == 0:
             return
 
-        # Diagnostic: per-setup detail so we can see what happens to each limit.
+        # Entry price: limit at FVG mid (signal.entry) OR market at current
+        # M5 Close (with spread/slippage already applied via signal-side
+        # adjust_entry below). Market mode bypasses the FVG-mid passive
+        # limit which often goes unfilled in fast markets.
+        if config.ENTRY_MODE == "market":
+            from risk import adjust_entry as _adj_entry
+            cur_bar = self._bar_at(pair, "5T", t)
+            mkt_entry_raw = cur_bar.Close if cur_bar is not None else signal.entry
+            entry_price = _adj_entry(mkt_entry_raw, direction, pair)
+            # Recompute units against the actual entry (sizing is risk-based).
+            units = int(position_size(self.equity, entry_price, signal.stop, pair)
+                        * config.PYRAMID_LEG_RISK_FRAC[0]
+                        * size_mult)
+            if units == 0:
+                return
+        else:
+            entry_price = signal.entry
+
+        # Diagnostic: per-setup detail so we can see what happens to each entry.
         if not hasattr(self, "_setup_log"):
             self._setup_log = []
         self._setup_log.append({
             "t": t, "pair": pair, "direction": direction,
-            "entry": signal.entry, "stop": signal.stop, "target": signal.target.price,
+            "entry": entry_price, "stop": signal.stop, "target": signal.target.price,
             "swept": swept_name, "zone": f"{zone.kind}/{zone.tf}",
             "rr": round(signal.rr, 2), "score": round(score.total, 2),
-            "outcome": "limit_placed",
+            "outcome": "placed",
         })
         self.pending[pair] = {
-            "entry_price": signal.entry, "stop": signal.stop, "target": signal.target.price,
+            "entry_price": entry_price, "stop": signal.stop, "target": signal.target.price,
             "direction": direction, "units": units, "leg_idx": 1,
             "risk_pct": leg_risk_pct * size_mult,
             "_setup_log_idx": len(self._setup_log) - 1,
@@ -949,6 +967,10 @@ class Backtester:
             },
         }
         g["limit_placed"] += 1
+        # Market mode: fill immediately on the same bar.
+        if config.ENTRY_MODE == "market":
+            self._fill_entry(pair, t)
+            self._setup_log[-1]["outcome"] = "market_filled"
 
     def _maybe_pyramid(self, pair, t):
         st = self.active[pair]
