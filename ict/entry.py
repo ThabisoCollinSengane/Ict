@@ -37,7 +37,7 @@ def build(
     *,
     pair: str,
     direction: int,
-    trigger_fvg: FVG,
+    trigger_fvg,            # FVG | OrderBlock | Breaker — caller passes the trigger zone
     swept_price: float,
     target: Target,
     confluence_score: float,

@@ -23,6 +23,8 @@ import config
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.fvg import enumerate_fvgs, first_fvg_after, detect_new_fvg
+from ict.order_block import detect_order_blocks
+from ict.breaker import detect_breakers
 from ict.killzones import (
     in_used_killzone, minutes_into_killzone, can_enter_new_pipeline,
 )
@@ -760,24 +762,119 @@ class Backtester:
             g.setdefault("smt_absent", 0)
             g["smt_absent"] += 1
 
-        # Trigger: any unmitigated in-direction M5 FVG inside the killzone.
-        # (Used to require "after first hour" — restriction dropped because
-        # it cost most setups without measurable edge.)
+        # MSS-2-of-3 — primary directional gate. At least 2 of
+        # {EURUSD, GBPUSD, DXY} M15 must show a market-structure shift
+        # in the trade direction. DXY's MSS is inverted because DXY up
+        # = USD strong = EUR/GBP pairs down.
+        mss_hits = 0
+        for sym in ("EURUSD", "GBPUSD"):
+            sb = self.bars_up_to(sym, "15T", t)
+            if sb and mss_direction(sb) == direction:
+                mss_hits += 1
+        dxy_bars_15 = self.bars_up_to("DXY", "15T", t)
+        if dxy_bars_15 and mss_direction(dxy_bars_15) == -direction:
+            mss_hits += 1
+        if mss_hits < 2:
+            g.setdefault("mss_2_of_3_fail", 0)
+            g["mss_2_of_3_fail"] += 1
+            return
+        g.setdefault("mss_2_of_3_pass", 0)
+        g["mss_2_of_3_pass"] += 1
+
+        # Trigger search: any unmitigated in-direction zone inside the
+        # killzone, in operator-priority order: M5 FVG -> M5 OB -> M5
+        # breaker -> M15 breaker. The user-spec rule is "look for entries
+        # starting from the smaller timeframes."
         mins_in = minutes_into_killzone(now) or 0
         kz_open_bar_idx = len(bars_5) - (mins_in // 5)
+
+        trigger = None         # the zone object
+        trigger_kind = None    # "fvg" / "ob" / "breaker"
+        trigger_tf = None      # "5T" / "15T"
+        c0_for_stop = None     # M5 bar reference for fallback stop logic
+
         fvg = first_fvg_after(bars_5, pair, kz_open_bar_idx, direction)
-        if fvg is None:
+        if fvg is not None:
+            trigger, trigger_kind, trigger_tf = fvg, "fvg", "5T"
+            trigger_idx = fvg.bar_index
+            c0_for_stop = bars_5[max(0, fvg.bar_index - 1)]
+        else:
+            obs = detect_order_blocks(bars_5)
+            for ob in obs:
+                if (ob.direction == direction and not ob.mitigated
+                        and ob.bar_index >= kz_open_bar_idx):
+                    trigger, trigger_kind, trigger_tf = ob, "ob", "5T"
+                    trigger_idx = ob.bar_index
+                    break
+        if trigger is None:
+            for tf in ("5T", "15T"):
+                tf_bars = self.bars_up_to(pair, tf, t)
+                if not tf_bars:
+                    continue
+                brks = detect_breakers(tf_bars)
+                # Filter to in-direction, unmitigated, recent (last ~12 bars on M5
+                # is ~1h; on M15 it's ~3h — both within a killzone's reach).
+                recent_cut = len(tf_bars) - (12 if tf == "5T" else 8)
+                for br in brks:
+                    if (br.direction == direction and not br.mitigated
+                            and br.flipped_index >= recent_cut):
+                        trigger, trigger_kind, trigger_tf = br, "breaker", tf
+                        trigger_idx = br.flipped_index
+                        break
+                if trigger is not None:
+                    break
+        if trigger is None:
             return
         g["m5_fvg_trigger"] += 1
+        g.setdefault(f"trigger_{trigger_kind}_{trigger_tf}", 0)
+        g[f"trigger_{trigger_kind}_{trigger_tf}"] += 1
 
-        # Entry on first touch of the FVG's near edge (the side price reaches
-        # first as it retraces back into the gap). Bullish FVG: top = c2.Low.
-        # Bearish FVG: bottom = c2.High. Stop just beyond c0 (the candle
-        # whose unfilled order is what creates the gap on displacement).
-        c0_idx = max(0, fvg.bar_index - 1)
-        c0 = bars_5[c0_idx]
-        near_edge = fvg.top if direction > 0 else fvg.bottom
-        stop_raw = (c0.Low - pip_size(pair)) if direction > 0 else (c0.High + pip_size(pair))
+        # Near edge of the trigger zone: the side price reaches first
+        # when retesting. Same convention for FVG, OB, Breaker — they
+        # all expose top/bottom on the same dataclass shape.
+        near_edge = trigger.top if direction > 0 else trigger.bottom
+
+        # Stop: nearest M5 swing high/low BEYOND the near edge, with M15
+        # swing as a tighter alternative if M5 is too wide. User spec:
+        # "my stops are always based on m5 and M15 timeframe."
+        pip_p = pip_size(pair)
+        swings_5 = find_swings(bars_5)
+        bars_15 = self.bars_up_to(pair, "15T", t)
+        swings_15 = find_swings(bars_15) if bars_15 else []
+
+        def _structural_stop(target_swings, edge):
+            if direction < 0:
+                cands = [s.price for s in target_swings if s.kind == +1 and s.price > edge]
+                return (min(cands) + pip_p) if cands else None
+            cands = [s.price for s in target_swings if s.kind == -1 and s.price < edge]
+            return (max(cands) - pip_p) if cands else None
+
+        stop_m5 = _structural_stop(swings_5, near_edge)
+        stop_m15 = _structural_stop(swings_15, near_edge)
+        # Prefer the tighter (closer to entry) of the two — that's the
+        # smallest risk; the M5 swing usually wins unless price has been
+        # tightly coiling and the M15 swing is closer.
+        candidates = [s for s in (stop_m5, stop_m15) if s is not None]
+        if not candidates:
+            # Last-resort fallback so a trigger without nearby swings still
+            # gets a structural stop, even if wider than ideal.
+            if c0_for_stop is not None:
+                stop_raw = (c0_for_stop.Low - pip_p) if direction > 0 else (c0_for_stop.High + pip_p)
+            else:
+                stop_raw = (trigger.bottom - pip_p) if direction > 0 else (trigger.top + pip_p)
+        else:
+            if direction < 0:
+                stop_raw = min(candidates)
+            else:
+                stop_raw = max(candidates)
+
+        # Risk sanity check: a swing-based stop > 30 pips is a sign that
+        # the M5/M15 structure is too thin nearby; in that case skip the
+        # setup rather than overrisk.
+        if abs(near_edge - stop_raw) / pip_p > config.MAX_STRUCTURAL_STOP_PIPS:
+            g.setdefault("stop_too_wide", 0)
+            g["stop_too_wide"] += 1
+            return
 
         # Target — prefer the highest-TF pool that gives acceptable RR.
         # We can pre-compute risk from the swept-price stop to feed the
@@ -804,11 +901,11 @@ class Backtester:
         g["target_found"] += 1
 
         # --- Continuous context features (new scoring) ---
-        # Consolidation before FVG: how many of the K bars *before* the FVG
-        # formed had ranges overlapping the FVG zone.
-        pre_fvg = bars_5[:fvg.bar_index] if fvg.bar_index > 0 else []
+        # Consolidation before the trigger: how many of the K bars before
+        # the trigger formed had ranges overlapping the trigger zone.
+        pre = bars_5[:trigger_idx] if trigger_idx > 0 else []
         consolidation = time_in_zone_pre_event(
-            pre_fvg, fvg.top, fvg.bottom, config.GT_CONSOLIDATION_LOOKBACK_BARS,
+            pre, trigger.top, trigger.bottom, config.GT_CONSOLIDATION_LOOKBACK_BARS,
         )
 
         # Dwell at swept level pre-sweep: how many recent M5 bars touched
@@ -817,15 +914,17 @@ class Backtester:
             bars_5, swept_price, 2 * pip_p, config.GT_DWELL_LOOKBACK_BARS,
         )
 
-        # Displacement strength of the FVG's middle candle.
+        # Displacement strength of the trigger candle. For FVGs and OBs the
+        # candle range vs trailing median is meaningful; for breakers we use
+        # the bar at flipped_index. trigger_idx already abstracts the index.
         disp_strength = None
-        if fvg.bar_index >= config.GT_DISPLACEMENT_LOOKBACK_BARS:
-            window = bars_5[fvg.bar_index - config.GT_DISPLACEMENT_LOOKBACK_BARS:fvg.bar_index]
+        if 0 <= trigger_idx < len(bars_5) and trigger_idx >= config.GT_DISPLACEMENT_LOOKBACK_BARS:
+            window = bars_5[trigger_idx - config.GT_DISPLACEMENT_LOOKBACK_BARS:trigger_idx]
             ranges = sorted([b.High - b.Low for b in window])
             if ranges:
                 med = ranges[len(ranges) // 2]
                 if med > 0:
-                    mid_bar = bars_5[fvg.bar_index]
+                    mid_bar = bars_5[trigger_idx]
                     disp_strength = (mid_bar.High - mid_bar.Low) / med
 
         # Range expansion at the most recent M5 bar (the entry bar).
@@ -849,13 +948,15 @@ class Backtester:
         bars_15 = self.bars_up_to(pair, "15T", t)
         amd_label, _, _ = classify_amd_phase(bars_15, pair) if bars_15 else ("NONE", None, None)
 
-        # Record the features on the FVG itself (useful for post-trade audit).
-        fvg.displacement_strength = disp_strength
-        fvg.time_in_zone_pre_formation = consolidation
-        fvg.range_expansion = rng_exp
-        fvg.news_proximity_minutes = prox_min
-        fvg.news_impact = prox_impact
-        fvg.formed_in_macro_window = in_macro_window(now)
+        # Record audit fields on the trigger if it's an FVG. OB / Breaker
+        # dataclasses don't have these fields - we just skip the recording.
+        if trigger_kind == "fvg":
+            fvg.displacement_strength = disp_strength
+            fvg.time_in_zone_pre_formation = consolidation
+            fvg.range_expansion = rng_exp
+            fvg.news_proximity_minutes = prox_min
+            fvg.news_impact = prox_impact
+            fvg.formed_in_macro_window = in_macro_window(now)
 
         # Game-theory score.
         phases = cycle_phases(now)
@@ -885,7 +986,7 @@ class Backtester:
 
         # Build entry signal (applies spread+slippage to entry).
         signal = build_entry(
-            pair=pair, direction=direction, trigger_fvg=fvg,
+            pair=pair, direction=direction, trigger_fvg=trigger,
             swept_price=swept_price, target=target,
             confluence_score=score.total,
             swept_level_name=swept_name,
@@ -897,8 +998,8 @@ class Backtester:
             # Diagnostic: show why RR was rejected so we can tune floors.
             from risk import pip_size as _pip
             pip = _pip(pair)
-            raw_entry = fvg.mid
-            est_stop = (swept_price - pip) if direction > 0 else (swept_price + pip)
+            raw_entry = near_edge
+            est_stop = stop_raw
             est_risk = abs(raw_entry - est_stop) / pip
             est_reward = abs(target.price - raw_entry) / pip
             est_rr = est_reward / est_risk if est_risk > 0 else 0.0
@@ -952,8 +1053,13 @@ class Backtester:
         self._setup_log.append({
             "t": t, "pair": pair, "direction": direction,
             "entry": entry_price, "stop": signal.stop, "target": signal.target.price,
-            "swept": swept_name, "zone": f"{zone.kind}/{zone.tf}",
+            "risk_pips": round(signal.risk_pips, 1),
+            "reward_pips": round(signal.reward_pips, 1),
             "rr": round(signal.rr, 2), "score": round(score.total, 2),
+            "swept": swept_name, "zone": f"{zone.kind}/{zone.tf}",
+            "trigger": f"{trigger_kind}/{trigger_tf}",
+            "target_name": signal.target.name,
+            "mss_hits": mss_hits,
             "outcome": "placed",
         })
         self.pending[pair] = {
@@ -1124,9 +1230,12 @@ def main():
         for s in setup_log:
             best = s.get("best_offset_pips")
             best_s = f" best_offset_pips={best}" if best is not None else ""
-            print(f"  {s['t']} {s['pair']} dir={s['direction']:+d} "
-                  f"entry={s['entry']:.5f} stop={s['stop']:.5f} target={s['target']:.5f} "
-                  f"swept={s['swept']} zone={s['zone']} rr={s['rr']} score={s['score']} "
+            print(f"  {s['t']} {s['pair']:6s} dir={s['direction']:+d} "
+                  f"entry={s['entry']:.5f} stop={s['stop']:.5f} "
+                  f"target={s['target']:.5f} ({s.get('target_name','')})")
+            print(f"     risk={s.get('risk_pips','?')}p reward={s.get('reward_pips','?')}p "
+                  f"rr={s['rr']} score={s['score']} mss={s.get('mss_hits','?')}/3 "
+                  f"trigger={s.get('trigger','?')} swept={s['swept']} zone={s['zone']} "
                   f"outcome={s['outcome']}{best_s}")
 
     print("\n=== Calibration (vs 2 trades/day, 3-5 tradable days/week) ===")

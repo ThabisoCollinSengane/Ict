@@ -201,6 +201,12 @@ NEWS_HARD_BLOCK_ENABLED        = False
 SMT_REQUIRED                   = False
 GT_SMT_BONUS                   = 0.4
 
+# Structural stop hard cap. Stops are computed from the nearest M5 (or
+# M15) swing high/low beyond the entry; when that swing is unusually
+# far away (>N pips) the setup is skipped to avoid taking 1% risk on
+# a structurally over-wide stop.
+MAX_STRUCTURAL_STOP_PIPS       = 30
+
 # Entry execution mode:
 #   "market" - fire immediately at the current M5 Close (after spread/slippage
 #              adjustment). Used to bypass FVG-mid limits that often go unfilled.
