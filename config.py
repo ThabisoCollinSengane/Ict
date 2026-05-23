@@ -211,6 +211,14 @@ GT_SMT_BONUS                   = 0.4
 # a structurally over-wide stop.
 MAX_STRUCTURAL_STOP_PIPS       = 30
 
+# HTF FVG entry mechanic. When the zone is an H1+ FVG, use the FVG zone
+# itself for entry + stop (instead of an M5 trigger). Entry is the
+# near edge — UNLESS the FVG is wider than HTF_FVG_MID_THRESHOLD_PIPS
+# on H4/D1/W1, in which case we enter at the mid to keep the stop
+# manageable. H1 FVGs always enter at first touch (per operator spec).
+HTF_FVG_MID_THRESHOLD_PIPS     = 20
+HTF_FVG_STOP_BUFFER_PIPS       = 2
+
 # Entry execution mode:
 #   "market" - fire immediately at the current M5 Close (after spread/slippage
 #              adjustment). Used to bypass FVG-mid limits that often go unfilled.

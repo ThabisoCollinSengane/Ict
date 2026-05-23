@@ -762,10 +762,12 @@ class Backtester:
             g.setdefault("smt_absent", 0)
             g["smt_absent"] += 1
 
-        # MSS-2-of-3 — primary directional gate. At least 2 of
-        # {EURUSD, GBPUSD, DXY} M15 must show a market-structure shift
-        # in the trade direction. DXY's MSS is inverted because DXY up
-        # = USD strong = EUR/GBP pairs down.
+        # MSS-2-of-3 — primary directional gate for M5/M15-based setups.
+        # Skipped when the HTF zone we tapped is an H1+ FVG: per operator
+        # spec, HTF FVG taps stand on their own — MSS on the SAME timeframe
+        # as the entry-trigger (M5/M15) doesn't apply when the trade idea
+        # is sourced from H1+ structure.
+        is_htf_fvg_zone = (zone.kind == "fvg" and zone.tf in ("60T", "240T", "D", "W"))
         mss_hits = 0
         for sym in ("EURUSD", "GBPUSD"):
             sb = self.bars_up_to(sym, "15T", t)
@@ -774,19 +776,26 @@ class Backtester:
         dxy_bars_15 = self.bars_up_to("DXY", "15T", t)
         if dxy_bars_15 and mss_direction(dxy_bars_15) == -direction:
             mss_hits += 1
-        if mss_hits < 2:
-            g.setdefault("mss_2_of_3_fail", 0)
-            g["mss_2_of_3_fail"] += 1
-            return
-        g.setdefault("mss_2_of_3_pass", 0)
-        g["mss_2_of_3_pass"] += 1
+        if is_htf_fvg_zone:
+            g.setdefault("mss_skipped_htf_fvg", 0)
+            g["mss_skipped_htf_fvg"] += 1
+        else:
+            if mss_hits < 2:
+                g.setdefault("mss_2_of_3_fail", 0)
+                g["mss_2_of_3_fail"] += 1
+                return
+            g.setdefault("mss_2_of_3_pass", 0)
+            g["mss_2_of_3_pass"] += 1
 
         # Trigger search: any unmitigated in-direction zone inside the
-        # killzone, in operator-priority order: M5 FVG -> M5 OB -> M5
-        # breaker -> M15 breaker. The user-spec rule is "look for entries
-        # starting from the smaller timeframes."
+        # killzone, in operator-priority order:
+        #   M5 FVG -> M5 OB -> M15 FVG -> M15 OB -> M5 breaker -> M15 breaker.
+        # "Look for entries starting from the smaller timeframes" (user-spec):
+        # M5 wins over M15, FVG/OB win over breaker.
         mins_in = minutes_into_killzone(now) or 0
         kz_open_bar_idx = len(bars_5) - (mins_in // 5)
+        bars_15 = self.bars_up_to(pair, "15T", t)
+        kz_open_bar_15 = (len(bars_15) - (mins_in // 15)) if bars_15 else 0
 
         trigger = None         # the zone object
         trigger_kind = None    # "fvg" / "ob" / "breaker"
@@ -805,6 +814,22 @@ class Backtester:
                         and ob.bar_index >= kz_open_bar_idx):
                     trigger, trigger_kind, trigger_tf = ob, "ob", "5T"
                     trigger_idx = ob.bar_index
+                    break
+        # M15 FVG fallback — same construction as M5 FVG.
+        if trigger is None and bars_15:
+            fvg15 = first_fvg_after(bars_15, pair, kz_open_bar_15, direction)
+            if fvg15 is not None:
+                trigger, trigger_kind, trigger_tf = fvg15, "fvg", "15T"
+                trigger_idx = -1  # M15 index — not directly usable for M5 lookups
+                c0_for_stop = None
+        # M15 OB fallback.
+        if trigger is None and bars_15:
+            obs15 = detect_order_blocks(bars_15)
+            for ob in obs15:
+                if (ob.direction == direction and not ob.mitigated
+                        and ob.bar_index >= kz_open_bar_15):
+                    trigger, trigger_kind, trigger_tf = ob, "ob", "15T"
+                    trigger_idx = -1
                     break
         if trigger is None:
             for tf in ("5T", "15T"):
@@ -829,49 +854,70 @@ class Backtester:
         g.setdefault(f"trigger_{trigger_kind}_{trigger_tf}", 0)
         g[f"trigger_{trigger_kind}_{trigger_tf}"] += 1
 
-        # Near edge of the trigger zone: the side price reaches first
-        # when retesting. Same convention for FVG, OB, Breaker — they
-        # all expose top/bottom on the same dataclass shape.
-        near_edge = trigger.top if direction > 0 else trigger.bottom
-
-        # Stop: nearest M5 swing high/low BEYOND the near edge, with M15
-        # swing as a tighter alternative if M5 is too wide. User spec:
-        # "my stops are always based on m5 and M15 timeframe."
         pip_p = pip_size(pair)
-        swings_5 = find_swings(bars_5)
-        bars_15 = self.bars_up_to(pair, "15T", t)
-        swings_15 = find_swings(bars_15) if bars_15 else []
+        # If we're trading off an H1+ FVG zone, the ENTRY and STOP are
+        # derived from the HTF zone directly (per operator spec). The M5
+        # trigger above only serves to confirm a local fill is achievable
+        # within the killzone. H1/H4/D1/W1 FVG widths and structural stops
+        # are far more reliable than M5 swing wicks for these setups.
+        if is_htf_fvg_zone:
+            zone_width_pips = abs(zone.top - zone.bottom) / pip_p
+            wide_threshold = config.HTF_FVG_MID_THRESHOLD_PIPS
+            # H1 FVG always first-touch; H4/D1/W1 use mid only when wide.
+            use_mid = zone.tf in ("240T", "D", "W") and zone_width_pips > wide_threshold
+            if use_mid:
+                near_edge = (zone.top + zone.bottom) / 2.0
+            else:
+                near_edge = zone.top if direction > 0 else zone.bottom
+            # Stop one buffer beyond the opposite edge of the FVG zone.
+            stop_buf = config.HTF_FVG_STOP_BUFFER_PIPS * pip_p
+            if direction > 0:
+                stop_raw = zone.bottom - stop_buf
+            else:
+                stop_raw = zone.top + stop_buf
+            # Skip the M5/M15 swing-stop calculation below.
+            swings_5 = swings_15 = []
+            candidates = None
+        else:
+            # M5/M15-based entry: near edge of the local trigger zone,
+            # stop at the nearest swing beyond.
+            near_edge = trigger.top if direction > 0 else trigger.bottom
+            swings_5 = find_swings(bars_5)
+            bars_15_now = self.bars_up_to(pair, "15T", t)
+            swings_15 = find_swings(bars_15_now) if bars_15_now else []
 
-        def _structural_stop(target_swings, edge):
-            if direction < 0:
-                cands = [s.price for s in target_swings if s.kind == +1 and s.price > edge]
-                return (min(cands) + pip_p) if cands else None
-            cands = [s.price for s in target_swings if s.kind == -1 and s.price < edge]
-            return (max(cands) - pip_p) if cands else None
+        if not is_htf_fvg_zone:
+            def _structural_stop(target_swings, edge):
+                if direction < 0:
+                    cands = [s.price for s in target_swings if s.kind == +1 and s.price > edge]
+                    return (min(cands) + pip_p) if cands else None
+                cands = [s.price for s in target_swings if s.kind == -1 and s.price < edge]
+                return (max(cands) - pip_p) if cands else None
 
-        stop_m5 = _structural_stop(swings_5, near_edge)
-        stop_m15 = _structural_stop(swings_15, near_edge)
-        # Prefer the tighter (closer to entry) of the two — that's the
-        # smallest risk; the M5 swing usually wins unless price has been
-        # tightly coiling and the M15 swing is closer.
-        candidates = [s for s in (stop_m5, stop_m15) if s is not None]
-        if not candidates:
+            stop_m5 = _structural_stop(swings_5, near_edge)
+            stop_m15 = _structural_stop(swings_15, near_edge)
+            # Prefer the tighter (closer to entry) of the two — that's the
+            # smallest risk; the M5 swing usually wins unless price has been
+            # tightly coiling and the M15 swing is closer.
+            candidates = [s for s in (stop_m5, stop_m15) if s is not None]
+        if not is_htf_fvg_zone and not candidates:
             # Last-resort fallback so a trigger without nearby swings still
             # gets a structural stop, even if wider than ideal.
             if c0_for_stop is not None:
                 stop_raw = (c0_for_stop.Low - pip_p) if direction > 0 else (c0_for_stop.High + pip_p)
             else:
                 stop_raw = (trigger.bottom - pip_p) if direction > 0 else (trigger.top + pip_p)
-        else:
+        elif not is_htf_fvg_zone:
             if direction < 0:
                 stop_raw = min(candidates)
             else:
                 stop_raw = max(candidates)
 
-        # Risk sanity check: a swing-based stop > 30 pips is a sign that
-        # the M5/M15 structure is too thin nearby; in that case skip the
-        # setup rather than overrisk.
-        if abs(near_edge - stop_raw) / pip_p > config.MAX_STRUCTURAL_STOP_PIPS:
+        # Risk sanity check: skip setups whose stop is unusually wide.
+        # M5/M15 setups: M5/M15 swing > MAX_STRUCTURAL_STOP_PIPS.
+        # HTF FVG setups: the FVG zone itself > 2x MAX (rarely an issue).
+        max_stop = config.MAX_STRUCTURAL_STOP_PIPS * (2 if is_htf_fvg_zone else 1)
+        if abs(near_edge - stop_raw) / pip_p > max_stop:
             g.setdefault("stop_too_wide", 0)
             g["stop_too_wide"] += 1
             return
