@@ -46,7 +46,8 @@ def score_setup(
     vol_regime_label: Optional[str] = None,         # "DEAD" | "NORMAL" | "EXPANDING"
     news_proximity_minutes: Optional[int] = None,   # signed minutes
     news_impact: Optional[str] = None,              # "High" | "Medium" | None
-    smt_confirmed: Optional[bool] = None,           # True when NYO lag-divergence confirms
+    smt_confirmed: Optional[bool] = None,           # True when structural SMT confirms (3/3 aligned)
+    smt_divergence: Optional[bool] = None,          # True when 2/3 aligned + 1 diverges (reversal warning)
 ) -> ScoreBreakdown:
     s = ScoreBreakdown()
 
@@ -122,6 +123,11 @@ def score_setup(
 
     if smt_confirmed:
         s.bonuses["smt"] = config.GT_SMT_BONUS
+    elif smt_divergence:
+        # 2-of-3 structural-break confirmation + 1 lagging asset = ICT
+        # SMT divergence. The lagging asset is signalling potential
+        # reversal AGAINST our trade direction. Negative score.
+        s.bonuses["smt_divergence"] = -abs(config.GT_SMT_DIVERGENCE_PENALTY)
 
     return s
 

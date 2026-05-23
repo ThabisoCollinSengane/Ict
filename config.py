@@ -204,6 +204,10 @@ NEWS_HARD_BLOCK_ENABLED        = False
 # True = legacy hard-gate behavior (no SMT divergence -> no trade).
 SMT_REQUIRED                   = False
 GT_SMT_BONUS                   = 0.4
+# SMT divergence: 2/3 instruments aligned, 1 diverging. The diverging
+# instrument is leading the next reversal — negative score against our
+# trade direction.
+GT_SMT_DIVERGENCE_PENALTY      = 0.5
 
 # Structural stop hard cap. Stops are computed from the nearest M5 (or
 # M15) swing high/low beyond the entry; when that swing is unusually

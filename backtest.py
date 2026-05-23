@@ -34,7 +34,7 @@ from ict.levels import build_day_levels
 from ict.cls_cycles import cbdr_hl, cycle_phases, in_macro_window
 from ict.liquidity_zones import collect_zones, most_recent_tap
 from ict.liquidity_run import validate as validate_sweep, confirm_tf_for
-from ict.smt import confirm as smt_confirm
+from ict.smt import confirm as smt_confirm, structural_walk as smt_structural_walk
 from ict.target import pick as pick_target, pick_dol, candidates as target_candidates
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.swings import find_swings
@@ -740,40 +740,21 @@ class Backtester:
             return
         g["sweep_validated"] += 1
 
-        # SMT vs NYO on both pairs — confluence, NOT a hard gate.
-        # config.SMT_REQUIRED=True restores the legacy block-on-no-divergence
-        # behaviour. Default is False: SMT contributes to the game-theory
-        # score; setups can still fire without it.
-        other = OTHER[pair]
-        other_levels = self._day_levels(other, t)
-        other_bars_5 = self.bars_up_to(other, "5T", t)
-        smt = None
-        smt_warning = None
-        smt_dist_traded = None
-        smt_dist_other = None
-        if other_levels is not None and other_bars_5:
-            smt = smt_confirm(
-                traded_symbol=pair, traded_price=cur_price, traded_nyo=levels.nyo,
-                other_symbol=other, other_price=other_bars_5[-1].Close,
-                other_nyo=other_levels.nyo, direction=direction,
-            )
-            # Also probe the OPPOSITE direction — if SMT divergence exists
-            # for the other side it's a real reversal warning, distinct from
-            # "no read either way".
-            smt_warning = smt_confirm(
-                traded_symbol=pair, traded_price=cur_price, traded_nyo=levels.nyo,
-                other_symbol=other, other_price=other_bars_5[-1].Close,
-                other_nyo=other_levels.nyo, direction=-direction,
-            )
-            pip_p_diag = pip_size(pair)
-            if levels.nyo is not None:
-                smt_dist_traded = round((cur_price - levels.nyo) / pip_p_diag, 1)
-            if other_levels.nyo is not None:
-                smt_dist_other = round(
-                    (other_bars_5[-1].Close - other_levels.nyo) / pip_size(other), 1)
-        if config.SMT_REQUIRED and smt is None:
-            return
-        if smt is not None:
+        # Structural SMT — three-asset structural-break walk W1->D1->H4->H1
+        # ->M15. Operator-spec: SMT is for analysis on higher timeframes;
+        # M5 is excluded. Confluence-only, never a gate.
+        eur_by_tf = {tf: self.bars_up_to("EURUSD", tf, t)
+                     for tf in ("W", "D", "240T", "60T", "15T")}
+        gbp_by_tf = {tf: self.bars_up_to("GBPUSD", tf, t)
+                     for tf in ("W", "D", "240T", "60T", "15T")}
+        dxy_by_tf = {tf: self.bars_up_to("DXY", tf, t)
+                     for tf in ("W", "D", "240T", "60T", "15T")}
+        smt_struct = smt_structural_walk(direction, eur_by_tf, gbp_by_tf, dxy_by_tf)
+
+        # Count which read we got so the funnel is honest.
+        g.setdefault(f"smt_struct_{smt_struct.state}", 0)
+        g[f"smt_struct_{smt_struct.state}"] += 1
+        if smt_struct.state == "confirmed":
             g["smt_confirmed"] += 1
         else:
             g.setdefault("smt_absent", 0)
@@ -1038,7 +1019,8 @@ class Backtester:
             vol_regime_label=regime,
             news_proximity_minutes=prox_min,
             news_impact=prox_impact,
-            smt_confirmed=(smt is not None),
+            smt_confirmed=(smt_struct.state == "confirmed"),
+            smt_divergence=(smt_struct.state == "divergence"),
         )
         if not gt_passes(score):
             return
@@ -1123,10 +1105,12 @@ class Backtester:
             "mss_eur": mss_per_sym.get("EURUSD", 0),
             "mss_gbp": mss_per_sym.get("GBPUSD", 0),
             "mss_dxy": mss_per_sym.get("DXY", 0),
-            "smt_confirmed": smt is not None,
-            "smt_warning_opposite": smt_warning is not None,
-            "smt_dist_traded": smt_dist_traded,
-            "smt_dist_other": smt_dist_other,
+            "smt_state": smt_struct.state,
+            "smt_tf": smt_struct.tf,
+            "smt_dxy_aligned": smt_struct.dxy_aligned,
+            "smt_eur_aligned": smt_struct.eur_aligned,
+            "smt_gbp_aligned": smt_struct.gbp_aligned,
+            "smt_divergent": ",".join(smt_struct.divergent) or "-",
             "outcome": "placed",
         })
         self.pending[pair] = {
@@ -1333,12 +1317,12 @@ def main():
                   f"rr={s['rr']} score={s['score']} mss={s.get('mss_hits','?')}/3 "
                   f"trigger={s.get('trigger','?')} swept={s['swept']} zone={s['zone']} "
                   f"outcome={s['outcome']}{best_s}")
-            smt_ok = s.get("smt_confirmed")
-            smt_warn = s.get("smt_warning_opposite")
-            smt_label = ("confirmed" if smt_ok
-                         else ("WARNING_OPPOSITE" if smt_warn else "absent"))
-            print(f"     SMT={smt_label}  dist_traded={s.get('smt_dist_traded')}p  "
-                  f"dist_other={s.get('smt_dist_other')}p  "
+            smt_state = s.get("smt_state", "absent")
+            print(f"     SMT={smt_state:10s} tf={s.get('smt_tf','-')} "
+                  f"aligned(dxy={int(s.get('smt_dxy_aligned',0))}, "
+                  f"eur={int(s.get('smt_eur_aligned',0))}, "
+                  f"gbp={int(s.get('smt_gbp_aligned',0))}) "
+                  f"divergent={s.get('smt_divergent','-')}  "
                   f"mss(eur={s.get('mss_eur',0):+d}, gbp={s.get('mss_gbp',0):+d}, "
                   f"dxy={s.get('mss_dxy',0):+d})")
 
