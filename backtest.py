@@ -57,6 +57,10 @@ YF_TICKERS = {
     "USDCAD": "USDCAD=X",
     "USDSEK": "USDSEK=X",
     "USDCHF": "USDCHF=X",
+    # Real US Dollar Index (HistData ticker UDXUSD, remapped to "DXY"
+    # on import). Optional — when present we use it as the DXY series
+    # directly instead of computing synthetic DXY from constituents.
+    "DXY":    None,
 }
 
 Bar = namedtuple("Bar", "Open High Low Close")
@@ -99,8 +103,11 @@ def fetch_data(period="60d", interval="5m"):
         df = loader.get_bars(name, tf="5T")
         source = loader.source_for(name)
         if df is None or df.empty:
-            if yf is None:
-                print(f"  WARN: no data for {name} (no store, no yfinance)")
+            if ticker is None or yf is None:
+                # ticker=None means "store-only" (e.g. DXY). Skip silently
+                # if no store data; the caller is expected to handle absence.
+                if df is None:
+                    print(f"  INFO: no data for {name} (store empty, no yfinance fallback)")
                 continue
             df = yf.download(ticker, period=period, interval=interval,
                              progress=False, auto_adjust=False)
@@ -285,6 +292,12 @@ class Backtester:
     # -- biases --------------------------------------------------------------
 
     def _dxy_bias_1h(self, t):
+        # Prefer the real DXY series if we have it loaded; the synthetic
+        # constituent rebuild was a workaround for not having an index feed.
+        real = self.bars_up_to("DXY", "60T", t) if ("DXY", "60T") in self.tf_bars else None
+        if real and len(real) >= config.SWING_LOOKBACK + 2:
+            return htf_bias(real)
+
         rolls = {s: self.bars_up_to(s, "60T", t) for s in config.DXY_CONSTITUENTS}
         n = min((len(v) for v in rolls.values()), default=0)
         if n < config.SWING_LOOKBACK + 2:
