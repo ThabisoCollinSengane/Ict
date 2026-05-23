@@ -26,7 +26,7 @@ from ict.fvg import enumerate_fvgs, first_fvg_after, detect_new_fvg
 from ict.killzones import (
     in_used_killzone, minutes_into_killzone, can_enter_new_pipeline,
 )
-from ict.structure import directional_pull, bias_holds_on_tf
+from ict.structure import directional_pull, bias_holds_on_tf, classify_intermediates, last_unmitigated
 from ict.mss import mss_direction, structural_direction
 from ict.levels import build_day_levels
 from ict.cls_cycles import cbdr_hl, cycle_phases, in_macro_window
@@ -144,6 +144,11 @@ class Backtester:
         self.pending = {}
         self.trades = []
         self.risk = RiskOverlay(start_equity=self.equity, equity=self.equity)
+        # Per-session entry tracking: only one INITIAL entry per pair per
+        # killzone per UTC date. Pyramid adds do NOT consume this slot.
+        self.session_entries = {}    # (date, kz_name, pair) -> int
+        # Whether the London->NY handoff reversal has been processed today.
+        self.session_handoff_done = {}    # (date, pair) -> bool
         self.gate = {
             "checks": 0,
             "killzone+first_hour": 0,
@@ -307,6 +312,13 @@ class Backtester:
 
             now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
             in_kz = in_used_killzone(now)
+
+            # London -> NY handoff: at the start of NY-AM, if any open
+            # position's direction conflicts with the current D1 directional
+            # pull, exit it so the NY pipeline can re-enter on the new side.
+            if in_kz == "NY AM":
+                self._maybe_session_handoff(t, now)
+
             for pair in config.PAIRS:
                 if pair in self.active:
                     self._maybe_pyramid(pair, t)
@@ -333,6 +345,7 @@ class Backtester:
             st = self.active[pair]
             direction = st["direction"]
             target = st["target"]
+            tp_was_hit_this_bar = False
             for leg in list(st["legs"]):
                 sl = leg["stop"]
                 if direction > 0:
@@ -344,7 +357,17 @@ class Backtester:
                 if sl_hit:
                     self._exit_leg(pair, leg, sl, t, "stop")
                 elif tp_hit:
-                    self._exit_leg(pair, leg, target, t, "target")
+                    if not st.get("tp1_hit", False):
+                        # FIRST leg only on TP1; runners stay open.
+                        if leg is st["legs"][0]:
+                            self._exit_leg(pair, leg, target, t, "target_tp1_scale")
+                            tp_was_hit_this_bar = True
+                        # Other legs at TP1: leave them, runner extension below.
+                    else:
+                        # Runner target hit -> close.
+                        self._exit_leg(pair, leg, target, t, "target_runner")
+            if tp_was_hit_this_bar and self.active.get(pair, {}).get("legs"):
+                self._extend_runners(pair, t, target)
             if not self.active.get(pair, {}).get("legs"):
                 self.active.pop(pair, None)
 
@@ -371,8 +394,15 @@ class Backtester:
         if pair not in self.active:
             self.active[pair] = {
                 "direction": pe["direction"], "target": pe["target"],
-                "legs": [leg], "opened_at": t,
+                "original_target": pe["target"],
+                "legs": [leg], "opened_at": t, "tp1_hit": False,
             }
+            # Initial entry: consume the per-session entry slot.
+            now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+            kz_name = in_used_killzone(now)
+            if kz_name:
+                key = (now.date(), kz_name, pair)
+                self.session_entries[key] = self.session_entries.get(key, 0) + 1
         else:
             prior = self.active[pair]["legs"][-1]
             prior["stop"] = prior["entry"]   # BE on add
@@ -401,6 +431,91 @@ class Backtester:
         for leg in list(self.active[pair]["legs"]):
             self._exit_leg(pair, leg, price, t, reason)
 
+    def _extend_runners(self, pair, t, tp1_price):
+        """Called once when TP1 is hit and at least one runner leg survives.
+        Tighten runner stops to the nearest M15 ITH/ITL behind price, and set
+        the new target to the next HTF DOL beyond TP1. If no further DOL is
+        available (we're against the HTF draw), close all runners.
+        """
+        st = self.active[pair]
+        st["tp1_hit"] = True
+        direction = st["direction"]
+        cur_price = tp1_price   # we just hit it
+
+        # New target = next HTF DOL beyond current price.
+        levels = self._day_levels(pair, t)
+        cbdr_h, cbdr_l = self._cbdr(pair, t)
+        htf_for_dol = {
+            "D":    self.bars_up_to(pair, "D", t),
+            "240T": self.bars_up_to(pair, "240T", t),
+        }
+        new_target = pick_dol(
+            pair, htf_for_dol, levels, cbdr_h, cbdr_l, direction, cur_price,
+            risk_pips=None, min_rr=None,
+        ) if levels is not None else None
+        # Validate the new target is meaningfully beyond TP1.
+        pip = pip_size(pair)
+        min_extension_pips = 5
+        if (new_target is None
+                or (direction > 0 and new_target.price <= cur_price + min_extension_pips * pip)
+                or (direction < 0 and new_target.price >= cur_price - min_extension_pips * pip)):
+            # No HTF DOL beyond -> we're against the bigger draw. Exit runners.
+            self._force_close(pair, cur_price, t, "runner_no_htf_dol")
+            return
+
+        # Tighten runner stops to the nearest unmitigated M15 ITH/ITL
+        # behind price (ITH for longs' runners = above, but wait we want stop
+        # BEHIND for runners; for shorts the stop is ABOVE so we want the
+        # nearest unmitigated ITH above current; for longs we want the
+        # nearest unmitigated ITL below).
+        bars_15 = self.bars_up_to(pair, "15T", t)
+        new_stop = None
+        if bars_15:
+            ints = classify_intermediates(bars_15)
+            if direction > 0:
+                # Long runners: stop below at nearest unmitigated ITL.
+                itl_candidates = [i for i in ints if i.kind == -1
+                                  and not i.mitigated and i.price < cur_price]
+                if itl_candidates:
+                    new_stop = max(c.price for c in itl_candidates)
+            else:
+                ith_candidates = [i for i in ints if i.kind == +1
+                                  and not i.mitigated and i.price > cur_price]
+                if ith_candidates:
+                    new_stop = min(c.price for c in ith_candidates)
+
+        # Update target on the position and stops on remaining legs.
+        st["target"] = new_target.price
+        if new_stop is not None:
+            for leg in st["legs"]:
+                if direction > 0:
+                    leg["stop"] = max(leg["stop"], new_stop)
+                else:
+                    leg["stop"] = min(leg["stop"], new_stop)
+
+    def _maybe_session_handoff(self, t, now):
+        """At NY-AM open, close any open position whose direction conflicts
+        with the current D1 directional pull. The NY pipeline can then re-enter
+        on the new side as its own per-session trade.
+        """
+        for pair in list(self.active.keys()):
+            key = (now.date(), pair)
+            if self.session_handoff_done.get(key):
+                continue
+            d1_bars = self.bars_up_to(pair, "D", t)
+            if not d1_bars:
+                continue
+            d1_dir = directional_pull(d1_bars)
+            if d1_dir == 0:
+                self.session_handoff_done[key] = True
+                continue
+            pos_dir = self.active[pair]["direction"]
+            if pos_dir != d1_dir:
+                bar = self._bar_at(pair, "5T", t)
+                if bar is not None:
+                    self._force_close(pair, bar.Close, t, "session_handoff_reversal")
+            self.session_handoff_done[key] = True
+
     # -- new entry pipeline --------------------------------------------------
 
     def _maybe_open(self, pair, t):
@@ -414,6 +529,14 @@ class Backtester:
         if config.NEWS_HARD_BLOCK_ENABLED and self.news.is_blocked(now):
             return
         g["news_clear"] += 1
+
+        # Per-session entry cap: only one INITIAL entry per pair per killzone.
+        kz_name = in_used_killzone(now)
+        session_key = (now.date(), kz_name, pair) if kz_name else None
+        if session_key and self.session_entries.get(session_key, 0) >= 1:
+            g.setdefault("session_entry_cap", 0)
+            g["session_entry_cap"] += 1
+            return
 
         # Intermarket pair selection.
         dxy_b = self._dxy_bias_1h(t)
@@ -831,6 +954,35 @@ def summarize(bt):
     }
 
 
+def calibration_report(bt):
+    """Trade-frequency vs the operator-target of 2 trades/day (London + NY)
+    on 3-5 tradable days/week. Counts initial entries only (pyramid adds
+    don't count as new positions).
+    """
+    if not bt.trades:
+        return {"initial_entries": 0, "trades_per_day": 0.0,
+                "tradable_days": 0, "weeks_covered": 0}
+    df = pd.DataFrame(bt.trades)
+    df["opened_at"] = pd.to_datetime(df["opened_at"], utc=True)
+    df["date"] = df.opened_at.dt.date
+    # Initial entries = leg_idx 1.
+    initial = df[df.leg_idx == 1]
+    by_day = initial.groupby("date").size()
+    by_week = initial.groupby(initial.opened_at.dt.isocalendar().week).size()
+    tradable_days = (by_day > 0).sum()
+    span_days = (df.opened_at.max() - df.opened_at.min()).days or 1
+    return {
+        "initial_entries": int(len(initial)),
+        "pyramid_adds": int(len(df) - len(initial)),
+        "trades_per_day": round(len(initial) / max(span_days, 1), 2),
+        "tradable_days": int(tradable_days),
+        "calendar_days": int(span_days),
+        "target_per_day": 2,
+        "target_tradable_days_per_5_weekday_week": "3-5",
+        "by_week_initial_entries": by_week.to_dict() if not by_week.empty else {},
+    }
+
+
 def main():
     print("Fetching 60d of 5-min forex data from yfinance...")
     data = fetch_data()
@@ -857,6 +1009,10 @@ def main():
     print("\n=== Results ===")
     for k, v in summarize(bt).items():
         print(f"  {k:20s} {v}")
+
+    print("\n=== Calibration (vs 2 trades/day, 3-5 tradable days/week) ===")
+    for k, v in calibration_report(bt).items():
+        print(f"  {k:32s} {v}")
 
     if bt.trades:
         print("\n=== Trades ===")
