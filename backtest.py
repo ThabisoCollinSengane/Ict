@@ -172,10 +172,18 @@ class Backtester:
             "news_clear": 0,
             "intermarket": 0,
             "pair_match": 0,
-            "bias_cascade_d1_ok": 0,
-            "bias_cascade_h4_ok": 0,
-            "bias_cascade_h1_ok": 0,
-            "bias_cascade_m15_ok": 0,
+            "bias_cascade_d1_supports": 0,
+            "bias_cascade_d1_neutral": 0,
+            "bias_cascade_d1_against": 0,
+            "bias_cascade_h4_supports": 0,
+            "bias_cascade_h4_neutral": 0,
+            "bias_cascade_h4_against": 0,
+            "bias_cascade_h1_supports": 0,
+            "bias_cascade_h1_neutral": 0,
+            "bias_cascade_h1_against": 0,
+            "bias_cascade_m15_supports": 0,
+            "bias_cascade_m15_neutral": 0,
+            "bias_cascade_m15_against": 0,
             "htf_zone_tap": 0,
             "kz_swing_identified": 0,
             "retail_pool_swept": 0,
@@ -573,35 +581,43 @@ class Backtester:
         g["pair_match"] += 1
         direction = sig.direction
 
-        # Fractal bias cascade: D1 -> H4 -> H1 -> M15.
-        # D1 requires the directional pull (most-recent unmitigated ITH vs
-        # ITL: whichever is fresher) to match the trade direction — this is
-        # the active draw on liquidity. H4/H1/M15 require structure to be
-        # "not invalidated": price still on the correct side of the most
-        # recent unmitigated ITH (shorts) / ITL (longs). Strict TFs
-        # (config.BIAS_CASCADE_STRICT_TFS) block on fail; soft TFs are
-        # counted in the funnel but pass-through.
+        # Fractal bias cascade: D1 -> H4 -> H1 -> M15. Tri-state per TF
+        # ("supports" / "against" / "neutral"). Strict TFs reject only on
+        # EXPLICIT against; neutral (no structural read on that TF) falls
+        # through. This is what lets the algo trade when a higher TF is
+        # quiet enough not to have formed unmitigated ITH/ITL yet — common
+        # on D1 with only ~40 days of history.
         bars_5_pre = self.bars_up_to(pair, "5T", t)
         if not bars_5_pre:
             return
         cur_price_cascade = bars_5_pre[-1].Close
+
         d1_bars = self.bars_up_to(pair, "D", t)
-        if directional_pull(d1_bars) != direction:
+        d1_pull = directional_pull(d1_bars)
+        if d1_pull == direction:
+            g["bias_cascade_d1_supports"] += 1
+        elif d1_pull == -direction:
+            g["bias_cascade_d1_against"] += 1
             if "D" in config.BIAS_CASCADE_STRICT_TFS:
                 return
         else:
-            g["bias_cascade_d1_ok"] += 1
+            g["bias_cascade_d1_neutral"] += 1
 
         cascade_pass = True
-        for tf, gate_key in (("240T", "bias_cascade_h4_ok"),
-                             ("60T",  "bias_cascade_h1_ok"),
-                             ("15T",  "bias_cascade_m15_ok")):
+        for tf, key_root in (("240T", "bias_cascade_h4"),
+                             ("60T",  "bias_cascade_h1"),
+                             ("15T",  "bias_cascade_m15")):
             tf_bars_now = self.bars_up_to(pair, tf, t)
-            if bias_holds_on_tf(tf_bars_now, direction, cur_price_cascade):
-                g[gate_key] += 1
-            elif tf in config.BIAS_CASCADE_STRICT_TFS:
-                cascade_pass = False
-                break
+            state = bias_holds_on_tf(tf_bars_now, direction, cur_price_cascade)
+            if state is True:
+                g[f"{key_root}_supports"] += 1
+            elif state is False:
+                g[f"{key_root}_against"] += 1
+                if tf in config.BIAS_CASCADE_STRICT_TFS:
+                    cascade_pass = False
+                    break
+            else:
+                g[f"{key_root}_neutral"] += 1
         if not cascade_pass:
             return
 

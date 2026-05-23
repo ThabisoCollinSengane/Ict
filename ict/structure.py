@@ -65,25 +65,40 @@ def last_unmitigated(levels: list[IntermediateLevel], kind: int) -> Optional[Int
 
 
 def bias_holds_on_tf(candles, direction: int, current_price: float,
-                     left=None, right=None) -> bool:
-    """True if the most recent unmitigated ITH/ITL on this TF still
-    structurally supports `direction`.
+                     left=None, right=None):
+    """Tri-state structural read of this TF for `direction`.
 
-    For shorts (-1): an unmitigated ITH must exist and sit above current_price
-      (price is still below the ITH that anchored the bearish leg).
-    For longs (+1): an unmitigated ITL must exist and sit below current_price.
+    Returns:
+        True  — supports: an unmitigated ITH (for shorts) / ITL (for longs)
+                exists on the correct side of current_price.
+        False — against: no correct-side unmitigated level, but an
+                opposite-direction unmitigated level IS present (positive
+                evidence the move is going the other way).
+        None  — neutral: no unmitigated intermediates of either kind. No
+                read — caller decides whether to treat this as a soft pass
+                (insufficient history / quiet structure) or a strict fail.
 
-    Returns False if no qualifying unmitigated level exists — structure on
-    this TF gives no read for that side.
+    The previous return shape was a flat bool that conflated "no read"
+    with "against"; this version makes the distinction explicit so a thin
+    higher TF can be skipped rather than blocking otherwise valid setups.
     """
     if direction == 0:
         return False
     levels = classify_intermediates(candles, left, right)
+    if not levels:
+        return None
     kind = +1 if direction < 0 else -1
     lvl = last_unmitigated(levels, kind)
-    if lvl is None:
+    if lvl is not None:
+        on_correct_side = (lvl.price > current_price) if direction < 0 else (lvl.price < current_price)
+        if on_correct_side:
+            return True
+    # No correct-side unmitigated level. If an opposite-side unmitigated
+    # level exists, structure is actively against us.
+    opp = last_unmitigated(levels, -kind)
+    if opp is not None:
         return False
-    return (lvl.price > current_price) if direction < 0 else (lvl.price < current_price)
+    return None
 
 
 def directional_pull(candles, left=None, right=None) -> int:
