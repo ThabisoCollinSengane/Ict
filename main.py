@@ -154,6 +154,10 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if signal is None or signal.pair != pair:
             return
 
+        # Episode 12+18: Daily is the primary bias timeframe. Must agree first.
+        if config.REQUIRE_DAILY_BIAS:
+            if self._sym_bias(pair, self.bars_1d) != signal.direction:
+                return
         if self._sym_bias(pair, self.bars_1h) != signal.direction:
             return
         if self._sym_bias(pair, self.bars_4h) != signal.direction:
@@ -182,7 +186,9 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
 
         pip = pip_size(pair)
         entry = fvg.mid
-        stop = (sweep_price - pip) if signal.direction > 0 else (sweep_price + pip)
+        # Episode 18: stop at the FVG boundary, not the swept range extreme.
+        # "Put his stop at the top of that imbalance, not the candle before it."
+        stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
 
         risk_pips = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip

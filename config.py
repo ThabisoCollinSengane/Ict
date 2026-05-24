@@ -17,6 +17,16 @@ KILLZONES = [
 ]
 NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzone
 
+# --- ICT 2022 Episode 12: Market Structure hierarchy ---
+# Episode 12 defines three swing tiers: LTH/LTL (Daily ~50 bars), ITH/ITL (1H ~20
+# bars), STH/STL (1H ~8 bars). SWING_LOOKBACK is the ITH/ITL tier; the new
+# SWING_LOOKBACK_STH covers the short-term tier used in classify_swing_structure().
+SWING_LOOKBACK_STH = 8
+
+# Episode 12 + 18: "Daily is the most important, bias is found off daily."
+# When True, the daily chart BOS must agree with the intermarket signal direction.
+REQUIRE_DAILY_BIAS = True
+
 # --- News filter ---
 NEWS_BLOCK_MINUTES_BEFORE = 15
 NEWS_BLOCK_MINUTES_AFTER  = 15

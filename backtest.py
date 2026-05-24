@@ -95,7 +95,7 @@ class Backtester:
         self.gate = {
             "checks": 0, "in_killzone": 0, "news_clear": 0,
             "intermarket_signal": 0, "pair_matches": 0,
-            "h1_bias_ok": 0, "h4_bias_ok": 0,
+            "daily_bias_ok": 0, "h1_bias_ok": 0, "h4_bias_ok": 0,
             "consolidation_found": 0, "manipulation_correct_dir": 0,
             "m5_fvg_correct_dir": 0, "target_found": 0,
             "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
@@ -331,6 +331,11 @@ class Backtester:
             return
         g["pair_matches"] += 1
 
+        # Episode 12+18: Daily bias is the primary filter.
+        if config.REQUIRE_DAILY_BIAS:
+            if self._sym_bias(pair, "D", t) != signal.direction:
+                return
+        g["daily_bias_ok"] += 1
         if self._sym_bias(pair, "60T", t) != signal.direction:
             return
         g["h1_bias_ok"] += 1
@@ -363,7 +368,8 @@ class Backtester:
 
         pip = pip_size(pair)
         entry = fvg.mid
-        stop = (sweep_price - pip) if signal.direction > 0 else (sweep_price + pip)
+        # Episode 18: stop at the FVG boundary, not the swept range extreme.
+        stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
         risk_pips = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:

@@ -1,10 +1,16 @@
-"""HTF bias: Break-of-Structure + EMA filter."""
+"""HTF bias: Break-of-Structure + EMA filter.
+
+ICT 2022 Episode 12 — Market Structure For Precision Technicians:
+  Three-tier swing hierarchy: LTH/LTL (Daily), ITH/ITL (4H), STH/STL (1H).
+  `classify_swing_structure()` returns all three tiers from a single candle list.
+  Callers pass appropriately-sized lookbacks for each tier.
+"""
 
 import config
 
 
 def _swings(candles, lookback: int):
-    """Return (last_swing_high, last_swing_low) from the lookback window."""
+    """Return (swing_high, swing_low) from the trailing `lookback` candles."""
     n = len(candles)
     if n < lookback + 2:
         return None, None
@@ -12,6 +18,30 @@ def _swings(candles, lookback: int):
     swing_high = max(c.High for c in window)
     swing_low = min(c.Low for c in window)
     return swing_high, swing_low
+
+
+def classify_swing_structure(candles,
+                              lookback_lth: int = 50,
+                              lookback_ith: int = None,
+                              lookback_sth: int = None) -> dict:
+    """Episode 12: classify recent price swings into LTH/ITH/STH tiers.
+
+    Returns a dict with keys: lth, ltl, ith, itl, sth, stl.
+    Each value is the price level of the most recent swing of that tier, or None.
+
+    Recommended caller usage:
+      - Pass Daily bars with lookback_lth=50 for LTH/LTL.
+      - Pass 4H bars with default lookback_ith (SWING_LOOKBACK) for ITH/ITL.
+      - Pass 1H bars with lookback_sth (SWING_LOOKBACK_STH) for STH/STL.
+    """
+    lookback_ith = lookback_ith or config.SWING_LOOKBACK
+    lookback_sth = lookback_sth or config.SWING_LOOKBACK_STH
+
+    lth, ltl = _swings(candles, lookback_lth)
+    ith, itl = _swings(candles, lookback_ith)
+    sth, stl = _swings(candles, lookback_sth)
+
+    return {"lth": lth, "ltl": ltl, "ith": ith, "itl": itl, "sth": sth, "stl": stl}
 
 
 def htf_bias(candles, ema_value: float | None = None) -> int:
