@@ -39,7 +39,16 @@ def minutes_until_killzone_end(utc_dt) -> int | None:
     return None
 
 
+# Ep 5 + 7: New York noon hour is hard no-trade (12:00–13:00 ET).
+# "Not a clean time of day for price action."
+_NOON_START = time(12, 0)
+_NOON_END   = time(13, 0)
+
+
 def can_open_new_trade(utc_dt) -> bool:
-    """True if inside a killzone AND not in the last N minutes of it."""
+    """True if inside a killzone, not in the last N minutes, and not in the noon block."""
+    ny_t = _ensure_utc(utc_dt).astimezone(NY).time()
+    if _NOON_START <= ny_t < _NOON_END:
+        return False
     remaining = minutes_until_killzone_end(utc_dt)
     return remaining is not None and remaining > config.NO_NEW_TRADES_LAST_MIN

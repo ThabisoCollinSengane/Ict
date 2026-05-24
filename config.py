@@ -14,6 +14,7 @@ KILLZONES = [
     ("London Open",  "02:00", "05:00"),
     ("New York AM",  "07:00", "10:00"),
     ("London Close", "10:00", "12:00"),
+    ("Asia",         "19:00", "21:00"),  # Ep 3: Asia killzone; mark H/L as targets
 ]
 NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzone
 
@@ -26,6 +27,9 @@ SWING_LOOKBACK_STH = 8
 # Episode 12 + 18: "Daily is the most important, bias is found off daily."
 # When True, the daily chart BOS must agree with the intermarket signal direction.
 REQUIRE_DAILY_BIAS = True
+
+# Ep 12: "Limit your forecast to a 5-day time horizon."
+MAX_FORWARD_DAYS = 5
 
 # --- News filter ---
 NEWS_BLOCK_MINUTES_BEFORE = 15

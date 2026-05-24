@@ -23,6 +23,9 @@ UTC = pytz.utc
 class NewsCalendar:
     def __init__(self):
         self.events = []  # list of (utc_dt, currency, impact)
+        # Date of the most recent FOMC day that caused a major whipsaw, or None.
+        # Set externally by main.py when a FOMC-whipsaw is detected.
+        self.fomc_whipsaw_date = None
 
     # ---- Live ForexFactory weekly XML (works only for the current week) ----
     def load(self, xml_text: str) -> int:
@@ -83,5 +86,28 @@ class NewsCalendar:
         after = timedelta(minutes=config.NEWS_BLOCK_MINUTES_AFTER)
         for ev_dt, _, _ in self.events:
             if ev_dt - before <= utc_dt <= ev_dt + after:
+                return True
+        return False
+
+    def is_nfp_week(self, utc_dt: datetime) -> bool:
+        """Return True if the ISO week of `utc_dt` contains a USD Non-Farm Payrolls event.
+
+        NFP is typically released on the first Friday of each month at 08:30 NY time.
+        We detect it by scanning our loaded events for a USD High-impact event on a
+        Friday between 12:00–14:00 UTC (08:00–10:00 ET), which is the standard NFP slot.
+        If no events are loaded we conservatively return False.
+        """
+        if utc_dt.tzinfo is None:
+            utc_dt = UTC.localize(utc_dt)
+        week_start = utc_dt.date() - __import__("datetime").timedelta(days=utc_dt.weekday())
+        week_end = week_start + __import__("datetime").timedelta(days=6)
+        for ev_dt, currency, impact in self.events:
+            if currency != "USD" or impact != "High":
+                continue
+            ev_date = ev_dt.date()
+            if not (week_start <= ev_date <= week_end):
+                continue
+            # NFP is on a Friday (weekday 4) and released around 12:30 UTC
+            if ev_dt.weekday() == 4 and 12 <= ev_dt.hour <= 14:
                 return True
         return False

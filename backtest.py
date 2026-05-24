@@ -22,6 +22,13 @@ from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_consolidation, detect_manipulation
+from ict.dealing_range import (
+    detect_dealing_range,
+    is_valid_entry_zone,
+    is_valid_target_zone,
+    is_nfp_week_low_probability,
+    is_post_fomc_low_probability,
+)
 from intermarket import resolve as resolve_intermarket
 from news_filter import NewsCalendar
 from risk import position_size, pip_size
@@ -94,9 +101,10 @@ class Backtester:
         # Diagnostic counters: how many times each gate was reached / rejected.
         self.gate = {
             "checks": 0, "in_killzone": 0, "news_clear": 0,
-            "intermarket_signal": 0, "pair_matches": 0,
+            "nfp_fomc_ok": 0, "intermarket_signal": 0, "pair_matches": 0,
             "daily_bias_ok": 0, "h1_bias_ok": 0, "h4_bias_ok": 0,
-            "consolidation_found": 0, "manipulation_correct_dir": 0,
+            "dealing_range_ok": 0, "consolidation_found": 0,
+            "manipulation_correct_dir": 0,
             "m5_fvg_correct_dir": 0, "target_found": 0,
             "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
         }
@@ -280,6 +288,15 @@ class Backtester:
             candidates = [c for c in candidates if c < price]
         if not candidates:
             return None
+        # Prefer targets in the correct dealing range zone (premium for buys, discount
+        # for sells); fall back to unfiltered if no filtered target exists.
+        bars1h = self.bars_up_to(pair, "60T", t)
+        dr = detect_dealing_range(bars1h, lookback=100)
+        if dr is not None:
+            filtered = [c for c in candidates
+                        if is_valid_target_zone(c, dr.high, dr.low, direction)]
+            if filtered:
+                candidates = filtered
         return min(candidates, key=lambda x: abs(x - price))
 
     @staticmethod
@@ -321,6 +338,12 @@ class Backtester:
             return
         g["news_clear"] += 1
 
+        if is_nfp_week_low_probability(now, self.news.is_nfp_week(now)):
+            return
+        if is_post_fomc_low_probability(now, self.news.fomc_whipsaw_date):
+            return
+        g["nfp_fomc_ok"] += 1
+
         dxy_bias = self._dxy_bias_1h(t)
         eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t)
         signal = resolve_intermarket(dxy_bias, eurgbp_bias)
@@ -342,6 +365,17 @@ class Backtester:
         if self._sym_bias(pair, "240T", t) != signal.direction:
             return
         g["h4_bias_ok"] += 1
+
+        # Dealing range: entry must be in the correct premium/discount zone.
+        cur_price_dr = self.bars_up_to(pair, "5T", t)
+        if cur_price_dr:
+            cur_px = cur_price_dr[-1].Close
+            bars1h_dr = self.bars_up_to(pair, "60T", t)
+            dr = detect_dealing_range(bars1h_dr, lookback=100)
+            if dr is not None:
+                if not is_valid_entry_zone(cur_px, dr.high, dr.low, signal.direction):
+                    return
+        g["dealing_range_ok"] += 1
 
         bars15 = self.bars_up_to(pair, "15T", t)
         rng = detect_consolidation(bars15, pair)
