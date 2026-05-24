@@ -16,6 +16,7 @@ import config
 from ict.fvg import detect_new_fvg, update_mitigation, FVG
 from ict.order_block import detect_order_blocks, OrderBlock
 from ict.breaker import detect_breakers, Breaker
+from ict.swings import find_swings
 
 
 @dataclass
@@ -42,8 +43,12 @@ _RANK_BY_KIND_TF = {
     ("fvg", "60T"):   3,
     ("ob",  "D"):     2,
     ("ob",  "240T"):  4,
+    ("ob",  "60T"):   4,
     ("breaker", "240T"): 4,
     ("breaker", "15T"):  5,
+    ("swing", "D"):    3,
+    ("swing", "240T"): 4,
+    ("swing", "60T"):  5,
 }
 
 
@@ -66,6 +71,14 @@ def collect_zones(tf_bars_by_tf: dict, direction: int) -> list[Zone]:
     for tf in config.BREAKER_TFS:
         bars = tf_bars_by_tf.get(tf, [])
         zones += _scan_breakers(bars, tf, direction)
+
+    # HTF swings themselves are liquidity — resting orders stack just above
+    # a swing high (buyside) and just below a swing low (sellside). Tap-
+    # detection picks these up so a setup forming at a clean H4 / H1 swing
+    # qualifies even when no FVG / OB / Breaker overlaps the level.
+    for tf in config.HTF_SWING_TFS:
+        bars = tf_bars_by_tf.get(tf, [])
+        zones += _scan_swings(bars, tf, direction)
 
     zones.sort(key=lambda z: (z.rank, -z.top))
     return zones
@@ -124,6 +137,38 @@ def _scan_breakers(bars, tf, direction) -> list[Zone]:
             kind="breaker", tf=tf, direction=br.direction,
             top=br.top, bottom=br.bottom,
             rank=_RANK_BY_KIND_TF.get(("breaker", tf), 9),
+        ))
+    return out
+
+
+def _scan_swings(bars, tf, direction) -> list[Zone]:
+    """Unmitigated swing highs (for short setups) or swing lows (longs) as
+    standalone liquidity zones. Zone width = swing price ± SWING_ZONE_TOL.
+    """
+    if not bars or len(bars) < 5:
+        return []
+    swings = find_swings(bars)
+    if not swings:
+        return []
+    target_kind = +1 if direction < 0 else -1
+    out = []
+    # Use the last ~10 swings of relevant kind; earlier ones are noise.
+    for s in [sw for sw in swings if sw.kind == target_kind][-10:]:
+        # Check if subsequent close has broken this swing → mitigated.
+        tail = bars[s.index + 1:]
+        mitigated = any(
+            (target_kind == +1 and c.Close > s.price)
+            or (target_kind == -1 and c.Close < s.price)
+            for c in tail
+        )
+        if mitigated:
+            continue
+        tol = config.HTF_SWING_TOL_PIPS * 0.0001
+        out.append(Zone(
+            kind="swing", tf=tf, direction=direction,
+            top=s.price + tol if target_kind == +1 else s.price,
+            bottom=s.price if target_kind == +1 else s.price - tol,
+            rank=_RANK_BY_KIND_TF.get(("swing", tf), 6),
         ))
     return out
 

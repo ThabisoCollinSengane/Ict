@@ -102,7 +102,18 @@ BREAKER_TFS = ("15T", "240T")
 # "M5 consolidation + sweep + reversal" setups are really just a tap of an
 # H1 FVG seen from the LTF. Add H1 to the HTF tap pool.
 HTF_FVG_TFS = ("W", "D", "240T", "60T")
-HTF_OB_TFS  = ("D", "240T")
+# Order Blocks: H1 added per operator spec ("hunt liquidity all the way
+# down to H1, with H4 the priority"). M15 OB stays an entry trigger only.
+HTF_OB_TFS  = ("D", "240T", "60T")
+# Unmitigated HTF swing highs/lows treated as standalone liquidity zones —
+# resting orders cluster just beyond them even without a perfect FVG / OB
+# / Breaker. Tap of any of these = qualifying liquidity event.
+HTF_SWING_TFS = ("D", "240T", "60T")
+HTF_SWING_TOL_PIPS = 2.0           # zone width = swing price ± this many pips
+# How far back (in M5 bars) to look for an HTF zone tap. Was 6 = 30 min;
+# widened to capture taps that happened earlier in the killzone but whose
+# downstream M5 setup only formed now.
+HTF_TAP_LOOKBACK_M5_BARS = 24      # 2 hours of M5
 
 # --- SMT ---
 # Both pair_price and other_pair_price compared to their NYO; require strict

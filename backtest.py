@@ -692,7 +692,7 @@ class Backtester:
             return
         cur_price = bars_5[-1].Close
         # Tap = any of the last ~30 min of M5 wicks entered an unmitigated zone.
-        zone = most_recent_tap(zones, bars_5[-6:])
+        zone = most_recent_tap(zones, bars_5[-config.HTF_TAP_LOOKBACK_M5_BARS:])
         if zone is None:
             return
         g["htf_zone_tap"] += 1
