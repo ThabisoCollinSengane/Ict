@@ -34,7 +34,11 @@ from ict.levels import build_day_levels
 from ict.cls_cycles import cbdr_hl, cycle_phases, in_macro_window
 from ict.liquidity_zones import collect_zones, most_recent_tap
 from ict.liquidity_run import validate as validate_sweep, confirm_tf_for
-from ict.smt import confirm as smt_confirm, structural_walk as smt_structural_walk
+from ict.smt import (
+    confirm as smt_confirm,
+    structural_walk as smt_structural_walk,
+    session_open_smt,
+)
 from ict.target import pick as pick_target, pick_dol, candidates as target_candidates
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.swings import find_swings
@@ -201,6 +205,12 @@ class Backtester:
         self._levels_cache = {}
         self._cbdr_cache = {}
         self._london_first_hour_cache = {}
+        # Session-open prices: each killzone open marks a fresh anchor for
+        # session-SMT (treat each session start as its own "true day").
+        # key = (utc_date, kz_name, symbol) -> open price.
+        self._session_open_cache = {}
+        # Rejection log for post-run audit.
+        self._rejection_log = []
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -250,6 +260,33 @@ class Backtester:
         if key not in self._cbdr_cache:
             self._cbdr_cache[key] = cbdr_hl(self.data_5m[sym], t)
         return self._cbdr_cache[key]
+
+    def _session_open_price(self, sym, t):
+        """Return the Open of the first M5 bar inside the current killzone for
+        `sym`, or None if outside a session. Cached per (utc_date, kz_name,
+        sym) so we don't rescan the M5 series every check.
+        """
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        kz_name = in_used_killzone(now)
+        if kz_name is None:
+            return None
+        key = (now.date(), kz_name, sym)
+        cached = self._session_open_cache.get(key)
+        if cached is not None:
+            return cached
+        # Find the first M5 bar whose timestamp is inside this killzone today.
+        df = self.tf_dfs.get((sym, "5T"))
+        if df is None or df.empty:
+            return None
+        day_start = pd.Timestamp(now.date()).tz_localize("UTC")
+        day_end = day_start + pd.Timedelta(days=1)
+        day_slice = df[(df.index >= day_start) & (df.index < day_end)]
+        for ts, row in day_slice.iterrows():
+            ts_py = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+            if in_used_killzone(ts_py) == kz_name:
+                self._session_open_cache[key] = float(row.Open)
+                return float(row.Open)
+        return None
 
     def _killzone_open_swings(self, sym, t):
         """At the most recent killzone-open prior to `t`, snapshot the
@@ -760,14 +797,47 @@ class Backtester:
             g.setdefault("smt_absent", 0)
             g["smt_absent"] += 1
 
-        # Hard veto on SMT divergence: 2/3 instruments aligned + 1 lagging
-        # IS the textbook ICT reversal warning. The diverging asset leads
-        # the next move against our trade direction. Per operator review of
-        # 6-trade sample: 3 of 4 losers had explicit divergence warnings.
+        # Hard veto on SMT divergence — but only when the reading came
+        # from an HTF (W/D/H4/H1). M15 divergence is too noisy to act on
+        # alone; it stays in scoring as a soft penalty.
         if smt_struct.state == "divergence":
-            g.setdefault("smt_divergence_veto", 0)
-            g["smt_divergence_veto"] += 1
-            return
+            if smt_struct.tf in ("W", "D", "240T", "60T"):
+                g.setdefault("smt_divergence_veto_htf", 0)
+                g["smt_divergence_veto_htf"] += 1
+                self._rejection_log.append({
+                    "t": t, "pair": pair, "direction": direction,
+                    "reason": f"smt_divergence_veto_{smt_struct.tf}",
+                    "swept": swept_name,
+                    "zone": f"{zone.kind}/{zone.tf}",
+                    "smt_divergent": ",".join(smt_struct.divergent),
+                })
+                return
+            # M15 divergence: not a veto. The score penalty from
+            # game_theory still applies via the smt_divergence=True flag.
+            g.setdefault("smt_divergence_m15_soft", 0)
+            g["smt_divergence_m15_soft"] += 1
+
+        # Session-open SMT (lower-TF, killzone-anchored). Treats the start
+        # of the active session as a fresh "true day": each instrument's
+        # price NOW vs its session-open price gives an additional cross-
+        # asset confluence check, independent of the structural-break SMT.
+        sess_smt = None
+        eur_so = self._session_open_price("EURUSD", t)
+        gbp_so = self._session_open_price("GBPUSD", t)
+        dxy_so = self._session_open_price("DXY", t)
+        if all(x is not None for x in (eur_so, gbp_so, dxy_so)):
+            eur_bars = self.bars_up_to("EURUSD", "5T", t)
+            gbp_bars = self.bars_up_to("GBPUSD", "5T", t)
+            dxy_bars = self.bars_up_to("DXY", "5T", t)
+            if eur_bars and gbp_bars and dxy_bars:
+                sess_smt = session_open_smt(
+                    direction,
+                    eur_open=eur_so, eur_now=eur_bars[-1].Close,
+                    gbp_open=gbp_so, gbp_now=gbp_bars[-1].Close,
+                    dxy_open=dxy_so, dxy_now=dxy_bars[-1].Close,
+                )
+                g.setdefault(f"sess_smt_{sess_smt.state}", 0)
+                g[f"sess_smt_{sess_smt.state}"] += 1
 
         # MSS-2-of-3 — required for ALL setups (operator decision: keep MSS
         # confluence even on HTF FVG entries; the volatility/PnL pattern
@@ -787,6 +857,16 @@ class Backtester:
         if mss_hits < 2:
             g.setdefault("mss_2_of_3_fail", 0)
             g["mss_2_of_3_fail"] += 1
+            self._rejection_log.append({
+                "t": t, "pair": pair, "direction": direction,
+                "reason": "mss_2_of_3_fail",
+                "swept": swept_name,
+                "zone": f"{zone.kind}/{zone.tf}",
+                "mss_hits": mss_hits,
+                "mss_eur": mss_per_sym.get("EURUSD", 0),
+                "mss_gbp": mss_per_sym.get("GBPUSD", 0),
+                "mss_dxy": mss_per_sym.get("DXY", 0),
+            })
             return
         g.setdefault("mss_2_of_3_pass", 0)
         g["mss_2_of_3_pass"] += 1
@@ -1030,6 +1110,8 @@ class Backtester:
             news_impact=prox_impact,
             smt_confirmed=(smt_struct.state == "confirmed"),
             smt_divergence=(smt_struct.state == "divergence"),
+            session_smt_confirmed=(sess_smt is not None and sess_smt.state == "confirmed"),
+            session_smt_divergence=(sess_smt is not None and sess_smt.state == "divergence"),
         )
         if not gt_passes(score):
             return
@@ -1120,6 +1202,10 @@ class Backtester:
             "smt_eur_aligned": smt_struct.eur_aligned,
             "smt_gbp_aligned": smt_struct.gbp_aligned,
             "smt_divergent": ",".join(smt_struct.divergent) or "-",
+            "sess_smt_state": sess_smt.state if sess_smt else "no_open",
+            "sess_smt_eur_move": sess_smt.eur_move_pips if sess_smt else None,
+            "sess_smt_gbp_move": sess_smt.gbp_move_pips if sess_smt else None,
+            "sess_smt_dxy_move": sess_smt.dxy_move_pips if sess_smt else None,
             "outcome": "placed",
         })
         self.pending[pair] = {
@@ -1334,12 +1420,35 @@ def main():
                   f"divergent={s.get('smt_divergent','-')}  "
                   f"mss(eur={s.get('mss_eur',0):+d}, gbp={s.get('mss_gbp',0):+d}, "
                   f"dxy={s.get('mss_dxy',0):+d})")
+            ss = s.get("sess_smt_state", "no_open")
+            print(f"     SessSMT={ss:10s} moves_pips(eur={s.get('sess_smt_eur_move')}, "
+                  f"gbp={s.get('sess_smt_gbp_move')}, dxy={s.get('sess_smt_dxy_move')})")
 
     audit = pattern_audit(bt)
     if audit:
         print("\n=== Pattern audit (HTF-FVG-tap setups across the run) ===")
         for k, v in audit.items():
             print(f"  {k:25s} {v}")
+
+    rejections = getattr(bt, "_rejection_log", [])
+    if rejections:
+        # Group by reason for the funnel breakdown.
+        by_reason = {}
+        for r in rejections:
+            by_reason.setdefault(r["reason"], []).append(r)
+        print(f"\n=== Rejection log ({len(rejections)} setups vetoed) ===")
+        for reason, items in sorted(by_reason.items(), key=lambda kv: -len(kv[1])):
+            print(f"\n  -- {reason} ({len(items)}) --")
+            for r in items:
+                extras = []
+                if "mss_hits" in r:
+                    extras.append(f"mss={r['mss_hits']}/3 (eur={r.get('mss_eur',0):+d} "
+                                  f"gbp={r.get('mss_gbp',0):+d} dxy={r.get('mss_dxy',0):+d})")
+                if "smt_divergent" in r:
+                    extras.append(f"divergent={r['smt_divergent']}")
+                extras_s = "  ".join(extras)
+                print(f"    {r['t']} {r['pair']:6s} dir={r['direction']:+d} "
+                      f"swept={r.get('swept','-')} zone={r.get('zone','-')}  {extras_s}")
 
     print("\n=== Calibration (vs 2 trades/day, 3-5 tradable days/week) ===")
     for k, v in calibration_report(bt).items():

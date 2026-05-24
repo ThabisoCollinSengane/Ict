@@ -168,6 +168,90 @@ def structural_on_tf(direction: int, bars_eur, bars_gbp, bars_dxy) -> Structural
     )
 
 
+# ---- Session-open SMT (LTF anchor, H1/M15/M5) ------------------------------
+#
+# Operator-spec: each session opening (London open, NY-AM open) creates a
+# NEW directional anchor — much like the NYO at midnight. Compare each
+# instrument's current price to its session-open price; if all three have
+# moved in directions consistent with the trade, the cross-asset alignment
+# is confirming. Used for entry timing on lower TFs (H1/M15/M5).
+#
+# This is anchored to the session OPEN, not to structural swings — so it
+# answers "are all three pairs moving the right way SINCE THIS SESSION
+# STARTED?" rather than "did each one take out a recent swing?".
+
+
+@_dc
+class SessionSMT:
+    state: str                   # "confirmed" | "divergence" | "absent"
+    dxy_aligned: bool
+    eur_aligned: bool
+    gbp_aligned: bool
+    divergent: list = _field(default_factory=list)
+    eur_move_pips: float = 0.0   # signed (positive = up, negative = down)
+    gbp_move_pips: float = 0.0
+    dxy_move_pips: float = 0.0
+
+
+def session_open_smt(direction: int,
+                     eur_open: float, eur_now: float,
+                     gbp_open: float, gbp_now: float,
+                     dxy_open: float, dxy_now: float,
+                     min_move_pips: float = 3.0) -> SessionSMT:
+    """SMT alignment relative to session open.
+
+    For a SHORT setup (-1) the expected pattern is:
+        EUR below its session-open by >= min_move_pips
+        GBP below its session-open by >= min_move_pips
+        DXY above its session-open by >= min_move_pips
+    Mirror for longs.
+
+    3/3 -> confirmed. 2/3 -> divergence (the lagging instrument is the
+    early-reversal signal). <2 -> absent.
+    """
+    pip_eur = _pip("EURUSD")
+    pip_gbp = _pip("GBPUSD")
+    # DXY index uses points like other forex pairs but the "pip" is more
+    # meaningful as raw points; we use 0.01 (one point) as a conservative
+    # unit so the min-move threshold is non-trivial.
+    pip_dxy = 0.01
+
+    eur_move = (eur_now - eur_open) / pip_eur
+    gbp_move = (gbp_now - gbp_open) / pip_gbp
+    dxy_move = (dxy_now - dxy_open) / pip_dxy
+
+    if direction == -1:
+        eur_aligned = eur_move <= -min_move_pips
+        gbp_aligned = gbp_move <= -min_move_pips
+        dxy_aligned = dxy_move >= +min_move_pips
+    else:
+        eur_aligned = eur_move >= +min_move_pips
+        gbp_aligned = gbp_move >= +min_move_pips
+        dxy_aligned = dxy_move <= -min_move_pips
+
+    count = sum([eur_aligned, gbp_aligned, dxy_aligned])
+    divergent = []
+    if not dxy_aligned: divergent.append("DXY")
+    if not eur_aligned: divergent.append("EUR")
+    if not gbp_aligned: divergent.append("GBP")
+
+    if count == 3:
+        state = "confirmed"
+    elif count == 2:
+        state = "divergence"
+    else:
+        state = "absent"
+
+    return SessionSMT(
+        state=state,
+        dxy_aligned=dxy_aligned, eur_aligned=eur_aligned, gbp_aligned=gbp_aligned,
+        divergent=divergent,
+        eur_move_pips=round(eur_move, 1),
+        gbp_move_pips=round(gbp_move, 1),
+        dxy_move_pips=round(dxy_move, 1),
+    )
+
+
 def structural_walk(direction: int, eur_by_tf: dict, gbp_by_tf: dict,
                     dxy_by_tf: dict) -> StructuralSMT:
     """Walk W1 -> D1 -> H4 -> H1 -> M15 and return the first TF that

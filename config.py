@@ -208,6 +208,10 @@ GT_SMT_BONUS                   = 0.4
 # instrument is leading the next reversal — negative score against our
 # trade direction.
 GT_SMT_DIVERGENCE_PENALTY      = 0.5
+# Session-open SMT — independent confluence anchored to the killzone open.
+# Smaller magnitude than the structural read.
+GT_SESSION_SMT_BONUS           = 0.3
+GT_SESSION_SMT_DIVERGENCE_PENALTY = 0.3
 
 # Structural stop hard cap. Stops are computed from the nearest M5 (or
 # M15) swing high/low beyond the entry; when that swing is unusually

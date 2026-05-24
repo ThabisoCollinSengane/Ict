@@ -48,6 +48,8 @@ def score_setup(
     news_impact: Optional[str] = None,              # "High" | "Medium" | None
     smt_confirmed: Optional[bool] = None,           # True when structural SMT confirms (3/3 aligned)
     smt_divergence: Optional[bool] = None,          # True when 2/3 aligned + 1 diverges (reversal warning)
+    session_smt_confirmed: Optional[bool] = None,   # session-open anchored, 3/3 aligned
+    session_smt_divergence: Optional[bool] = None,  # session-open, 2/3 aligned + 1 lagging
 ) -> ScoreBreakdown:
     s = ScoreBreakdown()
 
@@ -128,6 +130,13 @@ def score_setup(
         # SMT divergence. The lagging asset is signalling potential
         # reversal AGAINST our trade direction. Negative score.
         s.bonuses["smt_divergence"] = -abs(config.GT_SMT_DIVERGENCE_PENALTY)
+
+    # Session-open SMT — independent confluence anchored to the current
+    # killzone open. Smaller bonus/penalty than the structural read.
+    if session_smt_confirmed:
+        s.bonuses["session_smt"] = config.GT_SESSION_SMT_BONUS
+    elif session_smt_divergence:
+        s.bonuses["session_smt_divergence"] = -abs(config.GT_SESSION_SMT_DIVERGENCE_PENALTY)
 
     return s
 
