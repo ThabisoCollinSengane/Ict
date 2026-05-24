@@ -839,6 +839,30 @@ class Backtester:
                 g.setdefault(f"sess_smt_{sess_smt.state}", 0)
                 g[f"sess_smt_{sess_smt.state}"] += 1
 
+        # Conservative tiebreaker: when structural SMT and session SMT
+        # explicitly disagree (one says confirmed, the other says
+        # divergence) we DEFAULT TO THE CONSERVATIVE CALL — skip. Per
+        # operator decision after reviewing the 5-trade sample where
+        # mixed signals consistently lost.
+        if sess_smt is not None:
+            s_state = smt_struct.state
+            sess_state = sess_smt.state
+            disagree = (
+                (s_state == "confirmed" and sess_state == "divergence")
+                or (s_state == "divergence" and sess_state == "confirmed")
+            )
+            if disagree:
+                g.setdefault("smt_disagreement_skip", 0)
+                g["smt_disagreement_skip"] += 1
+                self._rejection_log.append({
+                    "t": t, "pair": pair, "direction": direction,
+                    "reason": f"smt_disagreement_struct{s_state}_sess{sess_state}",
+                    "swept": swept_name,
+                    "zone": f"{zone.kind}/{zone.tf}",
+                    "smt_divergent": ",".join(smt_struct.divergent) if s_state == "divergence" else "-",
+                })
+                return
+
         # MSS-2-of-3 — required for ALL setups (operator decision: keep MSS
         # confluence even on HTF FVG entries; the volatility/PnL pattern
         # showed mss=0/3 setups were carrying most of the losers).
