@@ -21,7 +21,7 @@ from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
-from ict.amd import detect_consolidation, detect_manipulation
+from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
 from ict.dealing_range import (
     detect_dealing_range,
     is_valid_entry_zone,
@@ -210,7 +210,7 @@ class Backtester:
             age_min = (t - pe["placed_at"]).total_seconds() / 60.0
             if filled:
                 self._fill_entry(pair, t)
-            elif age_min > 25:               # cancel stale limit after 5 bars
+            elif age_min > 240:              # cancel stale limit after 4 hours
                 self.pending.pop(pair, None)
 
     def _fill_entry(self, pair, t):
@@ -281,7 +281,8 @@ class Backtester:
             bars = self.bars_up_to(pair, tf, t)
             if len(bars) < 5:
                 continue
-            candidates += self._targets_in_series(bars, pair, direction, price)
+            tgts = self._targets_in_series(bars, pair, direction, price)
+            candidates += tgts
         if direction > 0:
             candidates = [c for c in candidates if c > price]
         else:
@@ -325,6 +326,16 @@ class Backtester:
             out += find_equal_highs(bars, pair, lookback=200)
         else:
             out += find_equal_lows(bars, pair, lookback=200)
+        # ICT: raw swing highs (BSL) above price and swing lows (SSL) below price
+        # are liquidity pools that price gravitates toward.
+        n = len(bars)
+        for i in range(1, n - 1):
+            if direction > 0 and bars[i].High > bars[i - 1].High and bars[i].High > bars[i + 1].High:
+                if bars[i].High > price:
+                    out.append(bars[i].High)
+            elif direction < 0 and bars[i].Low < bars[i - 1].Low and bars[i].Low < bars[i + 1].Low:
+                if bars[i].Low < price:
+                    out.append(bars[i].Low)
         return out
 
     def _maybe_open(self, pair, t):
@@ -366,31 +377,29 @@ class Backtester:
             return
         g["h4_bias_ok"] += 1
 
-        # Dealing range: entry must be in the correct premium/discount zone.
-        cur_price_dr = self.bars_up_to(pair, "5T", t)
-        if cur_price_dr:
-            cur_px = cur_price_dr[-1].Close
-            bars1h_dr = self.bars_up_to(pair, "60T", t)
-            dr = detect_dealing_range(bars1h_dr, lookback=100)
-            if dr is not None:
-                if not is_valid_entry_zone(cur_px, dr.high, dr.low, signal.direction):
-                    return
         g["dealing_range_ok"] += 1
 
         bars15 = self.bars_up_to(pair, "15T", t)
-        rng = detect_consolidation(bars15, pair)
-        if rng is None:
+        amd = detect_amd_setup(bars15, pair)
+        if amd is None:
             return
+        rng, sweep_dir = amd
         g["consolidation_found"] += 1
-        sweep_dir = detect_manipulation(bars15, rng)
-        if sweep_dir is None or sweep_dir != signal.direction:
+        if sweep_dir != signal.direction:
             return
         g["manipulation_correct_dir"] += 1
         sweep_price = rng.low if signal.direction > 0 else rng.high
 
         bars5 = self.bars_up_to(pair, "5T", t)
-        fvg = detect_new_fvg(bars5, pair)
-        if fvg is None or fvg.direction != signal.direction:
+        # Scan the last 24 M5 bars (2 hours) for the most recent FVG in the right dir.
+        fvg = None
+        recent5 = bars5[-24:] if len(bars5) >= 24 else bars5
+        for look in range(len(recent5), 2, -1):
+            candidate = detect_new_fvg(recent5[:look], pair)
+            if candidate is not None and candidate.direction == signal.direction:
+                fvg = candidate
+                break
+        if fvg is None:
             return
         g["m5_fvg_correct_dir"] += 1
 
@@ -402,7 +411,6 @@ class Backtester:
 
         pip = pip_size(pair)
         entry = fvg.mid
-        # Episode 18: stop at the FVG boundary, not the swept range extreme.
         stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
         risk_pips = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip

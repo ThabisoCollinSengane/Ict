@@ -22,7 +22,7 @@ from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
-from ict.amd import detect_consolidation, detect_manipulation
+from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
 from ict.dealing_range import (
     detect_dealing_range,
     is_valid_entry_zone,
@@ -181,11 +181,11 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
 
         # --- AMD on M15: identify accumulation + manipulation in our direction ---
         bars15 = self._asc(self.bars_15m[pair])
-        rng = detect_consolidation(bars15, pair)
-        if rng is None:
+        amd = detect_amd_setup(bars15, pair)
+        if amd is None:
             return
-        sweep_dir = detect_manipulation(bars15, rng)
-        if sweep_dir is None or sweep_dir != signal.direction:
+        rng, sweep_dir = amd
+        if sweep_dir != signal.direction:
             return
         # Stop sits beyond the manipulation extreme (which IS the swept range edge).
         sweep_price = rng.low if signal.direction > 0 else rng.high
