@@ -13,8 +13,6 @@ MIN_RR = 1.5                       # minimum reward:risk on initial entry
 KILLZONES = [
     ("London Open",  "02:00", "05:00"),
     ("New York AM",  "07:00", "10:00"),
-    ("London Close", "10:00", "12:00"),
-    ("Asia",         "19:00", "21:00"),  # Ep 3: Asia killzone; mark H/L as targets
 ]
 NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzone
 

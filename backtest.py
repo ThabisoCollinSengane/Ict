@@ -15,7 +15,7 @@ import pandas as pd
 import yfinance as yf
 
 import config
-from ict.killzones import can_open_new_trade
+from ict.killzones import can_open_new_trade, current_killzone
 from ict.fvg import detect_new_fvg, nearest_unmitigated
 from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
 from ict.liquidity import find_equal_highs, find_equal_lows
@@ -208,10 +208,15 @@ class Backtester:
             direction = pe["direction"]
             filled = (direction > 0 and bar.Low <= entry) or \
                      (direction < 0 and bar.High >= entry)
-            age_min = (t - pe["placed_at"]).total_seconds() / 60.0
-            if filled:
+            now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+            in_kz = current_killzone(now) is not None
+            if filled and in_kz:
+                # Only fill if we are still inside a kill zone — no off-hours entries.
                 self._fill_entry(pair, t)
-            elif age_min > 90:               # cancel stale limit after 90 min (keeps fills in-session)
+            elif not in_kz:
+                # Kill zone ended before the limit filled — cancel immediately.
+                self.pending.pop(pair, None)
+            elif (t - pe["placed_at"]).total_seconds() / 60.0 > 90:
                 self.pending.pop(pair, None)
 
     def _fill_entry(self, pair, t):
