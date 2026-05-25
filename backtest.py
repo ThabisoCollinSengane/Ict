@@ -562,10 +562,10 @@ class Backtester:
             return
         g["rr_ok"] += 1
 
-        # ZAR equity → USD for position sizing; enforce standard-account minimum lot.
+        # ZAR equity → USD for position sizing; floor at leg-1 lot from PYRAMID_LOTS.
         equity_usd = self.equity / config.USD_ZAR
         risk_units = int(position_size(equity_usd, entry, stop, pair))
-        min_units  = int(config.MIN_LOT_SIZE * config.LOT_UNITS)
+        min_units  = int(config.PYRAMID_LOTS[0] * config.LOT_UNITS)
         units = max(risk_units, min_units)
         if units == 0:
             return
@@ -631,8 +631,11 @@ class Backtester:
         if reward_pips < config.MIN_PIPS_TARGET:
             return
 
-        # Pyramid lot: always minimum lot — tight, controlled add.
-        units = int(config.MIN_LOT_SIZE * config.LOT_UNITS)
+        # Decreasing lot per leg: leg 1 = PYRAMID_LOTS[0], leg 2 = [1], leg 3 = [2].
+        # Each add is smaller so overall exposure grows conservatively.
+        leg_num = len(st["legs"]) + 1   # which leg we're about to add (2 or 3)
+        lot_idx = min(leg_num - 1, len(config.PYRAMID_LOTS) - 1)
+        units = int(config.PYRAMID_LOTS[lot_idx] * config.LOT_UNITS)
 
         self.pending[pair] = {
             "entry_price": entry, "stop": stop, "target": st["target"],

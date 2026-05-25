@@ -9,10 +9,16 @@ MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Standard-account lot sizing ---
 # 1 standard lot = 100 000 base-currency units.
-# MIN_LOT_SIZE sets the floor — risk-based sizing is used when it would produce MORE
-# units than the minimum, so the account grows into larger sizes over time.
-MIN_LOT_SIZE = 0.05                # minimum lots per leg (standard account floor)
-LOT_UNITS    = 100_000             # units per standard lot
+# PYRAMID_LOTS defines the lot size for each leg (1st add, 2nd add…).
+# Each subsequent pyramid leg is smaller so overall risk decreases as we scale in.
+#
+# Calibration check (USD-quoted pairs, USD_ZAR = 18.5):
+#   0.06 lots × 20 pips × 18.5 = R222  ← initial leg, 20-pip target
+#   0.04 lots × 20 pips × 18.5 = R148  ← 2nd leg add
+#   0.02 lots × 20 pips × 18.5 = R74   ← 3rd leg add
+LOT_UNITS       = 100_000          # units per standard lot
+PYRAMID_LOTS    = (0.06, 0.04, 0.02)   # lots for leg 1, 2, 3 (decreasing scale-in)
+MIN_LOT_SIZE    = PYRAMID_LOTS[0]  # convenience alias — base entry lot
 
 # --- Targets ---
 MIN_PIPS_TARGET = 10               # skip trade if nearest valid target < 10 pips
