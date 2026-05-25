@@ -562,9 +562,11 @@ class Backtester:
             return
         g["rr_ok"] += 1
 
-        # ZAR equity → USD for position sizing (units are in base currency).
+        # ZAR equity → USD for position sizing; enforce standard-account minimum lot.
         equity_usd = self.equity / config.USD_ZAR
-        units = int(position_size(equity_usd, entry, stop, pair))
+        risk_units = int(position_size(equity_usd, entry, stop, pair))
+        min_units  = int(config.MIN_LOT_SIZE * config.LOT_UNITS)
+        units = max(risk_units, min_units)
         if units == 0:
             return
         g["units_nonzero"] += 1
@@ -577,6 +579,12 @@ class Backtester:
         g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
+        """Add a new leg to a winning position.
+
+        Each pyramid leg gets its own FVG/OB stop (ICT c0 extreme) rather than
+        using the previous leg's entry as stop — that can be 50-80 pips wide and
+        turns pyramid legs into outsized losing trades.
+        """
         st = self.active[pair]
         if len(st["legs"]) >= config.MAX_LEGS:
             return
@@ -587,31 +595,50 @@ class Backtester:
             return
 
         bars5 = self.bars_up_to(pair, "5T", t)
-        fvg = detect_new_fvg(bars5, pair)
-        if fvg is None or fvg.direction != st["direction"]:
+        if not bars5:
             return
-
         cur_price = bars5[-1].Close
         pip = pip_size(pair)
+
+        # Must be at least 10 pips in favour of the last leg before adding.
         last_entry = st["legs"][-1]["entry"]
         favour_pips = (cur_price - last_entry) * st["direction"] / pip
         if favour_pips < 10:
             return
 
-        entry = fvg.mid
-        stop = st["legs"][-1]["entry"]
-        equity_usd = self.equity / config.USD_ZAR
-        units = int(position_size(equity_usd, entry, stop, pair))
-        if units == 0:
+        # Find a fresh FVG or OB entry with its own tight stop.
+        bars15 = self.bars_up_to(pair, "15T", t)
+        result = (
+            self._find_fvg_entry(bars5, pair, st["direction"], lookback=12)
+            or self._find_fvg_entry(bars15, pair, st["direction"], lookback=4)
+            or self._find_ob_entry(bars5, pair, st["direction"])
+        )
+        if result is None:
             return
+        entry, stop = result
+
+        # Entry must be on the correct retrace side.
+        if st["direction"] > 0 and entry > cur_price:
+            return
+        if st["direction"] < 0 and entry < cur_price:
+            return
+        if st["direction"] > 0 and stop >= entry:
+            return
+        if st["direction"] < 0 and stop <= entry:
+            return
+
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
+
+        # Pyramid lot: always minimum lot — tight, controlled add.
+        units = int(config.MIN_LOT_SIZE * config.LOT_UNITS)
 
         self.pending[pair] = {
             "entry_price": entry, "stop": stop, "target": st["target"],
             "direction": st["direction"], "units": units,
             "leg_idx": len(st["legs"]) + 1, "placed_at": t,
+            "entry_type": "pyramid",
         }
 
 

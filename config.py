@@ -4,8 +4,15 @@
 STARTING_CASH = 1_000              # R1 000 ZAR hypothetical account
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
-RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg
+RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
 MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
+
+# --- Standard-account lot sizing ---
+# 1 standard lot = 100 000 base-currency units.
+# MIN_LOT_SIZE sets the floor — risk-based sizing is used when it would produce MORE
+# units than the minimum, so the account grows into larger sizes over time.
+MIN_LOT_SIZE = 0.05                # minimum lots per leg (standard account floor)
+LOT_UNITS    = 100_000             # units per standard lot
 
 # --- Targets ---
 MIN_PIPS_TARGET = 10               # skip trade if nearest valid target < 10 pips
