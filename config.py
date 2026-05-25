@@ -22,7 +22,7 @@ MIN_LOT_SIZE    = PYRAMID_LOTS[0]  # convenience alias — base entry lot
 
 # --- Targets ---
 MIN_PIPS_TARGET = 10               # skip trade if nearest valid target < 10 pips
-MIN_RR = 1.5                       # minimum reward:risk on initial entry
+MIN_RR = 1.2                       # minimum reward:risk on initial entry
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [

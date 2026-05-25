@@ -359,22 +359,30 @@ class Backtester:
             return None
         return min(valid, key=lambda x: abs(x[0] - cur_price))
 
-    def _find_target(self, pair, direction, t, price):
+    def _find_target(self, pair, direction, t, price, stop=None):
+        """Find the nearest target that satisfies the RR requirement.
+
+        If `stop` is supplied, selects the nearest candidate where
+        |target - price| >= |price - stop| * MIN_RR (RR-aware selection).
+        Falls back to the plain-nearest candidate if nothing satisfies RR.
+
+        Timeframe search order: M15 (last 48 bars) → H1 (24 bars) → H4 → D → W.
+        M15/H1 lookbacks are capped to avoid O(n²) scan cost.
+        """
         candidates = []
-        for tf in ("240T", "D", "W"):
+        for tf, cap in [("15T", 48), ("60T", 24), ("240T", 60), ("D", 0), ("W", 0)]:
             bars = self.bars_up_to(pair, tf, t)
             if len(bars) < 5:
                 continue
-            tgts = self._targets_in_series(bars, pair, direction, price)
-            candidates += tgts
+            bars_slice = bars[-cap:] if cap and len(bars) > cap else bars
+            candidates += self._targets_in_series(bars_slice, pair, direction, price)
         if direction > 0:
             candidates = [c for c in candidates if c > price]
         else:
             candidates = [c for c in candidates if c < price]
         if not candidates:
             return None
-        # Prefer targets in the correct dealing range zone (premium for buys, discount
-        # for sells); fall back to unfiltered if no filtered target exists.
+        # Prefer targets in the correct dealing range zone (premium/discount).
         bars1h = self.bars_up_to(pair, "60T", t)
         dr = detect_dealing_range(bars1h, lookback=100)
         if dr is not None:
@@ -382,6 +390,12 @@ class Backtester:
                         if is_valid_target_zone(c, dr.high, dr.low, direction)]
             if filtered:
                 candidates = filtered
+        # If stop is known, prefer the nearest target that satisfies MIN_RR.
+        if stop is not None:
+            min_reward = abs(price - stop) * config.MIN_RR
+            rr_ok = [c for c in candidates if abs(c - price) >= min_reward]
+            if rr_ok:
+                return min(rr_ok, key=lambda x: abs(x - price))
         return min(candidates, key=lambda x: abs(x - price))
 
     @staticmethod
@@ -544,7 +558,7 @@ class Backtester:
 
         entry, stop, entry_type = min(valid_cands, key=lambda x: abs(x[0] - cur_price))
 
-        target = self._find_target(pair, signal.direction, t, entry)
+        target = self._find_target(pair, signal.direction, t, entry, stop=stop)
         if target is None:
             return
         g["target_found"] += 1
