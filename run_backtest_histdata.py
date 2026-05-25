@@ -87,9 +87,16 @@ class HistdataBacktester(bt_module.Backtester):
             self.tf_index[("UDXUSD", tf_name)] = d.index
 
     def _dxy_bias_1h(self, t, lookback: int = None) -> int:
-        """Use real UDXUSD 1H bars directly instead of ICE-formula synthetic DXY."""
         bars = self.bars_up_to("UDXUSD", "60T", t)
         return htf_bias(bars, lookback=lookback)
+
+    def _dxy_has_mss(self, t, direction) -> bool:
+        """Use real UDXUSD at H1/M15/M5 — any TF showing BOS in `direction` is valid."""
+        for tf in ("60T", "15T", "5T"):
+            bars = self.bars_up_to("UDXUSD", tf, t)
+            if htf_bias(bars, lookback=config.SWING_LOOKBACK_STH) == direction:
+                return True
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -98,19 +105,36 @@ class HistdataBacktester(bt_module.Backtester):
 
 def main():
     print("=" * 60)
-    print("ICT Intermarket Backtest — HistData.com M1 data (2024–2025)")
+    print("ICT Intermarket Backtest — HistData.com M1 data (2022–2025)")
     print("=" * 60)
 
-    years = ["2024", "2025"]
+    years = ["2022", "2023", "2024", "2025"]
     syms = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
+    missing = []
     for sym in syms:
         for yr in years:
             path = os.path.join(DATA_DIR, f"{sym}_{yr}.csv")
             if not os.path.exists(path):
-                print(f"ERROR: missing {path}")
-                sys.exit(1)
+                missing.append(path)
+    if missing:
+        print("Missing data files (will be skipped):")
+        for p in missing:
+            print(f"  {p}")
+        # Only abort if core pairs are completely missing
+        core_missing = [p for p in missing if "2024" in p or "2025" in p]
+        if core_missing:
+            for p in core_missing:
+                print(f"ERROR: missing {p}")
+            sys.exit(1)
+        # Filter years to only those present for all syms
+        available_years = []
+        for yr in years:
+            if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv")) for s in syms):
+                available_years.append(yr)
+        years = available_years
+        print(f"Using available years: {years}")
 
-    print("\nLoading and resampling to 5-minute bars (2024 + 2025)...")
+    print(f"\nLoading and resampling to 5-minute bars ({' + '.join(years)})...")
     data_5m = {}
     dxy_5m = None
     for sym in syms:

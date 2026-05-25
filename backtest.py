@@ -255,8 +255,9 @@ class Backtester:
         bars = self.bars_up_to(sym, tf, t)
         return htf_bias(bars, lookback=lookback)
 
-    def _dxy_bias_1h(self, t, lookback: int = None):
-        rolls = {s: self.bars_up_to(s, "60T", t) for s in config.DXY_CONSTITUENTS}
+    def _dxy_bias(self, tf, t, lookback: int = None):
+        """Synthetic DXY BOS on the given timeframe."""
+        rolls = {s: self.bars_up_to(s, tf, t) for s in config.DXY_CONSTITUENTS}
         lb = lookback if lookback is not None else config.SWING_LOOKBACK
         n = min((len(v) for v in rolls.values()), default=0)
         if n < lb + 2:
@@ -276,6 +277,23 @@ class Backtester:
         if len(series) < lb + 2:
             return 0
         return htf_bias(series, lookback=lb)
+
+    def _dxy_bias_1h(self, t, lookback: int = None):
+        return self._dxy_bias("60T", t, lookback=lookback)
+
+    def _pair_has_mss(self, sym, t, direction):
+        """True if H1, M15, or M5 shows BOS in `direction` for `sym`."""
+        for tf in ("60T", "15T", "5T"):
+            if self._sym_bias(sym, tf, t, lookback=config.SWING_LOOKBACK_STH) == direction:
+                return True
+        return False
+
+    def _dxy_has_mss(self, t, direction):
+        """True if synthetic DXY shows BOS in `direction` on any of H1/M15/M5."""
+        for tf in ("60T", "15T", "5T"):
+            if self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH) == direction:
+                return True
+        return False
 
     def _find_target(self, pair, direction, t, price):
         candidates = []
@@ -382,13 +400,13 @@ class Backtester:
             return
         g["pair_matches"] += 1
 
-        # MSS top-down: H1 → M15 → M5.  At least ONE timeframe must show a
-        # market-structure shift (BOS) in the signal direction.  Daily and H4
-        # are informational only — not gating filters.
-        h1_mss  = self._sym_bias(pair, "60T", t,  lookback=config.SWING_LOOKBACK_STH)
-        m15_mss = self._sym_bias(pair, "15T", t,  lookback=config.SWING_LOOKBACK_STH)
-        m5_mss  = self._sym_bias(pair, "5T",  t,  lookback=config.SWING_LOOKBACK_STH)
-        if not any(b == signal.direction for b in (h1_mss, m15_mss, m5_mss)):
+        # MSS confirmation: 2 of 3 pairs (EURUSD, GBPUSD, DXY) must show BOS.
+        # DXY is inverse — bearish DXY confirms a bullish EUR/GBP signal.
+        # Each pair is checked top-down: H1 → M15 → M5 (any TF valid for that pair).
+        eurusd_mss = self._pair_has_mss("EURUSD", t, signal.direction)
+        gbpusd_mss = self._pair_has_mss("GBPUSD", t, signal.direction)
+        dxy_mss    = self._dxy_has_mss(t, -signal.direction)
+        if (eurusd_mss + gbpusd_mss + dxy_mss) < 2:
             return
         g["mss_h1_m15_m5_ok"] += 1
 
