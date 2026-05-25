@@ -18,6 +18,9 @@ class FVG:
     bottom: float
     bar_index: int          # index of middle (displacement) candle
     mitigated: bool = False
+    # Ep 16: FVG should not be entered a 3rd time — it likely won't hold.
+    touch_count: int = 0
+    invalid: bool = False
 
     @property
     def mid(self) -> float:
@@ -48,14 +51,28 @@ def detect_new_fvg(candles, symbol: str) -> FVG | None:
 
 
 def update_mitigation(fvgs: list[FVG], last_candle) -> None:
-    """Mark FVGs mitigated when price trades back into the gap."""
+    """Mark FVGs mitigated / touched as price interacts with the gap.
+
+    Ep 9: mitigation uses candle CLOSE, not wick — a wick into a FVG does not
+    invalidate it; only a close through the far side does.
+    Ep 16: after 2 touches the FVG is flagged invalid (3rd entry rarely holds).
+    """
     for g in fvgs:
         if g.mitigated:
             continue
+        touched = False
         if g.direction > 0 and last_candle.Low <= g.top:
-            g.mitigated = True
+            touched = True
+            if last_candle.Close <= g.bottom:  # closed through the gap bottom
+                g.mitigated = True
         elif g.direction < 0 and last_candle.High >= g.bottom:
-            g.mitigated = True
+            touched = True
+            if last_candle.Close >= g.top:     # closed through the gap top
+                g.mitigated = True
+        if touched and not g.mitigated:
+            g.touch_count += 1
+            if g.touch_count >= 2:
+                g.invalid = True
 
 
 def nearest_unmitigated(fvgs: list[FVG], price: float, direction: int) -> FVG | None:

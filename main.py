@@ -22,7 +22,14 @@ from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
-from ict.amd import detect_consolidation, detect_manipulation
+from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
+from ict.dealing_range import (
+    detect_dealing_range,
+    is_valid_entry_zone,
+    is_valid_target_zone,
+    is_nfp_week_low_probability,
+    is_post_fomc_low_probability,
+)
 from intermarket import resolve as resolve_intermarket
 from news_filter import NewsCalendar
 from risk import position_size, pip_size, TradeState
@@ -148,27 +155,50 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if self.news.is_blocked(now):
             return
 
+        # --- Low Probability Conditions (from case study: Low Probability Conditions) ---
+        # 1. NFP week: Wednesday, Thursday, Friday are low probability.
+        if is_nfp_week_low_probability(now, self.news.is_nfp_week(now)):
+            return
+        # 2. FOMC whipsaw day: London and AM session are low probability that day.
+        if is_post_fomc_low_probability(now, self.news.fomc_whipsaw_date):
+            return
+        # 3. Trading against the daily trend is handled below via REQUIRE_DAILY_BIAS.
+
         dxy_bias = self._dxy_bias_1h()
         eurgbp_bias = self._sym_bias(config.REF_EURGBP, self.bars_1h)
         signal = resolve_intermarket(dxy_bias, eurgbp_bias)
         if signal is None or signal.pair != pair:
             return
 
+        # Episode 12+18: Daily is the primary bias timeframe. Must agree first.
+        if config.REQUIRE_DAILY_BIAS:
+            if self._sym_bias(pair, self.bars_1d) != signal.direction:
+                return
         if self._sym_bias(pair, self.bars_1h) != signal.direction:
             return
-        if self._sym_bias(pair, self.bars_4h) != signal.direction:
-            return
+        # H4 is long-term context; M15 AMD provides the intraday direction.
 
         # --- AMD on M15: identify accumulation + manipulation in our direction ---
         bars15 = self._asc(self.bars_15m[pair])
-        rng = detect_consolidation(bars15, pair)
-        if rng is None:
+        amd = detect_amd_setup(bars15, pair)
+        if amd is None:
             return
-        sweep_dir = detect_manipulation(bars15, rng)
-        if sweep_dir is None or sweep_dir != signal.direction:
+        rng, sweep_dir = amd
+        if sweep_dir != signal.direction:
             return
         # Stop sits beyond the manipulation extreme (which IS the swept range edge).
         sweep_price = rng.low if signal.direction > 0 else rng.high
+
+        # --- Dealing Range: confirm entry is in the correct premium/discount zone ---
+        # Use the HTF (1H) bars to detect the dealing range. A buy must come from
+        # discount (below 50% of the DR); a sell must come from premium (above 50%).
+        cur_price = self.last_price.get(pair)
+        if cur_price is not None:
+            bars1h = self._asc(self.bars_1h[pair])
+            dr = detect_dealing_range(bars1h, lookback=100)
+            if dr is not None:
+                if not is_valid_entry_zone(cur_price, dr.high, dr.low, signal.direction):
+                    return
 
         # --- M5 distribution trigger: fresh FVG in trade direction ---
         bars5 = self._asc(self.bars_5m[pair])
@@ -181,8 +211,9 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             return
 
         pip = pip_size(pair)
-        entry = fvg.mid
-        stop = (sweep_price - pip) if signal.direction > 0 else (sweep_price + pip)
+        # Enter at the near edge of the FVG (less retrace than the midpoint).
+        entry = fvg.top if signal.direction > 0 else fvg.bottom
+        stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
 
         risk_pips = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip
@@ -293,6 +324,22 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             candidates = [c for c in candidates if c < price]
         if not candidates:
             return None
+
+        # Premium/Discount filter on targets: when buying in discount we want a
+        # target in premium; when selling in premium we want a target in discount.
+        # Use the 1H dealing range if one is detected; otherwise accept any target.
+        bars1h = self._asc(self.bars_1h[pair])
+        dr = detect_dealing_range(bars1h, lookback=100)
+        if dr is not None:
+            filtered = [
+                c for c in candidates
+                if is_valid_target_zone(c, dr.high, dr.low, direction)
+            ]
+            if filtered:
+                candidates = filtered
+            # If no targets fall in the correct zone fall back to unfiltered list
+            # (avoids blocking all trades when DR is stale or very wide).
+
         return min(candidates, key=lambda x: abs(x - price))
 
     @staticmethod

@@ -1,21 +1,48 @@
 """Strategy parameters. Tweak here, no other code changes needed."""
 
 # --- Capital + risk ---
-STARTING_CASH = 10_000
-RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg
+STARTING_CASH = 1_000              # R1 000 ZAR hypothetical account
+ACCOUNT_CURRENCY = "ZAR"          # account denomination
+USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
+RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
 MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
+# --- Standard-account lot sizing ---
+# 1 standard lot = 100 000 base-currency units.
+# PYRAMID_LOTS defines the lot size for each leg (1st add, 2nd add…).
+# Each subsequent pyramid leg is smaller so overall risk decreases as we scale in.
+#
+# Calibration check (USD-quoted pairs, USD_ZAR = 18.5):
+#   0.06 lots × 20 pips × 18.5 = R222  ← initial leg, 20-pip target
+#   0.04 lots × 20 pips × 18.5 = R148  ← 2nd leg add
+#   0.02 lots × 20 pips × 18.5 = R74   ← 3rd leg add
+LOT_UNITS       = 100_000          # units per standard lot
+PYRAMID_LOTS    = (0.06, 0.04, 0.02)   # lots for leg 1, 2, 3 (decreasing scale-in)
+MIN_LOT_SIZE    = PYRAMID_LOTS[0]  # convenience alias — base entry lot
+
 # --- Targets ---
-MIN_PIPS_TARGET = 20               # skip trade if nearest valid target < 20 pips
-MIN_RR = 2.0                       # minimum reward:risk on initial entry
+MIN_PIPS_TARGET = 10               # skip trade if nearest valid target < 10 pips
+MIN_RR = 1.5                       # minimum reward:risk on initial entry
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
     ("London Open",  "02:00", "05:00"),
     ("New York AM",  "07:00", "10:00"),
-    ("London Close", "10:00", "12:00"),
 ]
 NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzone
+
+# --- ICT 2022 Episode 12: Market Structure hierarchy ---
+# Episode 12 defines three swing tiers: LTH/LTL (Daily ~50 bars), ITH/ITL (1H ~20
+# bars), STH/STL (1H ~8 bars). SWING_LOOKBACK is the ITH/ITL tier; the new
+# SWING_LOOKBACK_STH covers the short-term tier used in classify_swing_structure().
+SWING_LOOKBACK_STH = 8
+
+# Episode 12 + 18: "Daily is the most important, bias is found off daily."
+# When True, the daily chart BOS must agree with the intermarket signal direction.
+REQUIRE_DAILY_BIAS = True
+
+# Ep 12: "Limit your forecast to a 5-day time horizon."
+MAX_FORWARD_DAYS = 5
 
 # --- News filter ---
 NEWS_BLOCK_MINUTES_BEFORE = 15
@@ -33,7 +60,7 @@ TARGET_TF_MINUTES = (240, 1440, 10080)
 
 # --- Structure lookbacks ---
 SWING_LOOKBACK = 20                # bars to define swing high/low for BOS
-EQ_HIGH_LOW_TOLERANCE_PIPS = 2     # max pip diff to call two highs "equal"
+EQ_HIGH_LOW_TOLERANCE_PIPS = 5     # max pip diff to call two highs "equal"
 FVG_MIN_SIZE_PIPS = 3              # ignore micro FVGs
 OB_LOOKBACK_BARS = 200             # how far back on HTF to scan for unmitigated OB
 
@@ -43,12 +70,16 @@ OB_LOOKBACK_BARS = 200             # how far back on HTF to scan for unmitigated
 #   - no wider than AMD_MAX_RANGE_PIPS (high - low),
 #   - both extremes touched at least AMD_MIN_TOUCHES times.
 # A manipulation = a sweep of one extreme + close back inside within the last
-# AMD_SWEEP_LOOKBACK bars after the range ended.
+# AMD_SWEEP_LOOKBACK bars from NOW (not from range end).
+# AMD_RANGE_END_LOOKBACK controls how far back the range end can be (separate
+# from AMD_SWEEP_LOOKBACK); Asia consolidation ends hours before London/NY
+# manipulation so these two windows must be independently configurable.
 AMD_MIN_RANGE_BARS = 8             # ~2 hours on M15
 AMD_MAX_RANGE_BARS = 96            # ~24 hours on M15
 AMD_MAX_RANGE_PIPS = 35            # tight-enough coil to qualify as accumulation
 AMD_MIN_TOUCHES = 2                # the high and low each tagged at least twice
-AMD_SWEEP_LOOKBACK = 4             # manipulation must occur within last N M15 bars
+AMD_RANGE_END_LOOKBACK = 96        # range can have ended up to 24 H ago (Asia → London)
+AMD_SWEEP_LOOKBACK = 48            # sweep must be within last 48 M15 bars (12 H) from now
 
 # --- News data source ---
 # In backtest, the live ForexFactory "thisweek" XML is useless (it only returns

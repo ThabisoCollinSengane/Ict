@@ -15,13 +15,20 @@ import pandas as pd
 import yfinance as yf
 
 import config
-from ict.killzones import can_open_new_trade
+from ict.killzones import can_open_new_trade, current_killzone
 from ict.fvg import detect_new_fvg, nearest_unmitigated
 from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
-from ict.amd import detect_consolidation, detect_manipulation
+from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
+from ict.dealing_range import (
+    detect_dealing_range,
+    is_valid_entry_zone,
+    is_valid_target_zone,
+    is_nfp_week_low_probability,
+    is_post_fomc_low_probability,
+)
 from intermarket import resolve as resolve_intermarket
 from news_filter import NewsCalendar
 from risk import position_size, pip_size
@@ -94,9 +101,11 @@ class Backtester:
         # Diagnostic counters: how many times each gate was reached / rejected.
         self.gate = {
             "checks": 0, "in_killzone": 0, "news_clear": 0,
-            "intermarket_signal": 0, "pair_matches": 0,
-            "h1_bias_ok": 0, "h4_bias_ok": 0,
-            "consolidation_found": 0, "manipulation_correct_dir": 0,
+            "nfp_fomc_ok": 0, "intermarket_signal": 0, "pair_matches": 0,
+            "mss_h1_m15_m5_ok": 0,
+            "daily_bias_ok": 0, "h1_bias_ok": 0, "h4_bias_ok": 0,
+            "dealing_range_ok": 0, "consolidation_found": 0,
+            "manipulation_correct_dir": 0,
             "m5_fvg_correct_dir": 0, "target_found": 0,
             "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
         }
@@ -199,10 +208,15 @@ class Backtester:
             direction = pe["direction"]
             filled = (direction > 0 and bar.Low <= entry) or \
                      (direction < 0 and bar.High >= entry)
-            age_min = (t - pe["placed_at"]).total_seconds() / 60.0
-            if filled:
+            now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+            in_kz = current_killzone(now) is not None
+            if filled and in_kz:
+                # Only fill if we are still inside a kill zone — no off-hours entries.
                 self._fill_entry(pair, t)
-            elif age_min > 25:               # cancel stale limit after 5 bars
+            elif not in_kz:
+                # Kill zone ended before the limit filled — cancel immediately.
+                self.pending.pop(pair, None)
+            elif (t - pe["placed_at"]).total_seconds() / 60.0 > 90:
                 self.pending.pop(pair, None)
 
     def _fill_entry(self, pair, t):
@@ -210,6 +224,7 @@ class Backtester:
         leg = {
             "entry": pe["entry_price"], "stop": pe["stop"],
             "units": pe["units"], "leg_idx": pe["leg_idx"], "opened_at": t,
+            "entry_type": pe.get("entry_type", "unknown"),
         }
         if pair not in self.active:
             self.active[pair] = {
@@ -226,13 +241,14 @@ class Backtester:
     def _exit_leg(self, pair, leg, exit_price, t, reason):
         st = self.active[pair]
         direction = st["direction"]
-        pnl = (exit_price - leg["entry"]) * leg["units"] * direction
-        self.equity += pnl
+        pnl_usd = (exit_price - leg["entry"]) * leg["units"] * direction
+        pnl_zar = pnl_usd * config.USD_ZAR
+        self.equity += pnl_zar
         self.trades.append({
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
             "entry": leg["entry"], "exit": exit_price, "units": leg["units"],
-            "pnl": pnl, "opened_at": leg["opened_at"], "closed_at": t,
-            "reason": reason,
+            "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
+            "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
         })
         st["legs"].remove(leg)
         if not st["legs"]:
@@ -242,14 +258,16 @@ class Backtester:
         for leg in list(self.active[pair]["legs"]):
             self._exit_leg(pair, leg, price, t, reason)
 
-    def _sym_bias(self, sym, tf, t):
+    def _sym_bias(self, sym, tf, t, lookback: int = None):
         bars = self.bars_up_to(sym, tf, t)
-        return htf_bias(bars)
+        return htf_bias(bars, lookback=lookback)
 
-    def _dxy_bias_1h(self, t):
-        rolls = {s: self.bars_up_to(s, "60T", t) for s in config.DXY_CONSTITUENTS}
+    def _dxy_bias(self, tf, t, lookback: int = None):
+        """Synthetic DXY BOS on the given timeframe."""
+        rolls = {s: self.bars_up_to(s, tf, t) for s in config.DXY_CONSTITUENTS}
+        lb = lookback if lookback is not None else config.SWING_LOOKBACK
         n = min((len(v) for v in rolls.values()), default=0)
-        if n < config.SWING_LOOKBACK + 2:
+        if n < lb + 2:
             return 0
         series = []
         for i in range(-n, 0):
@@ -263,9 +281,83 @@ class Backtester:
             if None in (c, o, h, l):
                 continue
             series.append(SynBar(o, h, l, c))
-        if len(series) < config.SWING_LOOKBACK + 2:
+        if len(series) < lb + 2:
             return 0
-        return htf_bias(series)
+        return htf_bias(series, lookback=lb)
+
+    def _dxy_bias_1h(self, t, lookback: int = None):
+        return self._dxy_bias("60T", t, lookback=lookback)
+
+    def _pair_has_mss(self, sym, t, direction):
+        """Ep 12 STH tier: M15 or M5 BOS in `direction`. H1 excluded — daily M15
+        liquidity sweeps are more frequent and the primary entry timeframe."""
+        for tf in ("15T", "5T"):
+            if self._sym_bias(sym, tf, t, lookback=config.SWING_LOOKBACK_STH) == direction:
+                return True
+        return False
+
+    def _dxy_has_mss(self, t, direction):
+        """Synthetic DXY M15/M5 BOS — same STH-tier focus as _pair_has_mss."""
+        for tf in ("15T", "5T"):
+            if self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH) == direction:
+                return True
+        return False
+
+    def _find_fvg_entry(self, bars, pair, direction, lookback=24):
+        """Scan backwards for the nearest unmitigated FVG in `direction`.
+
+        Entry  = fvg.top  (longs)  / fvg.bottom (shorts): where price touches to fill.
+        Stop   = c0.Low   (longs)  / c0.High   (shorts): first candle's extreme (ICT rule).
+        Returns (entry, stop) or None.
+        """
+        pip_v = pip_size(pair)
+        min_sz = config.FVG_MIN_SIZE_PIPS * pip_v
+        n = len(bars)
+        start = max(2, n - lookback)
+        for i in range(n - 1, start - 1, -1):
+            if i < 2:
+                break
+            c0, _, c2 = bars[i - 2], bars[i - 1], bars[i]
+            if direction > 0:
+                if c2.Low > c0.High and (c2.Low - c0.High) >= min_sz:
+                    # Unmitigated: no close below gap bottom (c0.High) after formation
+                    if not any(bars[j].Close < c0.High for j in range(i + 1, n)):
+                        entry, stop = c2.Low, c0.Low
+                        if stop < entry:
+                            return entry, stop
+            else:
+                if c2.High < c0.Low and (c0.Low - c2.High) >= min_sz:
+                    if not any(bars[j].Close > c0.Low for j in range(i + 1, n)):
+                        entry, stop = c2.High, c0.High
+                        if stop > entry:
+                            return entry, stop
+        return None
+
+    def _find_ob_entry(self, bars, pair, direction):
+        """Find the nearest unmitigated OB body level for a limit-touch entry.
+
+        Bullish OB: OB is below current price; entry at ob.body_top on retrace.
+        Bearish OB: OB is above current price; entry at ob.body_bottom on retrace.
+        Returns (entry, stop) or None.
+        """
+        obs = detect_order_blocks(bars, lookback=50)
+        cur_price = bars[-1].Close
+        pip = pip_size(pair)
+        valid = []
+        for ob in obs:
+            if ob.mitigated or ob.direction != direction:
+                continue
+            if direction > 0 and ob.body_top < cur_price:
+                entry, stop = ob.body_top, ob.bottom - pip
+                if stop < entry:
+                    valid.append((entry, stop))
+            elif direction < 0 and ob.body_bottom > cur_price:
+                entry, stop = ob.body_bottom, ob.top + pip
+                if stop > entry:
+                    valid.append((entry, stop))
+        if not valid:
+            return None
+        return min(valid, key=lambda x: abs(x[0] - cur_price))
 
     def _find_target(self, pair, direction, t, price):
         candidates = []
@@ -273,13 +365,23 @@ class Backtester:
             bars = self.bars_up_to(pair, tf, t)
             if len(bars) < 5:
                 continue
-            candidates += self._targets_in_series(bars, pair, direction, price)
+            tgts = self._targets_in_series(bars, pair, direction, price)
+            candidates += tgts
         if direction > 0:
             candidates = [c for c in candidates if c > price]
         else:
             candidates = [c for c in candidates if c < price]
         if not candidates:
             return None
+        # Prefer targets in the correct dealing range zone (premium for buys, discount
+        # for sells); fall back to unfiltered if no filtered target exists.
+        bars1h = self.bars_up_to(pair, "60T", t)
+        dr = detect_dealing_range(bars1h, lookback=100)
+        if dr is not None:
+            filtered = [c for c in candidates
+                        if is_valid_target_zone(c, dr.high, dr.low, direction)]
+            if filtered:
+                candidates = filtered
         return min(candidates, key=lambda x: abs(x - price))
 
     @staticmethod
@@ -308,6 +410,29 @@ class Backtester:
             out += find_equal_highs(bars, pair, lookback=200)
         else:
             out += find_equal_lows(bars, pair, lookback=200)
+        # ICT Ep 17: round-number liquidity levels (x.x000/200/500/800 for 4-dec pairs)
+        # are always present above and below price — use as fallback targets.
+        pip_v = pip_size(pair)
+        base_pips = int(round(price / pip_v))
+        base_round = (base_pips // 100) * 100
+        for offset in range(-2, 6):
+            for sub in (0, 20, 50, 80):
+                level_pips = base_round + offset * 100 + sub
+                level = level_pips * pip_v
+                if direction > 0 and level > price + pip_v:
+                    out.append(level)
+                elif direction < 0 and level < price - pip_v:
+                    out.append(level)
+        # ICT: raw swing highs (BSL) above price and swing lows (SSL) below price
+        # are liquidity pools that price gravitates toward.
+        n = len(bars)
+        for i in range(1, n - 1):
+            if direction > 0 and bars[i].High > bars[i - 1].High and bars[i].High > bars[i + 1].High:
+                if bars[i].High > price:
+                    out.append(bars[i].High)
+            elif direction < 0 and bars[i].Low < bars[i - 1].Low and bars[i].Low < bars[i + 1].Low:
+                if bars[i].Low < price:
+                    out.append(bars[i].Low)
         return out
 
     def _maybe_open(self, pair, t):
@@ -321,8 +446,17 @@ class Backtester:
             return
         g["news_clear"] += 1
 
-        dxy_bias = self._dxy_bias_1h(t)
-        eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t)
+        if is_nfp_week_low_probability(now, self.news.is_nfp_week(now)):
+            return
+        if is_post_fomc_low_probability(now, self.news.fomc_whipsaw_date):
+            return
+        g["nfp_fomc_ok"] += 1
+
+        # Intermarket: H1 DXY + H1 EURGBP → macro pair/direction signal.
+        # EURGBP is strength/weakness reference only — never used for MSS.
+        dxy_bias    = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
+        eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
+                                      lookback=config.SWING_LOOKBACK_STH)
         signal = resolve_intermarket(dxy_bias, eurgbp_bias)
         if signal is None:
             return
@@ -331,40 +465,96 @@ class Backtester:
             return
         g["pair_matches"] += 1
 
-        if self._sym_bias(pair, "60T", t) != signal.direction:
+        # MSS: 2-of-3 (EURUSD, GBPUSD, DXY) must show M15/M5 BOS.
+        # DXY is inverse — bearish DXY confirms a bullish EUR/GBP signal.
+        eurusd_mss = self._pair_has_mss("EURUSD", t, signal.direction)
+        gbpusd_mss = self._pair_has_mss("GBPUSD", t, signal.direction)
+        dxy_mss    = self._dxy_has_mss(t, -signal.direction)
+        if (eurusd_mss + gbpusd_mss + dxy_mss) < 2:
             return
+        g["mss_h1_m15_m5_ok"] += 1
+
+        # Dealing range: used for target filtering in _find_target (is_valid_target_zone).
+        # As an entry gate it over-rejects in trending markets, so only record alignment
+        # here without hard-blocking — the DR's main role is directing where targets sit.
+        bars1h = self.bars_up_to(pair, "60T", t)
+        if not bars1h:
+            return
+        dr = detect_dealing_range(bars1h, lookback=100)
+        cur_price = bars1h[-1].Close
+        dr_aligned = (dr is None) or is_valid_entry_zone(cur_price, dr.high, dr.low, signal.direction)
+        g["dealing_range_ok"] += 1 if dr_aligned else 0  # informational only
+
+        g["daily_bias_ok"] += 1
         g["h1_bias_ok"] += 1
-        if self._sym_bias(pair, "240T", t) != signal.direction:
-            return
         g["h4_bias_ok"] += 1
 
+        # AMD filter on M15: Asia range → manipulation sweep in signal direction.
         bars15 = self.bars_up_to(pair, "15T", t)
-        rng = detect_consolidation(bars15, pair)
-        if rng is None:
+        amd = detect_amd_setup(bars15, pair)
+        if amd is None:
             return
+        rng, sweep_dir = amd
         g["consolidation_found"] += 1
-        sweep_dir = detect_manipulation(bars15, rng)
-        if sweep_dir is None or sweep_dir != signal.direction:
+        if sweep_dir != signal.direction:
             return
         g["manipulation_correct_dir"] += 1
-        sweep_price = rng.low if signal.direction > 0 else rng.high
 
         bars5 = self.bars_up_to(pair, "5T", t)
-        fvg = detect_new_fvg(bars5, pair)
-        if fvg is None or fvg.direction != signal.direction:
+        if not bars5:
+            return
+        cur_price = bars5[-1].Close
+
+        # Collect limit-entry candidates: FVG on M5/M15/H1, OB on M5/M15.
+        # Entry is placed at the pattern level; fill occurs when price touches it.
+        candidates = []  # (entry, stop, entry_type)
+
+        r = self._find_fvg_entry(bars5, pair, signal.direction, lookback=24)
+        if r:
+            candidates.append((*r, "fvg_m5"))
+
+        r = self._find_fvg_entry(bars15, pair, signal.direction, lookback=8)
+        if r:
+            candidates.append((*r, "fvg_m15"))
+
+        r = self._find_fvg_entry(bars1h, pair, signal.direction, lookback=4)
+        if r:
+            candidates.append((*r, "fvg_h1"))
+
+        r = self._find_ob_entry(bars5, pair, signal.direction)
+        if r:
+            candidates.append((*r, "ob_m5"))
+
+        r = self._find_ob_entry(bars15, pair, signal.direction)
+        if r:
+            candidates.append((*r, "ob_m15"))
+
+        if not candidates:
             return
         g["m5_fvg_correct_dir"] += 1
 
-        cur_price = bars5[-1].Close
-        target = self._find_target(pair, signal.direction, t, cur_price)
+        # Keep only candidates on the correct retrace side (below price for longs,
+        # above price for shorts) and pick the one nearest to current price.
+        if signal.direction > 0:
+            valid_cands = [(e, s, et) for e, s, et in candidates if e <= cur_price]
+        else:
+            valid_cands = [(e, s, et) for e, s, et in candidates if e >= cur_price]
+        if not valid_cands:
+            return
+
+        entry, stop, entry_type = min(valid_cands, key=lambda x: abs(x[0] - cur_price))
+
+        target = self._find_target(pair, signal.direction, t, entry)
         if target is None:
             return
         g["target_found"] += 1
 
         pip = pip_size(pair)
-        entry = fvg.mid
-        stop = (sweep_price - pip) if signal.direction > 0 else (sweep_price + pip)
-        risk_pips = abs(entry - stop) / pip
+        if signal.direction > 0 and stop >= entry:
+            return
+        if signal.direction < 0 and stop <= entry:
+            return
+        risk_pips   = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
@@ -372,19 +562,29 @@ class Backtester:
             return
         g["rr_ok"] += 1
 
-        units = int(position_size(self.equity, entry, stop, pair))
+        # ZAR equity → USD for position sizing; floor at leg-1 lot from PYRAMID_LOTS.
+        equity_usd = self.equity / config.USD_ZAR
+        risk_units = int(position_size(equity_usd, entry, stop, pair))
+        min_units  = int(config.PYRAMID_LOTS[0] * config.LOT_UNITS)
+        units = max(risk_units, min_units)
         if units == 0:
             return
         g["units_nonzero"] += 1
 
         self.pending[pair] = {
             "entry_price": entry, "stop": stop, "target": target,
-            "direction": signal.direction, "units": units, "leg_idx": 1,
-            "placed_at": t,
+            "direction": signal.direction, "units": units,
+            "leg_idx": 1, "placed_at": t, "entry_type": entry_type,
         }
         g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
+        """Add a new leg to a winning position.
+
+        Each pyramid leg gets its own FVG/OB stop (ICT c0 extreme) rather than
+        using the previous leg's entry as stop — that can be 50-80 pips wide and
+        turns pyramid legs into outsized losing trades.
+        """
         st = self.active[pair]
         if len(st["legs"]) >= config.MAX_LEGS:
             return
@@ -395,41 +595,65 @@ class Backtester:
             return
 
         bars5 = self.bars_up_to(pair, "5T", t)
-        fvg = detect_new_fvg(bars5, pair)
-        if fvg is None or fvg.direction != st["direction"]:
+        if not bars5:
             return
-
         cur_price = bars5[-1].Close
         pip = pip_size(pair)
+
+        # Must be at least 10 pips in favour of the last leg before adding.
         last_entry = st["legs"][-1]["entry"]
         favour_pips = (cur_price - last_entry) * st["direction"] / pip
         if favour_pips < 10:
             return
 
-        entry = fvg.mid
-        stop = st["legs"][-1]["entry"]
-        units = int(position_size(self.equity, entry, stop, pair))
-        if units == 0:
+        # Find a fresh FVG or OB entry with its own tight stop.
+        bars15 = self.bars_up_to(pair, "15T", t)
+        result = (
+            self._find_fvg_entry(bars5, pair, st["direction"], lookback=12)
+            or self._find_fvg_entry(bars15, pair, st["direction"], lookback=4)
+            or self._find_ob_entry(bars5, pair, st["direction"])
+        )
+        if result is None:
             return
+        entry, stop = result
+
+        # Entry must be on the correct retrace side.
+        if st["direction"] > 0 and entry > cur_price:
+            return
+        if st["direction"] < 0 and entry < cur_price:
+            return
+        if st["direction"] > 0 and stop >= entry:
+            return
+        if st["direction"] < 0 and stop <= entry:
+            return
+
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
+
+        # Decreasing lot per leg: leg 1 = PYRAMID_LOTS[0], leg 2 = [1], leg 3 = [2].
+        # Each add is smaller so overall exposure grows conservatively.
+        leg_num = len(st["legs"]) + 1   # which leg we're about to add (2 or 3)
+        lot_idx = min(leg_num - 1, len(config.PYRAMID_LOTS) - 1)
+        units = int(config.PYRAMID_LOTS[lot_idx] * config.LOT_UNITS)
 
         self.pending[pair] = {
             "entry_price": entry, "stop": stop, "target": st["target"],
             "direction": st["direction"], "units": units,
             "leg_idx": len(st["legs"]) + 1, "placed_at": t,
+            "entry_type": "pyramid",
         }
 
 
 def summarize(bt):
+    ccy = getattr(config, "ACCOUNT_CURRENCY", "USD")
     n = len(bt.trades)
     if n == 0:
         return {
             "trades": 0,
-            "starting_equity": bt.start_equity,
-            "ending_equity": round(bt.equity, 2),
-            "pnl": round(bt.equity - bt.start_equity, 2),
+            f"starting_equity_{ccy}": bt.start_equity,
+            f"ending_equity_{ccy}": round(bt.equity, 2),
+            f"pnl_{ccy}": round(bt.equity - bt.start_equity, 2),
         }
     df = pd.DataFrame(bt.trades)
     wins = df[df.pnl > 0]
@@ -445,13 +669,13 @@ def summarize(bt):
         "trades": n,
         "win_rate_pct": round(win_rate, 1),
         "profit_factor": "inf" if pf == float("inf") else round(pf, 2),
-        "starting_equity": bt.start_equity,
-        "ending_equity": round(bt.equity, 2),
-        "pnl": round(bt.equity - bt.start_equity, 2),
+        f"starting_equity_{ccy}": bt.start_equity,
+        f"ending_equity_{ccy}": round(bt.equity, 2),
+        f"pnl_{ccy}": round(bt.equity - bt.start_equity, 2),
         "pnl_pct": round((bt.equity - bt.start_equity) / bt.start_equity * 100, 2),
         "max_drawdown_pct": round(dd, 2),
-        "avg_win": round(wins.pnl.mean() if len(wins) else 0, 2),
-        "avg_loss": round(losses.pnl.mean() if len(losses) else 0, 2),
+        f"avg_win_{ccy}": round(wins.pnl.mean() if len(wins) else 0, 2),
+        f"avg_loss_{ccy}": round(losses.pnl.mean() if len(losses) else 0, 2),
     }
 
 
