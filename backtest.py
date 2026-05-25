@@ -453,11 +453,15 @@ class Backtester:
         g["target_found"] += 1
 
         pip = pip_size(pair)
-        # Enter at the near edge of the FVG — less retrace needed than the midpoint.
-        # Long: entry at fvg.top (= c2.Low, bottom of the gap nearest to current price).
-        # Short: entry at fvg.bottom (= c2.High, top of the gap nearest to current price).
-        entry = fvg.top if signal.direction > 0 else fvg.bottom
+        # Market order — enter at current close immediately.
+        # Stop is still anchored to the FVG boundary (structural invalidation level).
+        entry = cur_price
         stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
+        # Validate stop is on the correct side of entry.
+        if signal.direction > 0 and stop >= entry:
+            return
+        if signal.direction < 0 and stop <= entry:
+            return
         risk_pips = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
@@ -471,11 +475,9 @@ class Backtester:
             return
         g["units_nonzero"] += 1
 
-        self.pending[pair] = {
-            "entry_price": entry, "stop": stop, "target": target,
-            "direction": signal.direction, "units": units, "leg_idx": 1,
-            "placed_at": t,
-        }
+        # Open immediately — no limit queue.
+        leg = {"entry": entry, "stop": stop, "units": units, "leg_idx": 1, "opened_at": t}
+        self.active[pair] = {"direction": signal.direction, "target": target, "legs": [leg]}
         g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
