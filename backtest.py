@@ -211,7 +211,7 @@ class Backtester:
             age_min = (t - pe["placed_at"]).total_seconds() / 60.0
             if filled:
                 self._fill_entry(pair, t)
-            elif age_min > 240:              # cancel stale limit after 4 hours
+            elif age_min > 90:               # cancel stale limit after 90 min (keeps fills in-session)
                 self.pending.pop(pair, None)
 
     def _fill_entry(self, pair, t):
@@ -282,15 +282,16 @@ class Backtester:
         return self._dxy_bias("60T", t, lookback=lookback)
 
     def _pair_has_mss(self, sym, t, direction):
-        """True if H1, M15, or M5 shows BOS in `direction` for `sym`."""
-        for tf in ("60T", "15T", "5T"):
+        """Ep 12 STH tier: M15 or M5 BOS in `direction`. H1 excluded — daily M15
+        liquidity sweeps are more frequent and the primary entry timeframe."""
+        for tf in ("15T", "5T"):
             if self._sym_bias(sym, tf, t, lookback=config.SWING_LOOKBACK_STH) == direction:
                 return True
         return False
 
     def _dxy_has_mss(self, t, direction):
-        """True if synthetic DXY shows BOS in `direction` on any of H1/M15/M5."""
-        for tf in ("60T", "15T", "5T"):
+        """Synthetic DXY M15/M5 BOS — same STH-tier focus as _pair_has_mss."""
+        for tf in ("15T", "5T"):
             if self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH) == direction:
                 return True
         return False
@@ -388,8 +389,9 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
-        # Intermarket: use STH lookback (8 bars) so DXY/EURGBP reads fire frequently.
-        dxy_bias = self._dxy_bias_1h(t, lookback=config.SWING_LOOKBACK_STH)
+        # Intermarket: H1 for macro pair/direction (DXY and EURGBP need session context).
+        # EURGBP strength/weakness only — not used for MSS.
+        dxy_bias    = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
         eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
                                       lookback=config.SWING_LOOKBACK_STH)
         signal = resolve_intermarket(dxy_bias, eurgbp_bias)

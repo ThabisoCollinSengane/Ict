@@ -86,17 +86,14 @@ class HistdataBacktester(bt_module.Backtester):
             self.tf_bars[("UDXUSD", tf_name)] = df_to_bars(d)
             self.tf_index[("UDXUSD", tf_name)] = d.index
 
-    def _dxy_bias_1h(self, t, lookback: int = None) -> int:
-        bars = self.bars_up_to("UDXUSD", "60T", t)
-        return htf_bias(bars, lookback=lookback)
+    def _dxy_bias(self, tf, t, lookback=None) -> int:
+        """Use real UDXUSD at any timeframe instead of ICE-formula synthetic DXY."""
+        bars = self.bars_up_to("UDXUSD", tf, t)
+        lb = lookback if lookback is not None else config.SWING_LOOKBACK
+        return htf_bias(bars, lookback=lb)
 
-    def _dxy_has_mss(self, t, direction) -> bool:
-        """Use real UDXUSD at H1/M15/M5 — any TF showing BOS in `direction` is valid."""
-        for tf in ("60T", "15T", "5T"):
-            bars = self.bars_up_to("UDXUSD", tf, t)
-            if htf_bias(bars, lookback=config.SWING_LOOKBACK_STH) == direction:
-                return True
-        return False
+    def _dxy_bias_1h(self, t, lookback=None) -> int:
+        return self._dxy_bias("60T", t, lookback=lookback)
 
 
 # ---------------------------------------------------------------------------
