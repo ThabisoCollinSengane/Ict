@@ -175,12 +175,12 @@ def main():
         pd.set_option("display.width", 180)
         print(df[cols].to_string(index=False))
 
-        print("\n=== Per-pair P&L ===")
+        print("\n=== Per-pair P&L (ZAR) ===")
         for pair, grp in df.groupby("pair"):
             w = (grp.pnl > 0).sum()
             print(f"  {pair}: {len(grp)} trades  "
                   f"wins={w}  losses={len(grp)-w}  "
-                  f"P&L={grp.pnl.sum():.2f}")
+                  f"P&L=R{grp.pnl.sum():.2f}")
     else:
         print("\nNo trades generated.")
         print("Check the gate funnel to see which filter is the bottleneck.")

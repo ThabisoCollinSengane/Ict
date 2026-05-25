@@ -224,6 +224,7 @@ class Backtester:
         leg = {
             "entry": pe["entry_price"], "stop": pe["stop"],
             "units": pe["units"], "leg_idx": pe["leg_idx"], "opened_at": t,
+            "entry_type": pe.get("entry_type", "unknown"),
         }
         if pair not in self.active:
             self.active[pair] = {
@@ -240,13 +241,14 @@ class Backtester:
     def _exit_leg(self, pair, leg, exit_price, t, reason):
         st = self.active[pair]
         direction = st["direction"]
-        pnl = (exit_price - leg["entry"]) * leg["units"] * direction
-        self.equity += pnl
+        pnl_usd = (exit_price - leg["entry"]) * leg["units"] * direction
+        pnl_zar = pnl_usd * config.USD_ZAR
+        self.equity += pnl_zar
         self.trades.append({
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
             "entry": leg["entry"], "exit": exit_price, "units": leg["units"],
-            "pnl": pnl, "opened_at": leg["opened_at"], "closed_at": t,
-            "reason": reason,
+            "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
+            "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
         })
         st["legs"].remove(leg)
         if not st["legs"]:
@@ -300,6 +302,62 @@ class Backtester:
             if self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH) == direction:
                 return True
         return False
+
+    def _find_fvg_entry(self, bars, pair, direction, lookback=24):
+        """Scan backwards for the nearest unmitigated FVG in `direction`.
+
+        Entry  = fvg.top  (longs)  / fvg.bottom (shorts): where price touches to fill.
+        Stop   = c0.Low   (longs)  / c0.High   (shorts): first candle's extreme (ICT rule).
+        Returns (entry, stop) or None.
+        """
+        pip_v = pip_size(pair)
+        min_sz = config.FVG_MIN_SIZE_PIPS * pip_v
+        n = len(bars)
+        start = max(2, n - lookback)
+        for i in range(n - 1, start - 1, -1):
+            if i < 2:
+                break
+            c0, _, c2 = bars[i - 2], bars[i - 1], bars[i]
+            if direction > 0:
+                if c2.Low > c0.High and (c2.Low - c0.High) >= min_sz:
+                    # Unmitigated: no close below gap bottom (c0.High) after formation
+                    if not any(bars[j].Close < c0.High for j in range(i + 1, n)):
+                        entry, stop = c2.Low, c0.Low
+                        if stop < entry:
+                            return entry, stop
+            else:
+                if c2.High < c0.Low and (c0.Low - c2.High) >= min_sz:
+                    if not any(bars[j].Close > c0.Low for j in range(i + 1, n)):
+                        entry, stop = c2.High, c0.High
+                        if stop > entry:
+                            return entry, stop
+        return None
+
+    def _find_ob_entry(self, bars, pair, direction):
+        """Find the nearest unmitigated OB body level for a limit-touch entry.
+
+        Bullish OB: OB is below current price; entry at ob.body_top on retrace.
+        Bearish OB: OB is above current price; entry at ob.body_bottom on retrace.
+        Returns (entry, stop) or None.
+        """
+        obs = detect_order_blocks(bars, lookback=50)
+        cur_price = bars[-1].Close
+        pip = pip_size(pair)
+        valid = []
+        for ob in obs:
+            if ob.mitigated or ob.direction != direction:
+                continue
+            if direction > 0 and ob.body_top < cur_price:
+                entry, stop = ob.body_top, ob.bottom - pip
+                if stop < entry:
+                    valid.append((entry, stop))
+            elif direction < 0 and ob.body_bottom > cur_price:
+                entry, stop = ob.body_bottom, ob.top + pip
+                if stop > entry:
+                    valid.append((entry, stop))
+        if not valid:
+            return None
+        return min(valid, key=lambda x: abs(x[0] - cur_price))
 
     def _find_target(self, pair, direction, t, price):
         candidates = []
@@ -394,8 +452,8 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
-        # Intermarket: H1 for macro pair/direction (DXY and EURGBP need session context).
-        # EURGBP strength/weakness only — not used for MSS.
+        # Intermarket: H1 DXY + H1 EURGBP → macro pair/direction signal.
+        # EURGBP is strength/weakness reference only — never used for MSS.
         dxy_bias    = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
         eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
                                       lookback=config.SWING_LOOKBACK_STH)
@@ -407,9 +465,8 @@ class Backtester:
             return
         g["pair_matches"] += 1
 
-        # MSS confirmation: 2 of 3 pairs (EURUSD, GBPUSD, DXY) must show BOS.
+        # MSS: 2-of-3 (EURUSD, GBPUSD, DXY) must show M15/M5 BOS.
         # DXY is inverse — bearish DXY confirms a bullish EUR/GBP signal.
-        # Each pair is checked top-down: H1 → M15 → M5 (any TF valid for that pair).
         eurusd_mss = self._pair_has_mss("EURUSD", t, signal.direction)
         gbpusd_mss = self._pair_has_mss("GBPUSD", t, signal.direction)
         dxy_mss    = self._dxy_has_mss(t, -signal.direction)
@@ -417,11 +474,22 @@ class Backtester:
             return
         g["mss_h1_m15_m5_ok"] += 1
 
-        g["daily_bias_ok"] += 1   # informational — not a gate
+        # Dealing range: used for target filtering in _find_target (is_valid_target_zone).
+        # As an entry gate it over-rejects in trending markets, so only record alignment
+        # here without hard-blocking — the DR's main role is directing where targets sit.
+        bars1h = self.bars_up_to(pair, "60T", t)
+        if not bars1h:
+            return
+        dr = detect_dealing_range(bars1h, lookback=100)
+        cur_price = bars1h[-1].Close
+        dr_aligned = (dr is None) or is_valid_entry_zone(cur_price, dr.high, dr.low, signal.direction)
+        g["dealing_range_ok"] += 1 if dr_aligned else 0  # informational only
+
+        g["daily_bias_ok"] += 1
         g["h1_bias_ok"] += 1
         g["h4_bias_ok"] += 1
-        g["dealing_range_ok"] += 1
 
+        # AMD filter on M15: Asia range → manipulation sweep in signal direction.
         bars15 = self.bars_up_to(pair, "15T", t)
         amd = detect_amd_setup(bars15, pair)
         if amd is None:
@@ -431,38 +499,62 @@ class Backtester:
         if sweep_dir != signal.direction:
             return
         g["manipulation_correct_dir"] += 1
-        sweep_price = rng.low if signal.direction > 0 else rng.high
 
         bars5 = self.bars_up_to(pair, "5T", t)
-        # Scan the last 24 M5 bars (2 hours) for the most recent FVG in the right dir.
-        fvg = None
-        recent5 = bars5[-24:] if len(bars5) >= 24 else bars5
-        for look in range(len(recent5), 2, -1):
-            candidate = detect_new_fvg(recent5[:look], pair)
-            if candidate is not None and candidate.direction == signal.direction:
-                fvg = candidate
-                break
-        if fvg is None:
+        if not bars5:
+            return
+        cur_price = bars5[-1].Close
+
+        # Collect limit-entry candidates: FVG on M5/M15/H1, OB on M5/M15.
+        # Entry is placed at the pattern level; fill occurs when price touches it.
+        candidates = []  # (entry, stop, entry_type)
+
+        r = self._find_fvg_entry(bars5, pair, signal.direction, lookback=24)
+        if r:
+            candidates.append((*r, "fvg_m5"))
+
+        r = self._find_fvg_entry(bars15, pair, signal.direction, lookback=8)
+        if r:
+            candidates.append((*r, "fvg_m15"))
+
+        r = self._find_fvg_entry(bars1h, pair, signal.direction, lookback=4)
+        if r:
+            candidates.append((*r, "fvg_h1"))
+
+        r = self._find_ob_entry(bars5, pair, signal.direction)
+        if r:
+            candidates.append((*r, "ob_m5"))
+
+        r = self._find_ob_entry(bars15, pair, signal.direction)
+        if r:
+            candidates.append((*r, "ob_m15"))
+
+        if not candidates:
             return
         g["m5_fvg_correct_dir"] += 1
 
-        cur_price = bars5[-1].Close
-        target = self._find_target(pair, signal.direction, t, cur_price)
+        # Keep only candidates on the correct retrace side (below price for longs,
+        # above price for shorts) and pick the one nearest to current price.
+        if signal.direction > 0:
+            valid_cands = [(e, s, et) for e, s, et in candidates if e <= cur_price]
+        else:
+            valid_cands = [(e, s, et) for e, s, et in candidates if e >= cur_price]
+        if not valid_cands:
+            return
+
+        entry, stop, entry_type = min(valid_cands, key=lambda x: abs(x[0] - cur_price))
+
+        target = self._find_target(pair, signal.direction, t, entry)
         if target is None:
             return
         g["target_found"] += 1
 
         pip = pip_size(pair)
-        # Market order — enter at current close immediately.
-        # Stop is still anchored to the FVG boundary (structural invalidation level).
-        entry = cur_price
-        stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
-        # Validate stop is on the correct side of entry.
         if signal.direction > 0 and stop >= entry:
             return
         if signal.direction < 0 and stop <= entry:
             return
-        risk_pips = abs(entry - stop) / pip
+        risk_pips   = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
@@ -470,14 +562,18 @@ class Backtester:
             return
         g["rr_ok"] += 1
 
-        units = int(position_size(self.equity, entry, stop, pair))
+        # ZAR equity → USD for position sizing (units are in base currency).
+        equity_usd = self.equity / config.USD_ZAR
+        units = int(position_size(equity_usd, entry, stop, pair))
         if units == 0:
             return
         g["units_nonzero"] += 1
 
-        # Open immediately — no limit queue.
-        leg = {"entry": entry, "stop": stop, "units": units, "leg_idx": 1, "opened_at": t}
-        self.active[pair] = {"direction": signal.direction, "target": target, "legs": [leg]}
+        self.pending[pair] = {
+            "entry_price": entry, "stop": stop, "target": target,
+            "direction": signal.direction, "units": units,
+            "leg_idx": 1, "placed_at": t, "entry_type": entry_type,
+        }
         g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
@@ -504,7 +600,8 @@ class Backtester:
 
         entry = fvg.mid
         stop = st["legs"][-1]["entry"]
-        units = int(position_size(self.equity, entry, stop, pair))
+        equity_usd = self.equity / config.USD_ZAR
+        units = int(position_size(equity_usd, entry, stop, pair))
         if units == 0:
             return
         reward_pips = abs(st["target"] - entry) / pip
@@ -519,13 +616,14 @@ class Backtester:
 
 
 def summarize(bt):
+    ccy = getattr(config, "ACCOUNT_CURRENCY", "USD")
     n = len(bt.trades)
     if n == 0:
         return {
             "trades": 0,
-            "starting_equity": bt.start_equity,
-            "ending_equity": round(bt.equity, 2),
-            "pnl": round(bt.equity - bt.start_equity, 2),
+            f"starting_equity_{ccy}": bt.start_equity,
+            f"ending_equity_{ccy}": round(bt.equity, 2),
+            f"pnl_{ccy}": round(bt.equity - bt.start_equity, 2),
         }
     df = pd.DataFrame(bt.trades)
     wins = df[df.pnl > 0]
@@ -541,13 +639,13 @@ def summarize(bt):
         "trades": n,
         "win_rate_pct": round(win_rate, 1),
         "profit_factor": "inf" if pf == float("inf") else round(pf, 2),
-        "starting_equity": bt.start_equity,
-        "ending_equity": round(bt.equity, 2),
-        "pnl": round(bt.equity - bt.start_equity, 2),
+        f"starting_equity_{ccy}": bt.start_equity,
+        f"ending_equity_{ccy}": round(bt.equity, 2),
+        f"pnl_{ccy}": round(bt.equity - bt.start_equity, 2),
         "pnl_pct": round((bt.equity - bt.start_equity) / bt.start_equity * 100, 2),
         "max_drawdown_pct": round(dd, 2),
-        "avg_win": round(wins.pnl.mean() if len(wins) else 0, 2),
-        "avg_loss": round(losses.pnl.mean() if len(losses) else 0, 2),
+        f"avg_win_{ccy}": round(wins.pnl.mean() if len(wins) else 0, 2),
+        f"avg_loss_{ccy}": round(losses.pnl.mean() if len(losses) else 0, 2),
     }
 
 

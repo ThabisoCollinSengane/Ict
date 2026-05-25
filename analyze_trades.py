@@ -84,7 +84,8 @@ def main():
     wins  = df["win"].sum()
     print(f"\n{'='*60}")
     print(f"TOTAL  {total} trades  |  {wins}W {total-wins}L  |  "
-          f"WR {wins/total*100:.1f}%  |  PF {df[df.win].pnl.sum() / abs(df[~df.win].pnl.sum()):.2f}")
+          f"WR {wins/total*100:.1f}%  |  PF {df[df.win].pnl.sum() / abs(df[~df.win].pnl.sum()):.2f}  "
+          f"|  P&L R{df.pnl.sum():.2f} ZAR")
     print(f"{'='*60}")
 
     # ------------------------------------------------------------------ #
@@ -98,7 +99,7 @@ def main():
         avg_pip_w = grp[grp.win]["pips"].mean() if w else 0
         avg_pip_l = grp[~grp.win]["pips"].mean() if (n - w) else 0
         print(f"  {sess:14s}  {n:3d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  "
-              f"P&L ${pnl:+,.0f}  avg pip W={avg_pip_w:.1f} L={avg_pip_l:.1f}")
+              f"P&L R{pnl:+,.0f}  avg pip W={avg_pip_w:.1f} L={avg_pip_l:.1f}")
 
     # ------------------------------------------------------------------ #
     # 2. Session × Pair × Direction (most common winning patterns)
@@ -120,7 +121,7 @@ def main():
         flag = "WIN PATTERN" if r.pnl > 0 and r.wins >= 2 else ("LOSS DRAIN" if r.pnl < -200 else "")
         print(f"  {r.session:14s} {r.pair} {r.dir_label:5s}  "
               f"{int(r.n):3d} trades  {int(r.wins)}W/{int(r.losses)}L  "
-              f"WR {r.wr_pct:.0f}%  P&L ${r.pnl:+,.0f}  "
+              f"WR {r.wr_pct:.0f}%  P&L R{r.pnl:+,.0f}  "
               f"avg pip: W={r.avg_pip_win:.1f} L={r.avg_pip_loss:.1f}  {flag}")
 
     # ------------------------------------------------------------------ #
@@ -133,7 +134,7 @@ def main():
             continue
         w = grp.win.sum()
         n = len(grp)
-        print(f"  {day}  {n:3d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  P&L ${grp.pnl.sum():+,.0f}")
+        print(f"  {day}  {n:3d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  P&L R{grp.pnl.sum():+,.0f}")
 
     # ------------------------------------------------------------------ #
     # 4. Pip distribution — winners vs losers
@@ -156,7 +157,7 @@ def main():
         if r.pnl < 0 or r.wr_pct < 45:
             print(f"  {r.session:14s} {r.pair} {r.dir_label:5s}  "
                   f"{int(r.losses)} losses / {int(r.n)} trades  "
-                  f"WR {r.wr_pct:.0f}%  P&L ${r.pnl:+,.0f}")
+                  f"WR {r.wr_pct:.0f}%  P&L R{r.pnl:+,.0f}")
 
     # ------------------------------------------------------------------ #
     # 6. Best individual trades
@@ -165,13 +166,13 @@ def main():
     for _, r in df[df.win].nlargest(5, "pnl").iterrows():
         dur = (r.closed_at - r.opened_at).total_seconds() / 60
         print(f"  {str(r.opened_at)[:16]}  {r.pair} {r.dir_label}  "
-              f"session={r.session}  pips={r.pips}  P&L=${r.pnl:+,.0f}  dur={dur:.0f}min")
+              f"session={r.session}  pips={r.pips}  P&L=R{r.pnl:+,.0f}  dur={dur:.0f}min")
 
     print("\n--- TOP 5 LOSSES (by P&L) ---")
     for _, r in df[~df.win].nsmallest(5, "pnl").iterrows():
         dur = (r.closed_at - r.opened_at).total_seconds() / 60
         print(f"  {str(r.opened_at)[:16]}  {r.pair} {r.dir_label}  "
-              f"session={r.session}  pips={r.pips}  P&L=${r.pnl:+,.0f}  dur={dur:.0f}min")
+              f"session={r.session}  pips={r.pips}  P&L=R{r.pnl:+,.0f}  dur={dur:.0f}min")
 
     # ------------------------------------------------------------------ #
     # 7. Duration analysis
@@ -193,7 +194,7 @@ def main():
     for yr, grp in df.groupby("year"):
         w = grp.win.sum()
         n = len(grp)
-        print(f"  {yr}  {n:3d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  P&L ${grp.pnl.sum():+,.0f}")
+        print(f"  {yr}  {n:3d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  P&L R{grp.pnl.sum():+,.0f}")
 
 
 if __name__ == "__main__":
