@@ -91,17 +91,21 @@ def weekly_expansion_bias(weekly_candles) -> int:
     return 0
 
 
-def htf_bias(candles, ema_value: float | None = None) -> int:
+def htf_bias(candles, lookback: int = None, ema_value: float | None = None) -> int:
     """+1 bullish, -1 bearish, 0 neutral.
 
     Bullish if last close > most recent swing high (BOS up) AND > EMA.
     Bearish if last close < most recent swing low (BOS down) AND < EMA.
     Neutral otherwise.
+
+    `lookback` defaults to config.SWING_LOOKBACK (20). Pass a smaller value
+    (e.g. config.SWING_LOOKBACK_STH = 8) for faster short-term MSS reads.
     """
-    if len(candles) < config.SWING_LOOKBACK + 2:
+    lb = lookback if lookback is not None else config.SWING_LOOKBACK
+    if len(candles) < lb + 2:
         return 0
     prior = candles[:-1]
-    swing_high, swing_low = _swings(prior, config.SWING_LOOKBACK)
+    swing_high, swing_low = _swings(prior, lb)
     if swing_high is None:
         return 0
     last_close = candles[-1].Close

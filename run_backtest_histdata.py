@@ -86,10 +86,10 @@ class HistdataBacktester(bt_module.Backtester):
             self.tf_bars[("UDXUSD", tf_name)] = df_to_bars(d)
             self.tf_index[("UDXUSD", tf_name)] = d.index
 
-    def _dxy_bias_1h(self, t) -> int:
+    def _dxy_bias_1h(self, t, lookback: int = None) -> int:
         """Use real UDXUSD 1H bars directly instead of ICE-formula synthetic DXY."""
         bars = self.bars_up_to("UDXUSD", "60T", t)
-        return htf_bias(bars)
+        return htf_bias(bars, lookback=lookback)
 
 
 # ---------------------------------------------------------------------------

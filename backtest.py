@@ -102,6 +102,7 @@ class Backtester:
         self.gate = {
             "checks": 0, "in_killzone": 0, "news_clear": 0,
             "nfp_fomc_ok": 0, "intermarket_signal": 0, "pair_matches": 0,
+            "mss_h1_m15_m5_ok": 0,
             "daily_bias_ok": 0, "h1_bias_ok": 0, "h4_bias_ok": 0,
             "dealing_range_ok": 0, "consolidation_found": 0,
             "manipulation_correct_dir": 0,
@@ -250,14 +251,15 @@ class Backtester:
         for leg in list(self.active[pair]["legs"]):
             self._exit_leg(pair, leg, price, t, reason)
 
-    def _sym_bias(self, sym, tf, t):
+    def _sym_bias(self, sym, tf, t, lookback: int = None):
         bars = self.bars_up_to(sym, tf, t)
-        return htf_bias(bars)
+        return htf_bias(bars, lookback=lookback)
 
-    def _dxy_bias_1h(self, t):
+    def _dxy_bias_1h(self, t, lookback: int = None):
         rolls = {s: self.bars_up_to(s, "60T", t) for s in config.DXY_CONSTITUENTS}
+        lb = lookback if lookback is not None else config.SWING_LOOKBACK
         n = min((len(v) for v in rolls.values()), default=0)
-        if n < config.SWING_LOOKBACK + 2:
+        if n < lb + 2:
             return 0
         series = []
         for i in range(-n, 0):
@@ -271,9 +273,9 @@ class Backtester:
             if None in (c, o, h, l):
                 continue
             series.append(SynBar(o, h, l, c))
-        if len(series) < config.SWING_LOOKBACK + 2:
+        if len(series) < lb + 2:
             return 0
-        return htf_bias(series)
+        return htf_bias(series, lookback=lb)
 
     def _find_target(self, pair, direction, t, price):
         candidates = []
@@ -326,6 +328,19 @@ class Backtester:
             out += find_equal_highs(bars, pair, lookback=200)
         else:
             out += find_equal_lows(bars, pair, lookback=200)
+        # ICT Ep 17: round-number liquidity levels (x.x000/200/500/800 for 4-dec pairs)
+        # are always present above and below price — use as fallback targets.
+        pip_v = pip_size(pair)
+        base_pips = int(round(price / pip_v))
+        base_round = (base_pips // 100) * 100
+        for offset in range(-2, 6):
+            for sub in (0, 20, 50, 80):
+                level_pips = base_round + offset * 100 + sub
+                level = level_pips * pip_v
+                if direction > 0 and level > price + pip_v:
+                    out.append(level)
+                elif direction < 0 and level < price - pip_v:
+                    out.append(level)
         # ICT: raw swing highs (BSL) above price and swing lows (SSL) below price
         # are liquidity pools that price gravitates toward.
         n = len(bars)
@@ -355,8 +370,10 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
-        dxy_bias = self._dxy_bias_1h(t)
-        eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t)
+        # Intermarket: use STH lookback (8 bars) so DXY/EURGBP reads fire frequently.
+        dxy_bias = self._dxy_bias_1h(t, lookback=config.SWING_LOOKBACK_STH)
+        eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
+                                      lookback=config.SWING_LOOKBACK_STH)
         signal = resolve_intermarket(dxy_bias, eurgbp_bias)
         if signal is None:
             return
@@ -365,18 +382,19 @@ class Backtester:
             return
         g["pair_matches"] += 1
 
-        # Episode 12+18: Daily bias is the primary filter.
-        if config.REQUIRE_DAILY_BIAS:
-            if self._sym_bias(pair, "D", t) != signal.direction:
-                return
-        g["daily_bias_ok"] += 1
-        if self._sym_bias(pair, "60T", t) != signal.direction:
+        # MSS top-down: H1 → M15 → M5.  At least ONE timeframe must show a
+        # market-structure shift (BOS) in the signal direction.  Daily and H4
+        # are informational only — not gating filters.
+        h1_mss  = self._sym_bias(pair, "60T", t,  lookback=config.SWING_LOOKBACK_STH)
+        m15_mss = self._sym_bias(pair, "15T", t,  lookback=config.SWING_LOOKBACK_STH)
+        m5_mss  = self._sym_bias(pair, "5T",  t,  lookback=config.SWING_LOOKBACK_STH)
+        if not any(b == signal.direction for b in (h1_mss, m15_mss, m5_mss)):
             return
-        g["h1_bias_ok"] += 1
-        if self._sym_bias(pair, "240T", t) != signal.direction:
-            return
-        g["h4_bias_ok"] += 1
+        g["mss_h1_m15_m5_ok"] += 1
 
+        g["daily_bias_ok"] += 1   # informational — not a gate
+        g["h1_bias_ok"] += 1
+        g["h4_bias_ok"] += 1
         g["dealing_range_ok"] += 1
 
         bars15 = self.bars_up_to(pair, "15T", t)
@@ -410,7 +428,10 @@ class Backtester:
         g["target_found"] += 1
 
         pip = pip_size(pair)
-        entry = fvg.mid
+        # Enter at the near edge of the FVG — less retrace needed than the midpoint.
+        # Long: entry at fvg.top (= c2.Low, bottom of the gap nearest to current price).
+        # Short: entry at fvg.bottom (= c2.High, top of the gap nearest to current price).
+        entry = fvg.top if signal.direction > 0 else fvg.bottom
         stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
         risk_pips = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip

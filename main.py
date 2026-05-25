@@ -176,8 +176,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 return
         if self._sym_bias(pair, self.bars_1h) != signal.direction:
             return
-        if self._sym_bias(pair, self.bars_4h) != signal.direction:
-            return
+        # H4 is long-term context; M15 AMD provides the intraday direction.
 
         # --- AMD on M15: identify accumulation + manipulation in our direction ---
         bars15 = self._asc(self.bars_15m[pair])
@@ -212,9 +211,8 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             return
 
         pip = pip_size(pair)
-        entry = fvg.mid
-        # Episode 18: stop at the FVG boundary, not the swept range extreme.
-        # "Put his stop at the top of that imbalance, not the candle before it."
+        # Enter at the near edge of the FVG (less retrace than the midpoint).
+        entry = fvg.top if signal.direction > 0 else fvg.bottom
         stop = (fvg.bottom - pip) if signal.direction > 0 else (fvg.top + pip)
 
         risk_pips = abs(entry - stop) / pip
