@@ -40,7 +40,8 @@ EQUITY_TIERS = [
 ]
 
 # --- Targets ---
-MIN_PIPS_TARGET = 20               # minimum target distance in pips (20 pip minimum win)
+MIN_PIPS_TARGET = 20               # minimum pips to target (entry and pyramid checks)
+MIN_ENTRY_PIPS_TARGET = 20         # same as MIN_PIPS_TARGET — keep them in sync here
 MIN_RR = 1.2                       # minimum reward:risk
 FIXED_STOP_PIPS = 10               # fixed stop distance — always 10 pips from entry
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit

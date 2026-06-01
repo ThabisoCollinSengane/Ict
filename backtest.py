@@ -413,6 +413,21 @@ class Backtester:
                 continue
             bars_slice = bars[-cap:] if cap and len(bars) > cap else bars
             candidates += self._targets_in_series(bars_slice, pair, direction, price)
+
+        # ICT: Previous Day High/Low (PDH/PDL) are the primary buy-side and sell-side
+        # liquidity pools — explicitly added so they are always considered as targets
+        # even when they don't qualify as local swing highs/lows.
+        d_bars = self.bars_up_to(pair, "D", t)
+        if len(d_bars) >= 2:
+            for db in d_bars[-4:-1]:        # last 3 completed daily candles
+                candidates.append(db.High)  # buy-side liquidity (BSL)
+                candidates.append(db.Low)   # sell-side liquidity (SSL)
+        # Previous Week High/Low (PWWH/PWWL) — higher-timeframe pools.
+        w_bars = self.bars_up_to(pair, "W", t)
+        if len(w_bars) >= 2:
+            candidates.append(w_bars[-2].High)
+            candidates.append(w_bars[-2].Low)
+
         if direction > 0:
             candidates = [c for c in candidates if c > price]
         else:
@@ -619,7 +634,7 @@ class Backtester:
         g["target_found"] += 1
 
         reward_pips = abs(target - entry) / pip
-        if reward_pips < config.MIN_PIPS_TARGET:
+        if reward_pips < config.MIN_ENTRY_PIPS_TARGET:
             return
         g["rr_ok"] += 1
 
