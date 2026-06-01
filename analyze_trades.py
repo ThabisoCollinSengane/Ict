@@ -189,9 +189,10 @@ def main():
     # ------------------------------------------------------------------ #
     # 8. Monthly breakdown (fixed lot equivalent — strips compounding)
     # ------------------------------------------------------------------ #
-    print("\n--- MONTHLY P&L (0.05 lots fixed — no compounding) ---")
     import config
     from risk import pip_size
+    base_lots = config.PYRAMID_LOTS[0]
+    print(f"\n--- MONTHLY P&L ({base_lots} lots fixed — no compounding, single leg) ---")
 
     BASE_UNITS = int(config.PYRAMID_LOTS[0] * config.LOT_UNITS)  # 5000 units
 
@@ -230,6 +231,32 @@ def main():
     print(f"  Avg monthly P&L:   R{monthly.pnl.mean():+,.0f}")
     print(f"  Best month:        R{monthly.pnl.max():+,.0f}  ({monthly.loc[monthly.pnl.idxmax(),'ym']})")
     print(f"  Worst month:       R{monthly.pnl.min():+,.0f}  ({monthly.loc[monthly.pnl.idxmin(),'ym']})")
+
+    # ------------------------------------------------------------------ #
+    # 9. Entry type breakdown
+    # ------------------------------------------------------------------ #
+    print("\n--- ENTRY TYPE BREAKDOWN ---")
+    if "entry_type" in df.columns:
+        et = df.groupby("entry_type").apply(lambda g: pd.Series({
+            "n":      len(g),
+            "wins":   (g.pnl > 0).sum(),
+            "wr_pct": (g.pnl > 0).mean() * 100,
+            "pnl":    g.pnl.sum(),
+            "avg_pnl": g.pnl.mean(),
+        })).reset_index().sort_values("n", ascending=False)
+
+        initial = df[df.leg_idx == 1]
+        pyramid = df[df.leg_idx > 1]
+        print(f"  Initial entries : {len(initial)} ({len(initial)/len(df)*100:.0f}%)")
+        print(f"  Pyramid adds    : {len(pyramid)} ({len(pyramid)/len(df)*100:.0f}%)")
+        print()
+        for _, r in et.iterrows():
+            print(f"  {r.entry_type:20s}  {int(r.n):4d} trades  "
+                  f"{int(r.wins)}W/{int(r.n-r.wins)}L  "
+                  f"WR {r.wr_pct:.0f}%  "
+                  f"avg R{r.avg_pnl:+,.0f}  total R{r.pnl:+,.0f}")
+    else:
+        print("  entry_type column not found in trade log")
 
 
 if __name__ == "__main__":
