@@ -63,7 +63,7 @@ MAX_CONSECUTIVE_LOSSES  = 5
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
-    ("London Open",  "02:00", "05:00"),
+    ("London Open",  "03:00", "05:00"),
     ("New York AM",  "07:00", "10:00"),
 ]
 NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzone
