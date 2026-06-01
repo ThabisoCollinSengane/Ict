@@ -9,26 +9,36 @@ MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Standard-account lot sizing ---
 # 1 standard lot = 100 000 base-currency units.
-# Pyramid: start small, build as trade proves itself.
-# Calibration (0.03→0.05→0.07 lots, 20-pip target, USD_ZAR=18.5):
-#   0.03 lots × 20 pips × 18.5 = R111  ← initial leg (small risk, prove the trade)
-#   0.05 lots × 20 pips × 18.5 = R185  ← 2nd leg add (+10 pips in favour)
-#   0.07 lots × 20 pips × 18.5 = R259  ← 3rd leg add (max conviction)
-#   Full pyramid win at 20 pips: R111 + R185 + R259 = R555
+# Pyramid: biggest entry first, smaller adds as trade extends.
+# Each new leg locks in prior gains (BE stop) before adding — smallest new leg
+# means prior locked profit ALWAYS exceeds new leg's maximum loss.
+#
+# Fail-safe proof (R900 tier, 40-pip trade — L1 at X, L2 at X+10, L3 at X+20):
+#   L1 trailing-stop locked at X+10 → +R55.50 minimum
+#   L2 stop at BE (X+10)           → R0 minimum
+#   L3 (0.01 lots) stop at X+10   → -R18.50 worst case
+#   NET floor if L3 stopped        → +R37 GUARANTEED (gains cannot be wiped)
+#
+# Calibration (0.03/0.02/0.01 lots, 40-pip trade, USD_ZAR=18.5):
+#   L1 0.03 lots × 40 pips × R9.25/pip = R222  (best entry, most pips)
+#   L2 0.02 lots × 30 pips × R9.25/pip = R111  (add with less size)
+#   L3 0.01 lots × 20 pips × R9.25/pip = R37   (smallest risk, largest protection)
+#   Full pyramid win: R370
 LOT_UNITS       = 100_000
-PYRAMID_LOTS    = (0.03, 0.05, 0.07)    # starting tier (< R3 000)
+PYRAMID_LOTS    = (0.03, 0.02, 0.01)    # R900 starting tier — decreasing pyramid
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 
-# Equity tiers — lot schedule grows as account reaches each level (ZAR).
+# Equity tiers — lot schedule grows as account reaches each milestone (ZAR).
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
-# Risk per full pyramid at 20-pip target × 18.5 USD/ZAR:
-#   R900  tier → R111 + R185 + R259 = R555 full win
-#   R3 000 tier → R185 + R296 + R444 = R925 full win
-#   R6 000 tier → R370 + R555 + R740 = R1 665 full win
+# Each tier keeps the decreasing pattern so the fail-safe always holds.
+#
+#   R900  tier: L1=0.03 L2=0.02 L3=0.01 → floor +R37 if L3 stopped
+#   R3000 tier: L1=0.05 L2=0.03 L3=0.02 → floor +R55 if L3 stopped
+#   R6000 tier: L1=0.10 L2=0.06 L3=0.04 → floor +R111 if L3 stopped
 EQUITY_TIERS = [
-    (6_000, (0.10, 0.15, 0.20)),   # R6 000+ account
-    (3_000, (0.05, 0.08, 0.12)),   # R3 000 account
-    (0,     (0.03, 0.05, 0.07)),   # R900 starting capital
+    (6_000, (0.10, 0.06, 0.04)),   # R6 000+ — full pyramid win R1 221 on 40-pip trade
+    (3_000, (0.05, 0.03, 0.02)),   # R3 000  — full pyramid win R610 on 40-pip trade
+    (0,     (0.03, 0.02, 0.01)),   # R900    — full pyramid win R370 on 40-pip trade
 ]
 
 # --- Targets ---
