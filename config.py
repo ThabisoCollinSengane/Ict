@@ -66,6 +66,11 @@ KILLZONES = [
     ("London Open",  "03:00", "05:00"),
     ("New York AM",  "07:00", "10:00"),
 ]
+# Oceanic currencies (AUD, NZD) peak during Asian session, not London/NY.
+AUD_NZD_KILLZONES = [
+    ("Asian Open",  "20:00", "22:00"),   # Sydney open
+    ("Tokyo Kill",  "23:00", "01:00"),   # Tokyo volume peak
+]
 NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzone
 
 # --- ICT 2022 Episode 12: Market Structure hierarchy ---
@@ -138,7 +143,7 @@ NEWS_SOURCE = "csv"
 NEWS_CSV_PATH = "data/news_events.csv"
 
 # --- Symbols ---
-PAIRS = ("GBPUSD", "EURUSD", "AUDUSD", "NZDUSD")   # tradeable
+PAIRS = ("GBPUSD", "EURUSD", "NZDUSD")   # tradeable (AUDUSD excluded: poor Asian WR)
 REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength
 REF_AUDNZD = "AUDNZD"              # AUD vs NZD relative strength
 # DXY synthetic uses these (all available on OANDA):

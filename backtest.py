@@ -180,19 +180,16 @@ class Backtester:
             if t < warmup_end:
                 continue
 
-            # Cheap killzone gate: skip heavy entry logic if not in any killzone.
             now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-            in_kz = can_open_new_trade(now)
 
-            # Session handover: close losing positions that fight the weekly AMD
-            # at the start of each kill zone (02:00 ET and 07:00 ET).
-            if in_kz:
+            # Session handover runs at any EUR/GBP kill zone start.
+            if can_open_new_trade(now):
                 self._check_session_handover(t)
 
             for pair in config.PAIRS:
                 if pair in self.active:
                     self._maybe_pyramid(pair, t)
-                elif in_kz and pair not in self.pending:
+                elif pair not in self.pending and can_open_new_trade(now, pair):
                     self._maybe_open(pair, t)
 
             if i % 1000 == 0 and i > 0:
@@ -695,7 +692,7 @@ class Backtester:
         g = self.gate
         g["checks"] += 1
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-        if not can_open_new_trade(now):
+        if not can_open_new_trade(now, pair):
             return
         g["in_killzone"] += 1
 
@@ -943,8 +940,8 @@ class Backtester:
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if self.news.is_blocked(now):
             return
-        # Only pyramid inside an active kill zone — off-hours adds are losing trades.
-        if not can_open_new_trade(now):
+        # Only pyramid inside the correct kill zone for this pair.
+        if not can_open_new_trade(now, pair):
             return
 
         # Intermarket score for this pyramid leg.
