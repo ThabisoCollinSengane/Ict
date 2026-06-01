@@ -1,7 +1,7 @@
 """Strategy parameters. Tweak here, no other code changes needed."""
 
 # --- Capital + risk ---
-STARTING_CASH = 1_000              # R1 000 ZAR hypothetical account
+STARTING_CASH = 900                # R900 ZAR starting capital
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
@@ -9,18 +9,22 @@ MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Standard-account lot sizing ---
 # 1 standard lot = 100 000 base-currency units.
-# Calibration (0.05 lots, 20-pip target, USD_ZAR=18.5):
-#   0.05 lots × 20 pips × 18.5 = R185  ← initial leg win
-#   0.03 lots × 20 pips × 18.5 = R111  ← 2nd leg add
-#   0.02 lots × 20 pips × 18.5 = R74   ← 3rd leg add
+# Pyramid: start small, build as trade proves itself.
+# Calibration (0.03→0.05→0.07 lots, 20-pip target, USD_ZAR=18.5):
+#   0.03 lots × 20 pips × 18.5 = R111  ← initial leg (small risk, prove the trade)
+#   0.05 lots × 20 pips × 18.5 = R185  ← 2nd leg add (+10 pips in favour)
+#   0.07 lots × 20 pips × 18.5 = R259  ← 3rd leg add (max conviction)
+#   Full pyramid win at 20 pips: R111 + R185 + R259 = R555
 LOT_UNITS       = 100_000
-PYRAMID_LOTS    = (0.05, 0.03, 0.02)
+PYRAMID_LOTS    = (0.03, 0.05, 0.07)
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 
 # --- Targets ---
 MIN_PIPS_TARGET = 20               # minimum target distance in pips (20 pip minimum win)
 MIN_RR = 1.2                       # minimum reward:risk
 FIXED_STOP_PIPS = 10               # fixed stop distance — always 10 pips from entry
+TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit
+TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profit
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [

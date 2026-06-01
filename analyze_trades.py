@@ -212,7 +212,7 @@ def main():
         "wr":     (g.fixed_pnl > 0).mean() * 100,
     })).reset_index()
 
-    running = 900.0
+    running = config.STARTING_CASH
     print(f"  {'Month':<10} {'Trades':>6}  {'W/L':>7}  {'WR':>5}  "
           f"{'Monthly P&L':>12}  {'Balance':>10}  {'Status'}")
     print(f"  {'-'*75}")

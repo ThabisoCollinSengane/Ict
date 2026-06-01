@@ -186,6 +186,23 @@ class Backtester:
             st = self.active[pair]
             direction = st["direction"]
             target = st["target"]
+            pip = pip_size(pair)
+
+            # Trail stop: move to BE at +TRAIL_BE_PIPS, lock +10 pips at +TRAIL_LOCK_PIPS.
+            for leg in st["legs"]:
+                pips_profit = (bar.Close - leg["entry"]) * direction / pip
+                if pips_profit >= config.TRAIL_LOCK_PIPS:
+                    locked = leg["entry"] + 10 * pip * direction
+                    if direction > 0:
+                        leg["stop"] = max(leg["stop"], locked)
+                    else:
+                        leg["stop"] = min(leg["stop"], locked)
+                elif pips_profit >= config.TRAIL_BE_PIPS:
+                    if direction > 0:
+                        leg["stop"] = max(leg["stop"], leg["entry"])
+                    else:
+                        leg["stop"] = min(leg["stop"], leg["entry"])
+
             for leg in list(st["legs"]):
                 sl = leg["stop"]
                 if direction > 0:
