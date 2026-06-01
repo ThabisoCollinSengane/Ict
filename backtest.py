@@ -122,7 +122,7 @@ class Backtester:
             # market profile counters
             "weekly_amd_confirmed": 0, "session_handover_closed": 0,
             # conviction signal counters
-            "ote_zone": 0, "choch_confirmed": 0,
+            "ote_zone": 0, "choch_confirmed": 0, "low_conviction": 0,
         }
         # Wipeout-prevention state
         self._peak_equity       = config.STARTING_CASH
@@ -728,6 +728,10 @@ class Backtester:
         direction, im_score = resolve_pair_direction(dxy_bias, eurgbp_bias, pair)
         if direction is None:
             return   # DXY flat → no USD bias → hard gate
+        # Skip secondary pair when EURGBP actively disagrees (im_score=0.5 means
+        # EURGBP is pointing to the other pair — trading against it reduces quality).
+        if im_score < 0.75:
+            return
         g["intermarket_signal"] += 1
         g["pair_matches"] += 1
 
@@ -792,9 +796,15 @@ class Backtester:
                 conviction += 1
                 g["manipulation_correct_dir"] += 1
 
-        # OTE zone: price in Fibonacci 62-79% retrace of last swing (0-1)
-        ote_hit = in_ote(cur_price, bars15, direction,
-                         lookback=config.SWING_LOOKBACK, pip_tol=3 * pip_size(pair))
+        # OTE zone: bonus conviction when price is in 62-79% retrace (M15 or H1 swing).
+        # OTE defines profit POTENTIAL (Fib extension targets), not an entry filter.
+        pip_v = pip_size(pair)
+        ote_hit = (
+            in_ote(cur_price, bars15, direction,
+                   lookback=config.SWING_LOOKBACK, pip_tol=3 * pip_v)
+            or in_ote(cur_price, bars1h, direction,
+                      lookback=config.SWING_LOOKBACK // 2, pip_tol=3 * pip_v)
+        )
         if ote_hit:
             conviction += 1
             g["ote_zone"] += 1
@@ -804,6 +814,11 @@ class Backtester:
         if choch:
             conviction += 1
             g["choch_confirmed"] += 1
+
+        # Minimum conviction to trade — filters out low-confluence setups.
+        if conviction < config.MIN_CONVICTION:
+            g["low_conviction"] += 1
+            return
 
         # Max legs this trade may pyramid to based on conviction
         if conviction <= 2:
