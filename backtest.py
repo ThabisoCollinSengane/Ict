@@ -507,16 +507,17 @@ class Backtester:
         g["h1_bias_ok"] += 1
         g["h4_bias_ok"] += 1
 
-        # AMD filter on M15: Asia range → manipulation sweep in signal direction.
+        # AMD on M15: scored, not required. Full setup (consolidation + correct sweep)
+        # adds conviction; absent = still tradeable when MSS + FVG are strong.
         bars15 = self.bars_up_to(pair, "15T", t)
         amd = detect_amd_setup(bars15, pair)
-        if amd is None:
-            return
-        rng, sweep_dir = amd
-        g["consolidation_found"] += 1
-        if sweep_dir != signal.direction:
-            return
-        g["manipulation_correct_dir"] += 1
+        amd_score = 0
+        if amd is not None:
+            rng, sweep_dir = amd
+            g["consolidation_found"] += 1
+            if sweep_dir == signal.direction:
+                amd_score = 1
+                g["manipulation_correct_dir"] += 1
 
         bars5 = self.bars_up_to(pair, "5T", t)
         if not bars5:
@@ -563,21 +564,42 @@ class Backtester:
         g["units_nonzero"] += 1
 
         # Market order: fill immediately at current bar close.
+        entry_type = "market_amd" if amd_score else "market_mss"
         leg = {
             "entry": entry, "stop": stop, "units": units,
-            "leg_idx": 1, "opened_at": t, "entry_type": "market",
+            "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
         }
         self.active[pair] = {"direction": signal.direction, "target": target, "legs": [leg]}
         g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
-        """Add a new leg to a winning position at market price with fixed stop."""
+        """Add a new leg to a winning position at market price with fixed stop.
+
+        Intermarket signal is used as a score to scale the pyramid lot size:
+          - Signal still agrees with trade direction → full pyramid lot
+          - Signal neutral (DXY or EURGBP flat)    → half lot (cautious add)
+          - Signal disagrees                        → skip pyramid entirely
+        """
         st = self.active[pair]
         if len(st["legs"]) >= config.MAX_LEGS:
             return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if self.news.is_blocked(now):
             return
+
+        # Intermarket score for this pyramid leg.
+        dxy_bias    = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
+        eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
+                                      lookback=config.SWING_LOOKBACK_STH)
+        im_signal = resolve_intermarket(dxy_bias, eurgbp_bias)
+        if im_signal is not None and im_signal.pair == pair:
+            if im_signal.direction != st["direction"]:
+                return          # macro has flipped against us — skip
+            im_score = 1.0      # full lot: signal still agrees
+        elif im_signal is None:
+            im_score = 0.5      # half lot: macro is neutral
+        else:
+            return              # signal points to wrong pair — skip
 
         bars5 = self.bars_up_to(pair, "5T", t)
         if not bars5:
@@ -612,10 +634,11 @@ class Backtester:
         if reward_pips < config.MIN_PIPS_TARGET:
             return
 
-        # Decreasing lot per leg: leg 1=0.06, leg 2=0.04, leg 3=0.02.
+        # Lot size: decreasing pyramid schedule scaled by intermarket score.
         leg_num = len(st["legs"]) + 1
         lot_idx = min(leg_num - 1, len(config.PYRAMID_LOTS) - 1)
-        units = int(config.PYRAMID_LOTS[lot_idx] * config.LOT_UNITS)
+        base_units = int(config.PYRAMID_LOTS[lot_idx] * config.LOT_UNITS)
+        units = max(int(base_units * im_score), int(config.PYRAMID_LOTS[-1] * config.LOT_UNITS))
 
         # Promote prior leg stop to breakeven before adding new leg.
         prior = st["legs"][-1]
@@ -624,7 +647,7 @@ class Backtester:
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
-            "entry_type": "pyramid_market",
+            "entry_type": f"pyramid_im{im_score:.1f}",
         }
         st["legs"].append(leg)
 
