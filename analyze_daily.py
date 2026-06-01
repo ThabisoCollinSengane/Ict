@@ -98,17 +98,40 @@ def analyse(bt):
     print()
 
     # ── Weekly frequency (3-of-5 pattern) ────────────────────────────────────
-    weekly = df.groupby("open_week")
-    week_day_counts = weekly["open_date"].nunique()
-    print("WEEKLY TRADING FREQUENCY (3-of-5 pattern)")
+    # Count only leg_idx==1 entries as "a trade" (pyramid adds don't count)
+    df1 = df[df["leg_idx"] == 1] if "leg_idx" in df.columns else df
+    df1 = df1.copy()
+    df1["open_week"] = pd.to_datetime(df1["opened_at"]).dt.to_period("W")
+    df1["open_date"] = pd.to_datetime(df1["opened_at"]).dt.date
+
+    weekly1 = df1.groupby("open_week")
+    week_trade_counts = weekly1.size()
+    week_day_counts   = weekly1["open_date"].nunique()
+
+    print("WEEKLY TRADE BUDGET (target 3–5 per week)")
     print("-" * 40)
-    print(f"  Total weeks with trades : {len(week_day_counts)}")
-    print(f"  Avg trading days/week   : {week_day_counts.mean():.2f}")
+    total_weeks = len(week_trade_counts)
+    print(f"  Weeks with ≥1 trade     : {total_weeks}")
+    print(f"  Avg trades/week         : {week_trade_counts.mean():.2f}")
+    print(f"  Avg pairs/week          : {weekly1['pair'].nunique().mean():.2f}")
     print()
-    print("  Week distribution (how many days had trades):")
+    print("  Week distribution (total initial entries):")
+    for n, cnt in sorted(week_trade_counts.value_counts().items()):
+        pct = cnt / total_weeks * 100
+        bar = "█" * (cnt * 30 // max(total_weeks, 1))
+        print(f"    {n:2d} trade(s)/week : {cnt:4d} weeks ({pct:5.1f}%)  {bar}")
+    print()
+    print("  Pair share per week (avg initial entries):")
+    for pair, grp in df1.groupby("pair"):
+        wkly = grp.groupby("open_week").size()
+        print(f"    {pair}: avg {wkly.mean():.2f}/week  "
+              f"max {wkly.max()}/week  "
+              f"weeks active {len(wkly)}/{total_weeks} ({len(wkly)/total_weeks*100:.0f}%)")
+    print()
+    print("  Week distribution (trading days per week):")
     for n, cnt in sorted(week_day_counts.value_counts().items()):
-        pct = cnt / len(week_day_counts) * 100
-        bar = "█" * (cnt * 30 // len(week_day_counts))
+        pct = cnt / total_weeks * 100
+        bar = "█" * (cnt * 30 // max(total_weeks, 1))
         print(f"    {n} day(s)/week : {cnt:4d} weeks ({pct:5.1f}%)  {bar}")
     print()
 

@@ -120,6 +120,9 @@ class Backtester:
             "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
             # protection counters
             "drawdown_halt": 0, "daily_loss_halt": 0, "consec_loss_pause": 0,
+            # weekly/daily budget counters
+            "weekly_cap": 0, "weekly_pair_cap": 0,
+            "daily_cap": 0, "daily_pair_cap": 0,
             # market profile counters
             "weekly_amd_confirmed": 0, "session_handover_closed": 0,
             # conviction signal counters
@@ -133,6 +136,11 @@ class Backtester:
         self._drawdown_halt_until = None  # date after which trading resumes
         # Per-pair weekly AMD cache: updated each bar (daily resolution is enough)
         self._weekly_amd        = {}   # pair -> WeeklyAMD or None
+        # Weekly trade budget (3-of-5 pattern)
+        self._week_total        = {}   # (iso_year, iso_week) -> int
+        self._week_pair         = {}   # (iso_year, iso_week, pair) -> int
+        self._day_total         = {}   # date -> int
+        self._day_pair          = {}   # (date, pair) -> int
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -741,6 +749,28 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
+        # ── Weekly / daily trade budget ───────────────────────────────────────
+        iso = day_key.isocalendar()
+        week_key   = (iso[0], iso[1])
+        week_total = self._week_total.get(week_key, 0)
+        week_pair  = self._week_pair.get((week_key[0], week_key[1], pair), 0)
+        day_total  = self._day_total.get(day_key, 0)
+        day_pair   = self._day_pair.get((day_key, pair), 0)
+
+        if week_total >= config.MAX_TRADES_PER_WEEK:
+            g["weekly_cap"] += 1
+            return
+        if week_pair >= config.MAX_PAIR_TRADES_PER_WEEK:
+            g["weekly_pair_cap"] += 1
+            return
+        if day_total >= config.MAX_TRADES_PER_DAY:
+            g["daily_cap"] += 1
+            return
+        if day_pair >= config.MAX_PAIR_TRADES_PER_DAY:
+            g["daily_pair_cap"] += 1
+            return
+        # ─────────────────────────────────────────────────────────────────────
+
         # Intermarket: DXY gives USD direction.
         # EUR/GBP family (unchanged): EURGBP selects EURUSD vs GBPUSD.
         # NZDUSD family (independent): AUDNZD selects NZD as preferred vs AUD; DXY confirms direction.
@@ -860,8 +890,12 @@ class Backtester:
             conviction += 1
             g["choch_confirmed"] += 1
 
-        # Minimum conviction to trade — filters out low-confluence setups.
-        if conviction < config.MIN_CONVICTION:
+        # Minimum conviction gate — escalates after WEEKLY_SOFT_CAP entries this week
+        # so that the 4th and 5th weekly slots are reserved for cleaner setups only.
+        min_conv = (config.MIN_CONVICTION_LATE_WEEK
+                    if week_total >= config.WEEKLY_SOFT_CAP
+                    else config.MIN_CONVICTION)
+        if conviction < min_conv:
             g["low_conviction"] += 1
             return
 
@@ -936,6 +970,12 @@ class Backtester:
             "max_legs": max_legs,       # conviction-based pyramid cap
         }
         g["limit_placed"] += 1
+
+        # Charge weekly and daily budget slots for this initial entry.
+        self._week_total[week_key]                        = week_total + 1
+        self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
+        self._day_total[day_key]                          = day_total + 1
+        self._day_pair[(day_key, pair)]                   = day_pair + 1
 
     def _maybe_pyramid(self, pair, t):
         """Add a new leg to a winning position at market price with fixed stop.

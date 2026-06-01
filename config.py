@@ -61,6 +61,22 @@ MAX_DAILY_LOSS_PCT      = 6.0     # ~2 full stop-losses at 0.03 lots
 #    Counter resets automatically at the start of each new trading day.
 MAX_CONSECUTIVE_LOSSES  = 5
 
+# --- Weekly trade budget (3-of-5 pattern, pair balance) ---
+# Hard cap: never more than 5 new positions in a Mon-Sun ISO week.
+MAX_TRADES_PER_WEEK      = 5
+# Soft cap: after taking 3 trades this week, only enter if conviction is high.
+# The first 3 slots use the standard MIN_CONVICTION bar; slots 4-5 are reserved
+# for only the clearest setups so quality stays high into the week's end.
+WEEKLY_SOFT_CAP          = 3
+MIN_CONVICTION_LATE_WEEK = 7     # trades 4 and 5 require 7+ vs normal 6+
+# Daily spread: prevents all 5 weekly trades clustering on one busy day.
+MAX_TRADES_PER_DAY       = 2     # max new entries per calendar day (UTC)
+# Pair daily cap: ensures multi-trade days use different pairs rather than
+# double-entering the same pair. The hard weekly cap is the primary frequency
+# control; pair balance over the week emerges naturally from the daily rule.
+MAX_PAIR_TRADES_PER_DAY  = 1     # max 1 initial entry per pair per UTC day
+MAX_PAIR_TRADES_PER_WEEK = 5     # match hard cap (no effective per-pair weekly limit)
+
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
     ("London Open",  "03:00", "05:00"),
