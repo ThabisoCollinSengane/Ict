@@ -586,6 +586,9 @@ class Backtester:
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if self.news.is_blocked(now):
             return
+        # Only pyramid inside an active kill zone — off-hours adds are losing trades.
+        if not can_open_new_trade(now):
+            return
 
         # Intermarket score for this pyramid leg.
         dxy_bias    = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
