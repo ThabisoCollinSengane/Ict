@@ -719,18 +719,22 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
-        # Intermarket: DXY H1 direction (hard gate) + EURGBP as preference score.
-        # DXY alone gives the USD direction. EURGBP tells which USD pair to PREFER
-        # but BOTH can trade — the non-preferred pair gets a lower im_score.
+        # Intermarket: ICT cheat sheet (scenarios 1a/1b/2a/2b/3a/3b).
+        # DXY gives USD direction. EURGBP selects which pair to trade:
+        #   EURGBP bull → EURUSD (scenarios 1b short / 2a long)
+        #   EURGBP bear → GBPUSD (scenarios 1a short / 2b long)
+        #   EURGBP flat → EURUSD default only (scenarios 3a/3b)
         dxy_bias    = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
         eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
                                       lookback=config.SWING_LOOKBACK_STH)
         direction, im_score = resolve_pair_direction(dxy_bias, eurgbp_bias, pair)
         if direction is None:
             return   # DXY flat → no USD bias → hard gate
-        # Skip secondary pair when EURGBP actively disagrees (im_score=0.5 means
-        # EURGBP is pointing to the other pair — trading against it reduces quality).
+        # EURGBP actively disagrees with this pair → skip (trade the preferred pair only).
         if im_score < 0.75:
+            return
+        # EURGBP neutral → default to EURUSD only (ICT scenarios 3a/3b).
+        if eurgbp_bias == 0 and pair == "GBPUSD":
             return
         g["intermarket_signal"] += 1
         g["pair_matches"] += 1
