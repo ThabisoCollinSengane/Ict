@@ -390,12 +390,16 @@ class Backtester:
                         if is_valid_target_zone(c, dr.high, dr.low, direction)]
             if filtered:
                 candidates = filtered
-        # If stop is known, prefer the nearest target that satisfies MIN_RR.
+        # Prefer the nearest target satisfying both MIN_RR and MIN_PIPS_TARGET.
+        pip_v = pip_size(pair)
         if stop is not None:
-            min_reward = abs(price - stop) * config.MIN_RR
-            rr_ok = [c for c in candidates if abs(c - price) >= min_reward]
-            if rr_ok:
-                return min(rr_ok, key=lambda x: abs(x - price))
+            min_reward = max(abs(price - stop) * config.MIN_RR,
+                             config.MIN_PIPS_TARGET * pip_v)
+        else:
+            min_reward = config.MIN_PIPS_TARGET * pip_v
+        rr_ok = [c for c in candidates if abs(c - price) >= min_reward]
+        if rr_ok:
+            return min(rr_ok, key=lambda x: abs(x - price))
         return min(candidates, key=lambda x: abs(x - price))
 
     @staticmethod
@@ -519,60 +523,33 @@ class Backtester:
             return
         cur_price = bars5[-1].Close
 
-        # Collect limit-entry candidates: FVG on M5/M15/H1, OB on M5/M15.
-        # Entry is placed at the pattern level; fill occurs when price touches it.
-        candidates = []  # (entry, stop, entry_type)
-
-        r = self._find_fvg_entry(bars5, pair, signal.direction, lookback=24)
-        if r:
-            candidates.append((*r, "fvg_m5"))
-
-        r = self._find_fvg_entry(bars15, pair, signal.direction, lookback=8)
-        if r:
-            candidates.append((*r, "fvg_m15"))
-
-        r = self._find_fvg_entry(bars1h, pair, signal.direction, lookback=4)
-        if r:
-            candidates.append((*r, "fvg_h1"))
-
-        r = self._find_ob_entry(bars5, pair, signal.direction)
-        if r:
-            candidates.append((*r, "ob_m5"))
-
-        r = self._find_ob_entry(bars15, pair, signal.direction)
-        if r:
-            candidates.append((*r, "ob_m15"))
-
-        if not candidates:
+        # FVG or OB in the signal direction confirms displacement occurred.
+        # Used as a quality gate only — entry is at market price, not the FVG level.
+        fvg_ok = (
+            self._find_fvg_entry(bars5, pair, signal.direction, lookback=24) is not None
+            or self._find_fvg_entry(bars15, pair, signal.direction, lookback=8) is not None
+            or self._find_fvg_entry(bars1h, pair, signal.direction, lookback=4) is not None
+            or self._find_ob_entry(bars5, pair, signal.direction) is not None
+            or self._find_ob_entry(bars15, pair, signal.direction) is not None
+        )
+        if not fvg_ok:
             return
         g["m5_fvg_correct_dir"] += 1
 
-        # Keep only candidates on the correct retrace side (below price for longs,
-        # above price for shorts) and pick the one nearest to current price.
+        pip = pip_size(pair)
+        entry = cur_price
         if signal.direction > 0:
-            valid_cands = [(e, s, et) for e, s, et in candidates if e <= cur_price]
+            stop = entry - config.FIXED_STOP_PIPS * pip
         else:
-            valid_cands = [(e, s, et) for e, s, et in candidates if e >= cur_price]
-        if not valid_cands:
-            return
-
-        entry, stop, entry_type = min(valid_cands, key=lambda x: abs(x[0] - cur_price))
+            stop = entry + config.FIXED_STOP_PIPS * pip
 
         target = self._find_target(pair, signal.direction, t, entry, stop=stop)
         if target is None:
             return
         g["target_found"] += 1
 
-        pip = pip_size(pair)
-        if signal.direction > 0 and stop >= entry:
-            return
-        if signal.direction < 0 and stop <= entry:
-            return
-        risk_pips   = abs(entry - stop) / pip
         reward_pips = abs(target - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
-            return
-        if risk_pips <= 0 or (reward_pips / risk_pips) < config.MIN_RR:
             return
         g["rr_ok"] += 1
 
@@ -585,24 +562,18 @@ class Backtester:
             return
         g["units_nonzero"] += 1
 
-        self.pending[pair] = {
-            "entry_price": entry, "stop": stop, "target": target,
-            "direction": signal.direction, "units": units,
-            "leg_idx": 1, "placed_at": t, "entry_type": entry_type,
+        # Market order: fill immediately at current bar close.
+        leg = {
+            "entry": entry, "stop": stop, "units": units,
+            "leg_idx": 1, "opened_at": t, "entry_type": "market",
         }
+        self.active[pair] = {"direction": signal.direction, "target": target, "legs": [leg]}
         g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
-        """Add a new leg to a winning position.
-
-        Each pyramid leg gets its own FVG/OB stop (ICT c0 extreme) rather than
-        using the previous leg's entry as stop — that can be 50-80 pips wide and
-        turns pyramid legs into outsized losing trades.
-        """
+        """Add a new leg to a winning position at market price with fixed stop."""
         st = self.active[pair]
         if len(st["legs"]) >= config.MAX_LEGS:
-            return
-        if pair in self.pending:
             return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if self.news.is_blocked(now):
@@ -620,43 +591,42 @@ class Backtester:
         if favour_pips < 10:
             return
 
-        # Find a fresh FVG or OB entry with its own tight stop.
+        # FVG or OB confirms continued displacement (quality gate).
         bars15 = self.bars_up_to(pair, "15T", t)
-        result = (
-            self._find_fvg_entry(bars5, pair, st["direction"], lookback=12)
-            or self._find_fvg_entry(bars15, pair, st["direction"], lookback=4)
-            or self._find_ob_entry(bars5, pair, st["direction"])
+        fvg_ok = (
+            self._find_fvg_entry(bars5, pair, st["direction"], lookback=12) is not None
+            or self._find_fvg_entry(bars15, pair, st["direction"], lookback=4) is not None
+            or self._find_ob_entry(bars5, pair, st["direction"]) is not None
         )
-        if result is None:
+        if not fvg_ok:
             return
-        entry, stop = result
 
-        # Entry must be on the correct retrace side.
-        if st["direction"] > 0 and entry > cur_price:
-            return
-        if st["direction"] < 0 and entry < cur_price:
-            return
-        if st["direction"] > 0 and stop >= entry:
-            return
-        if st["direction"] < 0 and stop <= entry:
-            return
+        # Market entry at current price with fixed stop.
+        entry = cur_price
+        if st["direction"] > 0:
+            stop = entry - config.FIXED_STOP_PIPS * pip
+        else:
+            stop = entry + config.FIXED_STOP_PIPS * pip
 
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
 
-        # Decreasing lot per leg: leg 1 = PYRAMID_LOTS[0], leg 2 = [1], leg 3 = [2].
-        # Each add is smaller so overall exposure grows conservatively.
-        leg_num = len(st["legs"]) + 1   # which leg we're about to add (2 or 3)
+        # Decreasing lot per leg: leg 1=0.06, leg 2=0.04, leg 3=0.02.
+        leg_num = len(st["legs"]) + 1
         lot_idx = min(leg_num - 1, len(config.PYRAMID_LOTS) - 1)
         units = int(config.PYRAMID_LOTS[lot_idx] * config.LOT_UNITS)
 
-        self.pending[pair] = {
-            "entry_price": entry, "stop": stop, "target": st["target"],
-            "direction": st["direction"], "units": units,
-            "leg_idx": len(st["legs"]) + 1, "placed_at": t,
-            "entry_type": "pyramid",
+        # Promote prior leg stop to breakeven before adding new leg.
+        prior = st["legs"][-1]
+        prior["stop"] = prior["entry"]
+
+        leg = {
+            "entry": entry, "stop": stop, "units": units,
+            "leg_idx": len(st["legs"]) + 1, "opened_at": t,
+            "entry_type": "pyramid_market",
         }
+        st["legs"].append(leg)
 
 
 def summarize(bt):

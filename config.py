@@ -21,8 +21,9 @@ PYRAMID_LOTS    = (0.06, 0.04, 0.02)   # lots for leg 1, 2, 3 (decreasing scale-
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]  # convenience alias — base entry lot
 
 # --- Targets ---
-MIN_PIPS_TARGET = 10               # skip trade if nearest valid target < 10 pips
-MIN_RR = 1.2                       # minimum reward:risk on initial entry
+MIN_PIPS_TARGET = 20               # minimum target distance in pips (20 pip minimum win)
+MIN_RR = 1.2                       # minimum reward:risk
+FIXED_STOP_PIPS = 10               # fixed stop distance — always 10 pips from entry
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
