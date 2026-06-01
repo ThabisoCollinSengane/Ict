@@ -741,36 +741,37 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
-        # Intermarket: DXY gives USD direction. Relative-strength cross selects pair.
-        # EUR/GBP family: EURGBP picks EURUSD vs GBPUSD (ICT cheat sheet 1a–3b)
-        # AUD/NZD family: AUDNZD picks AUDUSD vs NZDUSD (same structure, same logic)
+        # Intermarket: DXY gives USD direction.
+        # EUR/GBP family (unchanged): EURGBP selects EURUSD vs GBPUSD.
+        # NZDUSD (standalone): DXY-only, completely independent — no cross reference.
         dxy_bias = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
-        if pair in ("EURUSD", "GBPUSD"):
-            ref_bias     = self._sym_bias(config.REF_EURGBP, "60T", t,
-                                          lookback=config.SWING_LOOKBACK_STH)
-            primary_pair = "EURUSD"
-            mss_sym1, mss_sym2 = "EURUSD", "GBPUSD"
-        else:   # AUDUSD, NZDUSD
-            ref_bias     = self._sym_bias(config.REF_AUDNZD, "60T", t,
-                                          lookback=config.SWING_LOOKBACK_STH)
-            primary_pair = "AUDUSD"
-            mss_sym1, mss_sym2 = "AUDUSD", "NZDUSD"
-        secondary_pair = mss_sym2
+        if dxy_bias == 0:
+            return   # DXY flat → no USD bias → hard gate for all pairs
 
-        direction, im_score = resolve_pair_direction(dxy_bias, ref_bias, pair, primary_pair)
-        if direction is None:
-            return   # DXY flat → no USD bias → hard gate
-        # Cross actively disagrees with this pair → skip (trade the preferred pair only).
-        if im_score < 0.75:
-            return
-        # Cross neutral → default to primary pair only (no preference signal).
-        if ref_bias == 0 and pair == secondary_pair:
-            return
+        if pair in ("EURUSD", "GBPUSD"):
+            # Original EUR/GBP logic — unchanged.
+            eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
+                                         lookback=config.SWING_LOOKBACK_STH)
+            direction, im_score = resolve_pair_direction(
+                dxy_bias, eurgbp_bias, pair, "EURUSD"
+            )
+            if direction is None:
+                return
+            if im_score < 0.75:
+                return
+            if eurgbp_bias == 0 and pair == "GBPUSD":
+                return
+            mss_sym1, mss_sym2 = "EURUSD", "GBPUSD"
+
+        else:   # NZDUSD — DXY-only, no AUDNZD reference
+            direction = -dxy_bias          # DXY bullish → NZD bearish
+            im_score  = 0.75              # single-signal quality (equivalent to neutral cross)
+            mss_sym1, mss_sym2 = "NZDUSD", "AUDUSD"
+
         g["intermarket_signal"] += 1
         g["pair_matches"] += 1
 
-        # MSS: 2-of-3 using the two pairs in this family + DXY inverse.
-        # Reference cross is NOT in MSS — it is pair-preference only (im_score above).
+        # MSS: 2-of-3 using both pairs in the family + DXY inverse.
         sym1_mss  = self._pair_has_mss(mss_sym1, t, direction)
         sym2_mss  = self._pair_has_mss(mss_sym2, t, direction)
         dxy_mss   = self._dxy_has_mss(t, -direction)
@@ -800,8 +801,8 @@ class Backtester:
         conviction = 0
 
         # Intermarket quality (0-2)
-        if im_score >= 1.0:   conviction += 2    # preferred pair per EURGBP
-        elif im_score >= 0.75: conviction += 1   # neutral EURGBP, DXY only
+        if im_score >= 1.0:   conviction += 2    # preferred pair per cross
+        elif im_score >= 0.75: conviction += 1   # cross neutral or DXY-only
 
         # MSS quality (0-2)
         conviction += min(mss_count, 2)
@@ -947,18 +948,23 @@ class Backtester:
         # Intermarket score for this pyramid leg.
         dxy_bias = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
         if pair in ("EURUSD", "GBPUSD"):
-            ref_bias     = self._sym_bias(config.REF_EURGBP, "60T", t,
-                                          lookback=config.SWING_LOOKBACK_STH)
-            primary_pair = "EURUSD"
-        else:
-            ref_bias     = self._sym_bias(config.REF_AUDNZD, "60T", t,
-                                          lookback=config.SWING_LOOKBACK_STH)
-            primary_pair = "AUDUSD"
-        dir_check, im_score = resolve_pair_direction(dxy_bias, ref_bias, pair, primary_pair)
-        if dir_check is None:
-            im_score = 0.5      # DXY flat → neutral, still pyramid but half size
-        elif dir_check != st["direction"]:
-            return              # macro has flipped against us → skip pyramid
+            eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
+                                         lookback=config.SWING_LOOKBACK_STH)
+            dir_check, im_score = resolve_pair_direction(
+                dxy_bias, eurgbp_bias, pair, "EURUSD"
+            )
+            if dir_check is None:
+                im_score = 0.5
+            elif dir_check != st["direction"]:
+                return
+        else:   # NZDUSD — DXY-only
+            if dxy_bias == 0:
+                im_score = 0.5
+            else:
+                dir_check = -dxy_bias
+                if dir_check != st["direction"]:
+                    return
+                im_score = 0.75
 
         # Weekly AMD override: if the confirmed weekly distribution direction
         # agrees with this position, upgrade im_score to 1.0 (full lots) even

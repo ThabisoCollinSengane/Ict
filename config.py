@@ -145,6 +145,6 @@ NEWS_CSV_PATH = "data/news_events.csv"
 # --- Symbols ---
 PAIRS = ("GBPUSD", "EURUSD", "NZDUSD")   # tradeable (AUDUSD excluded: poor Asian WR)
 REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength
-REF_AUDNZD = "AUDNZD"              # AUD vs NZD relative strength
+REF_AUDNZD = "AUDNZD"              # AUDNZD data (loaded for AUDUSD MSS bars; not used as bias signal)
 # DXY synthetic uses these (all available on OANDA):
 DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
