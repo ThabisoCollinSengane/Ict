@@ -43,16 +43,23 @@ def direction_label(d):
 
 def main():
     years = ["2022", "2023", "2024", "2025"]
-    syms  = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
+    core_syms     = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
+    optional_syms = ["AUDUSD", "NZDUSD", "AUDNZD"]
 
     available = [y for y in years
-                 if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{y}.csv")) for s in syms)]
+                 if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{y}.csv")) for s in core_syms)]
     print(f"Loading {available} ...")
 
     data_5m = {}
     dxy_5m  = None
-    for sym in syms:
-        frames = [load_m1(os.path.join(DATA_DIR, f"{sym}_{y}.csv")) for y in available]
+    all_syms = core_syms + [s for s in optional_syms
+                            if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{y}.csv"))
+                                   for y in available)]
+    for sym in all_syms:
+        frames = [load_m1(os.path.join(DATA_DIR, f"{sym}_{y}.csv")) for y in available
+                  if os.path.exists(os.path.join(DATA_DIR, f"{sym}_{y}.csv"))]
+        if not frames:
+            continue
         m1 = pd.concat(frames).sort_index()
         m1 = m1[~m1.index.duplicated(keep="first")]
         m5 = _resample(m1, "5min")
@@ -257,6 +264,92 @@ def main():
                   f"avg R{r.avg_pnl:+,.0f}  total R{r.pnl:+,.0f}")
     else:
         print("  entry_type column not found in trade log")
+
+    # ------------------------------------------------------------------ #
+    # 10. Weekly trade distribution (initial entries only)
+    # ------------------------------------------------------------------ #
+    print("\n--- WEEKLY TRADE DISTRIBUTION (initial entries, leg_idx=1) ---")
+    df1 = df[df.leg_idx == 1].copy()
+    df1["open_week"] = df1["opened_at"].dt.to_period("W")
+    week_counts = df1.groupby("open_week").size()
+    total_weeks  = len(week_counts)
+    print(f"  Active weeks    : {total_weeks}")
+    print(f"  Avg trades/week : {week_counts.mean():.2f}  "
+          f"(target 3–5)")
+    print(f"  Weeks at 3–5    : {((week_counts >= 3) & (week_counts <= 5)).sum()} "
+          f"({((week_counts >= 3) & (week_counts <= 5)).sum()/total_weeks*100:.0f}%)")
+    print(f"  Weeks < 3       : {(week_counts < 3).sum()} "
+          f"({(week_counts < 3).sum()/total_weeks*100:.0f}%)")
+    print(f"  Weeks > 5       : {(week_counts > 5).sum()} "
+          f"({(week_counts > 5).sum()/total_weeks*100:.0f}%)")
+    print()
+    for n, cnt in sorted(week_counts.value_counts().items()):
+        pct = cnt / total_weeks * 100
+        bar = "█" * int(cnt * 40 // total_weeks)
+        print(f"    {n:2d} trade(s)/week : {cnt:4d} ({pct:5.1f}%)  {bar}")
+
+    print()
+    print("  Per-pair weekly share (initial entries):")
+    for pair, grp in df1.groupby("pair"):
+        wkly = grp.groupby("open_week").size()
+        print(f"    {pair}: {len(grp):3d} total  avg {wkly.mean():.2f}/week  "
+              f"max {int(wkly.max())}/week  "
+              f"active {len(wkly)}/{total_weeks} weeks ({len(wkly)/total_weeks*100:.0f}%)")
+
+    # ------------------------------------------------------------------ #
+    # 11. Top repeating WIN patterns (ranked by frequency then WR)
+    # ------------------------------------------------------------------ #
+    print("\n--- TOP REPEATING WIN PATTERNS (session × pair × direction × entry_type) ---")
+    grp_cols = ["session", "pair", "dir_label"]
+    if "entry_type" in df.columns:
+        df["entry_cat"] = df["entry_type"].str.split("_").str[:2].str.join("_")
+        grp_cols = ["session", "pair", "dir_label", "entry_cat"]
+
+    combos2 = df.groupby(grp_cols).apply(
+        lambda g: pd.Series({
+            "n":      len(g),
+            "wins":   int(g.win.sum()),
+            "losses": int((~g.win).sum()),
+            "wr_pct": g.win.mean() * 100,
+            "pnl":    g.pnl.sum(),
+            "avg_pnl_w": g[g.win].pnl.mean() if g.win.any() else 0,
+            "avg_pnl_l": g[~g.win].pnl.mean() if (~g.win).any() else 0,
+        })
+    ).reset_index()
+
+    winners = combos2[(combos2.wins >= 3) & (combos2.pnl > 0)].sort_values(
+        ["wins", "wr_pct"], ascending=False).head(15)
+    for _, r in winners.iterrows():
+        label = " | ".join(str(r[c]) for c in grp_cols)
+        print(f"  {label:<55s}  "
+              f"{int(r.wins):3d}W/{int(r.losses):3d}L  WR {r.wr_pct:.0f}%  "
+              f"P&L R{r.pnl:+,.0f}  avg_W R{r.avg_pnl_w:+,.0f}")
+
+    # ------------------------------------------------------------------ #
+    # 12. Top repeating LOSS patterns (ranked by frequency then losses)
+    # ------------------------------------------------------------------ #
+    print("\n--- TOP REPEATING LOSS PATTERNS (session × pair × direction × entry_type) ---")
+    losers = combos2[(combos2.losses >= 3)].sort_values(
+        ["losses", "wr_pct"], ascending=[False, True]).head(15)
+    for _, r in losers.iterrows():
+        label = " | ".join(str(r[c]) for c in grp_cols)
+        flag = " *** DRAIN" if r.pnl < -500 else ""
+        print(f"  {label:<55s}  "
+              f"{int(r.wins):3d}W/{int(r.losses):3d}L  WR {r.wr_pct:.0f}%  "
+              f"P&L R{r.pnl:+,.0f}  avg_L R{r.avg_pnl_l:+,.0f}{flag}")
+
+    # ------------------------------------------------------------------ #
+    # 13. Exit reason breakdown
+    # ------------------------------------------------------------------ #
+    print("\n--- EXIT REASON BREAKDOWN ---")
+    if "reason" in df.columns:
+        for reason, grp in df.groupby("reason"):
+            w = grp.win.sum()
+            n = len(grp)
+            print(f"  {reason:12s}: {n:4d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  "
+                  f"P&L R{grp.pnl.sum():+,.0f}")
+    else:
+        print("  reason column not found")
 
 
 if __name__ == "__main__":
