@@ -30,14 +30,12 @@ MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 # Equity tiers — all legs stay equal; only the lot size grows with the account.
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
 #
-#   R900  → 0.03 flat  — full pyramid win R499  on 40-pip trade  (stays until R6000)
+#   R900  → 0.03 flat  — full pyramid win R499  on 40-pip trade
+#   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade
 #   R6000 → 0.10 flat  — full pyramid win R1665 on 40-pip trade
-#
-# The R3000 intermediate step (0.05 lots) is intentionally skipped — capital
-# stays at 0.03 throughout the growth phase to keep risk flat and consistent.
-# The lot-size jump happens only once the account reaches the R6000 milestone.
 EQUITY_TIERS = [
     (6_000, (0.10, 0.10, 0.10)),
+    (3_000, (0.05, 0.05, 0.05)),
     (0,     (0.03, 0.03, 0.03)),
 ]
 
