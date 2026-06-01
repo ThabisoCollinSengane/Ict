@@ -108,7 +108,14 @@ class Backtester:
             "manipulation_correct_dir": 0,
             "m5_fvg_correct_dir": 0, "target_found": 0,
             "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
+            # protection counters
+            "drawdown_halt": 0, "daily_loss_halt": 0, "consec_loss_pause": 0,
         }
+        # Wipeout-prevention state
+        self._peak_equity       = config.STARTING_CASH
+        self._consec_losses     = 0
+        self._day_open_eq       = {}   # date -> equity at start of that calendar day
+        self._drawdown_halt_until = None  # date after which trading resumes
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -261,6 +268,12 @@ class Backtester:
         pnl_usd = (exit_price - leg["entry"]) * leg["units"] * direction
         pnl_zar = pnl_usd * config.USD_ZAR
         self.equity += pnl_zar
+        # Update peak equity and consecutive loss counter after every close.
+        self._peak_equity = max(self._peak_equity, self.equity)
+        if pnl_zar > 0:
+            self._consec_losses = 0
+        else:
+            self._consec_losses += 1
         self.trades.append({
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
             "entry": leg["entry"], "exit": exit_price, "units": leg["units"],
@@ -484,6 +497,38 @@ class Backtester:
         if not can_open_new_trade(now):
             return
         g["in_killzone"] += 1
+
+        # ── Wipeout-prevention checks ──────────────────────────────────────
+        day_key = now.date()
+        # Reset daily equity snapshot and consecutive loss counter each new day.
+        if day_key not in self._day_open_eq:
+            self._day_open_eq[day_key] = self.equity
+            self._consec_losses = 0
+
+        # 1. Peak drawdown halt: pause trading for DRAWDOWN_PAUSE_DAYS after >20% DD.
+        if self._drawdown_halt_until is not None and day_key < self._drawdown_halt_until:
+            g["drawdown_halt"] += 1
+            return
+        if self._peak_equity > 0:
+            dd_pct = (self._peak_equity - self.equity) / self._peak_equity * 100
+            if dd_pct >= config.MAX_DRAWDOWN_HALT_PCT:
+                from datetime import timedelta
+                self._drawdown_halt_until = day_key + timedelta(days=config.DRAWDOWN_PAUSE_DAYS)
+                g["drawdown_halt"] += 1
+                return
+
+        # 2. Daily loss cap: sit out rest of day after losing >6% of day-open equity.
+        day_open = self._day_open_eq[day_key]
+        if day_open > 0 and (day_open - self.equity) / day_open * 100 >= config.MAX_DAILY_LOSS_PCT:
+            g["daily_loss_halt"] += 1
+            return
+
+        # 3. Consecutive loss pause: sit out rest of day after N straight losses.
+        if self._consec_losses >= config.MAX_CONSECUTIVE_LOSSES:
+            g["consec_loss_pause"] += 1
+            return
+        # ────────────────────────────────────────────────────────────────────
+
         if self.news.is_blocked(now):
             return
         g["news_clear"] += 1

@@ -9,36 +9,34 @@ MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Standard-account lot sizing ---
 # 1 standard lot = 100 000 base-currency units.
-# Pyramid: biggest entry first, smaller adds as trade extends.
-# Each new leg locks in prior gains (BE stop) before adding — smallest new leg
-# means prior locked profit ALWAYS exceeds new leg's maximum loss.
+# Pyramid: SAME lot size on every leg — maximises pips-per-leg and keeps the
+# fail-safe at exactly R0 net when the last leg stops.
 #
-# Fail-safe proof (R900 tier, 40-pip trade — L1 at X, L2 at X+10, L3 at X+20):
-#   L1 trailing-stop locked at X+10 → +R55.50 minimum
-#   L2 stop at BE (X+10)           → R0 minimum
-#   L3 (0.01 lots) stop at X+10   → -R18.50 worst case
-#   NET floor if L3 stopped        → +R37 GUARANTEED (gains cannot be wiped)
+# Fail-safe proof (R900 tier, flat 0.03 lots, L1 at X, L2 at X+10, L3 at X+20):
+#   L1 trailing-stop locked at X+10  → +R55.50
+#   L2 stop at BE (X+10)             → R0
+#   L3 (0.03 lots) stop at X+10      → -R55.50
+#   NET floor if L3 stopped           → R0  (never lose on a winning trade)
 #
-# Calibration (0.03/0.02/0.01 lots, 40-pip trade, USD_ZAR=18.5):
-#   L1 0.03 lots × 40 pips × R9.25/pip = R222  (best entry, most pips)
-#   L2 0.02 lots × 30 pips × R9.25/pip = R111  (add with less size)
-#   L3 0.01 lots × 20 pips × R9.25/pip = R37   (smallest risk, largest protection)
-#   Full pyramid win: R370
+# Calibration (flat 0.03 lots, 40-pip trade, USD_ZAR=18.5):
+#   L1 0.03 × 40 pips × R9.25/pip = R222
+#   L2 0.03 × 30 pips × R9.25/pip = R166.50
+#   L3 0.03 × 20 pips × R9.25/pip = R111
+#   Full pyramid win: R499.50
 LOT_UNITS       = 100_000
-PYRAMID_LOTS    = (0.03, 0.02, 0.01)    # R900 starting tier — decreasing pyramid
+PYRAMID_LOTS    = (0.03, 0.03, 0.03)    # flat — same lot on every leg
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 
-# Equity tiers — lot schedule grows as account reaches each milestone (ZAR).
+# Equity tiers — all legs stay equal; only the lot size grows with the account.
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
-# Each tier keeps the decreasing pattern so the fail-safe always holds.
 #
-#   R900  tier: L1=0.03 L2=0.02 L3=0.01 → floor +R37 if L3 stopped
-#   R3000 tier: L1=0.05 L2=0.03 L3=0.02 → floor +R55 if L3 stopped
-#   R6000 tier: L1=0.10 L2=0.06 L3=0.04 → floor +R111 if L3 stopped
+#   R900  → 0.03 flat  — full pyramid win R499  on 40-pip trade
+#   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade
+#   R6000 → 0.10 flat  — full pyramid win R1665 on 40-pip trade
 EQUITY_TIERS = [
-    (6_000, (0.10, 0.06, 0.04)),   # R6 000+ — full pyramid win R1 221 on 40-pip trade
-    (3_000, (0.05, 0.03, 0.02)),   # R3 000  — full pyramid win R610 on 40-pip trade
-    (0,     (0.03, 0.02, 0.01)),   # R900    — full pyramid win R370 on 40-pip trade
+    (6_000, (0.10, 0.10, 0.10)),
+    (3_000, (0.05, 0.05, 0.05)),
+    (0,     (0.03, 0.03, 0.03)),
 ]
 
 # --- Targets ---
@@ -47,6 +45,19 @@ MIN_RR = 1.2                       # minimum reward:risk
 FIXED_STOP_PIPS = 10               # fixed stop distance — always 10 pips from entry
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit
 TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profit
+
+# --- Account protection (wipeout prevention) ---
+# 1. Peak drawdown halt: if equity falls >20% from its highest point, stop trading
+#    for DRAWDOWN_PAUSE_DAYS calendar days before retrying. Prevents cascading losses
+#    in trending-against conditions.
+MAX_DRAWDOWN_HALT_PCT   = 20.0
+DRAWDOWN_PAUSE_DAYS     = 5
+# 2. Daily loss cap: stop opening new trades for the rest of the calendar day once
+#    daily losses exceed this % of the account equity at day open.
+MAX_DAILY_LOSS_PCT      = 6.0     # ~2 full stop-losses at 0.03 lots
+# 3. Consecutive loss pause: after N straight losses, sit out the rest of the day.
+#    Counter resets automatically at the start of each new trading day.
+MAX_CONSECUTIVE_LOSSES  = 5
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
