@@ -16,8 +16,20 @@ MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 #   0.07 lots × 20 pips × 18.5 = R259  ← 3rd leg add (max conviction)
 #   Full pyramid win at 20 pips: R111 + R185 + R259 = R555
 LOT_UNITS       = 100_000
-PYRAMID_LOTS    = (0.03, 0.05, 0.07)
+PYRAMID_LOTS    = (0.03, 0.05, 0.07)    # starting tier (< R3 000)
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]
+
+# Equity tiers — lot schedule grows as account reaches each level (ZAR).
+# Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
+# Risk per full pyramid at 20-pip target × 18.5 USD/ZAR:
+#   R900  tier → R111 + R185 + R259 = R555 full win
+#   R3 000 tier → R185 + R296 + R444 = R925 full win
+#   R6 000 tier → R370 + R555 + R740 = R1 665 full win
+EQUITY_TIERS = [
+    (6_000, (0.10, 0.15, 0.20)),   # R6 000+ account
+    (3_000, (0.05, 0.08, 0.12)),   # R3 000 account
+    (0,     (0.03, 0.05, 0.07)),   # R900 starting capital
+]
 
 # --- Targets ---
 MIN_PIPS_TARGET = 20               # minimum target distance in pips (20 pip minimum win)

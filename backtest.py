@@ -305,6 +305,13 @@ class Backtester:
     def _dxy_bias_1h(self, t, lookback: int = None):
         return self._dxy_bias("60T", t, lookback=lookback)
 
+    def _pyramid_lots(self):
+        """Return (leg1, leg2, leg3) lot sizes for the current equity tier."""
+        for min_eq, lots in config.EQUITY_TIERS:
+            if self.equity >= min_eq:
+                return lots
+        return config.EQUITY_TIERS[-1][1]
+
     def _pair_has_mss(self, sym, t, direction):
         """Ep 12 STH tier: M15 or M5 BOS in `direction`. H1 excluded — daily M15
         liquidity sweeps are more frequent and the primary entry timeframe."""
@@ -571,10 +578,11 @@ class Backtester:
             return
         g["rr_ok"] += 1
 
-        # ZAR equity → USD for position sizing; floor at leg-1 lot from PYRAMID_LOTS.
+        # ZAR equity → USD for position sizing; floor at leg-1 lot for current tier.
         equity_usd = self.equity / config.USD_ZAR
         risk_units = int(position_size(equity_usd, entry, stop, pair))
-        min_units  = int(config.PYRAMID_LOTS[0] * config.LOT_UNITS)
+        tier_lots  = self._pyramid_lots()
+        min_units  = int(tier_lots[0] * config.LOT_UNITS)
         units = max(risk_units, min_units)
         if units == 0:
             return
@@ -654,11 +662,12 @@ class Backtester:
         if reward_pips < config.MIN_PIPS_TARGET:
             return
 
-        # Lot size: decreasing pyramid schedule scaled by intermarket score.
-        leg_num = len(st["legs"]) + 1
-        lot_idx = min(leg_num - 1, len(config.PYRAMID_LOTS) - 1)
-        base_units = int(config.PYRAMID_LOTS[lot_idx] * config.LOT_UNITS)
-        units = max(int(base_units * im_score), int(config.PYRAMID_LOTS[-1] * config.LOT_UNITS))
+        # Lot size: growing pyramid schedule for current tier, scaled by intermarket score.
+        tier_lots = self._pyramid_lots()
+        leg_num   = len(st["legs"]) + 1
+        lot_idx   = min(leg_num - 1, len(tier_lots) - 1)
+        base_units = int(tier_lots[lot_idx] * config.LOT_UNITS)
+        units = max(int(base_units * im_score), int(tier_lots[-1] * config.LOT_UNITS))
 
         # Promote prior leg stop to breakeven before adding new leg.
         prior = st["legs"][-1]
