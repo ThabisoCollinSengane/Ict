@@ -22,6 +22,13 @@ from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
+from ict.market_profile import (
+    daily_open as mp_daily_open,
+    weekly_open as mp_weekly_open,
+    session_open as mp_session_open,
+    detect_weekly_amd,
+    profile_score,
+)
 from ict.dealing_range import (
     detect_dealing_range,
     is_valid_entry_zone,
@@ -110,12 +117,16 @@ class Backtester:
             "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
             # protection counters
             "drawdown_halt": 0, "daily_loss_halt": 0, "consec_loss_pause": 0,
+            # market profile counters
+            "weekly_amd_confirmed": 0, "session_handover_closed": 0,
         }
         # Wipeout-prevention state
         self._peak_equity       = config.STARTING_CASH
         self._consec_losses     = 0
         self._day_open_eq       = {}   # date -> equity at start of that calendar day
         self._drawdown_halt_until = None  # date after which trading resumes
+        # Per-pair weekly AMD cache: updated each bar (daily resolution is enough)
+        self._weekly_amd        = {}   # pair -> WeeklyAMD or None
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -166,6 +177,12 @@ class Backtester:
             # Cheap killzone gate: skip heavy entry logic if not in any killzone.
             now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
             in_kz = can_open_new_trade(now)
+
+            # Session handover: close losing positions that fight the weekly AMD
+            # at the start of each kill zone (02:00 ET and 07:00 ET).
+            if in_kz:
+                self._check_session_handover(t)
+
             for pair in config.PAIRS:
                 if pair in self.active:
                     self._maybe_pyramid(pair, t)
@@ -324,6 +341,99 @@ class Backtester:
             if self.equity >= min_eq:
                 return lots
         return config.EQUITY_TIERS[-1][1]
+
+    # ------------------------------------------------------------------
+    # Market profile helpers
+    # ------------------------------------------------------------------
+
+    def _daily_open(self, pair: str, t) -> float | None:
+        bars = self.tf_bars.get((pair, "60T"), [])
+        ts   = self.tf_index.get((pair, "60T"))
+        if ts is None or not bars:
+            return None
+        return mp_daily_open(bars, ts, t)
+
+    def _weekly_open(self, pair: str, t) -> float | None:
+        bars = self.tf_bars.get((pair, "D"), [])
+        ts   = self.tf_index.get((pair, "D"))
+        if ts is None or not bars:
+            return None
+        return mp_weekly_open(bars, ts, t)
+
+    def _session_open(self, pair: str, sess_name: str, t) -> float | None:
+        bars = self.tf_bars.get((pair, "5T"), [])
+        ts   = self.tf_index.get((pair, "5T"))
+        if ts is None or not bars:
+            return None
+        return mp_session_open(bars, ts, sess_name, t)
+
+    def _get_weekly_amd(self, pair: str, t) -> object | None:
+        """Cached weekly AMD for this bar (recomputed at most once per bar per pair)."""
+        bars = self.tf_bars.get((pair, "D"), [])
+        ts   = self.tf_index.get((pair, "D"))
+        if ts is None or not bars:
+            self._weekly_amd[pair] = None
+            return None
+        self._weekly_amd[pair] = detect_weekly_amd(bars, ts, t)
+        return self._weekly_amd[pair]
+
+    def _profile_score(self, pair: str, direction: int, cur_price: float, t) -> int:
+        """How many open levels (daily, weekly, session) agree with direction? 0-3."""
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        import pytz
+        ny = pytz.timezone("America/New_York")
+        ny_dt = now.astimezone(ny)
+        h = ny_dt.hour
+        sess = "London Open" if 2 <= h < 5 else ("New York AM" if 7 <= h < 10 else None)
+        d_op = self._daily_open(pair, t)
+        w_op = self._weekly_open(pair, t)
+        s_op = self._session_open(pair, sess, t) if sess else None
+        return profile_score(cur_price, direction, d_op, w_op, s_op)
+
+    def _check_session_handover(self, t):
+        """At kill zone open: close any position that is losing AND fights the weekly AMD.
+
+        The weekly distribution run defines the multi-day directional bias. A
+        position entered in a prior session that is now underwater AND against the
+        confirmed weekly AMD should be closed rather than waiting for a 10-pip stop.
+        The current session's entry logic will then open fresh in the correct direction.
+        """
+        if not config.SESSION_HANDOVER_CLOSE:
+            return
+
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        import pytz
+        ny = pytz.timezone("America/New_York")
+        ny_dt = now.astimezone(ny)
+        h, m = ny_dt.hour, ny_dt.minute
+
+        # Only fire at kill zone boundaries: exactly 02:00 or 07:00 ET (±5 min)
+        is_kz_open = (h == 2 and m <= 5) or (h == 7 and m <= 5)
+        if not is_kz_open:
+            return
+
+        for pair in list(self.active.keys()):
+            st = self.active[pair]
+            wamd = self._get_weekly_amd(pair, t)
+            if wamd is None:
+                continue  # no confirmed weekly AMD — don't interfere
+            if wamd.direction == st["direction"]:
+                continue  # position agrees with weekly profile — leave it
+
+            # Position is fighting the weekly AMD.
+            # Get current price to determine if the position is losing.
+            m5_bar = self._bar_at(pair, "5T", t)
+            if m5_bar is None:
+                continue
+            cur_price = m5_bar.Close
+            pip = pip_size(pair)
+            first_entry = st["legs"][0]["entry"]
+            pips_profit = (cur_price - first_entry) * st["direction"] / pip
+
+            if pips_profit < 0:
+                # Losing and fighting weekly AMD → close all legs at market.
+                self._force_close(pair, cur_price, t, "session_handover")
+                self.gate["session_handover_closed"] += 1
 
     def _pair_has_mss(self, sym, t, direction):
         """Ep 12 STH tier: M15 or M5 BOS in `direction`. H1 excluded — daily M15
@@ -591,6 +701,19 @@ class Backtester:
         g["h1_bias_ok"] += 1
         g["h4_bias_ok"] += 1
 
+        # Weekly AMD (Power-of-Three on the weekly range): Monday box → Judas swing
+        # → distribution toward PWWH/PWWL. When confirmed and aligned with signal
+        # direction, marks the trade as a "weekly distribution" entry — pyramid legs
+        # will use full lots regardless of intermarket score.
+        wamd = self._get_weekly_amd(pair, t)
+        weekly_amd_dir = wamd.direction if wamd is not None else 0
+        if wamd is not None and wamd.direction == signal.direction:
+            g["weekly_amd_confirmed"] += 1
+
+        # Open-level profile score: how many of (daily open, weekly open, session open)
+        # agree with the signal direction. Used to scale pyramid aggressiveness.
+        p_score = self._profile_score(pair, signal.direction, cur_price, t)
+
         # AMD on M15: scored, not required. Full setup (consolidation + correct sweep)
         # adds conviction; absent = still tradeable when MSS + FVG are strong.
         bars15 = self.bars_up_to(pair, "15T", t)
@@ -654,7 +777,14 @@ class Backtester:
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
         }
-        self.active[pair] = {"direction": signal.direction, "target": target, "legs": [leg]}
+        self.active[pair] = {
+            "direction": signal.direction,
+            "target": target,
+            "legs": [leg],
+            # Market profile context: used in _maybe_pyramid for lot sizing.
+            "weekly_amd_dir": weekly_amd_dir,
+            "profile_score": p_score,
+        }
         g["limit_placed"] += 1
 
     def _maybe_pyramid(self, pair, t):
@@ -688,6 +818,16 @@ class Backtester:
             im_score = 0.5      # half lot: macro is neutral
         else:
             return              # signal points to wrong pair — skip
+
+        # Weekly AMD override: if the confirmed weekly distribution direction
+        # agrees with this position, upgrade im_score to 1.0 (full lots) even
+        # when the intermarket is neutral. The weekly profile is the higher-
+        # timeframe authority — if the Judas swing already fired, the market
+        # SHOULD distribute toward PWWH/PWWL for the rest of the week.
+        if config.WEEKLY_AMD_FULL_PYRAMID:
+            wamd_dir = st.get("weekly_amd_dir", 0)
+            if wamd_dir == st["direction"]:
+                im_score = 1.0      # weekly AMD confirms — full pyramid lots
 
         bars5 = self.bars_up_to(pair, "5T", t)
         if not bars5:
@@ -733,10 +873,11 @@ class Backtester:
         prior = st["legs"][-1]
         prior["stop"] = prior["entry"]
 
+        wamd_tag = "wamd" if st.get("weekly_amd_dir") == st["direction"] else "im"
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
-            "entry_type": f"pyramid_im{im_score:.1f}",
+            "entry_type": f"pyramid_{wamd_tag}{im_score:.1f}",
         }
         st["legs"].append(leg)
 

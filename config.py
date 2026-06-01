@@ -117,6 +117,18 @@ AMD_MIN_TOUCHES = 2                # the high and low each tagged at least twice
 AMD_RANGE_END_LOOKBACK = 96        # range can have ended up to 24 H ago (Asia → London)
 AMD_SWEEP_LOOKBACK = 48            # sweep must be within last 48 M15 bars (12 H) from now
 
+# --- Market Profile ---
+# Weekly AMD: when the weekly Judas swing is confirmed (Monday range swept on
+# Tue/Wed/Thu and close back inside), pyramid legs use FULL lots regardless of
+# the intermarket score — the weekly distribution is the "huge pyramid" setup.
+WEEKLY_AMD_FULL_PYRAMID = True
+
+# Session handover: at the START of each kill zone, any active position whose
+# direction CONFLICTS with the confirmed weekly AMD and that is currently LOSING
+# (negative pnl) is closed at market. The session's own entry logic then
+# re-enters in the correct direction.
+SESSION_HANDOVER_CLOSE = True
+
 # --- News data source ---
 # In backtest, the live ForexFactory "thisweek" XML is useless (it only returns
 # the current real-world week). Set NEWS_SOURCE = "csv" for backtests; the loader
