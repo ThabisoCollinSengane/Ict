@@ -743,7 +743,7 @@ class Backtester:
 
         # Intermarket: DXY gives USD direction.
         # EUR/GBP family (unchanged): EURGBP selects EURUSD vs GBPUSD.
-        # NZDUSD (standalone): DXY-only, completely independent — no cross reference.
+        # NZDUSD family (independent): AUDNZD selects NZD as preferred vs AUD; DXY confirms direction.
         dxy_bias = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
         if dxy_bias == 0:
             return   # DXY flat → no USD bias → hard gate for all pairs
@@ -763,9 +763,20 @@ class Backtester:
                 return
             mss_sym1, mss_sym2 = "EURUSD", "GBPUSD"
 
-        else:   # NZDUSD — DXY-only, no AUDNZD reference
-            direction = -dxy_bias          # DXY bullish → NZD bearish
-            im_score  = 0.75              # single-signal quality (equivalent to neutral cross)
+        else:   # NZDUSD — DXY + AUDNZD cross (independent of EUR/GBP family)
+            audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
+                                         lookback=config.SWING_LOOKBACK_STH)
+            # NZDUSD is the non-primary pair; AUDNZD picks NZD vs AUD.
+            # im_score 1.0: AUDNZD confirms NZD is the extreme (NZDUSD preferred).
+            # im_score 0.5: AUDNZD says AUD is extreme → AUDUSD preferred (not traded, skip).
+            # im_score 0.75: AUDNZD neutral → no cross signal, don't default to NZDUSD.
+            direction, im_score = resolve_pair_direction(
+                dxy_bias, audnzd_bias, "NZDUSD", "AUDUSD"
+            )
+            if direction is None:
+                return
+            if im_score < 1.0:
+                return   # only trade when AUDNZD explicitly confirms NZDUSD
             mss_sym1, mss_sym2 = "NZDUSD", "AUDUSD"
 
         g["intermarket_signal"] += 1
@@ -957,14 +968,16 @@ class Backtester:
                 im_score = 0.5
             elif dir_check != st["direction"]:
                 return
-        else:   # NZDUSD — DXY-only
-            if dxy_bias == 0:
+        else:   # NZDUSD — DXY + AUDNZD (independent of EUR/GBP)
+            audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
+                                         lookback=config.SWING_LOOKBACK_STH)
+            dir_check, im_score = resolve_pair_direction(
+                dxy_bias, audnzd_bias, "NZDUSD", "AUDUSD"
+            )
+            if dir_check is None:
                 im_score = 0.5
-            else:
-                dir_check = -dxy_bias
-                if dir_check != st["direction"]:
-                    return
-                im_score = 0.75
+            elif dir_check != st["direction"]:
+                return
 
         # Weekly AMD override: if the confirmed weekly distribution direction
         # agrees with this position, upgrade im_score to 1.0 (full lots) even
