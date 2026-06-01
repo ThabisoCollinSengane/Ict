@@ -16,8 +16,6 @@ def _parse(hhmm: str) -> time:
 
 _KZ     = [(name, _parse(s), _parse(e)) for name, s, e in config.KILLZONES]
 _KZ_AUD = [(name, _parse(s), _parse(e)) for name, s, e in config.AUD_NZD_KILLZONES]
-# NZDUSD trades across all four sessions: London, NY AM, Asian Open, Tokyo Kill.
-_KZ_NZD = _KZ + _KZ_AUD
 
 
 def _ensure_utc(dt):
@@ -26,8 +24,8 @@ def _ensure_utc(dt):
 
 def _kz_list(pair: str | None):
     """Return the kill zone list appropriate for this pair."""
-    if pair == "NZDUSD":
-        return _KZ_NZD
+    # NZDUSD uses London Open + NY AM (same as EUR/GBP) — active during US session.
+    # AUDUSD uses Asian session kill zones.
     return _KZ_AUD if pair in _AUD_ONLY_PAIRS else _KZ
 
 
