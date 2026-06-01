@@ -6,7 +6,7 @@ import config
 
 NY = pytz.timezone("America/New_York")
 
-_AUD_NZD_PAIRS = frozenset(("AUDUSD", "NZDUSD"))
+_AUD_ONLY_PAIRS = frozenset(("AUDUSD",))
 
 
 def _parse(hhmm: str) -> time:
@@ -16,6 +16,8 @@ def _parse(hhmm: str) -> time:
 
 _KZ     = [(name, _parse(s), _parse(e)) for name, s, e in config.KILLZONES]
 _KZ_AUD = [(name, _parse(s), _parse(e)) for name, s, e in config.AUD_NZD_KILLZONES]
+# NZDUSD trades across all four sessions: London, NY AM, Asian Open, Tokyo Kill.
+_KZ_NZD = _KZ + _KZ_AUD
 
 
 def _ensure_utc(dt):
@@ -24,7 +26,9 @@ def _ensure_utc(dt):
 
 def _kz_list(pair: str | None):
     """Return the kill zone list appropriate for this pair."""
-    return _KZ_AUD if pair in _AUD_NZD_PAIRS else _KZ
+    if pair == "NZDUSD":
+        return _KZ_NZD
+    return _KZ_AUD if pair in _AUD_ONLY_PAIRS else _KZ
 
 
 def current_killzone(utc_dt, pair: str | None = None) -> str | None:
