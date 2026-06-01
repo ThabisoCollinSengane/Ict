@@ -1064,16 +1064,21 @@ class Backtester:
         # structure level rather than being chased at momentum highs/lows.
         bars15 = self.bars_up_to(pair, "15T", t)
         bars1h = self.bars_up_to(pair, "60T", t)
-        fvg_ok = (
-            self._find_fvg_entry(bars5, pair, st["direction"], lookback=12) is not None
-            or self._find_fvg_entry(bars15, pair, st["direction"], lookback=4) is not None
-            or self._find_ob_entry(bars5, pair, st["direction"]) is not None
-            # Breaker blocks: M5, M15, H1 per bias timeframe.
-            or self._find_breaker_entry(bars5, pair, st["direction"])
-            or self._find_breaker_entry(bars15, pair, st["direction"])
-            or (bars1h and self._find_breaker_entry(bars1h, pair, st["direction"]))
-        )
-        if not fvg_ok:
+        # Detect which pattern triggered the pyramid add.
+        pyr_pattern = None
+        if self._find_fvg_entry(bars5, pair, st["direction"], lookback=12) is not None:
+            pyr_pattern = "fvg_m5"
+        elif self._find_fvg_entry(bars15, pair, st["direction"], lookback=4) is not None:
+            pyr_pattern = "fvg_m15"
+        elif self._find_ob_entry(bars5, pair, st["direction"]) is not None:
+            pyr_pattern = "ob_m5"
+        elif self._find_breaker_entry(bars5, pair, st["direction"]):
+            pyr_pattern = "breaker_m5"
+        elif self._find_breaker_entry(bars15, pair, st["direction"]):
+            pyr_pattern = "breaker_m15"
+        elif bars1h and self._find_breaker_entry(bars1h, pair, st["direction"]):
+            pyr_pattern = "breaker_h1"
+        if pyr_pattern is None:
             return
 
         # Market entry at current price with fixed stop.
@@ -1102,7 +1107,7 @@ class Backtester:
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
-            "entry_type": f"pyramid_{wamd_tag}{im_score:.1f}",
+            "entry_type": f"pyramid_{wamd_tag}{im_score:.1f}_{pyr_pattern}",
         }
         st["legs"].append(leg)
 

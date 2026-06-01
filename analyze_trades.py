@@ -430,6 +430,138 @@ def main():
     else:
         print("  reason column not found")
 
+    # ------------------------------------------------------------------ #
+    # 14. Pyramid analytics (level distribution, entry patterns, SD targets)
+    # ------------------------------------------------------------------ #
+    print("\n" + "=" * 60)
+    print("PYRAMID ANALYTICS")
+    print("=" * 60)
+
+    from risk import pip_size as _pip_size
+
+    # ── 14a. Leg level distribution ───────────────────────────────────────
+    print("\n--- LEG LEVEL DISTRIBUTION ---")
+    for leg_n, grp in df.groupby("leg_idx"):
+        w = grp.win.sum()
+        n = len(grp)
+        label = {1: "L1 Initial", 2: "L2 Add", 3: "L3 Add"}.get(int(leg_n), f"L{leg_n}")
+        print(f"  {label}: {n:4d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  "
+              f"P&L R{grp.pnl.sum():+,.0f}")
+
+    # Positions that actually pyramided (reached L2 or L3)
+    pyr_l2 = df[df.leg_idx == 2]
+    pyr_l3 = df[df.leg_idx == 3]
+    initial = df[df.leg_idx == 1]
+    print(f"\n  Positions that added L2 : {len(pyr_l2):3d}  "
+          f"({len(pyr_l2)/len(initial)*100:.1f}% of initial entries)")
+    print(f"  Positions that added L3 : {len(pyr_l3):3d}  "
+          f"({len(pyr_l3)/len(initial)*100:.1f}% of initial entries)")
+
+    # ── 14b. Pyramid entry patterns ───────────────────────────────────────
+    print("\n--- PYRAMID ENTRY PATTERNS (L2/L3 legs) ---")
+    pyr_legs = df[df.leg_idx > 1].copy()
+    if not pyr_legs.empty:
+        def _pyr_pattern(et):
+            # "pyramid_im1.0_fvg_m5" → "fvg_m5"
+            parts = str(et).split("_", 2)  # ["pyramid", "im1.0", "fvg_m5"]
+            return parts[2] if len(parts) > 2 else et
+
+        pyr_legs["pyr_pat"] = pyr_legs["entry_type"].apply(_pyr_pattern)
+        for pat, grp in pyr_legs.groupby("pyr_pat"):
+            w = grp.win.sum()
+            n = len(grp)
+            print(f"  {pat:<14}  {n:3d} pyramid legs  {w}W/{n-w}L  "
+                  f"WR {w/n*100:.0f}%  P&L R{grp.pnl.sum():+,.0f}")
+    else:
+        print("  No pyramid legs in dataset")
+
+    # ── 14c. ICT Standard Deviation target classification ─────────────────
+    # Stop = 10 pips fixed. SD levels = multiples of initial risk:
+    #   1st SD = 1R  = 10 pips  (minimum viable / trail to BE)
+    #   2nd SD = 2R  = 20 pips  (MIN_PIPS_TARGET — standard first target)
+    #   3rd SD = 3R  = 30 pips  (127.2% extension)
+    #   4th SD = 4R+ = 40+ pips (161.8%+ full distribution)
+    print("\n--- ICT STANDARD DEVIATION TARGET HITS (winning trades, all legs) ---")
+    winners = df[df.win].copy()
+    winners["pips_profit"] = winners.apply(
+        lambda r: (r["exit"] - r["entry"]) * r["direction"] / _pip_size(r["pair"]),
+        axis=1
+    )
+    winners["sd_level"] = pd.cut(
+        winners["pips_profit"],
+        bins=[0, 10, 20, 30, 40, 9999],
+        labels=["<1st SD (<10pip)", "1st SD (10-19pip)",
+                "2nd SD (20-29pip)", "3rd SD (30-39pip)", "4th SD (40+pip)"]
+    )
+    sd_counts = winners["sd_level"].value_counts().sort_index()
+    total_wins = len(winners)
+    print(f"  {'SD Level':<22}  {'Count':>6}  {'%':>6}  {'Avg P&L':>10}")
+    print(f"  {'-'*52}")
+    for sd, cnt in sd_counts.items():
+        grp = winners[winners.sd_level == sd]
+        avg_pnl = grp.pnl.mean()
+        pct = cnt / total_wins * 100
+        bar = "█" * int(cnt * 30 // total_wins)
+        print(f"  {str(sd):<22}  {cnt:>6}  {pct:>5.1f}%  R{avg_pnl:>+9,.0f}  {bar}")
+
+    # SD by leg level
+    print(f"\n  SD target by leg level:")
+    for leg_n, grp in winners.groupby("leg_idx"):
+        label = {1: "L1", 2: "L2", 3: "L3"}.get(int(leg_n), f"L{leg_n}")
+        avg_pips = grp["pips_profit"].mean()
+        avg_sd = avg_pips / 10  # express as SD multiples (10-pip stop = 1 SD)
+        print(f"    {label}: {len(grp):3d} wins  avg {avg_pips:.1f} pips  "
+              f"≈ {avg_sd:.1f}R  (avg P&L R{grp.pnl.mean():+,.0f})")
+
+    # SD per pair
+    print(f"\n  SD target distribution per pair (winners only):")
+    for pair, grp in winners.groupby("pair"):
+        avg_pips = grp["pips_profit"].mean()
+        top_sd = grp["sd_level"].mode().iloc[0] if not grp.empty else "—"
+        print(f"    {pair}: {len(grp):3d} wins  avg {avg_pips:.1f} pips  "
+              f"most common target: {top_sd}")
+
+    # ── 14d. Full position view (grouped by close time)  ──────────────────
+    print("\n--- FULL POSITION VIEW (grouped positions with ≥2 legs) ---")
+    df["closed_at_str"] = df["closed_at"].astype(str).str[:16]
+    multi_leg = df.groupby(["pair", "closed_at_str"]).filter(lambda g: len(g) > 1)
+    pos_groups = multi_leg.groupby(["pair", "closed_at_str"])
+
+    pos_rows = []
+    for (pair, close_str), grp in pos_groups:
+        legs_sorted = grp.sort_values("leg_idx")
+        n_legs = len(legs_sorted)
+        patterns = " → ".join(legs_sorted["entry_type"].apply(
+            lambda et: str(et).split("_", 1)[1] if "_" in str(et) else et
+        ).tolist())
+        total_pnl = legs_sorted.pnl.sum()
+        l1_pips = ((legs_sorted.iloc[0]["exit"] - legs_sorted.iloc[0]["entry"])
+                   * legs_sorted.iloc[0]["direction"]
+                   / _pip_size(pair))
+        opened_str = str(legs_sorted.iloc[0]["opened_at"])[:16]
+        pos_rows.append({
+            "pair": pair, "legs": n_legs, "opened": opened_str, "closed": close_str,
+            "patterns": patterns, "pips_l1": round(l1_pips, 1),
+            "total_pnl": total_pnl, "won": total_pnl > 0,
+        })
+
+    if pos_rows:
+        pos_df = pd.DataFrame(pos_rows)
+        wins_pos = pos_df.won.sum()
+        print(f"  Multi-leg positions: {len(pos_df)} total  "
+              f"{wins_pos}W/{len(pos_df)-wins_pos}L  "
+              f"WR {wins_pos/len(pos_df)*100:.0f}%  "
+              f"P&L R{pos_df.total_pnl.sum():+,.0f}")
+        print()
+        print(f"  {'Opened':<17}  {'Pair':<7}  {'Legs':>4}  {'PnL':>9}  Pattern chain")
+        print(f"  {'-'*80}")
+        for _, r in pos_df.sort_values("total_pnl", ascending=False).iterrows():
+            flag = "★" if r.total_pnl > 0 else " "
+            print(f"  {flag} {r.opened:<16}  {r.pair:<7}  {int(r.legs):>4}  "
+                  f"R{r.total_pnl:>+8,.0f}  {r.patterns}")
+    else:
+        print("  No multi-leg positions found in this run")
+
 
 if __name__ == "__main__":
     main()
