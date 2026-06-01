@@ -106,7 +106,6 @@ class Backtester:
         self.equity = config.STARTING_CASH
         self.start_equity = self.equity
         self.active = {}
-        self.pending = {}
         self.trades = []
         # Diagnostic counters: how many times each gate was reached / rejected.
         self.gate = {
@@ -197,13 +196,12 @@ class Backtester:
             for pair in config.PAIRS:
                 if pair in self.active:
                     self._maybe_pyramid(pair, t)
-                elif pair not in self.pending and can_open_new_trade(now, pair):
+                elif can_open_new_trade(now, pair):
                     self._maybe_open(pair, t)
 
             if i % 1000 == 0 and i > 0:
                 print(f"    bar {i}/{total} ({t}) - active={len(self.active)} "
-                      f"pending={len(self.pending)} trades={len(self.trades)} "
-                      f"equity={self.equity:.0f}")
+                      f"trades={len(self.trades)} equity={self.equity:.0f}")
 
         # Close any remaining positions at last available 5m close.
         last_t = timestamps[-1]
@@ -256,59 +254,6 @@ class Backtester:
             if not self.active.get(pair, {}).get("legs"):
                 self.active.pop(pair, None)
 
-        # Pending limit entry fills.
-        if pair in self.pending:
-            pe = self.pending[pair]
-            entry = pe["entry_price"]
-            direction = pe["direction"]
-            filled = (direction > 0 and bar.Low <= entry) or \
-                     (direction < 0 and bar.High >= entry)
-            now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-            in_kz = current_killzone(now, pair) is not None
-            if filled and in_kz:
-                self._fill_entry(pair, t)
-            elif not in_kz:
-                # Kill zone ended before fill — cancel and refund budget slot.
-                self._cancel_pending(pair)
-            elif (t - pe["placed_at"]).total_seconds() / 60.0 > 90:
-                # Limit expired (90-min timeout) — cancel and refund.
-                self._cancel_pending(pair)
-
-    def _cancel_pending(self, pair):
-        """Cancel a pending limit order and refund the reserved budget slot."""
-        pe = self.pending.pop(pair, None)
-        if pe is None:
-            return
-        wk = pe.get("week_key")
-        dk = pe.get("day_key")
-        if wk:
-            self._week_total[wk]                         = max(0, self._week_total.get(wk, 1) - 1)
-            self._week_pair[(wk[0], wk[1], pair)]        = max(0, self._week_pair.get((wk[0], wk[1], pair), 1) - 1)
-        if dk:
-            self._day_total[dk]                          = max(0, self._day_total.get(dk, 1) - 1)
-            self._day_pair[(dk, pair)]                   = max(0, self._day_pair.get((dk, pair), 1) - 1)
-
-    def _fill_entry(self, pair, t):
-        pe = self.pending.pop(pair)
-        leg = {
-            "entry": pe["entry_price"], "stop": pe["stop"],
-            "units": pe["units"], "leg_idx": pe["leg_idx"], "opened_at": t,
-            "entry_type": pe.get("entry_type", "unknown"),
-        }
-        if pair not in self.active:
-            self.active[pair] = {
-                "direction": pe["direction"],
-                "target": pe["target"],
-                "legs": [leg],
-                "weekly_amd_dir": pe.get("weekly_amd_dir", 0),
-                "profile_score":  pe.get("profile_score", 0),
-                "max_legs":       pe.get("max_legs", config.MAX_LEGS),
-            }
-        else:
-            # Pyramid: promote prior leg to BE.
-            prior = self.active[pair]["legs"][-1]
-            prior["stop"] = prior["entry"]
-            self.active[pair]["legs"].append(leg)
 
     def _exit_leg(self, pair, leg, exit_price, t, reason):
         st = self.active[pair]
@@ -578,9 +523,9 @@ class Backtester:
         """Return (entry, stop) if a breaker block is present, else None.
 
         Bullish breaker: old bearish OB broken upward; price pulls back into its
-        body zone → buy-limit at ob.body_bottom, stop one pip below ob.bottom.
-        Bearish breaker: old bullish OB broken downward; price rallies back into
-        its body zone → sell-limit at ob.body_top, stop one pip above ob.top.
+        body zone → entry at ob.body_bottom, stop one pip below ob.bottom.
+        Bearish breaker: old bullish OB broken downward; price rallies into
+        its body zone → entry at ob.body_top, stop one pip above ob.top.
         """
         cur_price = bars[-1].Close
         pip = pip_size(pair)
@@ -600,14 +545,14 @@ class Backtester:
         return entry, stop
 
     def _get_limit_entry(self, bars5, bars15, bars1h, pair, direction, cur_price):
-        """Return (entry_level, stop, pattern_tag) for an anticipatory limit order.
+        """Return (pattern_level, stop, pattern_tag) for an ICT counter-trend entry.
 
-        Tries each pattern in priority order and returns the FIRST one whose
-        limit level is counter-trend relative to cur_price:
-          - LONG:  entry_level < cur_price  (price still falling toward it)
-          - SHORT: entry_level > cur_price  (price still rising toward it)
+        Confirms a valid pattern exists counter-trend to cur_price:
+          LONG:  pattern_level < cur_price  (price still falling toward it)
+          SHORT: pattern_level > cur_price  (price still rising toward it)
 
-        This implements the ICT model of buying into weakness / selling into strength.
+        pattern_level is discarded by the caller — the market order fills at
+        cur_price.  stop is the pattern's invalidation level (OB/FVG boundary).
         """
         checks = [
             (self._find_fvg_entry(bars5,  pair, direction, lookback=24), "fvg_m5"),
@@ -972,17 +917,19 @@ class Backtester:
             return
         cur_price = bars5[-1].Close
 
-        # Anticipatory limit entry: buy into weakness / sell into strength.
-        # _get_limit_entry returns the pattern level that price is still moving
-        # TOWARD (counter-trend), so we will be filled at a better price than
-        # a reactive market entry would give.
-        entry, stop, pattern_tag = self._get_limit_entry(
+        # Pattern detection with counter-trend confirmation.
+        # _get_limit_entry finds the nearest valid pattern level that price is
+        # still moving TOWARD (direction > 0 → level below price; direction < 0
+        # → level above price).  We use that level only for the STOP placement;
+        # the actual fill is a market order at cur_price (bar close).
+        _level, stop, pattern_tag = self._get_limit_entry(
             bars5, bars15, bars1h, pair, direction, cur_price
         )
         if pattern_tag is None:
             return
         g["m5_fvg_correct_dir"] += 1
 
+        entry = cur_price          # market order — fill immediately at bar close
         pip = pip_size(pair)
 
         target = self._find_target(pair, direction, t, entry, stop=stop)
@@ -1005,23 +952,21 @@ class Backtester:
             return
         g["units_nonzero"] += 1
 
-        # Place a pending LIMIT order at the pattern level.
-        # Budget is reserved now; refunded if the order expires unfilled.
+        # Market order: fill immediately at current bar close.
         base_type  = "amd" if amd_score else "mss"
         entry_type = f"{base_type}_{pattern_tag}"
-        self.pending[pair] = {
-            "entry_price": entry, "stop": stop, "units": units,
-            "direction": direction, "target": target,
-            "leg_idx": 1, "placed_at": t, "entry_type": entry_type,
-            "weekly_amd_dir": weekly_amd_dir, "profile_score": p_score,
-            "max_legs": max_legs,
-            # Budget keys for refund on cancellation.
-            "week_key": week_key, "day_key": day_key,
+        leg = {
+            "entry": entry, "stop": stop, "units": units,
+            "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
         }
-        g["limit_placed"] += 1
-
-        # Reserve budget immediately so no other pair can steal the slot
-        # before this limit fills. Refunded in the cancellation paths.
+        self.active[pair] = {
+            "direction": direction,
+            "target": target,
+            "legs": [leg],
+            "weekly_amd_dir": weekly_amd_dir,
+            "profile_score": p_score,
+            "max_legs": max_legs,
+        }
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
         self._day_total[day_key]                          = day_total + 1
