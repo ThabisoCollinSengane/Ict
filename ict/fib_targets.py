@@ -22,7 +22,7 @@ This means 100% = the original swing_high (for long) — price returns to where 
 
 from __future__ import annotations
 
-EXTENSION_RATIOS = (1.0, 1.272, 1.618, 2.0, 2.618)
+EXTENSION_RATIOS = (1.272, 1.618, 2.0, 2.618)
 
 
 def fib_extension_targets(
