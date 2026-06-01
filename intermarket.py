@@ -1,30 +1,21 @@
-"""Intermarket signals: DXY + EURGBP → direction and pair preference score.
+"""Intermarket signals: DXY + relative-strength cross → direction and pair score.
 
-Original table (kept for reference, still used by _maybe_pyramid's resolve() call):
+Two pair families supported, each driven by DXY and a cross for pair selection:
 
-  | DXY  | EURGBP | Preferred pair        |
-  |------|--------|-----------------------|
-  | Bear | Bull   | LONG EURUSD  (score 1.0) |
-  | Bear | Bear   | LONG GBPUSD  (score 1.0) |
-  | Bull | Bull   | SHORT GBPUSD (score 1.0) |
-  | Bull | Bear   | SHORT EURUSD (score 1.0) |
+  EUR/GBP family  — reference cross: EURGBP
+    DXY Bear (-1) → USD weak → LONG EURUSD or GBPUSD
+      EURGBP Bull  → EURUSD preferred (score 1.0), GBPUSD secondary (0.5)
+      EURGBP Bear  → GBPUSD preferred (score 1.0), EURUSD secondary (0.5)
+      EURGBP Flat  → both equal (score 0.75); default pair = EURUSD
 
-Extended table (new resolve_pair_direction, used for initial entry):
+  AUD/NZD family  — reference cross: AUDNZD
+    DXY Bear (-1) → USD weak → LONG AUDUSD or NZDUSD
+      AUDNZD Bull  → AUDUSD preferred (score 1.0), NZDUSD secondary (0.5)
+      AUDNZD Bear  → NZDUSD preferred (score 1.0), AUDUSD secondary (0.5)
+      AUDNZD Flat  → both equal (score 0.75); default pair = AUDUSD
 
-  DXY alone is sufficient to determine USD direction. EURGBP is a PREFERENCE
-  score that says which pair to favour — but BOTH pairs can trade:
-
-  DXY Bear (-1) → implied direction = LONG for all USD pairs (+1)
-    EURGBP Bull  → EURUSD preferred (score 1.0), GBPUSD secondary (0.5)
-    EURGBP Bear  → GBPUSD preferred (score 1.0), EURUSD secondary (0.5)
-    EURGBP Flat  → both equal (score 0.75)
-
-  DXY Bull (+1) → implied direction = SHORT for all USD pairs (-1)
-    EURGBP Bull  → GBPUSD preferred  (score 1.0), EURUSD secondary (0.5)
-    EURGBP Bear  → EURUSD preferred  (score 1.0), GBPUSD secondary (0.5)
-    EURGBP Flat  → both equal (score 0.75)
-
-  DXY Flat (0)  → no trade (direction unknown, hard gate)
+  DXY Bull (+1) → USD strong → direction inverts; PREFERRED pair is the WEAKER one.
+  DXY Flat  (0) → no trade (direction unknown, hard gate).
 """
 
 from dataclasses import dataclass
@@ -53,32 +44,35 @@ def resolve(dxy_bias: int, eurgbp_bias: int) -> IntermarketSignal | None:
 
 def resolve_pair_direction(
     dxy_bias: int,
-    eurgbp_bias: int,
+    ref_bias: int,
     pair: str,
+    primary_pair: str = "EURUSD",
 ) -> tuple[int, float] | tuple[None, float]:
     """Return (direction, im_score) for a specific pair.
 
-    Requires only DXY to be non-zero. EURGBP adjusts the preference score
-    (1.0 = preferred pair, 0.75 = neutral / no EURGBP signal, 0.5 = secondary).
+    primary_pair — the pair preferred when ref_bias > 0 and DXY is bearish:
+      "EURUSD" for EUR/GBP family (EURGBP > 0 → EUR strong → EURUSD is the long)
+      "AUDUSD" for AUD/NZD family (AUDNZD > 0 → AUD strong → AUDUSD is the long)
 
-    Returns (None, 0.0) if DXY is flat — caller should skip the trade.
+    Scoring:
+      1.0 — preferred pair for the current DXY + ref_bias combination
+      0.75 — ref_bias is flat (no cross signal; DXY direction only)
+      0.5  — secondary pair (cross disagrees; caller typically skips this)
+
+    Returns (None, 0.0) if DXY is flat — caller should gate the trade out.
     """
     if dxy_bias == 0:
         return None, 0.0
 
-    direction = -dxy_bias   # DXY inverse: DXY down = USD pairs up
+    direction = -dxy_bias   # DXY inverse: DXY down → USD pairs rally
 
-    if eurgbp_bias == 0:
-        score = 0.75        # DXY direction but no pair preference
-    elif dxy_bias == -1:    # USD weak → buy USD pairs
-        if pair == "EURUSD":
-            score = 1.0 if eurgbp_bias == +1 else 0.5
-        else:               # GBPUSD
-            score = 1.0 if eurgbp_bias == -1 else 0.5
-    else:                   # USD strong → sell USD pairs (dxy_bias == +1)
-        if pair == "EURUSD":
-            score = 1.0 if eurgbp_bias == -1 else 0.5
-        else:               # GBPUSD
-            score = 1.0 if eurgbp_bias == +1 else 0.5
+    if ref_bias == 0:
+        score = 0.75
+    elif dxy_bias == -1:    # USD weak → buy the stronger of the two
+        # preferred pair is primary when its currency is stronger (ref_bias > 0)
+        score = 1.0 if (ref_bias > 0) == (pair == primary_pair) else 0.5
+    else:                   # USD strong → short the weaker of the two (dxy_bias == +1)
+        # preferred pair is primary when its currency is weaker (ref_bias < 0)
+        score = 1.0 if (ref_bias < 0) == (pair == primary_pair) else 0.5
 
     return direction, score

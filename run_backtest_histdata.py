@@ -110,30 +110,43 @@ def main():
     print("=" * 60)
 
     years = ["2022", "2023", "2024", "2025"]
-    syms = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
-    missing = []
-    for sym in syms:
-        for yr in years:
-            path = os.path.join(DATA_DIR, f"{sym}_{yr}.csv")
-            if not os.path.exists(path):
-                missing.append(path)
-    if missing:
-        print("Missing data files (will be skipped):")
-        for p in missing:
-            print(f"  {p}")
-        # Only abort if core pairs are completely missing
-        core_missing = [p for p in missing if "2024" in p or "2025" in p]
-        if core_missing:
-            for p in core_missing:
-                print(f"ERROR: missing {p}")
-            sys.exit(1)
-        # Filter years to only those present for all syms
-        available_years = []
-        for yr in years:
-            if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv")) for s in syms):
-                available_years.append(yr)
-        years = available_years
-        print(f"Using available years: {years}")
+    # Core pairs required for the EUR/GBP family. AUD/NZD pairs are optional —
+    # the backtest runs without them and gains those trades when data is added.
+    core_syms     = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
+    optional_syms = ["AUDUSD", "NZDUSD", "AUDNZD"]
+
+    # Abort only if core pairs are completely absent for recent years.
+    core_missing = [
+        os.path.join(DATA_DIR, f"{s}_{yr}.csv")
+        for s in core_syms for yr in years
+        if not os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv"))
+        and yr in ("2024", "2025")
+    ]
+    if core_missing:
+        for p in core_missing:
+            print(f"ERROR: missing {p}")
+        sys.exit(1)
+
+    # Filter to years where all core pairs are present.
+    years = [yr for yr in years
+             if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv"))
+                    for s in core_syms)]
+    if not years:
+        print("ERROR: no complete years found for core pairs")
+        sys.exit(1)
+
+    # Determine which optional pairs have complete coverage for the same years.
+    available_optional = [
+        s for s in optional_syms
+        if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv")) for yr in years)
+    ]
+    if available_optional:
+        print(f"  Optional pairs available: {', '.join(available_optional)}")
+    else:
+        print("  Optional pairs (AUDUSD/NZDUSD/AUDNZD): not yet downloaded — "
+              "download from HistData.com to enable AUD/NZD trades")
+
+    syms = core_syms + available_optional
 
     print(f"\nLoading and resampling to 5-minute bars ({' + '.join(years)})...")
     data_5m = {}

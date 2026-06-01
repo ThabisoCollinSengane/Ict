@@ -138,7 +138,8 @@ NEWS_SOURCE = "csv"
 NEWS_CSV_PATH = "data/news_events.csv"
 
 # --- Symbols ---
-PAIRS = ("GBPUSD", "EURUSD")       # tradeable
-REF_EURGBP = "EURGBP"              # relative strength reference
+PAIRS = ("GBPUSD", "EURUSD", "AUDUSD", "NZDUSD")   # tradeable
+REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength
+REF_AUDNZD = "AUDNZD"              # AUD vs NZD relative strength
 # DXY synthetic uses these (all available on OANDA):
 DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
