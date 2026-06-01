@@ -95,6 +95,10 @@ class HistdataBacktester(bt_module.Backtester):
     def _dxy_bias_1h(self, t, lookback=None) -> int:
         return self._dxy_bias("60T", t, lookback=lookback)
 
+    def _dxy_bars(self, tf, t):
+        """Use real UDXUSD bars for Judas divergence (matches _dxy_bias override)."""
+        return self.bars_up_to("UDXUSD", tf, t)
+
 
 # ---------------------------------------------------------------------------
 # Main

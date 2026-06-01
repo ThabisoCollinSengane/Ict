@@ -23,6 +23,7 @@ from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
 from ict.ote import in_ote, find_swing
+from ict.liquidity_divergence import judas_sweep_divergence
 from ict.fib_targets import nearest_fib_target
 from ict.market_profile import (
     daily_open as mp_daily_open,
@@ -123,6 +124,7 @@ class Backtester:
             "weekly_amd_confirmed": 0, "session_handover_closed": 0,
             # conviction signal counters
             "ote_zone": 0, "choch_confirmed": 0, "low_conviction": 0,
+            "judas_divergence": 0,
         }
         # Wipeout-prevention state
         self._peak_equity       = config.STARTING_CASH
@@ -338,6 +340,26 @@ class Backtester:
 
     def _dxy_bias_1h(self, t, lookback: int = None):
         return self._dxy_bias("60T", t, lookback=lookback)
+
+    def _dxy_bars(self, tf, t):
+        """Synthetic DXY bar series for the given timeframe (list of SynBar)."""
+        rolls = {s: self.bars_up_to(s, tf, t) for s in config.DXY_CONSTITUENTS}
+        n = min((len(v) for v in rolls.values()), default=0)
+        if n < 2:
+            return []
+        series = []
+        for i in range(-n, 0):
+            close_px = {s: rolls[s][i].Close for s in config.DXY_CONSTITUENTS}
+            high_px  = {s: rolls[s][i].High  for s in config.DXY_CONSTITUENTS}
+            low_px   = {s: rolls[s][i].Low   for s in config.DXY_CONSTITUENTS}
+            open_px  = {s: rolls[s][i].Open  for s in config.DXY_CONSTITUENTS}
+            c = compute_dxy(close_px)
+            o = compute_dxy(open_px)
+            h, l = compute_dxy_range(high_px, low_px)
+            if None in (c, o, h, l):
+                continue
+            series.append(SynBar(o, h, l, c))
+        return series
 
     def _pyramid_lots(self):
         """Return (leg1, leg2, leg3) lot sizes for the current equity tier."""
