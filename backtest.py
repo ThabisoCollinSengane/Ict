@@ -22,6 +22,8 @@ from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
+from ict.ote import in_ote, find_swing
+from ict.fib_targets import nearest_fib_target
 from ict.market_profile import (
     daily_open as mp_daily_open,
     weekly_open as mp_weekly_open,
@@ -36,7 +38,7 @@ from ict.dealing_range import (
     is_nfp_week_low_probability,
     is_post_fomc_low_probability,
 )
-from intermarket import resolve as resolve_intermarket
+from intermarket import resolve as resolve_intermarket, resolve_pair_direction
 from news_filter import NewsCalendar
 from risk import position_size, pip_size
 
@@ -119,6 +121,8 @@ class Backtester:
             "drawdown_halt": 0, "daily_loss_halt": 0, "consec_loss_pause": 0,
             # market profile counters
             "weekly_amd_confirmed": 0, "session_handover_closed": 0,
+            # conviction signal counters
+            "ote_zone": 0, "choch_confirmed": 0,
         }
         # Wipeout-prevention state
         self._peak_equity       = config.STARTING_CASH
@@ -435,6 +439,23 @@ class Backtester:
                 self._force_close(pair, cur_price, t, "session_handover")
                 self.gate["session_handover_closed"] += 1
 
+    def _choch_score(self, pair: str, direction: int, t) -> int:
+        """Return 1 if a CHoCH (Change of Character) just fired on M15.
+
+        CHoCH = the most recent swing BOS is OPPOSITE to the prior window's bias,
+        confirming a reversal. This is the first BOS in the new direction after
+        a sustained move in the opposite direction — the highest-conviction entry.
+        """
+        bars15 = self.bars_up_to(pair, "15T", t)
+        lb = config.SWING_LOOKBACK_STH
+        if len(bars15) < lb * 3 + 2:
+            return 0
+        prior_bias   = htf_bias(bars15[:-lb], lookback=lb)
+        current_bias = htf_bias(bars15,       lookback=lb)
+        if prior_bias == -direction and current_bias == direction:
+            return 1
+        return 0
+
     def _pair_has_mss(self, sym, t, direction):
         """Ep 12 STH tier: M15 or M5 BOS in `direction`. H1 excluded — daily M15
         liquidity sweeps are more frequent and the primary entry timeframe."""
@@ -534,6 +555,20 @@ class Backtester:
         M15/H1 lookbacks are capped to avoid O(n²) scan cost.
         """
         candidates = []
+
+        # Fibonacci extension targets from the initiating OTE swing (Ep. 12 / SD model).
+        # These project the natural profit magnets at 100%, 127.2%, 161.8%, 200% of the swing.
+        pip_v = pip_size(pair)
+        bars15 = self.bars_up_to(pair, "15T", t)
+        swing = find_swing(bars15, direction, lookback=config.SWING_LOOKBACK)
+        if swing is not None:
+            fib_t = nearest_fib_target(
+                swing[0], swing[1], direction, price,
+                min_distance=config.MIN_PIPS_TARGET * pip_v,
+            )
+            if fib_t is not None:
+                candidates.append(fib_t)
+
         for tf, cap in [("15T", 48), ("60T", 24), ("240T", 60), ("D", 0), ("W", 0)]:
             bars = self.bars_up_to(pair, tf, t)
             if len(bars) < 5:
@@ -570,7 +605,6 @@ class Backtester:
             if filtered:
                 candidates = filtered
         # Prefer the nearest target satisfying both MIN_RR and MIN_PIPS_TARGET.
-        pip_v = pip_size(pair)
         if stop is not None:
             min_reward = max(abs(price - stop) * config.MIN_RR,
                              config.MIN_PIPS_TARGET * pip_v)
@@ -648,9 +682,13 @@ class Backtester:
             self._consec_losses = 0
 
         # 1. Peak drawdown halt: pause trading for DRAWDOWN_PAUSE_DAYS after >20% DD.
-        if self._drawdown_halt_until is not None and day_key < self._drawdown_halt_until:
-            g["drawdown_halt"] += 1
-            return
+        if self._drawdown_halt_until is not None:
+            if day_key < self._drawdown_halt_until:
+                g["drawdown_halt"] += 1
+                return
+            # Pause expired → reset peak to current equity so DD is measured from here
+            self._peak_equity = self.equity
+            self._drawdown_halt_until = None
         if self._peak_equity > 0:
             dd_pct = (self._peak_equity - self.equity) / self._peak_equity * 100
             if dd_pct >= config.MAX_DRAWDOWN_HALT_PCT:
@@ -681,86 +719,116 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
-        # Intermarket: H1 DXY + H1 EURGBP → macro pair/direction signal.
-        # EURGBP is strength/weakness reference only — never used for MSS.
+        # Intermarket: DXY H1 direction (hard gate) + EURGBP as preference score.
+        # DXY alone gives the USD direction. EURGBP tells which USD pair to PREFER
+        # but BOTH can trade — the non-preferred pair gets a lower im_score.
         dxy_bias    = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
         eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
                                       lookback=config.SWING_LOOKBACK_STH)
-        signal = resolve_intermarket(dxy_bias, eurgbp_bias)
-        if signal is None:
-            return
+        direction, im_score = resolve_pair_direction(dxy_bias, eurgbp_bias, pair)
+        if direction is None:
+            return   # DXY flat → no USD bias → hard gate
         g["intermarket_signal"] += 1
-        if signal.pair != pair:
-            return
         g["pair_matches"] += 1
 
-        # MSS: 2-of-3 (EURUSD, GBPUSD, DXY) must show M15/M5 BOS.
-        # DXY is inverse — bearish DXY confirms a bullish EUR/GBP signal.
-        eurusd_mss = self._pair_has_mss("EURUSD", t, signal.direction)
-        gbpusd_mss = self._pair_has_mss("GBPUSD", t, signal.direction)
-        dxy_mss    = self._dxy_has_mss(t, -signal.direction)
-        if (eurusd_mss + gbpusd_mss + dxy_mss) < 2:
-            return
+        # MSS: 2-of-3 using (EURUSD M15/M5, GBPUSD M15/M5, DXY M15/M5 inverse).
+        # EURGBP is NOT in MSS — it is pair-preference only (im_score above).
+        # Score: 2-of-3 = 0.67, 3-of-3 = 1.0 — drives conviction.
+        eurusd_mss = self._pair_has_mss("EURUSD", t, direction)
+        gbpusd_mss = self._pair_has_mss("GBPUSD", t, direction)
+        dxy_mss    = self._dxy_has_mss(t, -direction)
+        mss_count  = eurusd_mss + gbpusd_mss + dxy_mss
+        if mss_count < 2:
+            return   # Need at least 2-of-3 MSS
         g["mss_h1_m15_m5_ok"] += 1
 
-        # Dealing range: used for target filtering in _find_target (is_valid_target_zone).
-        # As an entry gate it over-rejects in trending markets, so only record alignment
-        # here without hard-blocking — the DR's main role is directing where targets sit.
+        # Dealing range: informational only (DR over-rejects in trending markets).
         bars1h = self.bars_up_to(pair, "60T", t)
         if not bars1h:
             return
         dr = detect_dealing_range(bars1h, lookback=100)
         cur_price = bars1h[-1].Close
-        dr_aligned = (dr is None) or is_valid_entry_zone(cur_price, dr.high, dr.low, signal.direction)
-        g["dealing_range_ok"] += 1 if dr_aligned else 0  # informational only
+        dr_aligned = (dr is None) or is_valid_entry_zone(cur_price, dr.high, dr.low, direction)
+        g["dealing_range_ok"] += 1 if dr_aligned else 0
 
         g["daily_bias_ok"] += 1
         g["h1_bias_ok"] += 1
         g["h4_bias_ok"] += 1
 
-        # Weekly AMD (Power-of-Three on the weekly range): Monday box → Judas swing
-        # → distribution toward PWWH/PWWL. When confirmed and aligned with signal
-        # direction, marks the trade as a "weekly distribution" entry — pyramid legs
-        # will use full lots regardless of intermarket score.
+        # ── Conviction scoring ────────────────────────────────────────────────
+        # Sum points from all confirming signals. Score → max pyramid legs:
+        #   0-2 pts  → 1 leg only (entry only, no pyramid adds)
+        #   3-4 pts  → 2 legs  (one add)
+        #   5+ pts   → 3 legs  (full pyramid)
+        conviction = 0
+
+        # Intermarket quality (0-2)
+        if im_score >= 1.0:   conviction += 2    # preferred pair per EURGBP
+        elif im_score >= 0.75: conviction += 1   # neutral EURGBP, DXY only
+
+        # MSS quality (0-2)
+        conviction += min(mss_count, 2)
+
+        # Weekly AMD confirmed in same direction (0-2)
         wamd = self._get_weekly_amd(pair, t)
         weekly_amd_dir = wamd.direction if wamd is not None else 0
-        if wamd is not None and wamd.direction == signal.direction:
+        if wamd is not None and wamd.direction == direction:
+            conviction += 2
             g["weekly_amd_confirmed"] += 1
 
-        # Open-level profile score: how many of (daily open, weekly open, session open)
-        # agree with the signal direction. Used to scale pyramid aggressiveness.
-        p_score = self._profile_score(pair, signal.direction, cur_price, t)
+        # Open-level profile score: daily/weekly/session opens agreeing (0-1)
+        p_score = self._profile_score(pair, direction, cur_price, t)
+        conviction += min(p_score, 1)
 
-        # AMD on M15: scored, not required. Full setup (consolidation + correct sweep)
-        # adds conviction; absent = still tradeable when MSS + FVG are strong.
+        # AMD on M15 (0-1)
         bars15 = self.bars_up_to(pair, "15T", t)
         amd = detect_amd_setup(bars15, pair)
         amd_score = 0
         if amd is not None:
             rng, sweep_dir = amd
             g["consolidation_found"] += 1
-            if sweep_dir == signal.direction:
+            if sweep_dir == direction:
                 amd_score = 1
+                conviction += 1
                 g["manipulation_correct_dir"] += 1
+
+        # OTE zone: price in Fibonacci 62-79% retrace of last swing (0-1)
+        ote_hit = in_ote(cur_price, bars15, direction,
+                         lookback=config.SWING_LOOKBACK, pip_tol=3 * pip_size(pair))
+        if ote_hit:
+            conviction += 1
+            g["ote_zone"] += 1
+
+        # CHoCH: bias on the PRIOR window was OPPOSITE, confirming reversal (0-1)
+        choch = self._choch_score(pair, direction, t)
+        if choch:
+            conviction += 1
+            g["choch_confirmed"] += 1
+
+        # Max legs this trade may pyramid to based on conviction
+        if conviction <= 2:
+            max_legs = 1
+        elif conviction <= 4:
+            max_legs = 2
+        else:
+            max_legs = config.MAX_LEGS
+        # ─────────────────────────────────────────────────────────────────────
 
         bars5 = self.bars_up_to(pair, "5T", t)
         if not bars5:
             return
         cur_price = bars5[-1].Close
 
-        # FVG, OB, or Breaker in the signal direction confirms displacement /
-        # disciplined pullback to a broken structure level.
+        # FVG, OB, or Breaker confirms displacement or disciplined pullback.
         fvg_ok = (
-            self._find_fvg_entry(bars5, pair, signal.direction, lookback=24) is not None
-            or self._find_fvg_entry(bars15, pair, signal.direction, lookback=8) is not None
-            or self._find_fvg_entry(bars1h, pair, signal.direction, lookback=4) is not None
-            or self._find_ob_entry(bars5, pair, signal.direction) is not None
-            or self._find_ob_entry(bars15, pair, signal.direction) is not None
-            # Breaker block: price returning to a mitigated opposite-direction OB.
-            # Valid on M5, M15, or H1 per the bias timeframe — entry still at market.
-            or self._find_breaker_entry(bars5, pair, signal.direction)
-            or self._find_breaker_entry(bars15, pair, signal.direction)
-            or self._find_breaker_entry(bars1h, pair, signal.direction)
+            self._find_fvg_entry(bars5, pair, direction, lookback=24) is not None
+            or self._find_fvg_entry(bars15, pair, direction, lookback=8) is not None
+            or self._find_fvg_entry(bars1h, pair, direction, lookback=4) is not None
+            or self._find_ob_entry(bars5, pair, direction) is not None
+            or self._find_ob_entry(bars15, pair, direction) is not None
+            or self._find_breaker_entry(bars5, pair, direction)
+            or self._find_breaker_entry(bars15, pair, direction)
+            or self._find_breaker_entry(bars1h, pair, direction)
         )
         if not fvg_ok:
             return
@@ -768,12 +836,12 @@ class Backtester:
 
         pip = pip_size(pair)
         entry = cur_price
-        if signal.direction > 0:
+        if direction > 0:
             stop = entry - config.FIXED_STOP_PIPS * pip
         else:
             stop = entry + config.FIXED_STOP_PIPS * pip
 
-        target = self._find_target(pair, signal.direction, t, entry, stop=stop)
+        target = self._find_target(pair, direction, t, entry, stop=stop)
         if target is None:
             return
         g["target_found"] += 1
@@ -800,12 +868,12 @@ class Backtester:
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
         }
         self.active[pair] = {
-            "direction": signal.direction,
+            "direction": direction,
             "target": target,
             "legs": [leg],
-            # Market profile context: used in _maybe_pyramid for lot sizing.
             "weekly_amd_dir": weekly_amd_dir,
             "profile_score": p_score,
+            "max_legs": max_legs,       # conviction-based pyramid cap
         }
         g["limit_placed"] += 1
 
@@ -818,7 +886,8 @@ class Backtester:
           - Signal disagrees                        → skip pyramid entirely
         """
         st = self.active[pair]
-        if len(st["legs"]) >= config.MAX_LEGS:
+        max_legs = st.get("max_legs", config.MAX_LEGS)
+        if len(st["legs"]) >= max_legs:
             return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if self.news.is_blocked(now):
