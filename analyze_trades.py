@@ -187,14 +187,49 @@ def main():
           f"min={l_dur.min():.0f}m  max={l_dur.max():.0f}m")
 
     # ------------------------------------------------------------------ #
-    # 8. Yearly breakdown
+    # 8. Monthly breakdown (fixed lot equivalent — strips compounding)
     # ------------------------------------------------------------------ #
-    print("\n--- YEARLY BREAKDOWN ---")
-    df["year"] = df["opened_at"].dt.year
-    for yr, grp in df.groupby("year"):
-        w = grp.win.sum()
-        n = len(grp)
-        print(f"  {yr}  {n:3d} trades  {w}W/{n-w}L  WR {w/n*100:.0f}%  P&L R{grp.pnl.sum():+,.0f}")
+    print("\n--- MONTHLY P&L (0.05 lots fixed — no compounding) ---")
+    import config
+    from risk import pip_size
+
+    BASE_UNITS = int(config.PYRAMID_LOTS[0] * config.LOT_UNITS)  # 5000 units
+
+    def fixed_pnl(row):
+        """Recalculate P&L at fixed 0.05 lots regardless of account size."""
+        p = pip_size(row["pair"])
+        pips = (row["exit"] - row["entry"]) * row["direction"] / p
+        return pips * BASE_UNITS * p * config.USD_ZAR
+
+    df["fixed_pnl"] = df.apply(fixed_pnl, axis=1)
+    df["ym"] = df["opened_at"].dt.to_period("M")
+
+    monthly = df.groupby("ym").apply(lambda g: pd.Series({
+        "trades": len(g),
+        "wins":   (g.fixed_pnl > 0).sum(),
+        "losses": (g.fixed_pnl <= 0).sum(),
+        "pnl":    g.fixed_pnl.sum(),
+        "wr":     (g.fixed_pnl > 0).mean() * 100,
+    })).reset_index()
+
+    running = 900.0
+    print(f"  {'Month':<10} {'Trades':>6}  {'W/L':>7}  {'WR':>5}  "
+          f"{'Monthly P&L':>12}  {'Balance':>10}  {'Status'}")
+    print(f"  {'-'*75}")
+    for _, r in monthly.iterrows():
+        running += r.pnl
+        status = "✓ PROFIT" if r.pnl > 0 else "✗ loss"
+        print(f"  {str(r.ym):<10} {int(r.trades):>6}  "
+              f"{int(r.wins)}W/{int(r.losses)}L  {r.wr:>4.0f}%  "
+              f"R{r.pnl:>+10,.0f}  R{running:>9,.0f}  {status}")
+
+    profitable_months = (monthly.pnl > 0).sum()
+    total_months = len(monthly)
+    print(f"\n  Profitable months: {profitable_months}/{total_months} "
+          f"({profitable_months/total_months*100:.0f}%)")
+    print(f"  Avg monthly P&L:   R{monthly.pnl.mean():+,.0f}")
+    print(f"  Best month:        R{monthly.pnl.max():+,.0f}  ({monthly.loc[monthly.pnl.idxmax(),'ym']})")
+    print(f"  Worst month:       R{monthly.pnl.min():+,.0f}  ({monthly.loc[monthly.pnl.idxmin(),'ym']})")
 
 
 if __name__ == "__main__":
