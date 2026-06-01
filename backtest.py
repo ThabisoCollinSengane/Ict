@@ -17,7 +17,7 @@ import yfinance as yf
 import config
 from ict.killzones import can_open_new_trade, current_killzone
 from ict.fvg import detect_new_fvg, nearest_unmitigated
-from ict.order_block import detect_order_blocks, nearest_unmitigated_ob
+from ict.order_block import detect_order_blocks, nearest_unmitigated_ob, find_breaker_zone
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
@@ -506,6 +506,23 @@ class Backtester:
             return None
         return min(valid, key=lambda x: abs(x[0] - cur_price))
 
+    def _find_breaker_entry(self, bars, pair, direction):
+        """Return True if current price is inside a breaker block zone.
+
+        Scans for mitigated OBs of the opposite direction whose body zone
+        current price is retracing into. This is the "disciplined chase" entry:
+        - Bullish breaker: old bearish OB broken to the upside; price pulls back
+          into the body → support zone → add long.
+        - Bearish breaker: old bullish OB broken to the downside; price rallies
+          back into the body → resistance zone → add short.
+
+        Used as an alternative confirmation gate alongside FVG/OB checks.
+        Returns True if at a breaker zone, False otherwise.
+        """
+        cur_price = bars[-1].Close
+        pip = pip_size(pair)
+        return find_breaker_zone(bars, direction, cur_price, pip) is not None
+
     def _find_target(self, pair, direction, t, price, stop=None):
         """Find the nearest target that satisfies the RR requirement.
 
@@ -731,14 +748,19 @@ class Backtester:
             return
         cur_price = bars5[-1].Close
 
-        # FVG or OB in the signal direction confirms displacement occurred.
-        # Used as a quality gate only — entry is at market price, not the FVG level.
+        # FVG, OB, or Breaker in the signal direction confirms displacement /
+        # disciplined pullback to a broken structure level.
         fvg_ok = (
             self._find_fvg_entry(bars5, pair, signal.direction, lookback=24) is not None
             or self._find_fvg_entry(bars15, pair, signal.direction, lookback=8) is not None
             or self._find_fvg_entry(bars1h, pair, signal.direction, lookback=4) is not None
             or self._find_ob_entry(bars5, pair, signal.direction) is not None
             or self._find_ob_entry(bars15, pair, signal.direction) is not None
+            # Breaker block: price returning to a mitigated opposite-direction OB.
+            # Valid on M5, M15, or H1 per the bias timeframe — entry still at market.
+            or self._find_breaker_entry(bars5, pair, signal.direction)
+            or self._find_breaker_entry(bars15, pair, signal.direction)
+            or self._find_breaker_entry(bars1h, pair, signal.direction)
         )
         if not fvg_ok:
             return
@@ -841,12 +863,19 @@ class Backtester:
         if favour_pips < 10:
             return
 
-        # FVG or OB confirms continued displacement (quality gate).
+        # FVG, OB, or Breaker confirms displacement / disciplined pullback.
+        # Breakers are the PRIMARY pyramid entry — price pulls back to a broken
+        # structure level rather than being chased at momentum highs/lows.
         bars15 = self.bars_up_to(pair, "15T", t)
+        bars1h = self.bars_up_to(pair, "60T", t)
         fvg_ok = (
             self._find_fvg_entry(bars5, pair, st["direction"], lookback=12) is not None
             or self._find_fvg_entry(bars15, pair, st["direction"], lookback=4) is not None
             or self._find_ob_entry(bars5, pair, st["direction"]) is not None
+            # Breaker blocks: M5, M15, H1 per bias timeframe.
+            or self._find_breaker_entry(bars5, pair, st["direction"])
+            or self._find_breaker_entry(bars15, pair, st["direction"])
+            or (bars1h and self._find_breaker_entry(bars1h, pair, st["direction"]))
         )
         if not fvg_ok:
             return

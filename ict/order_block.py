@@ -10,9 +10,19 @@ Episode 18 rules implemented here:
 Episode 35 note: OB zone is defined by the candle BODY (open/close), not wicks.
    `body_top` / `body_bottom` expose the 50% mean-threshold zone.
    `top` / `bottom` still hold wick extremes for stop/target calculations.
+
+Breaker Block (Ep. 12):
+A mitigated OB of the OPPOSITE direction that price is returning to.
+Example — Bullish Breaker:
+  1. A bearish OB existed (last bullish candle before bearish BOS + FVG).
+  2. Price later broke ABOVE that OB (mitigated it).
+  3. Now price retraces back DOWN into the old OB body zone.
+  4. That zone is now SUPPORT — a bullish breaker entry.
+Used for pyramid adds: "chasing a move but in a disciplined manner."
 """
 
 from dataclasses import dataclass, field
+from typing import Optional
 import config
 
 
@@ -118,3 +128,42 @@ def nearest_unmitigated_ob(obs: list[OrderBlock], price: float, direction: int) 
     if not candidates:
         return None
     return min(candidates, key=lambda o: abs(o.mid - price))
+
+
+def find_breaker_zone(
+    candles,
+    direction: int,
+    current_price: float,
+    pip_value: float,
+    lookback: int = None,
+) -> Optional[OrderBlock]:
+    """Return the nearest breaker block that current price is returning to, or None.
+
+    A BULLISH BREAKER (+1): a BEARISH OB (-1) that was mitigated upward (price
+    broke above its body_top). Price has since retraced back into the OB body
+    zone — this level now acts as support.
+
+    A BEARISH BREAKER (-1): a BULLISH OB (+1) that was mitigated downward (price
+    broke below its body_bottom). Price has rallied back into the OB body zone —
+    this level now acts as resistance.
+
+    Tolerance: ±3 pips of the body zone is considered "at the breaker."
+    """
+    lookback = lookback or config.OB_LOOKBACK_BARS
+    obs = detect_order_blocks(candles, lookback=lookback)
+    tol = 3 * pip_value
+    candidates = []
+
+    for ob in obs:
+        # Need mitigated OBs of the OPPOSITE direction.
+        if ob.direction != -direction:
+            continue
+        if not ob.mitigated:
+            continue
+        # Price must be inside or within tolerance of the body zone.
+        if ob.body_bottom - tol <= current_price <= ob.body_top + tol:
+            candidates.append(ob)
+
+    if not candidates:
+        return None
+    return min(candidates, key=lambda o: abs(o.mid - current_price))
