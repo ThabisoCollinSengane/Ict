@@ -120,9 +120,9 @@ TARGET_TF_MINUTES = (240, 1440, 10080)
 
 # --- Entry pattern block list ---
 # Patterns to never trade as initial entries (confirmed losers from backtest).
-# Format: "<base>_<pattern>" where base is fvg/ob/breaker and pattern is m5/m15/h1.
-# breaker_m15: 0% WR across all pairs (2 trades, 0W/2L, -R668) — block permanently.
-BLOCKED_ENTRY_PATTERNS = frozenset({"breaker_m15"})
+# breaker_m15 had only 2 sample trades on the old reactive-entry system.
+# With anticipatory limit entries we collect a fresh sample — cleared for now.
+BLOCKED_ENTRY_PATTERNS: frozenset = frozenset()
 
 # Block pyramid adds when intermarket score is neutral (im_score=0.5, direction unclear).
 # Backtest: 5 pyramid_im0.5 trades → 0W/5L, -R740. No edge; skip neutral-conviction adds.

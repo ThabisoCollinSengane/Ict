@@ -264,15 +264,29 @@ class Backtester:
             filled = (direction > 0 and bar.Low <= entry) or \
                      (direction < 0 and bar.High >= entry)
             now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-            in_kz = current_killzone(now) is not None
+            in_kz = current_killzone(now, pair) is not None
             if filled and in_kz:
-                # Only fill if we are still inside a kill zone — no off-hours entries.
                 self._fill_entry(pair, t)
             elif not in_kz:
-                # Kill zone ended before the limit filled — cancel immediately.
-                self.pending.pop(pair, None)
+                # Kill zone ended before fill — cancel and refund budget slot.
+                self._cancel_pending(pair)
             elif (t - pe["placed_at"]).total_seconds() / 60.0 > 90:
-                self.pending.pop(pair, None)
+                # Limit expired (90-min timeout) — cancel and refund.
+                self._cancel_pending(pair)
+
+    def _cancel_pending(self, pair):
+        """Cancel a pending limit order and refund the reserved budget slot."""
+        pe = self.pending.pop(pair, None)
+        if pe is None:
+            return
+        wk = pe.get("week_key")
+        dk = pe.get("day_key")
+        if wk:
+            self._week_total[wk]                         = max(0, self._week_total.get(wk, 1) - 1)
+            self._week_pair[(wk[0], wk[1], pair)]        = max(0, self._week_pair.get((wk[0], wk[1], pair), 1) - 1)
+        if dk:
+            self._day_total[dk]                          = max(0, self._day_total.get(dk, 1) - 1)
+            self._day_pair[(dk, pair)]                   = max(0, self._day_pair.get((dk, pair), 1) - 1)
 
     def _fill_entry(self, pair, t):
         pe = self.pending.pop(pair)
@@ -286,6 +300,9 @@ class Backtester:
                 "direction": pe["direction"],
                 "target": pe["target"],
                 "legs": [leg],
+                "weekly_amd_dir": pe.get("weekly_amd_dir", 0),
+                "profile_score":  pe.get("profile_score", 0),
+                "max_legs":       pe.get("max_legs", config.MAX_LEGS),
             }
         else:
             # Pyramid: promote prior leg to BE.
@@ -558,21 +575,63 @@ class Backtester:
         return min(valid, key=lambda x: abs(x[0] - cur_price))
 
     def _find_breaker_entry(self, bars, pair, direction):
-        """Return True if current price is inside a breaker block zone.
+        """Return (entry, stop) if a breaker block is present, else None.
 
-        Scans for mitigated OBs of the opposite direction whose body zone
-        current price is retracing into. This is the "disciplined chase" entry:
-        - Bullish breaker: old bearish OB broken to the upside; price pulls back
-          into the body → support zone → add long.
-        - Bearish breaker: old bullish OB broken to the downside; price rallies
-          back into the body → resistance zone → add short.
-
-        Used as an alternative confirmation gate alongside FVG/OB checks.
-        Returns True if at a breaker zone, False otherwise.
+        Bullish breaker: old bearish OB broken upward; price pulls back into its
+        body zone → buy-limit at ob.body_bottom, stop one pip below ob.bottom.
+        Bearish breaker: old bullish OB broken downward; price rallies back into
+        its body zone → sell-limit at ob.body_top, stop one pip above ob.top.
         """
         cur_price = bars[-1].Close
         pip = pip_size(pair)
-        return find_breaker_zone(bars, direction, cur_price, pip) is not None
+        ob = find_breaker_zone(bars, direction, cur_price, pip)
+        if ob is None:
+            return None
+        if direction > 0:
+            entry = ob.body_bottom
+            stop  = ob.bottom - pip
+        else:
+            entry = ob.body_top
+            stop  = ob.top + pip
+        if direction > 0 and stop >= entry:
+            return None
+        if direction < 0 and stop <= entry:
+            return None
+        return entry, stop
+
+    def _get_limit_entry(self, bars5, bars15, bars1h, pair, direction, cur_price):
+        """Return (entry_level, stop, pattern_tag) for an anticipatory limit order.
+
+        Tries each pattern in priority order and returns the FIRST one whose
+        limit level is counter-trend relative to cur_price:
+          - LONG:  entry_level < cur_price  (price still falling toward it)
+          - SHORT: entry_level > cur_price  (price still rising toward it)
+
+        This implements the ICT model of buying into weakness / selling into strength.
+        """
+        checks = [
+            (self._find_fvg_entry(bars5,  pair, direction, lookback=24), "fvg_m5"),
+            (self._find_fvg_entry(bars15, pair, direction, lookback=8),  "fvg_m15"),
+            (self._find_fvg_entry(bars1h, pair, direction, lookback=4),  "fvg_h1"),
+            (self._find_ob_entry(bars5,   pair, direction),              "ob_m5"),
+            (self._find_ob_entry(bars15,  pair, direction),              "ob_m15"),
+            (self._find_breaker_entry(bars5,  pair, direction),          "breaker_m5"),
+            (self._find_breaker_entry(bars15, pair, direction),          "breaker_m15"),
+            (self._find_breaker_entry(bars1h, pair, direction) if bars1h else None, "breaker_h1"),
+        ]
+        for result, tag in checks:
+            if result is None:
+                continue
+            entry_level, stop = result
+            # Counter-trend filter: price must still be moving toward the level.
+            if direction > 0 and entry_level >= cur_price:
+                continue   # price already below or at level — missed the entry
+            if direction < 0 and entry_level <= cur_price:
+                continue   # price already above or at level — missed the entry
+            if tag in config.BLOCKED_ENTRY_PATTERNS:
+                continue
+            return entry_level, stop, tag
+        return None, None, None
 
     def _find_target(self, pair, direction, t, price, stop=None):
         """Find the nearest target that satisfies the RR requirement.
@@ -913,39 +972,18 @@ class Backtester:
             return
         cur_price = bars5[-1].Close
 
-        # FVG, OB, or Breaker confirms displacement or disciplined pullback.
-        # Record the FIRST (highest-priority) matching pattern for analytics.
-        pattern_tag = None
-        if self._find_fvg_entry(bars5, pair, direction, lookback=24) is not None:
-            pattern_tag = "fvg_m5"
-        elif self._find_fvg_entry(bars15, pair, direction, lookback=8) is not None:
-            pattern_tag = "fvg_m15"
-        elif self._find_fvg_entry(bars1h, pair, direction, lookback=4) is not None:
-            pattern_tag = "fvg_h1"
-        elif self._find_ob_entry(bars5, pair, direction) is not None:
-            pattern_tag = "ob_m5"
-        elif self._find_ob_entry(bars15, pair, direction) is not None:
-            pattern_tag = "ob_m15"
-        elif self._find_breaker_entry(bars5, pair, direction):
-            pattern_tag = "breaker_m5"
-        elif self._find_breaker_entry(bars15, pair, direction):
-            pattern_tag = "breaker_m15"
-        elif self._find_breaker_entry(bars1h, pair, direction):
-            pattern_tag = "breaker_h1"
-
+        # Anticipatory limit entry: buy into weakness / sell into strength.
+        # _get_limit_entry returns the pattern level that price is still moving
+        # TOWARD (counter-trend), so we will be filled at a better price than
+        # a reactive market entry would give.
+        entry, stop, pattern_tag = self._get_limit_entry(
+            bars5, bars15, bars1h, pair, direction, cur_price
+        )
         if pattern_tag is None:
-            return
-        if pattern_tag in config.BLOCKED_ENTRY_PATTERNS:
-            g["blocked_pattern"] = g.get("blocked_pattern", 0) + 1
             return
         g["m5_fvg_correct_dir"] += 1
 
         pip = pip_size(pair)
-        entry = cur_price
-        if direction > 0:
-            stop = entry - config.FIXED_STOP_PIPS * pip
-        else:
-            stop = entry + config.FIXED_STOP_PIPS * pip
 
         target = self._find_target(pair, direction, t, entry, stop=stop)
         if target is None:
@@ -967,24 +1005,23 @@ class Backtester:
             return
         g["units_nonzero"] += 1
 
-        # Market order: fill immediately at current bar close.
+        # Place a pending LIMIT order at the pattern level.
+        # Budget is reserved now; refunded if the order expires unfilled.
         base_type  = "amd" if amd_score else "mss"
         entry_type = f"{base_type}_{pattern_tag}"
-        leg = {
-            "entry": entry, "stop": stop, "units": units,
-            "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
-        }
-        self.active[pair] = {
-            "direction": direction,
-            "target": target,
-            "legs": [leg],
-            "weekly_amd_dir": weekly_amd_dir,
-            "profile_score": p_score,
-            "max_legs": max_legs,       # conviction-based pyramid cap
+        self.pending[pair] = {
+            "entry_price": entry, "stop": stop, "units": units,
+            "direction": direction, "target": target,
+            "leg_idx": 1, "placed_at": t, "entry_type": entry_type,
+            "weekly_amd_dir": weekly_amd_dir, "profile_score": p_score,
+            "max_legs": max_legs,
+            # Budget keys for refund on cancellation.
+            "week_key": week_key, "day_key": day_key,
         }
         g["limit_placed"] += 1
 
-        # Charge weekly and daily budget slots for this initial entry.
+        # Reserve budget immediately so no other pair can steal the slot
+        # before this limit fills. Refunded in the cancellation paths.
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
         self._day_total[day_key]                          = day_total + 1
