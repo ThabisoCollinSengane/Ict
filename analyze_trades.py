@@ -266,6 +266,85 @@ def main():
         print("  entry_type column not found in trade log")
 
     # ------------------------------------------------------------------ #
+    # 9b. Entry PATTERN breakdown (fvg/ob/breaker × timeframe × W/L)
+    # ------------------------------------------------------------------ #
+    print("\n--- ENTRY PATTERN BREAKDOWN (fvg/ob/breaker × timeframe) ---")
+    if "entry_type" in df.columns:
+        # Parse pattern tag from entry_type: "amd_fvg_m15" → "fvg_m15"
+        def _pattern(et):
+            parts = str(et).split("_", 1)  # split on first _ only (amd/mss prefix)
+            return parts[1] if len(parts) > 1 else et
+
+        df["pattern"] = df["entry_type"].apply(_pattern)
+        PATTERN_ORDER = ["fvg_m5", "fvg_m15", "fvg_h1",
+                         "ob_m5", "ob_m15",
+                         "breaker_m5", "breaker_m15", "breaker_h1"]
+
+        pt = df.groupby("pattern").apply(
+            lambda g: pd.Series({
+                "n":       len(g),
+                "wins":    int((g.pnl > 0).sum()),
+                "losses":  int((g.pnl <= 0).sum()),
+                "wr_pct":  (g.pnl > 0).mean() * 100,
+                "pnl":     g.pnl.sum(),
+                "avg_w":   g[g.pnl > 0].pnl.mean() if (g.pnl > 0).any() else 0,
+                "avg_l":   g[g.pnl <= 0].pnl.mean() if (g.pnl <= 0).any() else 0,
+            })
+        ).reset_index()
+
+        print(f"  {'Pattern':<14}  {'N':>4}  {'W/L':>8}  {'WR':>5}  "
+              f"{'Total P&L':>12}  {'avg_W':>9}  {'avg_L':>9}  Status")
+        print(f"  {'-'*80}")
+        for pat in PATTERN_ORDER:
+            row = pt[pt.pattern == pat]
+            if row.empty:
+                continue
+            r = row.iloc[0]
+            flag = ""
+            if r.wr_pct >= 55 and r.pnl > 0:
+                flag = "★ BEST"
+            elif r.wr_pct < 40 or r.pnl < 0:
+                flag = "✗ AVOID"
+            print(f"  {pat:<14}  {int(r.n):>4}  "
+                  f"{int(r.wins)}W/{int(r.losses)}L  {r.wr_pct:>4.0f}%  "
+                  f"R{r.pnl:>+11,.0f}  R{r.avg_w:>+8,.0f}  R{r.avg_l:>+8,.0f}  {flag}")
+
+        # Detailed: pattern × session × pair (winners)
+        print(f"\n  TOP WIN PATTERNS (pattern × session × pair, ≥3 wins):")
+        print(f"  {'-'*85}")
+        detail_w = df.groupby(["pattern", "session", "pair"]).apply(
+            lambda g: pd.Series({
+                "n":      len(g),
+                "wins":   int((g.pnl > 0).sum()),
+                "losses": int((g.pnl <= 0).sum()),
+                "wr_pct": (g.pnl > 0).mean() * 100,
+                "pnl":    g.pnl.sum(),
+                "avg_w":  g[g.pnl > 0].pnl.mean() if (g.pnl > 0).any() else 0,
+            })
+        ).reset_index()
+        winners_detail = detail_w[detail_w.wins >= 3].sort_values(
+            ["wins", "wr_pct"], ascending=False).head(20)
+        for _, r in winners_detail.iterrows():
+            flag = "★★" if r.wr_pct >= 60 else ("★" if r.wr_pct >= 50 else "")
+            print(f"  {r.pattern:<14}  {r.session:<18}  {r.pair}  "
+                  f"{int(r.wins)}W/{int(r.losses)}L  WR {r.wr_pct:.0f}%  "
+                  f"P&L R{r.pnl:+,.0f}  avg_W R{r.avg_w:+,.0f}  {flag}")
+
+        # Detailed: pattern × session × pair (losers / avoid)
+        print(f"\n  LOSS DRAINS TO AVOID (pattern × session × pair, ≥3 losses, WR<50%):")
+        print(f"  {'-'*85}")
+        losers_detail = detail_w[
+            (detail_w.losses >= 3) & (detail_w.wr_pct < 50)
+        ].sort_values(["losses", "wr_pct"], ascending=[False, True]).head(20)
+        for _, r in losers_detail.iterrows():
+            drain = " *** BLOCK" if r.pnl < -200 else ""
+            print(f"  {r.pattern:<14}  {r.session:<18}  {r.pair}  "
+                  f"{int(r.wins)}W/{int(r.losses)}L  WR {r.wr_pct:.0f}%  "
+                  f"P&L R{r.pnl:+,.0f}{drain}")
+    else:
+        print("  entry_type column not found — re-run backtest to generate pattern tags")
+
+    # ------------------------------------------------------------------ #
     # 10. Weekly trade distribution (initial entries only)
     # ------------------------------------------------------------------ #
     print("\n--- WEEKLY TRADE DISTRIBUTION (initial entries, leg_idx=1) ---")

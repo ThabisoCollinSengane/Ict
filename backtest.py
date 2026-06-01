@@ -914,17 +914,29 @@ class Backtester:
         cur_price = bars5[-1].Close
 
         # FVG, OB, or Breaker confirms displacement or disciplined pullback.
-        fvg_ok = (
-            self._find_fvg_entry(bars5, pair, direction, lookback=24) is not None
-            or self._find_fvg_entry(bars15, pair, direction, lookback=8) is not None
-            or self._find_fvg_entry(bars1h, pair, direction, lookback=4) is not None
-            or self._find_ob_entry(bars5, pair, direction) is not None
-            or self._find_ob_entry(bars15, pair, direction) is not None
-            or self._find_breaker_entry(bars5, pair, direction)
-            or self._find_breaker_entry(bars15, pair, direction)
-            or self._find_breaker_entry(bars1h, pair, direction)
-        )
-        if not fvg_ok:
+        # Record the FIRST (highest-priority) matching pattern for analytics.
+        pattern_tag = None
+        if self._find_fvg_entry(bars5, pair, direction, lookback=24) is not None:
+            pattern_tag = "fvg_m5"
+        elif self._find_fvg_entry(bars15, pair, direction, lookback=8) is not None:
+            pattern_tag = "fvg_m15"
+        elif self._find_fvg_entry(bars1h, pair, direction, lookback=4) is not None:
+            pattern_tag = "fvg_h1"
+        elif self._find_ob_entry(bars5, pair, direction) is not None:
+            pattern_tag = "ob_m5"
+        elif self._find_ob_entry(bars15, pair, direction) is not None:
+            pattern_tag = "ob_m15"
+        elif self._find_breaker_entry(bars5, pair, direction):
+            pattern_tag = "breaker_m5"
+        elif self._find_breaker_entry(bars15, pair, direction):
+            pattern_tag = "breaker_m15"
+        elif self._find_breaker_entry(bars1h, pair, direction):
+            pattern_tag = "breaker_h1"
+
+        if pattern_tag is None:
+            return
+        if pattern_tag in config.BLOCKED_ENTRY_PATTERNS:
+            g["blocked_pattern"] = g.get("blocked_pattern", 0) + 1
             return
         g["m5_fvg_correct_dir"] += 1
 
@@ -956,7 +968,8 @@ class Backtester:
         g["units_nonzero"] += 1
 
         # Market order: fill immediately at current bar close.
-        entry_type = "market_amd" if amd_score else "market_mss"
+        base_type  = "amd" if amd_score else "mss"
+        entry_type = f"{base_type}_{pattern_tag}"
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
@@ -1028,6 +1041,11 @@ class Backtester:
             wamd_dir = st.get("weekly_amd_dir", 0)
             if wamd_dir == st["direction"]:
                 im_score = 1.0      # weekly AMD confirms — full pyramid lots
+
+        # Block neutral-conviction pyramid adds (im_score=0.5 = no clear signal).
+        # Backtest: pyramid_im0.5 → 0W/5L across 4 years. No edge without a clear bias.
+        if config.BLOCK_NEUTRAL_PYRAMID and im_score == 0.5:
+            return
 
         bars5 = self.bars_up_to(pair, "5T", t)
         if not bars5:

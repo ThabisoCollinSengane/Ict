@@ -118,6 +118,16 @@ HTF_BIAS_RES_MIN  = 60             # 1H bias
 # Targets are searched across H4, Daily, Weekly; nearest viable wins.
 TARGET_TF_MINUTES = (240, 1440, 10080)
 
+# --- Entry pattern block list ---
+# Patterns to never trade as initial entries (confirmed losers from backtest).
+# Format: "<base>_<pattern>" where base is fvg/ob/breaker and pattern is m5/m15/h1.
+# breaker_m15: 0% WR across all pairs (2 trades, 0W/2L, -R668) — block permanently.
+BLOCKED_ENTRY_PATTERNS = frozenset({"breaker_m15"})
+
+# Block pyramid adds when intermarket score is neutral (im_score=0.5, direction unclear).
+# Backtest: 5 pyramid_im0.5 trades → 0W/5L, -R740. No edge; skip neutral-conviction adds.
+BLOCK_NEUTRAL_PYRAMID = True
+
 # --- Structure lookbacks ---
 SWING_LOOKBACK = 20                # bars to define swing high/low for BOS
 EQ_HIGH_LOW_TOLERANCE_PIPS = 5     # max pip diff to call two highs "equal"

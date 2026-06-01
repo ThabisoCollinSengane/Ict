@@ -7,6 +7,7 @@ import config
 NY = pytz.timezone("America/New_York")
 
 _AUD_ONLY_PAIRS = frozenset(("AUDUSD",))
+_NZD_ONLY_PAIRS = frozenset(("NZDUSD",))
 
 
 def _parse(hhmm: str) -> time:
@@ -16,6 +17,8 @@ def _parse(hhmm: str) -> time:
 
 _KZ     = [(name, _parse(s), _parse(e)) for name, s, e in config.KILLZONES]
 _KZ_AUD = [(name, _parse(s), _parse(e)) for name, s, e in config.AUD_NZD_KILLZONES]
+# NZDUSD: London Open only (03:00-05:00 ET). NY AM drains on both directions per backtest.
+_KZ_NZD = [(name, s, e) for name, s, e in _KZ if "London" in name]
 
 
 def _ensure_utc(dt):
@@ -24,8 +27,11 @@ def _ensure_utc(dt):
 
 def _kz_list(pair: str | None):
     """Return the kill zone list appropriate for this pair."""
-    # NZDUSD uses London Open + NY AM (same as EUR/GBP) — active during US session.
-    # AUDUSD uses Asian session kill zones.
+    # NZDUSD: London Open only — NY AM is a proven drain on both LONG and SHORT.
+    # AUDUSD: Asian sessions (Sydney + Tokyo).
+    # EUR/GBP: London Open + NY AM.
+    if pair in _NZD_ONLY_PAIRS:
+        return _KZ_NZD
     return _KZ_AUD if pair in _AUD_ONLY_PAIRS else _KZ
 
 
