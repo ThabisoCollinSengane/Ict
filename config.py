@@ -30,12 +30,14 @@ MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 # Equity tiers — all legs stay equal; only the lot size grows with the account.
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
 #
-#   R900  → 0.03 flat  — full pyramid win R499  on 40-pip trade
-#   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade
+#   R900  → 0.03 flat  — full pyramid win R499  on 40-pip trade  (stays until R6000)
 #   R6000 → 0.10 flat  — full pyramid win R1665 on 40-pip trade
+#
+# The R3000 intermediate step (0.05 lots) is intentionally skipped — capital
+# stays at 0.03 throughout the growth phase to keep risk flat and consistent.
+# The lot-size jump happens only once the account reaches the R6000 milestone.
 EQUITY_TIERS = [
     (6_000, (0.10, 0.10, 0.10)),
-    (3_000, (0.05, 0.05, 0.05)),
     (0,     (0.03, 0.03, 0.03)),
 ]
 
@@ -70,10 +72,12 @@ MAX_TRADES_PER_WEEK      = 5
 WEEKLY_SOFT_CAP          = 3
 MIN_CONVICTION_LATE_WEEK = 7     # trades 4 and 5 require 7+ vs normal 6+
 # Daily spread: prevents all 5 weekly trades clustering on one busy day.
-MAX_TRADES_PER_DAY       = 2     # max new entries per calendar day (UTC)
+MAX_TRADES_PER_DAY       = 3     # max new entries per calendar day (UTC)
 # Pair daily cap: ensures multi-trade days use different pairs rather than
 # double-entering the same pair. The hard weekly cap is the primary frequency
 # control; pair balance over the week emerges naturally from the daily rule.
+# Setting to 3 allows one slot each for NZDUSD (Asian), EURUSD (London), and
+# GBPUSD (NY AM) on the same UTC calendar day — the ideal balanced day.
 MAX_PAIR_TRADES_PER_DAY  = 1     # max 1 initial entry per pair per UTC day
 MAX_PAIR_TRADES_PER_WEEK = 5     # match hard cap (no effective per-pair weekly limit)
 
