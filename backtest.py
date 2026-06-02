@@ -1240,6 +1240,16 @@ class Backtester:
             elif dir_check != st["direction"]:
                 return
 
+        # Only allow pyramids with full intermarket conviction (im_score = 1.0).
+        # Backtest shows im0.8 (score=0.75, displayed as 0.8) and wamd-triggered
+        # pyramids are net losers: 86% stop-out rate, combined -R2k vs +R850 for im1.0.
+        if im_score < 1.0:
+            self.gate["pyramid_blocked_low_im"] = self.gate.get("pyramid_blocked_low_im", 0) + 1
+            return
+        if st.get("weekly_amd_dir") == st["direction"]:
+            self.gate["pyramid_blocked_wamd"] = self.gate.get("pyramid_blocked_wamd", 0) + 1
+            return
+
         # Weekly AMD override: if the confirmed weekly distribution direction
         # agrees with this position, upgrade im_score to 1.0 (full lots) even
         # when the intermarket is neutral. The weekly profile is the higher-
@@ -1273,15 +1283,16 @@ class Backtester:
         if favour_pips < config.PYRAMID_MIN_FAVOUR_PIPS:
             return
 
-        # FVG, OB, or Breaker across M1→H1 confirms a pullback to a live pattern.
-        # M1 is checked first for pyramid adds — it shows the tightest, most current
-        # level and confirms the fractal structure is still intact at execution speed.
+        # FVG, OB, or Breaker — M5→M15→H1 first (same as normal entries).
+        # Using M5/M15/H1 structural levels places the stop 10-30+ pips away,
+        # giving the pyramid room to breathe. M1-first stops (2-5 pips) are too
+        # tight and get swept by normal noise (86% stop-out rate in backtest).
         bars15 = self.bars_up_to(pair, "15T", t)
         bars1h = self.bars_up_to(pair, "60T", t)
         bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
         _level, stop, pyr_pattern = self._get_limit_entry(
             bars5, bars15, bars1h, pair, st["direction"], cur_price,
-            bars1m=bars1m, for_pyramid=True,
+            bars1m=bars1m, for_pyramid=False,
         )
         if pyr_pattern is None:
             return
