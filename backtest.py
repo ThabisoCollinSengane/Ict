@@ -827,9 +827,6 @@ class Backtester:
         day_total  = self._day_total.get(day_key, 0)
         day_pair   = self._day_pair.get((day_key, pair), 0)
 
-        if week_total >= config.MAX_TRADES_PER_WEEK:
-            g["weekly_cap"] += 1
-            return
         if week_pair >= config.MAX_PAIR_TRADES_PER_WEEK:
             g["weekly_pair_cap"] += 1
             return
@@ -965,11 +962,59 @@ class Backtester:
             conviction += 1
             g["choch_confirmed"] += 1
 
-        # Minimum conviction gate — escalates after WEEKLY_SOFT_CAP entries this week
-        # so that the 4th and 5th weekly slots are reserved for cleaner setups only.
-        min_conv = (config.MIN_CONVICTION_LATE_WEEK
-                    if week_total >= config.WEEKLY_SOFT_CAP
-                    else config.MIN_CONVICTION)
+        # ── Game-theory bonuses ──────────────────────────────────────────────
+        # 1. Retail-pool sweep: equal highs/lows swept just before our entry.
+        #    Price hunted obvious liquidity → smart money distributed → ideal entry.
+        eq_lows  = find_equal_lows(bars15,  config.EQ_HIGH_LOW_TOLERANCE_PIPS * pip_v)
+        eq_highs = find_equal_highs(bars15, config.EQ_HIGH_LOW_TOLERANCE_PIPS * pip_v)
+        if direction > 0 and eq_lows  and cur_price > eq_lows[-1]:
+            conviction += 1
+            g["gt_pool_sweep"] = g.get("gt_pool_sweep", 0) + 1
+        elif direction < 0 and eq_highs and cur_price < eq_highs[-1]:
+            conviction += 1
+            g["gt_pool_sweep"] = g.get("gt_pool_sweep", 0) + 1
+
+        # 2. Strong displacement wick: last M5 bar's wick ≥ 60% of bar range.
+        #    Aggressive institutional delivery bar — confirms the directional push.
+        if bars5:
+            lb = bars5[-1]
+            bar_range = lb.High - lb.Low
+            if bar_range > 0:
+                if direction > 0:
+                    lower_wick = lb.Close - lb.Low
+                    if lower_wick / bar_range >= 0.60:
+                        conviction += 1
+                        g["gt_disp_wick"] = g.get("gt_disp_wick", 0) + 1
+                else:
+                    upper_wick = lb.High - lb.Close
+                    if upper_wick / bar_range >= 0.60:
+                        conviction += 1
+                        g["gt_disp_wick"] = g.get("gt_disp_wick", 0) + 1
+
+        # 3. ICT macro window: entry fires inside a known high-probability delivery
+        #    window (London 02:33–03:00, 10am macro 09:50–10:10, 1pm macro 12:50–13:10,
+        #    NY close macro 15:15–15:45 — all New York time).
+        ny_hour   = (t.hour - 5) % 24   # UTC-5 approx (EST)
+        ny_minute = t.minute
+        ny_hhmm   = ny_hour * 100 + ny_minute
+        _macro_windows = [(233, 300), (950, 1010), (1250, 1310), (1515, 1545)]
+        if any(lo <= ny_hhmm <= hi for lo, hi in _macro_windows):
+            conviction += 1
+            g["gt_macro_window"] = g.get("gt_macro_window", 0) + 1
+
+        # 4. Judas reversal: NY AM session is reversing London's first-hour direction.
+        #    Strongest game-theory setup — NY is the smart-money correction of London manipulation.
+        kz = current_killzone(t, pair)
+        if kz and "New York" in kz:
+            london_bars = [b for b in bars1h if hasattr(b, 'Close')]
+            if len(bars1h) >= 3:
+                london_dir = 1 if bars1h[-2].Close > bars1h[-3].Close else -1
+                if london_dir != direction:
+                    conviction += 1
+                    g["gt_judas_reversal"] = g.get("gt_judas_reversal", 0) + 1
+        # ─────────────────────────────────────────────────────────────────────
+
+        min_conv = config.MIN_CONVICTION
         if conviction < min_conv:
             g["low_conviction"] += 1
             return
