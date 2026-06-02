@@ -212,6 +212,34 @@ def main():
                   f"wins={w}  losses={len(grp)-w}  "
                   f"P&L=R{grp.pnl.sum():.2f}")
 
+        print("\n=== Per-year breakdown ===")
+        print(f"  {'Year':<6} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'P&L ZAR':>12} {'MaxDD%':>8}")
+        print("  " + "-" * 50)
+        df["year"] = df["opened_at"].dt.year
+        for yr, grp in df.groupby("year"):
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            eq_yr = grp.pnl.cumsum()
+            rmax = eq_yr.cummax()
+            dd = ((eq_yr - rmax) / (rmax + 500) * 100).min() if len(eq_yr) else 0
+            print(f"  {yr:<6} {len(grp):>7} {w:>5} {wr:>5.1f}% {grp.pnl.sum():>12.2f} {dd:>7.1f}%")
+
+        print("\n=== Per-pair × year ===")
+        print(f"  {'Pair':<8} {'Year':<6} {'Trades':>7} {'Wins':>5} {'WR%':>6}")
+        print("  " + "-" * 35)
+        for (pair, yr), grp in df.groupby(["pair", "year"]):
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            print(f"  {pair:<8} {yr:<6} {len(grp):>7} {w:>5} {wr:>5.1f}%")
+
+        print("\n=== Entry-type breakdown ===")
+        print(f"  {'Entry type':<20} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'Avg P&L':>10}")
+        print("  " + "-" * 50)
+        for etype, grp in df.groupby("entry_type"):
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            print(f"  {etype:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% {grp.pnl.mean():>10.2f}")
+
         print("\n=== Session-open side breakdown (above/below open) ===")
         print(f"  {'Category':<12} {'Trades':>7} {'Wins':>5} {'Losses':>7} {'WR%':>6} "
               f"{'P&L ZAR':>12} {'Avg P&L':>10}")

@@ -135,6 +135,8 @@ class Backtester:
         self._consec_losses     = 0
         self._day_open_eq       = {}   # date -> equity at start of that calendar day
         self._drawdown_halt_until = None  # date after which trading resumes
+        # Market profile cache: (pair, date) -> profile dict (recomputed once per bar)
+        self._mp_cache          = {}   # (pair, t) -> {"vwap", "vah", "val", "poc"}
         # Per-pair weekly AMD cache: updated each bar (daily resolution is enough)
         self._weekly_amd        = {}   # pair -> WeeklyAMD or None
         # Weekly trade budget (3-of-5 pattern)
@@ -390,6 +392,49 @@ class Backtester:
             return None
         self._weekly_amd[pair] = detect_weekly_amd(bars, ts, t)
         return self._weekly_amd[pair]
+
+    def _market_profile(self, pair: str, t) -> dict | None:
+        """Prior-day range structure: PDH, PDL, PDM, VAH, VAL.
+
+        ICT uses PDH/PDL as the key premium/discount reference for the next day.
+        Price below PDM = discount zone (buy bias); above PDM = premium (sell bias).
+        VAH/VAL are the 85th/15th percentile of the prior day's typical price —
+        the inner 70% zone where price spent most of the day.
+        Cached per (pair, date) since prior-day values don't change intraday.
+        """
+        cache_key = (pair, t.date())
+        cached = self._mp_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        df = self.tf_dfs.get((pair, "5T"))
+        if df is None:
+            self._mp_cache[cache_key] = None
+            return None
+
+        today_start    = t.replace(hour=0, minute=0, second=0, microsecond=0)
+        prev_day_start = today_start - pd.Timedelta(days=1)
+        prev_day_end   = today_start - pd.Timedelta(microseconds=1)
+        try:
+            prev_df = df.loc[prev_day_start:prev_day_end]
+        except Exception:
+            self._mp_cache[cache_key] = None
+            return None
+
+        if len(prev_df) < 50:
+            self._mp_cache[cache_key] = None
+            return None
+
+        pdh = float(prev_df["High"].max())
+        pdl = float(prev_df["Low"].min())
+        pdm = (pdh + pdl) / 2.0
+        typical = (prev_df["High"] + prev_df["Low"] + prev_df["Close"]) / 3
+        vah = float(typical.quantile(0.85))
+        val = float(typical.quantile(0.15))
+
+        result = {"pdh": pdh, "pdl": pdl, "pdm": pdm, "vah": vah, "val": val}
+        self._mp_cache[cache_key] = result
+        return result
 
     def _profile_score(self, pair: str, direction: int, cur_price: float, t):
         """Return (score, session_open_price).
@@ -963,16 +1008,26 @@ class Backtester:
             g["choch_confirmed"] += 1
 
         # ── Game-theory bonuses ──────────────────────────────────────────────
-        # 1. Retail-pool sweep: equal highs/lows swept just before our entry.
-        #    Price hunted obvious liquidity → smart money distributed → ideal entry.
+        # 1. Retail-pool sweep: equal highs/lows actually swept in last 20 bars.
+        #    Requires price to have PIERCED the level (stop-hunt) then recovered —
+        #    not just "equal lows exist and price is above them" (too loose).
         eq_lows  = find_equal_lows(bars15,  pair)
         eq_highs = find_equal_highs(bars15, pair)
-        if direction > 0 and eq_lows  and cur_price > eq_lows[-1]:
-            conviction += 1
-            g["gt_pool_sweep"] = g.get("gt_pool_sweep", 0) + 1
-        elif direction < 0 and eq_highs and cur_price < eq_highs[-1]:
-            conviction += 1
-            g["gt_pool_sweep"] = g.get("gt_pool_sweep", 0) + 1
+        recent15 = bars15[-20:] if len(bars15) >= 20 else bars15
+        if direction > 0 and eq_lows:
+            level = eq_lows[-1]
+            swept  = any(b.Low < level for b in recent15)
+            recovered = cur_price > level
+            if swept and recovered:
+                conviction += 1
+                g["gt_pool_sweep"] = g.get("gt_pool_sweep", 0) + 1
+        elif direction < 0 and eq_highs:
+            level = eq_highs[-1]
+            swept  = any(b.High > level for b in recent15)
+            recovered = cur_price < level
+            if swept and recovered:
+                conviction += 1
+                g["gt_pool_sweep"] = g.get("gt_pool_sweep", 0) + 1
 
         # 2. Strong displacement wick: last M5 bar's wick ≥ 60% of bar range.
         #    Aggressive institutional delivery bar — confirms the directional push.
@@ -1011,6 +1066,25 @@ class Backtester:
             if london_dir != direction:
                 conviction += 1
                 g["gt_judas_reversal"] = g.get("gt_judas_reversal", 0) + 1
+
+        # 5. Market Profile — prior-day discount/premium bonus.
+        #    Long below PDM = entering in discount; short above PDM = premium (+1).
+        #    Deep extreme (within 20% of PDH-PDL range) adds another +1.
+        mp = self._market_profile(pair, t)
+        if mp:
+            _mp_price = _bars5_gt[-1].Close if _bars5_gt else cur_price
+            pdm, pdh, pdl = mp["pdm"], mp["pdh"], mp["pdl"]
+            pd_range = pdh - pdl
+
+            if (direction > 0 and _mp_price < pdm) or (direction < 0 and _mp_price > pdm):
+                conviction += 1
+                g["gt_mp_discount"] = g.get("gt_mp_discount", 0) + 1
+
+            if pd_range > 0:
+                if (direction > 0 and _mp_price <= pdl + pd_range * 0.20) or \
+                   (direction < 0 and _mp_price >= pdh - pd_range * 0.20):
+                    conviction += 1
+                    g["gt_mp_extreme"] = g.get("gt_mp_extreme", 0) + 1
         # ─────────────────────────────────────────────────────────────────────
 
         min_conv = config.MIN_CONVICTION

@@ -42,7 +42,7 @@ EQUITY_TIERS = [
 ]
 
 # --- Targets ---
-MIN_CONVICTION = 6                 # minimum conviction score to open a trade (0–9 scale)
+MIN_CONVICTION = 6                 # minimum conviction score to open a trade (0–9+ scale)
 MIN_PIPS_TARGET = 20               # minimum pips to target (entry and pyramid checks)
 MIN_ENTRY_PIPS_TARGET = 20         # same as MIN_PIPS_TARGET — keep them in sync here
 MIN_RR = 1.2                       # minimum reward:risk
