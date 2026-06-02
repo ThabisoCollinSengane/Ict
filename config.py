@@ -1,7 +1,7 @@
 """Strategy parameters. Tweak here, no other code changes needed."""
 
 # --- Capital + risk ---
-STARTING_CASH = 900                # R900 ZAR starting capital
+STARTING_CASH = 500                # R500 ZAR starting capital
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
@@ -24,19 +24,21 @@ MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 #   L3 0.03 × 20 pips × R9.25/pip = R111
 #   Full pyramid win: R499.50
 LOT_UNITS       = 100_000
-PYRAMID_LOTS    = (0.03, 0.03, 0.03)    # flat — same lot on every leg
+PYRAMID_LOTS    = (0.02, 0.02, 0.02)    # flat — same lot on every leg
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 
 # Equity tiers — all legs stay equal; only the lot size grows with the account.
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
 #
+#   R500  → 0.02 flat  — full pyramid win R333  on 40-pip trade
 #   R900  → 0.03 flat  — full pyramid win R499  on 40-pip trade
 #   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade
 #   R6000 → 0.10 flat  — full pyramid win R1665 on 40-pip trade
 EQUITY_TIERS = [
     (6_000, (0.10, 0.10, 0.10)),
     (3_000, (0.05, 0.05, 0.05)),
-    (0,     (0.03, 0.03, 0.03)),
+    (900,   (0.03, 0.03, 0.03)),
+    (0,     (0.02, 0.02, 0.02)),
 ]
 
 # --- Targets ---
