@@ -135,7 +135,7 @@ PYRAMID_REQUIRE_WEEKLY_AMD = False
 
 # Minimum pips in favour of the last leg before adding a pyramid leg.
 # Higher values give more confirmation; lower values catch earlier in the move.
-PYRAMID_MIN_FAVOUR_PIPS = 10
+PYRAMID_MIN_FAVOUR_PIPS = 20
 
 # --- Structure lookbacks ---
 SWING_LOOKBACK = 20                # bars to define swing high/low for BOS
