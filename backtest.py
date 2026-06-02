@@ -1067,6 +1067,19 @@ class Backtester:
                 conviction += 1
                 g["gt_judas_reversal"] = g.get("gt_judas_reversal", 0) + 1
 
+        # 4b. Intermarket Judas-sweep divergence: DXY sweeps a liquidity level and
+        #     one of EURUSD/GBPUSD fails to follow. The failing pair held its ground
+        #     against the manipulation — when DXY reverses it delivers the strongest
+        #     move. Only credit when the divergence names THIS pair in THIS direction.
+        dxy15 = self._dxy_bars("15T", t)
+        eu15  = self.bars_up_to("EURUSD", "15T", t)
+        gu15  = self.bars_up_to("GBPUSD", "15T", t)
+        if dxy15 and eu15 and gu15:
+            div = judas_sweep_divergence(dxy15, eu15, gu15)
+            if div is not None and div[0] == pair and div[1] == direction:
+                conviction += 1
+                g["judas_divergence"] += 1
+
         # 5. Market Profile — prior-day discount/premium bonus.
         #    Long below PDM = entering in discount; short above PDM = premium (+1).
         #    Deep extreme (within 20% of PDH-PDL range) adds another +1.
