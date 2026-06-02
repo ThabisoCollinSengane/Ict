@@ -30,15 +30,17 @@ MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 # Equity tiers — all legs stay equal; only the lot size grows with the account.
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
 #
-#   R500  → 0.02 flat  — full pyramid win R333  on 40-pip trade
-#   R900  → 0.03 flat  — full pyramid win R499  on 40-pip trade
+#   R0    → 0.01 flat  — full pyramid win R166  on 40-pip trade  (3.7% risk at R500)
+#   R750  → 0.02 flat  — full pyramid win R333  on 40-pip trade  (4.4% risk at R750)
+#   R1500 → 0.03 flat  — full pyramid win R499  on 40-pip trade  (3.3% risk at R1500)
 #   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade
 #   R6000 → 0.10 flat  — full pyramid win R1665 on 40-pip trade
 EQUITY_TIERS = [
     (6_000, (0.10, 0.10, 0.10)),
     (3_000, (0.05, 0.05, 0.05)),
-    (900,   (0.03, 0.03, 0.03)),
-    (0,     (0.02, 0.02, 0.02)),
+    (1_500, (0.03, 0.03, 0.03)),
+    (750,   (0.02, 0.02, 0.02)),
+    (0,     (0.01, 0.01, 0.01)),
 ]
 
 # --- Targets ---
@@ -54,8 +56,8 @@ TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profi
 # 1. Peak drawdown halt: if equity falls >20% from its highest point, stop trading
 #    for DRAWDOWN_PAUSE_DAYS calendar days before retrying. Prevents cascading losses
 #    in trending-against conditions.
-MAX_DRAWDOWN_HALT_PCT   = 20.0
-DRAWDOWN_PAUSE_DAYS     = 5
+MAX_DRAWDOWN_HALT_PCT   = 15.0    # halt earlier — 20% was allowing too much cascade loss
+DRAWDOWN_PAUSE_DAYS     = 10      # 2-week break outlasts most short-term adverse regimes
 # 2. Daily loss cap: stop opening new trades for the rest of the calendar day once
 #    daily losses exceed this % of the account equity at day open.
 MAX_DAILY_LOSS_PCT      = 6.0     # ~2 full stop-losses at 0.03 lots
