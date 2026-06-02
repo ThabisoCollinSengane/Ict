@@ -78,16 +78,27 @@ class NewsCalendar:
             self.events.append((UTC.localize(naive), currency, impact))
         return len(self.events)
 
-    def is_blocked(self, utc_dt: datetime) -> bool:
-        """True if `utc_dt` is within block window of a relevant event."""
+    def nearest_impact(self, utc_dt: datetime) -> str | None:
+        """Return the highest impact level of events within the block window, or None.
+
+        Returns "High", "Medium", or None.  Callers treat High as trade-with-fixed-stop
+        and Medium as a hard block (spread risk without the directional catalyst).
+        """
         if utc_dt.tzinfo is None:
             utc_dt = UTC.localize(utc_dt)
         before = timedelta(minutes=config.NEWS_BLOCK_MINUTES_BEFORE)
         after = timedelta(minutes=config.NEWS_BLOCK_MINUTES_AFTER)
-        for ev_dt, _, _ in self.events:
+        found = None
+        for ev_dt, _, impact in self.events:
             if ev_dt - before <= utc_dt <= ev_dt + after:
-                return True
-        return False
+                if impact == "High":
+                    return "High"
+                found = impact
+        return found
+
+    def is_blocked(self, utc_dt: datetime) -> bool:
+        """True if `utc_dt` is within block window of a relevant event."""
+        return self.nearest_impact(utc_dt) is not None
 
     def is_nfp_week(self, utc_dt: datetime) -> bool:
         """Return True if the ISO week of `utc_dt` contains a USD Non-Farm Payrolls event.

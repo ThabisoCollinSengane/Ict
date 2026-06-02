@@ -7,6 +7,7 @@ and reports trades + summary stats. No QuantConnect dependency.
 Usage:  python backtest.py
 """
 
+import itertools
 import sys
 from collections import namedtuple
 from datetime import timedelta
@@ -153,14 +154,17 @@ class Backtester:
         else:
             print("  News CSV: not found (skipping news filter)")
 
-    def bars_up_to(self, sym, tf, t):
+    def bars_up_to(self, sym, tf, t, max_bars=None):
         idx = self.tf_index.get((sym, tf))
         if idx is None:
             return []
         pos = idx.searchsorted(t, side="right")
         if pos == 0:
             return []
-        return self.tf_bars[(sym, tf)][:pos]
+        bars = self.tf_bars[(sym, tf)]
+        if max_bars is not None:
+            return bars[max(0, pos - max_bars):pos]
+        return bars[:pos]
 
     def _bar_at(self, sym, tf, t):
         idx = self.tf_index.get((sym, tf))
@@ -272,6 +276,7 @@ class Backtester:
             "entry": leg["entry"], "exit": exit_price, "units": leg["units"],
             "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
             "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
+            "session_side": leg.get("session_side", "no_open"),
         })
         st["legs"].remove(leg)
         if not st["legs"]:
@@ -373,8 +378,13 @@ class Backtester:
         self._weekly_amd[pair] = detect_weekly_amd(bars, ts, t)
         return self._weekly_amd[pair]
 
-    def _profile_score(self, pair: str, direction: int, cur_price: float, t) -> int:
-        """How many open levels (daily, weekly, session) agree with direction? 0-3."""
+    def _profile_score(self, pair: str, direction: int, cur_price: float, t):
+        """Return (score, session_open_price).
+
+        score: how many open levels (daily, weekly, session) agree with direction (0-3).
+        session_open_price: the killzone open price (or None) — returned so callers can
+        reuse it for conviction/analytics without a second mp_session_open call.
+        """
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         import pytz
         ny = pytz.timezone("America/New_York")
@@ -384,7 +394,7 @@ class Backtester:
         d_op = self._daily_open(pair, t)
         w_op = self._weekly_open(pair, t)
         s_op = self._session_open(pair, sess, t) if sess else None
-        return profile_score(cur_price, direction, d_op, w_op, s_op)
+        return profile_score(cur_price, direction, d_op, w_op, s_op), s_op
 
     def _check_session_handover(self, t):
         """At kill zone open: close any position that is losing AND fights the weekly AMD.
@@ -544,39 +554,78 @@ class Backtester:
             return None
         return entry, stop
 
-    def _get_limit_entry(self, bars5, bars15, bars1h, pair, direction, cur_price):
+    def _get_limit_entry(self, bars5, bars15, bars1h, pair, direction, cur_price,
+                         bars1m=None, for_pyramid=False):
         """Return (pattern_level, stop, pattern_tag) for an ICT counter-trend entry.
 
         Confirms a valid pattern exists counter-trend to cur_price:
           LONG:  pattern_level < cur_price  (price still falling toward it)
           SHORT: pattern_level > cur_price  (price still rising toward it)
 
-        pattern_level is discarded by the caller — the market order fills at
-        cur_price.  stop is the pattern's invalidation level (OB/FVG boundary).
+        pattern_level is discarded by the caller — market order fills at cur_price.
+        stop is the pattern's invalidation level (OB/FVG boundary).
+
+        for_pyramid=True: M1 patterns first (tightest current level for adds).
+        for_pyramid=False: M1 patterns last (fallback; initial entries prefer HTF).
+
+        Pattern functions are called LAZILY — stops at first valid match.
         """
-        checks = [
-            (self._find_fvg_entry(bars5,  pair, direction, lookback=24), "fvg_m5"),
-            (self._find_fvg_entry(bars15, pair, direction, lookback=8),  "fvg_m15"),
-            (self._find_fvg_entry(bars1h, pair, direction, lookback=4),  "fvg_h1"),
-            (self._find_ob_entry(bars5,   pair, direction),              "ob_m5"),
-            (self._find_ob_entry(bars15,  pair, direction),              "ob_m15"),
-            (self._find_breaker_entry(bars5,  pair, direction),          "breaker_m5"),
-            (self._find_breaker_entry(bars15, pair, direction),          "breaker_m15"),
-            (self._find_breaker_entry(bars1h, pair, direction) if bars1h else None, "breaker_h1"),
-        ]
-        for result, tag in checks:
+        def _valid(result, tag):
             if result is None:
-                continue
-            entry_level, stop = result
-            # Counter-trend filter: price must still be moving toward the level.
-            if direction > 0 and entry_level >= cur_price:
-                continue   # price already below or at level — missed the entry
-            if direction < 0 and entry_level <= cur_price:
-                continue   # price already above or at level — missed the entry
+                return None
+            el, stop = result
+            if direction > 0 and el >= cur_price:
+                return None
+            if direction < 0 and el <= cur_price:
+                return None
             if tag in config.BLOCKED_ENTRY_PATTERNS:
-                continue
-            return entry_level, stop, tag
-        return None, None, None
+                return None
+            return el, stop, tag
+
+        def _try(result, tag):
+            """Return (el, stop, tag) if valid and counter-trend, else None."""
+            if result is None:
+                return None
+            el, stop = result
+            if direction > 0 and el >= cur_price:
+                return None
+            if direction < 0 and el <= cur_price:
+                return None
+            if tag in config.BLOCKED_ENTRY_PATTERNS:
+                return None
+            return el, stop, tag
+
+        def _check_m1():
+            if not bars1m:
+                return None
+            r = _try(self._find_fvg_entry(bars1m, pair, direction, lookback=30), "fvg_m1")
+            if r: return r
+            r = _try(self._find_ob_entry(bars1m, pair, direction), "ob_m1")
+            if r: return r
+            return _try(self._find_breaker_entry(bars1m, pair, direction), "breaker_m1")
+
+        def _check_base():
+            r = _try(self._find_fvg_entry(bars5,  pair, direction, lookback=24), "fvg_m5");
+            if r: return r
+            r = _try(self._find_fvg_entry(bars15, pair, direction, lookback=8),  "fvg_m15");
+            if r: return r
+            r = _try(self._find_fvg_entry(bars1h, pair, direction, lookback=4),  "fvg_h1");
+            if r: return r
+            r = _try(self._find_ob_entry(bars5,   pair, direction),              "ob_m5");
+            if r: return r
+            r = _try(self._find_ob_entry(bars15,  pair, direction),              "ob_m15");
+            if r: return r
+            r = _try(self._find_breaker_entry(bars5,  pair, direction),          "breaker_m5")
+            if r: return r
+            r = _try(self._find_breaker_entry(bars15, pair, direction),          "breaker_m15")
+            if r: return r
+            if bars1h:
+                return _try(self._find_breaker_entry(bars1h, pair, direction), "breaker_h1")
+            return None
+
+        # M1 first for pyramids (tightest current level); last for initial entries.
+        result = (_check_m1() or _check_base()) if for_pyramid else (_check_base() or _check_m1())
+        return result if result is not None else (None, None, None)
 
     def _find_target(self, pair, direction, t, price, stop=None):
         """Find the nearest target that satisfies the RR requirement.
@@ -743,7 +792,11 @@ class Backtester:
             return
         # ────────────────────────────────────────────────────────────────────
 
-        if self.news.is_blocked(now):
+        # News gate: Medium impact → block (spread risk, no directional catalyst).
+        # High impact → allow but override stop to fixed 10-pip (spread protection).
+        # News is often the CATALYST that drives price to target faster.
+        news_impact = self.news.nearest_impact(now)
+        if news_impact == "Medium":
             return
         g["news_clear"] += 1
 
@@ -859,11 +912,12 @@ class Backtester:
             conviction += 2
             g["weekly_amd_confirmed"] += 1
 
-        # Open-level profile score: daily/weekly/session opens agreeing (0-1)
-        p_score = self._profile_score(pair, direction, cur_price, t)
+        # Open-level profile score: daily/weekly/session opens agreeing (0-1).
+        # _session_open is returned from the same call so we don't duplicate mp_session_open.
+        p_score, _session_open = self._profile_score(pair, direction, cur_price, t)
         conviction += min(p_score, 1)
 
-        # AMD on M15 (0-1)
+        # AMD on M15 (0-1): Asia/London consolidation + manipulation sweep
         bars15 = self.bars_up_to(pair, "15T", t)
         amd = detect_amd_setup(bars15, pair)
         amd_score = 0
@@ -874,6 +928,10 @@ class Backtester:
                 amd_score = 1
                 conviction += 1
                 g["manipulation_correct_dir"] += 1
+
+        # M1 fractal structure is captured via _get_limit_entry (fvg_m1/ob_m1/
+        # breaker_m1) — same AMD concept at execution speed without the O(n³)
+        # consolidation scan cost that would stall the main loop.
 
         # OTE zone: bonus conviction when price is in 62-79% retrace (M15 or H1 swing).
         # OTE defines profit POTENTIAL (Fib extension targets), not an entry filter.
@@ -917,13 +975,24 @@ class Backtester:
             return
         cur_price = bars5[-1].Close
 
+        # Judas-swing confirmation: price below open for longs / above for shorts (+1).
+        # _session_open was already computed inside _profile_score above.
+        if _session_open is not None:
+            if (direction > 0 and cur_price < _session_open) or (direction < 0 and cur_price > _session_open):
+                conviction += 1
+                if conviction > 4:
+                    max_legs = config.MAX_LEGS
+                elif conviction > 2:
+                    max_legs = max(max_legs, 2)
+
         # Pattern detection with counter-trend confirmation.
         # _get_limit_entry finds the nearest valid pattern level that price is
         # still moving TOWARD (direction > 0 → level below price; direction < 0
         # → level above price).  We use that level only for the STOP placement;
         # the actual fill is a market order at cur_price (bar close).
+        bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
         _level, stop, pattern_tag = self._get_limit_entry(
-            bars5, bars15, bars1h, pair, direction, cur_price
+            bars5, bars15, bars1h, pair, direction, cur_price, bars1m=bars1m
         )
         if pattern_tag is None:
             return
@@ -931,6 +1000,12 @@ class Backtester:
 
         entry = cur_price          # market order — fill immediately at bar close
         pip = pip_size(pair)
+
+        # High-impact news nearby: override to fixed 10-pip stop (protects against
+        # spread widening while still trading the news catalyst).
+        if news_impact == "High":
+            stop = entry - config.FIXED_STOP_PIPS * pip if direction > 0 \
+                   else entry + config.FIXED_STOP_PIPS * pip
 
         target = self._find_target(pair, direction, t, entry, stop=stop)
         if target is None:
@@ -952,12 +1027,27 @@ class Backtester:
             return
         g["units_nonzero"] += 1
 
+        # High-impact news = distribution catalyst: upgrade to full pyramid regardless
+        # of conviction score.  News drives speed, direction, and strength — this is
+        # the highest-probability setup for reaching target fast.
+        if news_impact == "High":
+            max_legs = config.MAX_LEGS
+
         # Market order: fill immediately at current bar close.
         base_type  = "amd" if amd_score else "mss"
-        entry_type = f"{base_type}_{pattern_tag}"
+        entry_tag  = "news" if news_impact == "High" else base_type
+        entry_type = f"{entry_tag}_{pattern_tag}"
+        # Session-open side analytics tag (reuse _session_open computed above).
+        if _session_open is None:
+            _so_side = "no_open"
+        elif (direction > 0 and cur_price < _session_open) or (direction < 0 and cur_price > _session_open):
+            _so_side = "judas"
+        else:
+            _so_side = "momentum"
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
+            "session_side": _so_side,
         }
         self.active[pair] = {
             "direction": direction,
@@ -985,7 +1075,9 @@ class Backtester:
         if len(st["legs"]) >= max_legs:
             return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-        if self.news.is_blocked(now):
+        # Medium impact: block pyramid. High impact: allow with fixed stop below.
+        pyr_news_impact = self.news.nearest_impact(now)
+        if pyr_news_impact == "Medium":
             return
         # Only pyramid inside the correct kill zone for this pair.
         if not can_open_new_trade(now, pair):
@@ -1041,43 +1133,37 @@ class Backtester:
         if favour_pips < 10:
             return
 
-        # FVG, OB, or Breaker confirms displacement / disciplined pullback.
-        # Breakers are the PRIMARY pyramid entry — price pulls back to a broken
-        # structure level rather than being chased at momentum highs/lows.
+        # FVG, OB, or Breaker across M1→H1 confirms a pullback to a live pattern.
+        # M1 is checked first for pyramid adds — it shows the tightest, most current
+        # level and confirms the fractal structure is still intact at execution speed.
         bars15 = self.bars_up_to(pair, "15T", t)
         bars1h = self.bars_up_to(pair, "60T", t)
-        # Detect which pattern triggered the pyramid add.
-        pyr_pattern = None
-        if self._find_fvg_entry(bars5, pair, st["direction"], lookback=12) is not None:
-            pyr_pattern = "fvg_m5"
-        elif self._find_fvg_entry(bars15, pair, st["direction"], lookback=4) is not None:
-            pyr_pattern = "fvg_m15"
-        elif self._find_ob_entry(bars5, pair, st["direction"]) is not None:
-            pyr_pattern = "ob_m5"
-        elif self._find_breaker_entry(bars5, pair, st["direction"]):
-            pyr_pattern = "breaker_m5"
-        elif self._find_breaker_entry(bars15, pair, st["direction"]):
-            pyr_pattern = "breaker_m15"
-        elif bars1h and self._find_breaker_entry(bars1h, pair, st["direction"]):
-            pyr_pattern = "breaker_h1"
+        bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
+        _level, stop, pyr_pattern = self._get_limit_entry(
+            bars5, bars15, bars1h, pair, st["direction"], cur_price,
+            bars1m=bars1m, for_pyramid=True,
+        )
         if pyr_pattern is None:
             return
 
-        # Market entry at current price with fixed stop.
         entry = cur_price
-        if st["direction"] > 0:
-            stop = entry - config.FIXED_STOP_PIPS * pip
-        else:
-            stop = entry + config.FIXED_STOP_PIPS * pip
+        # High-impact news nearby: fixed 10-pip stop (spread protection).
+        if pyr_news_impact == "High":
+            stop = entry - config.FIXED_STOP_PIPS * pip if st["direction"] > 0 \
+                   else entry + config.FIXED_STOP_PIPS * pip
 
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
 
+        # High-impact news = distribution catalyst: upgrade to full lots.
+        if pyr_news_impact == "High":
+            im_score = 1.0
+
         # Lot size: growing pyramid schedule for current tier, scaled by intermarket score.
-        tier_lots = self._pyramid_lots()
-        leg_num   = len(st["legs"]) + 1
-        lot_idx   = min(leg_num - 1, len(tier_lots) - 1)
+        tier_lots  = self._pyramid_lots()
+        leg_num    = len(st["legs"]) + 1
+        lot_idx    = min(leg_num - 1, len(tier_lots) - 1)
         base_units = int(tier_lots[lot_idx] * config.LOT_UNITS)
         units = max(int(base_units * im_score), int(tier_lots[-1] * config.LOT_UNITS))
 
@@ -1086,10 +1172,11 @@ class Backtester:
         prior["stop"] = prior["entry"]
 
         wamd_tag = "wamd" if st.get("weekly_amd_dir") == st["direction"] else "im"
+        news_tag = "news" if pyr_news_impact == "High" else ""
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
-            "entry_type": f"pyramid_{wamd_tag}{im_score:.1f}_{pyr_pattern}",
+            "entry_type": f"pyramid_{wamd_tag}{news_tag}{im_score:.1f}_{pyr_pattern}",
         }
         st["legs"].append(leg)
 

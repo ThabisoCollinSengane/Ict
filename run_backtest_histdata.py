@@ -74,8 +74,14 @@ def df_to_bars(df: pd.DataFrame) -> list[Bar]:
 class HistdataBacktester(bt_module.Backtester):
     """Identical to Backtester but uses real UDXUSD for DXY bias."""
 
-    def __init__(self, data_5m: dict, dxy_5m: pd.DataFrame):
+    def __init__(self, data_5m: dict, dxy_5m: pd.DataFrame, data_m1: dict | None = None):
         super().__init__(data_5m)
+        # Register raw M1 bars for tradeable pairs (fractal pattern detection on M1).
+        if data_m1:
+            for sym, df in data_m1.items():
+                self.tf_dfs[(sym, "1T")]   = df
+                self.tf_bars[(sym, "1T")]  = df_to_bars(df)
+                self.tf_index[(sym, "1T")] = df.index
         # Register UDXUSD at all needed timeframes.
         for tf_name, rule in [
             ("5T", None), ("15T", "15min"), ("60T", "60min"),
@@ -150,7 +156,9 @@ def main():
 
     print(f"\nLoading and resampling to 5-minute bars ({' + '.join(years)})...")
     data_5m = {}
+    data_m1 = {}   # raw 1-minute bars for tradeable pairs (M1 pattern detection)
     dxy_5m = None
+    _tradeable = set(config.PAIRS)  # GBPUSD, EURUSD, NZDUSD
     for sym in syms:
         frames = []
         for yr in years:
@@ -166,9 +174,13 @@ def main():
             dxy_5m = m5
         else:
             data_5m[sym] = m5
+            # M1 registration disabled: df_to_bars on 1.4M rows is too slow at startup.
+            # M1 patterns in _get_limit_entry silently skip when bars1m=[].
+            # Re-enable when M1 bar access is refactored to lazy/on-demand loading.
+            # if sym in _tradeable: data_m1[sym] = m1
 
     print("\nRunning backtest...")
-    backtester = HistdataBacktester(data_5m, dxy_5m)
+    backtester = HistdataBacktester(data_5m, dxy_5m, data_m1)
     backtester.run()
 
     print("\n=== Gate funnel (entries passing each filter) ===")
@@ -187,9 +199,10 @@ def main():
         df = pd.DataFrame(backtester.trades)
         print(f"\n=== Trade log ({len(backtester.trades)} trades) ===")
         cols = ["opened_at", "closed_at", "pair", "direction",
-                "leg_idx", "entry", "exit", "units", "pnl", "reason"]
+                "leg_idx", "entry", "exit", "units", "pnl", "reason",
+                "session_side", "entry_type"]
         pd.set_option("display.max_rows", None)
-        pd.set_option("display.width", 180)
+        pd.set_option("display.width", 200)
         print(df[cols].to_string(index=False))
 
         print("\n=== Per-pair P&L (ZAR) ===")
@@ -198,6 +211,24 @@ def main():
             print(f"  {pair}: {len(grp)} trades  "
                   f"wins={w}  losses={len(grp)-w}  "
                   f"P&L=R{grp.pnl.sum():.2f}")
+
+        print("\n=== Session-open side breakdown (above/below open) ===")
+        print(f"  {'Category':<12} {'Trades':>7} {'Wins':>5} {'Losses':>7} {'WR%':>6} "
+              f"{'P&L ZAR':>12} {'Avg P&L':>10}")
+        print("  " + "-" * 65)
+        for side in ["judas", "momentum", "no_open"]:
+            g = df[df.session_side == side]
+            if len(g) == 0:
+                continue
+            wins = (g.pnl > 0).sum()
+            losses = len(g) - wins
+            wr = 100 * wins / len(g)
+            pnl = g.pnl.sum()
+            avg = g.pnl.mean()
+            label = {"judas": "below open", "momentum": "above open",
+                     "no_open": "no session"}[side]
+            print(f"  {label:<12} {len(g):>7} {wins:>5} {losses:>7} {wr:>5.1f}% "
+                  f"{pnl:>11.2f} {avg:>10.2f}")
     else:
         print("\nNo trades generated.")
         print("Check the gate funnel to see which filter is the bottleneck.")
