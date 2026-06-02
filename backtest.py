@@ -1127,10 +1127,16 @@ class Backtester:
         cur_price = bars5[-1].Close
         pip = pip_size(pair)
 
-        # Must be at least 10 pips in favour of the last leg before adding.
+        # Weekly AMD hard gate: skip pyramid unless weekly distribution already fired
+        # in the same direction as the trade. Controlled by PYRAMID_REQUIRE_WEEKLY_AMD.
+        if config.PYRAMID_REQUIRE_WEEKLY_AMD:
+            if st.get("weekly_amd_dir", 0) != st["direction"]:
+                return
+
+        # Must be at least PYRAMID_MIN_FAVOUR_PIPS in favour of the last leg before adding.
         last_entry = st["legs"][-1]["entry"]
         favour_pips = (cur_price - last_entry) * st["direction"] / pip
-        if favour_pips < 10:
+        if favour_pips < config.PYRAMID_MIN_FAVOUR_PIPS:
             return
 
         # FVG, OB, or Breaker across M1→H1 confirms a pullback to a live pattern.

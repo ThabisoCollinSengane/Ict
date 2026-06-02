@@ -128,6 +128,15 @@ BLOCKED_ENTRY_PATTERNS: frozenset = frozenset()
 # Backtest: 5 pyramid_im0.5 trades → 0W/5L, -R740. No edge; skip neutral-conviction adds.
 BLOCK_NEUTRAL_PYRAMID = True
 
+# Require confirmed weekly AMD direction before any pyramid add.
+# When True, pyramids are only allowed if the weekly AMD sweep already fired
+# in the same direction as the trade — eliminates mid-week guessing.
+PYRAMID_REQUIRE_WEEKLY_AMD = False
+
+# Minimum pips in favour of the last leg before adding a pyramid leg.
+# Higher values give more confirmation; lower values catch earlier in the move.
+PYRAMID_MIN_FAVOUR_PIPS = 10
+
 # --- Structure lookbacks ---
 SWING_LOOKBACK = 20                # bars to define swing high/low for BOS
 EQ_HIGH_LOW_TOLERANCE_PIPS = 5     # max pip diff to call two highs "equal"
