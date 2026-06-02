@@ -43,6 +43,7 @@ from ict.dealing_range import (
 from intermarket import resolve as resolve_intermarket, resolve_pair_direction
 from news_filter import NewsCalendar
 from risk import position_size, pip_size
+from trade_log import TradeLog
 
 
 YF_TICKERS = {
@@ -154,6 +155,8 @@ class Backtester:
         else:
             print("  News CSV: not found (skipping news filter)")
 
+        self.log = TradeLog()
+
     def bars_up_to(self, sym, tf, t, max_bars=None):
         idx = self.tf_index.get((sym, tf))
         if idx is None:
@@ -262,7 +265,12 @@ class Backtester:
     def _exit_leg(self, pair, leg, exit_price, t, reason):
         st = self.active[pair]
         direction = st["direction"]
-        pnl_usd = (exit_price - leg["entry"]) * leg["units"] * direction
+        # Apply exit spread friction (half-spread): you sell at bid for longs,
+        # buy at ask for shorts — effective exit is worse than the mid price.
+        _spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        _exit_friction = (_spread / 2) * pip_size(pair)
+        effective_exit = exit_price - direction * _exit_friction
+        pnl_usd = (effective_exit - leg["entry"]) * leg["units"] * direction
         pnl_zar = pnl_usd * config.USD_ZAR
         self.equity += pnl_zar
         # Update peak equity and consecutive loss counter after every close.
@@ -271,16 +279,21 @@ class Backtester:
             self._consec_losses = 0
         else:
             self._consec_losses += 1
-        self.trades.append({
+        record = {
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
-            "entry": leg["entry"], "exit": exit_price, "units": leg["units"],
+            "entry": leg["entry"], "exit": effective_exit, "units": leg["units"],
             "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
             "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
             "session_side": leg.get("session_side", "no_open"),
-        })
+        }
+        self.trades.append(record)
+        self.log.write_trade(record, equity_after=self.equity)
         st["legs"].remove(leg)
         if not st["legs"]:
             self.active.pop(pair, None)
+            self.log.delete_position(pair)
+        else:
+            self.log.upsert_position(pair, st)
 
     def _force_close(self, pair, price, t, reason):
         for leg in list(self.active[pair]["legs"]):
@@ -998,8 +1011,11 @@ class Backtester:
             return
         g["m5_fvg_correct_dir"] += 1
 
-        entry = cur_price          # market order — fill immediately at bar close
         pip = pip_size(pair)
+        # Simulate spread + slippage: worsen entry price by (half-spread + slippage).
+        _spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        _friction = (_spread / 2 + config.SLIPPAGE_PIPS) * pip
+        entry = cur_price + direction * _friction   # market order fill with friction
 
         # High-impact news nearby: override to fixed 10-pip stop (protects against
         # spread widening while still trading the news catalyst).
@@ -1152,7 +1168,10 @@ class Backtester:
         if pyr_pattern is None:
             return
 
-        entry = cur_price
+        # Apply entry friction to pyramid fills too.
+        _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        _fric_p = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
+        entry = cur_price + st["direction"] * _fric_p
         # High-impact news nearby: fixed 10-pip stop (spread protection).
         if pyr_news_impact == "High":
             stop = entry - config.FIXED_STOP_PIPS * pip if st["direction"] > 0 \

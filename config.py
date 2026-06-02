@@ -179,6 +179,24 @@ SESSION_HANDOVER_CLOSE = True
 NEWS_SOURCE = "csv"
 NEWS_CSV_PATH = "data/news_events.csv"
 
+# --- Spread + slippage simulation ---
+# Applied to every fill in backtest to model realistic execution friction.
+# Spread = broker bid/ask spread (you pay half on entry, half on exit = full round-trip).
+# Slippage = market-impact / execution lag on market orders (entry only).
+PAIR_SPREAD_PIPS = {
+    "EURUSD": 0.8,
+    "GBPUSD": 1.0,
+    "NZDUSD": 1.5,
+    "default": 1.0,
+}
+SLIPPAGE_PIPS = 0.5          # one-way slippage on market order entries
+
+# --- Drawdown kill switch (live hard stop) ---
+# In addition to the rolling MAX_DRAWDOWN_HALT_PCT (which pauses and resumes),
+# a SESSION_DRAWDOWN_PCT breach closes all open positions and halts the algorithm
+# for the remainder of the day — no automatic resume.  Set to 0 to disable.
+SESSION_DRAWDOWN_PCT = 10.0  # halt day if session equity falls >10% from session open
+
 # --- Symbols ---
 PAIRS = ("GBPUSD", "EURUSD", "NZDUSD")   # tradeable (AUDUSD excluded: poor Asian WR)
 REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength
