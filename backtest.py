@@ -965,8 +965,8 @@ class Backtester:
         # ── Game-theory bonuses ──────────────────────────────────────────────
         # 1. Retail-pool sweep: equal highs/lows swept just before our entry.
         #    Price hunted obvious liquidity → smart money distributed → ideal entry.
-        eq_lows  = find_equal_lows(bars15,  config.EQ_HIGH_LOW_TOLERANCE_PIPS * pip_v)
-        eq_highs = find_equal_highs(bars15, config.EQ_HIGH_LOW_TOLERANCE_PIPS * pip_v)
+        eq_lows  = find_equal_lows(bars15,  pair)
+        eq_highs = find_equal_highs(bars15, pair)
         if direction > 0 and eq_lows  and cur_price > eq_lows[-1]:
             conviction += 1
             g["gt_pool_sweep"] = g.get("gt_pool_sweep", 0) + 1
@@ -976,8 +976,9 @@ class Backtester:
 
         # 2. Strong displacement wick: last M5 bar's wick ≥ 60% of bar range.
         #    Aggressive institutional delivery bar — confirms the directional push.
-        if bars5:
-            lb = bars5[-1]
+        _bars5_gt = self.bars_up_to(pair, "5T", t)
+        if _bars5_gt:
+            lb = _bars5_gt[-1]
             bar_range = lb.High - lb.Low
             if bar_range > 0:
                 if direction > 0:
@@ -1005,13 +1006,11 @@ class Backtester:
         # 4. Judas reversal: NY AM session is reversing London's first-hour direction.
         #    Strongest game-theory setup — NY is the smart-money correction of London manipulation.
         kz = current_killzone(t, pair)
-        if kz and "New York" in kz:
-            london_bars = [b for b in bars1h if hasattr(b, 'Close')]
-            if len(bars1h) >= 3:
-                london_dir = 1 if bars1h[-2].Close > bars1h[-3].Close else -1
-                if london_dir != direction:
-                    conviction += 1
-                    g["gt_judas_reversal"] = g.get("gt_judas_reversal", 0) + 1
+        if kz and "New York" in kz and len(bars1h) >= 3:
+            london_dir = 1 if bars1h[-2].Close > bars1h[-3].Close else -1
+            if london_dir != direction:
+                conviction += 1
+                g["gt_judas_reversal"] = g.get("gt_judas_reversal", 0) + 1
         # ─────────────────────────────────────────────────────────────────────
 
         min_conv = config.MIN_CONVICTION
