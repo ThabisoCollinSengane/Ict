@@ -319,6 +319,7 @@ class Backtester:
             "session_side": leg.get("session_side", "no_open"),
             "target_type": st.get("target_type", "unknown"),
             "draw_score": st.get("draw_score", 0),
+            "im_scenario": st.get("im_scenario", "?"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -998,6 +999,7 @@ class Backtester:
         if dxy_bias == 0:
             return   # DXY flat → no USD bias → hard gate for all pairs
 
+        _im_scenario = "?"
         if pair in ("EURUSD", "GBPUSD"):
             # Original EUR/GBP logic — unchanged.
             eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
@@ -1012,6 +1014,14 @@ class Backtester:
             if eurgbp_bias == 0 and pair == "GBPUSD":
                 return
             mss_sym1, mss_sym2 = "EURUSD", "GBPUSD"
+            # ICT intermarket cheat sheet scenario classification.
+            # Mapping: (dxy, eurgbp) → scenario label as per the 6-panel diagram.
+            _scenario_map = {
+                (+1, +1): "1a", (+1, -1): "1b",
+                (-1, +1): "2a", (-1, -1): "2b",
+                (+1,  0): "3a", (-1,  0): "3b",
+            }
+            _im_scenario = _scenario_map.get((dxy_bias, eurgbp_bias), "?")
 
         else:   # NZDUSD — DXY + AUDNZD cross (independent of EUR/GBP family)
             audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
@@ -1028,6 +1038,7 @@ class Backtester:
             if im_score < 1.0:
                 return   # only trade when AUDNZD explicitly confirms NZDUSD
             mss_sym1, mss_sym2 = "NZDUSD", "AUDUSD"
+            _im_scenario = "N-long" if dxy_bias == -1 else "N-short"
 
         g["intermarket_signal"] += 1
         g["pair_matches"] += 1
@@ -1100,13 +1111,14 @@ class Backtester:
             _cached_draw = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
             self._draw_cache[_draw_key] = (_cached_draw, direction)
         _draw_score = _cached_draw
+        if _draw_score == 0:
+            g["htf_draw_counter"] += 1
+            return   # hard gate: no HTF draw alignment → skip
         conviction += _draw_score
         if _draw_score == 3:
             g["htf_draw_full_cascade"] += 1
-        elif _draw_score >= 1:
-            g["htf_draw_partial"] += 1
         else:
-            g["htf_draw_counter"] += 1
+            g["htf_draw_partial"] += 1
 
         # Open-level profile score: daily/weekly/session opens agreeing (0-1).
         # _session_open is returned from the same call so we don't duplicate mp_session_open.
@@ -1395,6 +1407,7 @@ class Backtester:
             "profile_score": p_score,
             "max_legs": max_legs,
             "draw_score": _draw_score,
+            "im_scenario": _im_scenario,
         }
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1

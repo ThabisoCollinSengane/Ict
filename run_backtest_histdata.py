@@ -274,6 +274,62 @@ def main():
                 print(f"  {label:<12} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>12.2f} {grp.pnl.mean():>10.2f} {pf:>6.2f}")
 
+        if "im_scenario" in df.columns:
+            # ICT intermarket cheat sheet validation.
+            # Scenarios come from (DXY H1 bias, EURGBP H1 bias) at entry:
+            #   1a  DXY↑ + EURGBP↑  →  GBPUSD short  (Dollar strength, GBP weakest)
+            #   1b  DXY↑ + EURGBP↓  →  EURUSD short  (Dollar strength, EUR weakest)
+            #   2a  DXY↓ + EURGBP↑  →  EURUSD long   (Dollar weakness, EUR strongest)
+            #   2b  DXY↓ + EURGBP↓  →  GBPUSD long   (Dollar weakness, GBP strongest)
+            #   3a  DXY↑ + flat     →  both short     (Dollar strength, cross unclear)
+            #   3b  DXY↓ + flat     →  both long      (Dollar weakness, cross unclear)
+            #   N-long/N-short       →  NZDUSD (DXY + AUDNZD family)
+            _scenario_predict = {
+                "1a": ("GBPUSD", -1), "1b": ("EURUSD", -1),
+                "2a": ("EURUSD", +1), "2b": ("GBPUSD", +1),
+                "3a": (None, -1),     "3b": (None, +1),
+                "N-long": ("NZDUSD", +1), "N-short": ("NZDUSD", -1),
+            }
+            print("\n=== ICT Intermarket Cheat Sheet validation ===")
+            print("  Checks whether each scenario's predicted pair+direction matches the actual trade.")
+            print("  'Aligned' = trade matches cheat sheet prediction; 'Off-script' = diverges.")
+            print(f"  {'Scenario':<10} {'Description':<30} {'Trades':>7} {'Wins':>5} "
+                  f"{'WR%':>6} {'P&L ZAR':>12} {'PF':>6} {'Aligned%':>9}")
+            print("  " + "-" * 88)
+            _desc = {
+                "1a": "DXY↑ + EUR>GBP → GBPUSD short",
+                "1b": "DXY↑ + GBP>EUR → EURUSD short",
+                "2a": "DXY↓ + EUR>GBP → EURUSD long",
+                "2b": "DXY↓ + GBP>EUR → GBPUSD long",
+                "3a": "DXY↑ + cross flat → both short",
+                "3b": "DXY↓ + cross flat → both long",
+                "N-long":  "DXY↓ + NZD strong → NZDUSD long",
+                "N-short": "DXY↑ + NZD weak  → NZDUSD short",
+                "?": "unclassified",
+            }
+            scenario_order = ["1a","1b","2a","2b","3a","3b","N-long","N-short","?"]
+            for sc in scenario_order:
+                grp = df[df["im_scenario"] == sc]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gross_win  = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gross_loss = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gross_win / gross_loss) if gross_loss > 0 else float("inf")
+                pred_pair, pred_dir = _scenario_predict.get(sc, (None, None))
+                if pred_dir is None:
+                    aligned_pct = "n/a"
+                else:
+                    if pred_pair is None:
+                        aligned = (grp["direction"] == pred_dir).sum()
+                    else:
+                        aligned = ((grp["pair"] == pred_pair) & (grp["direction"] == pred_dir)).sum()
+                    aligned_pct = f"{100*aligned/len(grp):>7.1f}%"
+                desc = _desc.get(sc, sc)
+                print(f"  {sc:<10} {desc:<30} {len(grp):>7} {w:>5} "
+                      f"{wr:>5.1f}% {grp.pnl.sum():>12.2f} {pf:>6.2f} {aligned_pct:>9}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
