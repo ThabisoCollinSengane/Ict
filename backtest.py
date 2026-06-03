@@ -270,7 +270,11 @@ class Backtester:
         direction = st["direction"]
         # Apply exit spread friction (half-spread): you sell at bid for longs,
         # buy at ask for shorts — effective exit is worse than the mid price.
+        # News trades: spread is still wide when the stop executes, so apply the
+        # same NEWS_HIGH_SPREAD_PIPS used at entry (not the normal per-pair spread).
         _spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        if leg.get("entry_type", "").startswith("news"):
+            _spread = max(_spread, config.NEWS_HIGH_SPREAD_PIPS)
         _exit_friction = (_spread / 2) * pip_size(pair)
         effective_exit = exit_price - direction * _exit_friction
         pnl_usd = (effective_exit - leg["entry"]) * leg["units"] * direction
@@ -1170,7 +1174,10 @@ class Backtester:
 
         pip = pip_size(pair)
         # Simulate spread + slippage: worsen entry price by (half-spread + slippage).
+        # During high-impact news the broker widens the spread; model that realistically.
         _spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        if news_impact == "High":
+            _spread = max(_spread, config.NEWS_HIGH_SPREAD_PIPS)
         _friction = (_spread / 2 + config.SLIPPAGE_PIPS) * pip
         entry = cur_price + direction * _friction   # market order fill with friction
 
@@ -1362,8 +1369,10 @@ class Backtester:
         if pyr_pattern is None:
             return
 
-        # Apply entry friction to pyramid fills too.
+        # Apply entry friction to pyramid fills too (widen for news, same as initial entries).
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        if pyr_news_impact == "High":
+            _spread_p = max(_spread_p, config.NEWS_HIGH_SPREAD_PIPS)
         _fric_p = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = cur_price + st["direction"] * _fric_p
         # High-impact news nearby: fixed 10-pip stop (spread protection).

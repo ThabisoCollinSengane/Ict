@@ -113,6 +113,11 @@ NEWS_BLOCK_MINUTES_AFTER  = 15
 NEWS_IMPACTS = ("High", "Medium")
 NEWS_CURRENCIES = ("USD", "EUR", "GBP")
 FOREXFACTORY_XML_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
+# During high-impact news the broker spread typically widens to 4-6 pips.
+# This is applied to entry friction AND exit friction on stop-outs during news
+# windows, so the backtest reflects the realistic ~15-pip worst case (10-pip
+# stop + widened spread) rather than the optimistic ~10.75 pips.
+NEWS_HIGH_SPREAD_PIPS = 5.0
 
 # --- Timeframes ---
 LTF_ENTRY_RES_MIN = 5              # 5m execution
