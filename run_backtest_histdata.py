@@ -292,6 +292,7 @@ def main():
                 "1a_ip": ("GBPUSD", -1), "1b_ip": ("EURUSD", -1),
                 "2a_ip": ("EURUSD", +1), "2b_ip": ("GBPUSD", +1),
                 "N-long": ("NZDUSD", +1), "N-short": ("NZDUSD", -1),
+                "N-long_h4": ("NZDUSD", +1), "N-short_h4": ("NZDUSD", -1),
             }
             print("\n=== ICT Intermarket Cheat Sheet validation ===")
             print("  Checks whether each scenario's predicted pair+direction matches the actual trade.")
@@ -310,19 +311,21 @@ def main():
                 "1b_h4":  "DXY↑ + H4 GBP>EUR → EURUSD short",
                 "2a_h4":  "DXY↓ + H4 EUR>GBP → EURUSD long",
                 "2b_h4":  "DXY↓ + H4 GBP>EUR → GBPUSD long",
-                "1a_ip":  "DXY↑ + IP EUR>GBP → GBPUSD short",
-                "1b_ip":  "DXY↑ + IP GBP>EUR → EURUSD short",
-                "2a_ip":  "DXY↓ + IP EUR>GBP → EURUSD long",
-                "2b_ip":  "DXY↓ + IP GBP>EUR → GBPUSD long",
-                "N-long":  "DXY↓ + NZD strong → NZDUSD long",
-                "N-short": "DXY↑ + NZD weak  → NZDUSD short",
+                "1a_ip":    "DXY↑ + IP EUR>GBP → GBPUSD short",
+                "1b_ip":    "DXY↑ + IP GBP>EUR → EURUSD short",
+                "2a_ip":    "DXY↓ + IP EUR>GBP → EURUSD long",
+                "2b_ip":    "DXY↓ + IP GBP>EUR → GBPUSD long",
+                "N-long":   "DXY↓ + NZD strong → NZDUSD long",
+                "N-short":  "DXY↑ + NZD weak  → NZDUSD short",
+                "N-long_h4":  "DXY↓ + H4 NZD strong → NZDUSD long",
+                "N-short_h4": "DXY↑ + H4 NZD weak  → NZDUSD short",
                 "?": "unclassified",
             }
             scenario_order = [
                 "1a","1b","2a","2b","3a","3b",
                 "1a_h4","1b_h4","2a_h4","2b_h4",
                 "1a_ip","1b_ip","2a_ip","2b_ip",
-                "N-long","N-short","?",
+                "N-long","N-short","N-long_h4","N-short_h4","?",
             ]
             for sc in scenario_order:
                 grp = df[df["im_scenario"] == sc]

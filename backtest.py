@@ -1075,6 +1075,17 @@ class Backtester:
         else:   # NZDUSD — DXY + AUDNZD cross (independent of EUR/GBP family)
             audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
                                          lookback=config.SWING_LOOKBACK_STH)
+            # H4 AUDNZD escalation: same logic as EURGBP cascade.
+            # When H1 AUDNZD is flat, check H4. If H4 shows NZD stronger
+            # (audnzd_bias → -1), NZDUSD still scores 1.0 and is allowed.
+            # If H4 shows AUD stronger, NZDUSD scores 0.5 → still blocked below.
+            _nzd_h4_escalated = False
+            if audnzd_bias == 0:
+                audnzd_h4 = self._sym_bias(config.REF_AUDNZD, "240T", t,
+                                           lookback=config.SWING_LOOKBACK_STH)
+                if audnzd_h4 != 0:
+                    audnzd_bias       = audnzd_h4
+                    _nzd_h4_escalated = True
             # NZDUSD is the non-primary pair; AUDNZD picks NZD vs AUD.
             # im_score 1.0: AUDNZD confirms NZD is the extreme (NZDUSD preferred).
             # im_score 0.5: AUDNZD says AUD is extreme → AUDUSD preferred (not traded, skip).
@@ -1087,7 +1098,8 @@ class Backtester:
             if im_score < 1.0:
                 return   # only trade when AUDNZD explicitly confirms NZDUSD
             mss_sym1, mss_sym2 = "NZDUSD", "AUDUSD"
-            _im_scenario = "N-long" if dxy_bias == -1 else "N-short"
+            _base = "N-long" if dxy_bias == -1 else "N-short"
+            _im_scenario = (_base + "_h4") if _nzd_h4_escalated else _base
 
         g["intermarket_signal"] += 1
         g["pair_matches"] += 1
@@ -1172,6 +1184,10 @@ class Backtester:
             return
         # 2a London = price entering London already deep into a EURUSD rally (PF 0.84).
         if _im_scenario in ("2a", "2a_h4", "2a_ip") and _is_london:
+            return
+        # N-long_h4: H1 AUDNZD flat, H4 confirms NZD strong → NZDUSD long.
+        # WR 0% in both IS (2022-23) and OOS (2024-25). Clear loser — gate entirely.
+        if _im_scenario == "N-long_h4":
             return
         conviction += _draw_score
         if _draw_score == 3:
@@ -1517,6 +1533,11 @@ class Backtester:
         else:   # NZDUSD — DXY + AUDNZD (independent of EUR/GBP)
             audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
                                          lookback=config.SWING_LOOKBACK_STH)
+            if audnzd_bias == 0:
+                audnzd_h4 = self._sym_bias(config.REF_AUDNZD, "240T", t,
+                                           lookback=config.SWING_LOOKBACK_STH)
+                if audnzd_h4 != 0:
+                    audnzd_bias = audnzd_h4
             dir_check, im_score = resolve_pair_direction(
                 dxy_bias, audnzd_bias, "NZDUSD", "AUDUSD"
             )
