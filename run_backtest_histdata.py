@@ -287,27 +287,36 @@ def main():
             _scenario_predict = {
                 "1a": ("GBPUSD", -1), "1b": ("EURUSD", -1),
                 "2a": ("EURUSD", +1), "2b": ("GBPUSD", +1),
-                "3a": (None, -1),     "3b": (None, +1),
+                "1a_h4": ("GBPUSD", -1), "1b_h4": ("EURUSD", -1),
+                "2a_h4": ("EURUSD", +1), "2b_h4": ("GBPUSD", +1),
                 "N-long": ("NZDUSD", +1), "N-short": ("NZDUSD", -1),
             }
             print("\n=== ICT Intermarket Cheat Sheet validation ===")
             print("  Checks whether each scenario's predicted pair+direction matches the actual trade.")
-            print("  'Aligned' = trade matches cheat sheet prediction; 'Off-script' = diverges.")
-            print(f"  {'Scenario':<10} {'Description':<30} {'Trades':>7} {'Wins':>5} "
-                  f"{'WR%':>6} {'P&L ZAR':>12} {'PF':>6} {'Aligned%':>9}")
-            print("  " + "-" * 88)
+            print("  _h4 = H1 EURGBP was flat; H4 EURGBP used for pair selection.")
+            print(f"  {'Scenario':<12} {'Description':<34} {'Trades':>7} {'Wins':>5} "
+                  f"{'WR%':>6} {'P&L ZAR':>12} {'PF':>6}")
+            print("  " + "-" * 84)
             _desc = {
-                "1a": "DXY↑ + EUR>GBP → GBPUSD short",
-                "1b": "DXY↑ + GBP>EUR → EURUSD short",
-                "2a": "DXY↓ + EUR>GBP → EURUSD long",
-                "2b": "DXY↓ + GBP>EUR → GBPUSD long",
-                "3a": "DXY↑ + cross flat → both short",
-                "3b": "DXY↓ + cross flat → both long",
+                "1a":     "DXY↑ + H1 EUR>GBP → GBPUSD short",
+                "1b":     "DXY↑ + H1 GBP>EUR → EURUSD short",
+                "2a":     "DXY↓ + H1 EUR>GBP → EURUSD long",
+                "2b":     "DXY↓ + H1 GBP>EUR → GBPUSD long",
+                "3a":     "DXY↑ + cross flat → EURUSD short",
+                "3b":     "DXY↓ + cross flat → EURUSD long",
+                "1a_h4":  "DXY↑ + H4 EUR>GBP → GBPUSD short",
+                "1b_h4":  "DXY↑ + H4 GBP>EUR → EURUSD short",
+                "2a_h4":  "DXY↓ + H4 EUR>GBP → EURUSD long",
+                "2b_h4":  "DXY↓ + H4 GBP>EUR → GBPUSD long",
                 "N-long":  "DXY↓ + NZD strong → NZDUSD long",
                 "N-short": "DXY↑ + NZD weak  → NZDUSD short",
                 "?": "unclassified",
             }
-            scenario_order = ["1a","1b","2a","2b","3a","3b","N-long","N-short","?"]
+            scenario_order = [
+                "1a","1b","2a","2b","3a","3b",
+                "1a_h4","1b_h4","2a_h4","2b_h4",
+                "N-long","N-short","?",
+            ]
             for sc in scenario_order:
                 grp = df[df["im_scenario"] == sc]
                 if len(grp) == 0:
@@ -327,8 +336,8 @@ def main():
                         aligned = ((grp["pair"] == pred_pair) & (grp["direction"] == pred_dir)).sum()
                     aligned_pct = f"{100*aligned/len(grp):>7.1f}%"
                 desc = _desc.get(sc, sc)
-                print(f"  {sc:<10} {desc:<30} {len(grp):>7} {w:>5} "
-                      f"{wr:>5.1f}% {grp.pnl.sum():>12.2f} {pf:>6.2f} {aligned_pct:>9}")
+                print(f"  {sc:<12} {desc:<34} {len(grp):>7} {w:>5} "
+                      f"{wr:>5.1f}% {grp.pnl.sum():>12.2f} {pf:>6.2f}")
 
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
