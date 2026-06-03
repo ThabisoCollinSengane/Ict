@@ -56,6 +56,17 @@ MIN_RR = 1.2                       # minimum reward:risk
 FIXED_STOP_PIPS = 10               # max/fallback stop distance — 10 pips from entry
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit
 TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profit
+# Structure trailing: once a trade is in profit, trail the stop behind the most
+# recent confirmed M5 swing point (the "manual trail off structure"). The trade
+# stays open until price breaks that structural point (an MSS against the
+# position), letting winners run to deep fib extensions instead of capping at the
+# first target. The fixed target becomes a soft objective, not a hard exit.
+STRUCTURE_TRAIL          = False   # disabled — pure fib target has highest compounded return
+STRUCTURE_TRAIL_TF       = "15T"   # timeframe whose swings define the trail (M5 too fine)
+STRUCTURE_TRAIL_ACTIVATE = 12      # pips of profit before structure trail engages
+STRUCTURE_TRAIL_LOOKBACK = 8       # swing-TF bars to scan for the most recent swing
+STRUCTURE_TRAIL_BUFFER   = 2.0     # pips beyond the swing point for the trail stop
+STRUCTURE_TRAIL_LET_RUN  = True    # don't hard-close at target; let structure trail govern
 # M1 market-structure stop: the stop is anchored to the nearest 1-minute swing
 # (STL for longs / STH for shorts) plus this buffer. Episode 12 — stop sits just
 # beyond the short-term structural point. M1 keeps it naturally tight (a few pips).

@@ -240,6 +240,11 @@ class Backtester:
             pip = pip_size(pair)
 
             # Trail stop: move to BE at +TRAIL_BE_PIPS, lock +10 pips at +TRAIL_LOCK_PIPS.
+            # Then (if enabled) trail behind the most recent confirmed M5 swing once
+            # the trade clears STRUCTURE_TRAIL_ACTIVATE pips — the "trail off structure"
+            # exit that lets winners run until an MSS breaks structure against them.
+            bars5_trail = (self.bars_up_to(pair, config.STRUCTURE_TRAIL_TF, t)
+                           if config.STRUCTURE_TRAIL else None)
             for leg in st["legs"]:
                 pips_profit = (bar.Close - leg["entry"]) * direction / pip
                 if pips_profit >= config.TRAIL_LOCK_PIPS:
@@ -254,14 +259,29 @@ class Backtester:
                     else:
                         leg["stop"] = min(leg["stop"], leg["entry"])
 
+                # Structure trail: ratchet the stop to the latest M5 swing point.
+                if config.STRUCTURE_TRAIL and pips_profit >= config.STRUCTURE_TRAIL_ACTIVATE:
+                    s_stop = self._structure_trail_stop(bars5_trail, direction, pip)
+                    if s_stop is not None:
+                        if direction > 0 and s_stop > leg["stop"] and s_stop < bar.Close:
+                            leg["stop"] = s_stop
+                            leg["trail_engaged"] = True
+                        elif direction < 0 and s_stop < leg["stop"] and s_stop > bar.Close:
+                            leg["stop"] = s_stop
+                            leg["trail_engaged"] = True
+
             for leg in list(st["legs"]):
                 sl = leg["stop"]
+                # When structure trail has engaged and LET_RUN is set, the trade
+                # rides on the structural stop — skip the fixed-target hard close so
+                # winners can extend past the first objective.
+                let_run = config.STRUCTURE_TRAIL_LET_RUN and leg.get("trail_engaged")
                 if direction > 0:
                     sl_hit = bar.Low <= sl
-                    tp_hit = bar.High >= target
+                    tp_hit = (not let_run) and bar.High >= target
                 else:
                     sl_hit = bar.High >= sl
-                    tp_hit = bar.Low <= target
+                    tp_hit = (not let_run) and bar.Low <= target
                 if sl_hit:                       # worst-case: SL first
                     self._exit_leg(pair, leg, sl, t, "stop")
                 elif tp_hit:
@@ -298,6 +318,7 @@ class Backtester:
             "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
             "session_side": leg.get("session_side", "no_open"),
             "target_type": st.get("target_type", "unknown"),
+            "draw_score": st.get("draw_score", 0),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -728,6 +749,33 @@ class Backtester:
             if (stop - entry) < min_dist:
                 stop = entry + min_dist
             return stop if stop > entry else None
+
+    def _structure_trail_stop(self, bars5, direction, pip):
+        """Most recent CONFIRMED M5 swing point, for trailing the stop off structure.
+
+        LONG  → the most recent confirmed swing low (a bar whose Low is below both
+                neighbours), minus STRUCTURE_TRAIL_BUFFER. Price breaking below it
+                is an MSS against the long → exit.
+        SHORT → the most recent confirmed swing high, plus the buffer.
+
+        A swing needs one bar on each side to confirm, so the last bar is never a
+        swing. Returns the trail-stop price, or None if no confirmed swing exists
+        in the lookback window.
+        """
+        if not bars5 or len(bars5) < 3:
+            return None
+        recent = bars5[-config.STRUCTURE_TRAIL_LOOKBACK:]
+        buf    = config.STRUCTURE_TRAIL_BUFFER * pip
+        # Scan from the most recent confirmable bar backwards (skip the last bar).
+        for i in range(len(recent) - 2, 0, -1):
+            c = recent[i]
+            if direction > 0:
+                if c.Low < recent[i - 1].Low and c.Low < recent[i + 1].Low:
+                    return c.Low - buf
+            else:
+                if c.High > recent[i - 1].High and c.High > recent[i + 1].High:
+                    return c.High + buf
+        return None
 
     def _find_target(self, pair, direction, t, price, stop=None):
         """Find the nearest target that satisfies the RR requirement.
@@ -1339,6 +1387,7 @@ class Backtester:
             "weekly_amd_dir": weekly_amd_dir,
             "profile_score": p_score,
             "max_legs": max_legs,
+            "draw_score": _draw_score,
         }
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1

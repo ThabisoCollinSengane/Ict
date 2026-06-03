@@ -246,6 +246,23 @@ def main():
             wr = 100 * w / len(grp)
             print(f"  {etype:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% {grp.pnl.mean():>10.2f}")
 
+        if "draw_score" in df.columns:
+            print("\n=== HTF Draw cascade (W→D→H4 agreement) — all trades ===")
+            print("  draw_score = how many of Weekly/Daily/H4 agreed with trade direction")
+            print(f"  {'Draw score':<12} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>12} {'Avg P&L':>10} {'PF':>6}")
+            print("  " + "-" * 62)
+            for score in sorted(df["draw_score"].unique()):
+                grp = df[df["draw_score"] == score]
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gross_win = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gross_loss = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gross_win / gross_loss) if gross_loss > 0 else float("inf")
+                label = f"{int(score)}/3"
+                print(f"  {label:<12} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>12.2f} {grp.pnl.mean():>10.2f} {pf:>6.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
