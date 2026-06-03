@@ -50,6 +50,15 @@ EQUITY_TIERS = [
 
 # --- Targets ---
 MIN_CONVICTION = 6                 # minimum conviction score to open a trade (0–9+ scale)
+# Draw-weighted position sizing: the HTF draw cascade (0-3) is the strongest edge
+# predictor (PF by bucket: 0/3≈1.2, 1/3≈3.2, 2/3≈4.1, 3/3≈6.2). Scale position
+# size by how many of Weekly/Daily/H4 agree with the draw, concentrating capital
+# in the highest-edge setups. The MAX_RISK_PER_TRADE_PCT guard still bounds the tail.
+DRAW_SIZE_MULT = {0: 1.0, 1: 1.0, 2: 1.5, 3: 2.0}
+# Draw-weighted sizing only engages once equity can absorb the larger position.
+# Below this the account trades flat lots (preservation): the early small-account
+# phase is where 2x sizing produced the deepest drawdowns.
+DRAW_SIZE_MIN_EQUITY = 3000        # ZAR equity floor before draw multipliers apply
 MIN_PIPS_TARGET = 20               # minimum pips to target (entry and pyramid checks)
 MIN_ENTRY_PIPS_TARGET = 20         # same as MIN_PIPS_TARGET — keep them in sync here
 MIN_RR = 1.2                       # minimum reward:risk

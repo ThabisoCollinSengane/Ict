@@ -1343,6 +1343,13 @@ class Backtester:
         tier_lots  = self._pyramid_lots()
         min_units  = int(tier_lots[0] * config.LOT_UNITS)
         units = max(risk_units, min_units)
+        # Draw-weighted sizing: scale up the highest-edge setups (3/3 cascade, PF 6.17)
+        # so they carry more capital. Applied to the risk-based size, then floored at
+        # the min lot so a multiplier never sizes below a tradeable position. Only
+        # engages above DRAW_SIZE_MIN_EQUITY — the fragile early account trades flat.
+        _draw_mult = config.DRAW_SIZE_MULT.get(_draw_score, 1.0)
+        if _draw_mult != 1.0 and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
+            units = max(int(units * _draw_mult), min_units)
         if units == 0:
             return
         g["units_nonzero"] += 1
