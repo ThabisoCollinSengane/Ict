@@ -54,7 +54,7 @@ MIN_CONVICTION = 6                 # minimum conviction score to open a trade (0
 # predictor (PF by bucket: 0/3≈1.2, 1/3≈3.2, 2/3≈4.1, 3/3≈6.2). Scale position
 # size by how many of Weekly/Daily/H4 agree with the draw, concentrating capital
 # in the highest-edge setups. The MAX_RISK_PER_TRADE_PCT guard still bounds the tail.
-DRAW_SIZE_MULT = {0: 1.0, 1: 1.0, 2: 1.5, 3: 2.0}
+DRAW_SIZE_MULT = {0: 1.0, 1: 1.0, 2: 2.0, 3: 3.0}
 # Draw-weighted sizing only engages once equity can absorb the larger position.
 # Below this the account trades flat lots (preservation): the early small-account
 # phase is where 2x sizing produced the deepest drawdowns.
