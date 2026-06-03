@@ -33,6 +33,7 @@ from ict.market_profile import (
     detect_weekly_amd,
     profile_score,
 )
+from ict.htf_draw import draw_cascade_score
 from ict.dealing_range import (
     detect_dealing_range,
     is_valid_entry_zone,
@@ -126,6 +127,8 @@ class Backtester:
             "daily_cap": 0, "daily_pair_cap": 0,
             # market profile counters
             "weekly_amd_confirmed": 0, "session_handover_closed": 0,
+            # HTF draw cascade counters (0-3 per trade)
+            "htf_draw_full_cascade": 0, "htf_draw_partial": 0, "htf_draw_counter": 0,
             # conviction signal counters
             "ote_zone": 0, "choch_confirmed": 0, "low_conviction": 0,
             "judas_divergence": 0, "ny_continuation": 0,
@@ -139,6 +142,8 @@ class Backtester:
         self._mp_cache          = {}   # (pair, t) -> {"vwap", "vah", "val", "poc"}
         # Per-pair weekly AMD cache: updated each bar (daily resolution is enough)
         self._weekly_amd        = {}   # pair -> WeeklyAMD or None
+        # HTF draw cascade cache: (pair, date) -> score; W/D/H4 draw doesn't change intraday
+        self._draw_cache        = {}   # (pair, date) -> int
         # Weekly trade budget (3-of-5 pattern)
         self._week_total        = {}   # (iso_year, iso_week) -> int
         self._week_pair         = {}   # (iso_year, iso_week, pair) -> int
@@ -1022,6 +1027,39 @@ class Backtester:
             conviction += 2
             g["weekly_amd_confirmed"] += 1
 
+        # HTF Draw on Liquidity cascade: W → D → H4 (0-3)
+        # The single most important directional factor — where is price magnetically
+        # drawn on the higher timeframes?  Each TF that agrees with trade direction
+        # adds +1.  Counter-draw trades earn 0 here (heavy disadvantage, no hard gate).
+        # Cached per (pair, date): W/D/H4 draw doesn't change within a trading day.
+        pip_v = pip_size(pair)
+        _draw_key = (pair, day_key)
+        if _draw_key not in self._draw_cache:
+            bars_w  = self.bars_up_to(pair, "W",    t)
+            bars_d  = self.bars_up_to(pair, "D",    t)
+            bars_h4 = self.bars_up_to(pair, "240T", t)
+            self._draw_cache[_draw_key] = (
+                draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v),
+                direction,
+            )
+        _cached_draw, _cached_dir = self._draw_cache[_draw_key]
+        # Cache stores the draw score for the FIRST direction seen that day.
+        # If current direction flipped intraday, recompute fresh.
+        if _cached_dir != direction:
+            bars_w  = self.bars_up_to(pair, "W",    t)
+            bars_d  = self.bars_up_to(pair, "D",    t)
+            bars_h4 = self.bars_up_to(pair, "240T", t)
+            _cached_draw = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
+            self._draw_cache[_draw_key] = (_cached_draw, direction)
+        _draw_score = _cached_draw
+        conviction += _draw_score
+        if _draw_score == 3:
+            g["htf_draw_full_cascade"] += 1
+        elif _draw_score >= 1:
+            g["htf_draw_partial"] += 1
+        else:
+            g["htf_draw_counter"] += 1
+
         # Open-level profile score: daily/weekly/session opens agreeing (0-1).
         # _session_open is returned from the same call so we don't duplicate mp_session_open.
         p_score, _session_open = self._profile_score(pair, direction, cur_price, t)
@@ -1045,7 +1083,6 @@ class Backtester:
 
         # OTE zone: bonus conviction when price is in 62-79% retrace (M15 or H1 swing).
         # OTE defines profit POTENTIAL (Fib extension targets), not an entry filter.
-        pip_v = pip_size(pair)
         ote_hit = (
             in_ote(cur_price, bars15, direction,
                    lookback=config.SWING_LOOKBACK, pip_tol=3 * pip_v)
