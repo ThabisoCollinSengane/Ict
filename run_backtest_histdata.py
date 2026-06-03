@@ -216,12 +216,18 @@ def main():
         print(f"  {'Year':<6} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'P&L ZAR':>12} {'MaxDD%':>8}")
         print("  " + "-" * 50)
         df["year"] = df["opened_at"].dt.year
-        for yr, grp in df.groupby("year"):
+        # Drawdown must be measured on the running account equity (carried across
+        # years), not a per-year cumsum reset to 0 over a fixed R500 base — the
+        # latter divides a within-year dip by ~R500 even after the account has
+        # grown to six figures, producing impossible <-100% readings.
+        df_sorted = df.sort_values("opened_at")
+        equity = config.STARTING_CASH + df_sorted.pnl.cumsum()
+        peak = equity.cummax()
+        df_sorted = df_sorted.assign(_dd=(equity - peak) / peak * 100)
+        for yr, grp in df_sorted.groupby("year"):
             w = (grp.pnl > 0).sum()
             wr = 100 * w / len(grp)
-            eq_yr = grp.pnl.cumsum()
-            rmax = eq_yr.cummax()
-            dd = ((eq_yr - rmax) / (rmax + 500) * 100).min() if len(eq_yr) else 0
+            dd = grp["_dd"].min() if len(grp) else 0
             print(f"  {yr:<6} {len(grp):>7} {w:>5} {wr:>5.1f}% {grp.pnl.sum():>12.2f} {dd:>7.1f}%")
 
         print("\n=== Per-pair × year ===")
