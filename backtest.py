@@ -964,7 +964,8 @@ class Backtester:
         import pytz as _pytz
         _ny_tz = _pytz.timezone("America/New_York")
         _ny_dt = now.astimezone(_ny_tz)
-        _is_ny = (7 <= _ny_dt.hour < 10)
+        _is_ny     = (7 <= _ny_dt.hour < 10)
+        _is_london = (2 <= _ny_dt.hour < 5)
 
         # ── Weekly / daily trade budget ───────────────────────────────────────
         iso = day_key.isocalendar()
@@ -1114,6 +1115,15 @@ class Backtester:
         if _draw_score == 0:
             g["htf_draw_counter"] += 1
             return   # hard gate: no HTF draw alignment → skip
+        # 2a (DXY↓ + EUR>GBP → EURUSD long) at 3/3 draw = move is fully mature.
+        # All three HTFs confirming = late entry + 3x sizing = catastrophic when wrong.
+        if _im_scenario == "2a" and _draw_score == 3:
+            return
+        # 2a London = price entering London already deep into a EURUSD rally.
+        # London open is often the Judas spike session — the high that gets swept —
+        # so chasing EURUSD longs during London in a 2a regime has PF 0.84.
+        if _im_scenario == "2a" and _is_london:
+            return
         conviction += _draw_score
         if _draw_score == 3:
             g["htf_draw_full_cascade"] += 1
@@ -1300,6 +1310,11 @@ class Backtester:
             bars5, bars15, bars1h, pair, direction, cur_price, bars1m=bars1m
         )
         if pattern_tag is None:
+            return
+        # In scenario 2a, entering on an H1 FVG means EURUSD has already moved
+        # 60-100 pips into the confirmed rally before the entry triggers (WR 14.3%).
+        # Only M5/M15 precision entries are valid in 2a — the move is too mature for H1.
+        if _im_scenario == "2a" and pattern_tag == "fvg_h1":
             return
         g["m5_fvg_correct_dir"] += 1
 
