@@ -1180,6 +1180,17 @@ class Backtester:
             stop = entry - config.FIXED_STOP_PIPS * pip if direction > 0 \
                    else entry + config.FIXED_STOP_PIPS * pip
 
+        # Universal stop cap: never risk more than FIXED_STOP_PIPS on any trade.
+        # The structural stop can sit 30–50 pips away, which at the broker min-lot
+        # floor produces 10%+ single-trade losses at small equity. Measure the cap
+        # from the spread-adjusted `entry` (the real fill) so the 10-pip buffer is
+        # true adverse room, not eaten by the spread. Tighter structural stops are
+        # left as-is; only stops wider than the cap are pulled in.
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        if abs(entry - stop) > _max_stop:
+            stop = entry - _max_stop if direction > 0 else entry + _max_stop
+            g["stop_capped_10pip"] = g.get("stop_capped_10pip", 0) + 1
+
         _tgt = self._find_target(pair, direction, t, entry, stop=stop)
         if _tgt is None:
             return
@@ -1200,6 +1211,16 @@ class Backtester:
         if units == 0:
             return
         g["units_nonzero"] += 1
+
+        # Max-risk-per-trade guard: when the min-lot floor forces a position whose
+        # stop would cost more than MAX_RISK_PER_TRADE_PCT of equity, the account is
+        # too small to trade this stop width safely — skip it. Prevents the 10%+
+        # single-trade losses that build the early-account drawdown.
+        trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
+        if trade_risk_zar > self.equity * (config.MAX_RISK_PER_TRADE_PCT / 100.0):
+            g["risk_cap_skip"] = g.get("risk_cap_skip", 0) + 1
+            return
+        g["risk_cap_ok"] = g.get("risk_cap_ok", 0) + 1
 
         # High-impact news = distribution catalyst: upgrade to full pyramid regardless
         # of conviction score.  News drives speed, direction, and strength — this is
@@ -1349,6 +1370,11 @@ class Backtester:
         if pyr_news_impact == "High":
             stop = entry - config.FIXED_STOP_PIPS * pip if st["direction"] > 0 \
                    else entry + config.FIXED_STOP_PIPS * pip
+
+        # Universal stop cap: never risk more than FIXED_STOP_PIPS on a pyramid leg.
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        if abs(entry - stop) > _max_stop:
+            stop = entry - _max_stop if st["direction"] > 0 else entry + _max_stop
 
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:

@@ -5,6 +5,11 @@ STARTING_CASH = 500                # R500 ZAR starting capital
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
+# Max-risk-per-trade guard: at small equity the broker min-lot floor (0.01) overrides
+# the 1% risk sizing, so a wide structural stop can risk 10%+ in a single trade. Skip
+# any setup whose floor-lot risk exceeds this % of current equity — the cap self-lifts
+# as the account grows. Set to a high value (e.g. 100) to disable.
+MAX_RISK_PER_TRADE_PCT = 8.0
 MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Standard-account lot sizing ---

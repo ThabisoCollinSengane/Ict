@@ -470,6 +470,15 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             stop = (cur_price - config.FIXED_STOP_PIPS * pip if direction > 0
                     else cur_price + config.FIXED_STOP_PIPS * pip)
 
+        # Universal stop cap: never risk more than FIXED_STOP_PIPS on any trade.
+        # Applied here so position sizing below uses the capped distance; the final
+        # stop is re-derived from the actual fill price in _on_entry_fill. Only
+        # stops wider than the cap are pulled in; tighter structural stops are kept.
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        if abs(cur_price - stop) > _max_stop:
+            stop = (cur_price - _max_stop if direction > 0
+                    else cur_price + _max_stop)
+
         target = self._find_target(pair, direction, cur_price)
         if target is None:
             return
@@ -596,6 +605,12 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                     else entry + config.FIXED_STOP_PIPS * pip)
             im_score = 1.0
 
+        # Universal stop cap: never risk more than FIXED_STOP_PIPS on a pyramid leg.
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        if abs(entry - stop) > _max_stop:
+            stop = (entry - _max_stop if st["direction"] > 0
+                    else entry + _max_stop)
+
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
             return
@@ -648,11 +663,21 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             return
 
         stop = info["stop"]
+        pip  = pip_size(pair)
         # For news High entries, recalculate fixed stop from actual fill price
         if st.get("news_impact") == "High":
-            pip  = pip_size(pair)
             stop = (fill_price - config.FIXED_STOP_PIPS * pip if st["direction"] > 0
                     else fill_price + config.FIXED_STOP_PIPS * pip)
+
+        # Universal stop cap measured from the ACTUAL broker fill price. The fill
+        # already sits on the far side of the spread (bought at ask / sold at bid),
+        # so a 10-pip stop from fill_price gives a true 10 pips of adverse room
+        # rather than having the spread eat into the buffer. Only wider stops are
+        # pulled in; tighter structural stops are kept.
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        if abs(fill_price - stop) > _max_stop:
+            stop = (fill_price - _max_stop if st["direction"] > 0
+                    else fill_price + _max_stop)
 
         qc_sym       = self.symbols[pair]
         signed_units = info["units"] * st["direction"]
