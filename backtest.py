@@ -338,6 +338,26 @@ class Backtester:
         bars = self.bars_up_to(sym, tf, t)
         return htf_bias(bars, lookback=lookback)
 
+    def _eurgbp_synthetic(self, t, lookback: int, threshold_pips: float) -> int:
+        """Synthetic EURGBP bias from individual pair H1 momentum divergence.
+
+        Compare pip change of EURUSD vs GBPUSD over `lookback` H1 bars.
+        Positive divergence (EU rose more than GU) → EUR stronger → EURGBP +1.
+        Negative divergence (GU rose more than EU) → GBP stronger → EURGBP -1.
+        """
+        eu = self.bars_up_to("EURUSD", "60T", t)
+        gu = self.bars_up_to("GBPUSD", "60T", t)
+        if min(len(eu), len(gu)) < lookback + 1:
+            return 0
+        eu_pips = (eu[-1].Close - eu[-lookback].Close) / 0.0001
+        gu_pips = (gu[-1].Close - gu[-lookback].Close) / 0.0001
+        divergence = eu_pips - gu_pips
+        if divergence > threshold_pips:
+            return +1   # EUR outperforming → synthetic EURGBP rising
+        if divergence < -threshold_pips:
+            return -1   # GBP outperforming → synthetic EURGBP falling
+        return 0
+
     def _dxy_bias(self, tf, t, lookback: int = None):
         """Synthetic DXY BOS on the given timeframe."""
         rolls = {s: self.bars_up_to(s, tf, t) for s in config.DXY_CONSTITUENTS}
@@ -1004,18 +1024,28 @@ class Backtester:
         if pair in ("EURUSD", "GBPUSD"):
             eurgbp_bias = self._sym_bias(config.REF_EURGBP, "60T", t,
                                          lookback=config.SWING_LOOKBACK_STH)
-            # H4 EURGBP escalation: when H1 cross is flat, check H4.
-            # If H4 has direction → use it; this unlocks GBPUSD as an entry pair
-            # and reclassifies the scenario (1a/1b/2a/2b instead of 3a/3b).
-            # If H4 is also flat → keep eurgbp_bias=0 and trade EURUSD only
-            # on DXY signal alone (the original 3a/3b behaviour — still profitable).
+            # Escalation cascade for EURGBP when H1 cross is flat:
+            #   Level 1: H1 EURGBP (direct)
+            #   Level 2: H4 EURGBP (when H1 flat) — unlocks GBPUSD, reclassifies scenario
+            #   Level 3: individual pair bias (when H4 also flat) — synthetic from EU vs GU momentum
+            # If all three are flat → keep eurgbp_bias=0 and trade EURUSD only (3a/3b).
             _h4_escalated = False
+            _ip_escalated = False
             if eurgbp_bias == 0:
                 eurgbp_h4 = self._sym_bias(config.REF_EURGBP, "240T", t,
                                            lookback=config.SWING_LOOKBACK_STH)
                 if eurgbp_h4 != 0:
                     eurgbp_bias   = eurgbp_h4
                     _h4_escalated = True
+            if eurgbp_bias == 0:
+                eurgbp_ip = self._eurgbp_synthetic(
+                    t,
+                    config.EURGBP_SYNTHETIC_LOOKBACK,
+                    config.EURGBP_SYNTHETIC_THRESHOLD_PIPS,
+                )
+                if eurgbp_ip != 0:
+                    eurgbp_bias  = eurgbp_ip
+                    _ip_escalated = True
             direction, im_score = resolve_pair_direction(
                 dxy_bias, eurgbp_bias, pair, "EURUSD"
             )
@@ -1023,21 +1053,24 @@ class Backtester:
                 return
             if im_score < 0.75:
                 return
-            # When cross is flat at both H1 and H4 (eurgbp_bias still 0 after escalation),
-            # GBPUSD has no selection signal — keep the original block.
+            # When cross is flat at all three levels, GBPUSD has no selection signal.
             if eurgbp_bias == 0 and pair == "GBPUSD":
                 return
             mss_sym1, mss_sym2 = "EURUSD", "GBPUSD"
             # ICT intermarket cheat sheet scenario classification.
-            # H4-escalated scenarios get a _h4 suffix so analytics can distinguish
-            # them from directly-confirmed H1 signals. 3a/3b labels when flat.
+            # _h4 = H1 flat, H4 used; _ip = H1+H4 both flat, individual pair momentum used.
             _scenario_map = {
                 (+1, +1): "1a", (+1, -1): "1b",
                 (-1, +1): "2a", (-1, -1): "2b",
                 (+1,  0): "3a", (-1,  0): "3b",
             }
             _base = _scenario_map.get((dxy_bias, eurgbp_bias), "?")
-            _im_scenario = (_base + "_h4") if _h4_escalated else _base
+            if _h4_escalated:
+                _im_scenario = _base + "_h4"
+            elif _ip_escalated:
+                _im_scenario = _base + "_ip"
+            else:
+                _im_scenario = _base
 
         else:   # NZDUSD — DXY + AUDNZD cross (independent of EUR/GBP family)
             audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
@@ -1130,19 +1163,15 @@ class Backtester:
         if _draw_score == 0:
             g["htf_draw_counter"] += 1
             return   # hard gate: no HTF draw alignment → skip
-        # 2a (DXY↓ + EUR>GBP → EURUSD long) at 3/3 draw = move is fully mature.
-        # All three HTFs confirming = late entry + 3x sizing = catastrophic when wrong.
-        # 2a_h4: H1 flat but H4 EURGBP confirms EUR>GBP — EURUSD long.
-        # This is an even more extended version of 2a: H1 bias hasn't caught up,
-        # meaning price has already moved very far. Gate entirely (PF 0.01, WR 25%).
-        if _im_scenario == "2a_h4":
+        # 2a variants gated entirely — move too extended by the time synthetic confirms.
+        # 2a_h4: H1 flat but H4 EURGBP confirms EUR>GBP (PF 0.01, WR 25%). Gate.
+        # 2a_ip: H1+H4 both flat, synthetic momentum fires — even more extended. Gate.
+        if _im_scenario in ("2a_h4", "2a_ip"):
             return
-        if _im_scenario in ("2a", "2a_h4") and _draw_score == 3:
+        if _im_scenario in ("2a", "2a_h4", "2a_ip") and _draw_score == 3:
             return
-        # 2a London = price entering London already deep into a EURUSD rally.
-        # London open is often the Judas spike session — the high that gets swept —
-        # so chasing EURUSD longs during London in a 2a regime has PF 0.84.
-        if _im_scenario in ("2a", "2a_h4") and _is_london:
+        # 2a London = price entering London already deep into a EURUSD rally (PF 0.84).
+        if _im_scenario in ("2a", "2a_h4", "2a_ip") and _is_london:
             return
         conviction += _draw_score
         if _draw_score == 3:
@@ -1334,7 +1363,7 @@ class Backtester:
         # In scenario 2a, entering on an H1 FVG means EURUSD has already moved
         # 60-100 pips into the confirmed rally before the entry triggers (WR 14.3%).
         # Only M5/M15 precision entries are valid in 2a — the move is too mature for H1.
-        if _im_scenario in ("2a", "2a_h4") and pattern_tag == "fvg_h1":
+        if _im_scenario in ("2a", "2a_h4", "2a_ip") and pattern_tag == "fvg_h1":
             return
         g["m5_fvg_correct_dir"] += 1
 

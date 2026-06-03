@@ -242,3 +242,10 @@ REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength
 REF_AUDNZD = "AUDNZD"              # AUDNZD data (loaded for AUDUSD MSS bars; not used as bias signal)
 # DXY synthetic uses these (all available on OANDA):
 DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
+
+# --- Individual pair bias (synthetic EURGBP from EURUSD vs GBPUSD momentum) ---
+# When EURGBP is flat at both H1 and H4, compare which USD pair moved more over
+# EURGBP_SYNTHETIC_LOOKBACK H1 bars. If the divergence exceeds the threshold,
+# the more-moved pair determines the synthetic EURGBP direction.
+EURGBP_SYNTHETIC_LOOKBACK         = 6    # H1 bars to look back
+EURGBP_SYNTHETIC_THRESHOLD_PIPS   = 10   # minimum divergence (pips) to fire
