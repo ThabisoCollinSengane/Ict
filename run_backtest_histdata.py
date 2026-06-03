@@ -10,6 +10,7 @@ Uses the actual DXY index (UDXUSD) directly for DXY bias instead of the
 6-constituent synthetic formula, since we have real index data.
 """
 
+import argparse
 import os
 import sys
 from collections import namedtuple
@@ -111,11 +112,21 @@ class HistdataBacktester(bt_module.Backtester):
 # ---------------------------------------------------------------------------
 
 def main():
+    parser = argparse.ArgumentParser(description="ICT Intermarket Backtest")
+    parser.add_argument(
+        "--years", nargs="+", default=["2022", "2023", "2024", "2025"],
+        metavar="YYYY",
+        help="Which years to include (default: all four)",
+    )
+    args = parser.parse_args()
+    requested_years = args.years
+
+    label = "–".join([requested_years[0], requested_years[-1]])
     print("=" * 60)
-    print("ICT Intermarket Backtest — HistData.com M1 data (2022–2025)")
+    print(f"ICT Intermarket Backtest — HistData.com M1 data ({label})")
     print("=" * 60)
 
-    years = ["2022", "2023", "2024", "2025"]
+    years = requested_years
     # Core pairs required for the EUR/GBP family. AUD/NZD pairs are optional —
     # the backtest runs without them and gains those trades when data is added.
     core_syms     = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
