@@ -687,8 +687,10 @@ class Backtester:
                 return _try(self._find_breaker_entry(bars1h, pair, direction), "breaker_h1")
             return None
 
-        # M1 first for pyramids (tightest current level); last for initial entries.
-        result = (_check_m1() or _check_base()) if for_pyramid else (_check_base() or _check_m1())
+        # M1 first for ALL entries: zeroes in on the tightest structural level (FVG/OB
+        # on M1/M5) so the stop sits naturally within 4-8 pips of entry — matching
+        # manual ICT execution. M5→M15→H1 used only when no M1 pattern is present.
+        result = _check_m1() or _check_base()
         return result if result is not None else (None, None, None)
 
     def _find_target(self, pair, direction, t, price, stop=None):
@@ -858,11 +860,12 @@ class Backtester:
             return
         # ────────────────────────────────────────────────────────────────────
 
-        # News gate: Medium impact → block (spread risk, no directional catalyst).
-        # High impact → allow but override stop to fixed 10-pip (spread protection).
-        # News is often the CATALYST that drives price to target faster.
+        # News gate:
+        #   Critical (CPI/NFP/FOMC) → block. 20-40+ pip Judas spike blows any tight stop.
+        #   Medium                  → block. Spread risk without directional catalyst.
+        #   High (BOE/ECB/other)    → allow with 10-pip stop + widened news spread.
         news_impact = self.news.nearest_impact(now)
-        if news_impact == "Medium":
+        if news_impact in ("Medium", "Critical"):
             return
         g["news_clear"] += 1
 
@@ -1281,9 +1284,9 @@ class Backtester:
         if len(st["legs"]) >= max_legs:
             return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
-        # Medium impact: block pyramid. High impact: allow with fixed stop below.
+        # Block pyramids during Critical (CPI/NFP/FOMC) and Medium events.
         pyr_news_impact = self.news.nearest_impact(now)
-        if pyr_news_impact == "Medium":
+        if pyr_news_impact in ("Medium", "Critical"):
             return
         # Only pyramid inside the correct kill zone for this pair.
         if not can_open_new_trade(now, pair):

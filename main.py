@@ -340,9 +340,9 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if week_pair >= config.MAX_PAIR_TRADES_PER_WEEK:
             return
 
-        # News impact check
+        # News gate: block Critical (CPI/NFP/FOMC) and Medium; allow other High.
         news_impact = self.news.nearest_impact(now)
-        if news_impact == "Medium":
+        if news_impact in ("Medium", "Critical"):
             return
 
         # Low-probability conditions
@@ -548,7 +548,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             return
 
         pyr_news = self.news.nearest_impact(now)
-        if pyr_news == "Medium":
+        if pyr_news in ("Medium", "Critical"):
             return
 
         # Intermarket score for this pyramid leg
@@ -836,7 +836,8 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 return _try(self._find_breaker_entry(bars1h, pair, direction), "breaker_h1")
             return None
 
-        result = (_check_m1() or _check_base()) if for_pyramid else (_check_base() or _check_m1())
+        # M1 first for all entries: tightest structural stop (4-8 pips), M5→M15→H1 fallback.
+        result = _check_m1() or _check_base()
         return result if result is not None else (None, None, None)
 
     def _find_fvg_entry(self, bars, pair, direction, lookback=24):
