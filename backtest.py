@@ -128,7 +128,7 @@ class Backtester:
             "weekly_amd_confirmed": 0, "session_handover_closed": 0,
             # conviction signal counters
             "ote_zone": 0, "choch_confirmed": 0, "low_conviction": 0,
-            "judas_divergence": 0,
+            "judas_divergence": 0, "ny_continuation": 0,
         }
         # Wipeout-prevention state
         self._peak_equity       = config.STARTING_CASH
@@ -143,7 +143,8 @@ class Backtester:
         self._week_total        = {}   # (iso_year, iso_week) -> int
         self._week_pair         = {}   # (iso_year, iso_week, pair) -> int
         self._day_total         = {}   # date -> int
-        self._day_pair          = {}   # (date, pair) -> int
+        self._day_pair          = {}   # (date, pair) -> int  — London session slot
+        self._day_pair_ny       = {}   # (date, pair) -> int  — NY session slot (separate)
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -867,6 +868,12 @@ class Backtester:
             return
         g["nfp_fomc_ok"] += 1
 
+        # Detect NY AM session early — needed for session-specific budget + threshold.
+        import pytz as _pytz
+        _ny_tz = _pytz.timezone("America/New_York")
+        _ny_dt = now.astimezone(_ny_tz)
+        _is_ny = (7 <= _ny_dt.hour < 10)
+
         # ── Weekly / daily trade budget ───────────────────────────────────────
         iso = day_key.isocalendar()
         week_key   = (iso[0], iso[1])
@@ -874,6 +881,7 @@ class Backtester:
         week_pair  = self._week_pair.get((week_key[0], week_key[1], pair), 0)
         day_total  = self._day_total.get(day_key, 0)
         day_pair   = self._day_pair.get((day_key, pair), 0)
+        day_pair_ny = self._day_pair_ny.get((day_key, pair), 0)
 
         if week_pair >= config.MAX_PAIR_TRADES_PER_WEEK:
             g["weekly_pair_cap"] += 1
@@ -881,9 +889,15 @@ class Backtester:
         if day_total >= config.MAX_TRADES_PER_DAY:
             g["daily_cap"] += 1
             return
-        if day_pair >= config.MAX_PAIR_TRADES_PER_DAY:
-            g["daily_pair_cap"] += 1
-            return
+        # NY uses its own per-pair daily slot so London trades don't block NY entries.
+        if _is_ny:
+            if day_pair_ny >= config.MAX_PAIR_TRADES_PER_DAY_NY:
+                g["daily_pair_cap"] += 1
+                return
+        else:
+            if day_pair >= config.MAX_PAIR_TRADES_PER_DAY:
+                g["daily_pair_cap"] += 1
+                return
         # ─────────────────────────────────────────────────────────────────────
 
         # Intermarket: DXY gives USD direction.
@@ -1070,6 +1084,15 @@ class Backtester:
                 conviction += 1
                 g["gt_judas_reversal"] = g.get("gt_judas_reversal", 0) + 1
 
+        # 4c. NY continuation: NY AM is extending London's direction (momentum run).
+        #     Not a reversal — price is running WITH London, usually a news-driven
+        #     distribution move toward the weekly target.
+        if _is_ny and len(bars1h) >= 3:
+            _london_dir = 1 if bars1h[-2].Close > bars1h[-3].Close else -1
+            if _london_dir == direction:
+                conviction += 1
+                g["ny_continuation"] += 1
+
         # 4b. Intermarket Judas-sweep divergence: DXY sweeps a liquidity level and
         #     one of EURUSD/GBPUSD fails to follow. The failing pair held its ground
         #     against the manipulation — when DXY reverses it delivers the strongest
@@ -1103,7 +1126,7 @@ class Backtester:
                     g["gt_mp_extreme"] = g.get("gt_mp_extreme", 0) + 1
         # ─────────────────────────────────────────────────────────────────────
 
-        min_conv = config.MIN_CONVICTION
+        min_conv = config.MIN_CONVICTION_NY if _is_ny else config.MIN_CONVICTION
         if conviction < min_conv:
             g["low_conviction"] += 1
             return
@@ -1212,7 +1235,10 @@ class Backtester:
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
         self._day_total[day_key]                          = day_total + 1
-        self._day_pair[(day_key, pair)]                   = day_pair + 1
+        if _is_ny:
+            self._day_pair_ny[(day_key, pair)] = day_pair_ny + 1
+        else:
+            self._day_pair[(day_key, pair)]    = day_pair + 1
 
     def _maybe_pyramid(self, pair, t):
         """Add a new leg to a winning position at market price with fixed stop.

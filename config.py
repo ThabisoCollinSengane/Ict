@@ -71,6 +71,12 @@ MAX_TRADES_PER_DAY       = 3     # max new entries per calendar day (UTC)
 MAX_PAIR_TRADES_PER_DAY  = 1     # max 1 initial entry per pair per UTC day
 MAX_PAIR_TRADES_PER_WEEK = 999   # effectively unlimited per-pair weekly entries
 
+# --- NY session overrides ---
+# NY AM gets its own daily entry slot (separate from London) so a London trade
+# on the same pair doesn't block the NY continuation or reversal.
+MIN_CONVICTION_NY        = 5   # lower gate: NY needs fewer confirms than London
+MAX_PAIR_TRADES_PER_DAY_NY = 1   # max NY initial entries per pair per UTC day
+
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
     ("London Open",  "03:00", "05:00"),
