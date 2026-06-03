@@ -174,10 +174,10 @@ def main():
             dxy_5m = m5
         else:
             data_5m[sym] = m5
-            # M1 registration disabled: df_to_bars on 1.4M rows is too slow at startup.
-            # M1 patterns in _get_limit_entry silently skip when bars1m=[].
-            # Re-enable when M1 bar access is refactored to lazy/on-demand loading.
-            # if sym in _tradeable: data_m1[sym] = m1
+            # M1 bars registered for tradeable pairs — used for stop placement
+            # (_m1_structure_stop anchors the stop to the nearest M1 swing).
+            if sym in _tradeable:
+                data_m1[sym] = m1
 
     print("\nRunning backtest...")
     backtester = HistdataBacktester(data_5m, dxy_5m, data_m1)

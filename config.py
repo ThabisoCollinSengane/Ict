@@ -53,9 +53,16 @@ MIN_CONVICTION = 6                 # minimum conviction score to open a trade (0
 MIN_PIPS_TARGET = 20               # minimum pips to target (entry and pyramid checks)
 MIN_ENTRY_PIPS_TARGET = 20         # same as MIN_PIPS_TARGET — keep them in sync here
 MIN_RR = 1.2                       # minimum reward:risk
-FIXED_STOP_PIPS = 10               # fixed stop distance — 10 pips from entry
+FIXED_STOP_PIPS = 10               # max/fallback stop distance — 10 pips from entry
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit
 TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profit
+# M1 market-structure stop: the stop is anchored to the nearest 1-minute swing
+# (STL for longs / STH for shorts) plus this buffer. Episode 12 — stop sits just
+# beyond the short-term structural point. M1 keeps it naturally tight (a few pips).
+# Entries still come from M5/M15/H1; M1 is used ONLY for stop placement.
+M1_STOP_BUFFER_PIPS = 1.0          # pips beyond the M1 swing point
+M1_STOP_MIN_PIPS    = 4.0          # floor — don't place a stop tighter than this (noise)
+M1_STOP_LOOKBACK    = 30           # M1 bars to scan for the nearest swing
 
 # --- Account protection (wipeout prevention) ---
 # 1. Peak drawdown halt: if equity falls >20% from its highest point, stop trading

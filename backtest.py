@@ -687,11 +687,42 @@ class Backtester:
                 return _try(self._find_breaker_entry(bars1h, pair, direction), "breaker_h1")
             return None
 
-        # M1 first for ALL entries: zeroes in on the tightest structural level (FVG/OB
-        # on M1/M5) so the stop sits naturally within 4-8 pips of entry — matching
-        # manual ICT execution. M5→M15→H1 used only when no M1 pattern is present.
-        result = _check_m1() or _check_base()
+        # Entries (initial AND pyramid) come from M5/M15/H1 patterns ONLY. M1 is NOT
+        # an entry source — it is used solely for stop placement (_m1_structure_stop).
+        result = _check_base()
         return result if result is not None else (None, None, None)
+
+    def _m1_structure_stop(self, bars1m, direction, entry, pip):
+        """Anchor the stop to the recent 1-minute swing extreme (Episode 12 STL/STH).
+
+        LONG  → below the lowest M1 low of the down-leg price just made (the STL),
+                minus M1_STOP_BUFFER_PIPS.
+        SHORT → above the highest M1 high of the up-leg (the STH), plus the buffer.
+
+        On a counter-trend entry the relevant structural point is the extreme of
+        the move into the entry — that is the short-term high/low a stop sits
+        beyond. Distance is floored at M1_STOP_MIN_PIPS (avoid noise-tight stops);
+        the caller's 10-pip cap bounds the wide side. Returns the stop price, or
+        None if the extreme isn't on the correct side of entry.
+        """
+        if not bars1m or len(bars1m) < 3:
+            return None
+        recent  = bars1m[-config.M1_STOP_LOOKBACK:]
+        buf     = config.M1_STOP_BUFFER_PIPS * pip
+        min_dist = config.M1_STOP_MIN_PIPS * pip
+
+        if direction > 0:
+            swing_low = min(c.Low for c in recent)
+            stop = swing_low - buf
+            if (entry - stop) < min_dist:           # too tight → floor it
+                stop = entry - min_dist
+            return stop if stop < entry else None
+        else:
+            swing_high = max(c.High for c in recent)
+            stop = swing_high + buf
+            if (stop - entry) < min_dist:
+                stop = entry + min_dist
+            return stop if stop > entry else None
 
     def _find_target(self, pair, direction, t, price, stop=None):
         """Find the nearest target that satisfies the RR requirement.
@@ -1184,6 +1215,15 @@ class Backtester:
         _friction = (_spread / 2 + config.SLIPPAGE_PIPS) * pip
         entry = cur_price + direction * _friction   # market order fill with friction
 
+        # Stop placement: anchor to M1 market structure (Episode 12 STL/STH). The
+        # entry pattern came from M5/M15/H1; the STOP comes from the nearest 1-minute
+        # swing, which keeps it naturally tight. Fall back to the pattern stop if no
+        # valid M1 swing is found.
+        _m1_stop = self._m1_structure_stop(bars1m, direction, entry, pip)
+        if _m1_stop is not None:
+            stop = _m1_stop
+            g["m1_stop_used"] = g.get("m1_stop_used", 0) + 1
+
         # High-impact news nearby: override to fixed 10-pip stop (protects against
         # spread widening while still trading the news catalyst).
         if news_impact == "High":
@@ -1358,10 +1398,8 @@ class Backtester:
         if favour_pips < config.PYRAMID_MIN_FAVOUR_PIPS:
             return
 
-        # FVG, OB, or Breaker — M5→M15→H1 first (same as normal entries).
-        # Using M5/M15/H1 structural levels places the stop 10-30+ pips away,
-        # giving the pyramid room to breathe. M1-first stops (2-5 pips) are too
-        # tight and get swept by normal noise (86% stop-out rate in backtest).
+        # Entry pattern from M5/M15/H1 (same as normal entries); the stop is then
+        # re-anchored to M1 structure below via _m1_structure_stop.
         bars15 = self.bars_up_to(pair, "15T", t)
         bars1h = self.bars_up_to(pair, "60T", t)
         bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
@@ -1378,6 +1416,12 @@ class Backtester:
             _spread_p = max(_spread_p, config.NEWS_HIGH_SPREAD_PIPS)
         _fric_p = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = cur_price + st["direction"] * _fric_p
+
+        # Anchor the pyramid stop to M1 market structure too (same as initial entries).
+        _m1_stop = self._m1_structure_stop(bars1m, st["direction"], entry, pip)
+        if _m1_stop is not None:
+            stop = _m1_stop
+
         # High-impact news nearby: fixed 10-pip stop (spread protection).
         if pyr_news_impact == "High":
             stop = entry - config.FIXED_STOP_PIPS * pip if st["direction"] > 0 \

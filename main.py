@@ -465,6 +465,12 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
 
         pip = pip_size(pair)
 
+        # Stop placement: anchor to M1 market structure (nearest M1 swing). Entry
+        # pattern came from M5/M15/H1; the stop comes from the 1-minute structure.
+        _m1_stop = self._m1_structure_stop(bars1m, direction, cur_price, pip)
+        if _m1_stop is not None:
+            stop = _m1_stop
+
         # News High: override to fixed 10-pip stop
         if news_impact == "High":
             stop = (cur_price - config.FIXED_STOP_PIPS * pip if direction > 0
@@ -600,6 +606,10 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             return
 
         entry = cur_price
+        # Anchor the pyramid stop to M1 market structure too (same as initial entries).
+        _m1_stop = self._m1_structure_stop(bars1m, st["direction"], entry, pip)
+        if _m1_stop is not None:
+            stop = _m1_stop
         if pyr_news == "High":
             stop = (entry - config.FIXED_STOP_PIPS * pip if st["direction"] > 0
                     else entry + config.FIXED_STOP_PIPS * pip)
@@ -836,9 +846,36 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 return _try(self._find_breaker_entry(bars1h, pair, direction), "breaker_h1")
             return None
 
-        # M1 first for all entries: tightest structural stop (4-8 pips), M5→M15→H1 fallback.
-        result = _check_m1() or _check_base()
+        # Entries (initial AND pyramid) from M5/M15/H1 ONLY. M1 is not an entry
+        # source — it is used solely for stop placement (_m1_structure_stop).
+        result = _check_base()
         return result if result is not None else (None, None, None)
+
+    def _m1_structure_stop(self, bars1m, direction, entry, pip):
+        """Anchor the stop to the recent 1-minute swing extreme (Episode 12 STL/STH).
+
+        LONG  → below the lowest M1 low of the move into entry, minus the buffer.
+        SHORT → above the highest M1 high of the move, plus the buffer.
+        Distance floored at M1_STOP_MIN_PIPS; the 10-pip cap bounds the wide side.
+        Returns the stop price, or None if the extreme isn't on the correct side.
+        """
+        if not bars1m or len(bars1m) < 3:
+            return None
+        recent   = bars1m[-config.M1_STOP_LOOKBACK:]
+        buf      = config.M1_STOP_BUFFER_PIPS * pip
+        min_dist = config.M1_STOP_MIN_PIPS * pip
+        if direction > 0:
+            swing_low = min(b.Low for b in recent)
+            stop = swing_low - buf
+            if (entry - stop) < min_dist:
+                stop = entry - min_dist
+            return stop if stop < entry else None
+        else:
+            swing_high = max(b.High for b in recent)
+            stop = swing_high + buf
+            if (stop - entry) < min_dist:
+                stop = entry + min_dist
+            return stop if stop > entry else None
 
     def _find_fvg_entry(self, bars, pair, direction, lookback=24):
         pip_v   = pip_size(pair)
