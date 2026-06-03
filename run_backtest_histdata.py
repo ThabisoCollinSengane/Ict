@@ -240,6 +240,70 @@ def main():
             wr = 100 * w / len(grp)
             print(f"  {etype:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% {grp.pnl.mean():>10.2f}")
 
+        if "target_type" in df.columns:
+            print("\n=== Draw on liquidity (target type) — all trades ===")
+            print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>12} {'Avg P&L':>10}")
+            print("  " + "-" * 62)
+            for ttype, grp in df.groupby("target_type"):
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                print(f"  {ttype:<18} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>12.2f} {grp.pnl.mean():>10.2f}")
+
+            wins_df = df[df.pnl > 0]
+            print("\n=== Winning trades only — by draw on liquidity ===")
+            print(f"  {'Draw on liquidity':<18} {'Wins':>5} {'% of wins':>10} {'P&L ZAR':>12}")
+            print("  " + "-" * 48)
+            total_wins = len(wins_df)
+            for ttype, grp in wins_df.groupby("target_type"):
+                pct = 100 * len(grp) / total_wins if total_wins else 0
+                print(f"  {ttype:<18} {len(grp):>5} {pct:>9.1f}% {grp.pnl.sum():>12.2f}")
+
+            # --- Pyramids: draw on liquidity by leg type (initial vs pyramid add) ---
+            if "leg_idx" in df.columns:
+                df["leg_kind"] = df["leg_idx"].apply(
+                    lambda i: "initial (L1)" if i == 1 else "pyramid (L2+)")
+                print("\n=== Draw on liquidity — initial vs pyramid legs (winners) ===")
+                print(f"  {'Leg':<14} {'Draw on liquidity':<18} {'Wins':>5} {'WR%':>6} {'P&L ZAR':>12}")
+                print("  " + "-" * 60)
+                for legk in ["initial (L1)", "pyramid (L2+)"]:
+                    sub_all = df[df.leg_kind == legk]
+                    for ttype, grp in sub_all[sub_all.pnl > 0].groupby("target_type"):
+                        all_grp = sub_all[sub_all.target_type == ttype]
+                        wr = 100 * len(grp) / len(all_grp) if len(all_grp) else 0
+                        print(f"  {legk:<14} {ttype:<18} {len(grp):>5} {wr:>5.1f}% {grp.pnl.sum():>12.2f}")
+
+            # --- Sessions: which killzone the winning draws were hit in ---
+            def _killzone(ts):
+                # opened_at is tz-aware UTC; killzones defined in NY time.
+                ny = ts.tz_convert("America/New_York")
+                h = ny.hour
+                if 2 <= h < 5:
+                    return "London Open"
+                if 7 <= h < 10:
+                    return "New York AM"
+                if 20 <= h or h < 2:
+                    return "Asian"
+                return "Other"
+            try:
+                wins_df = wins_df.copy()
+                wins_df["session"] = wins_df["opened_at"].apply(_killzone)
+                print("\n=== Winning trades — by session × draw on liquidity ===")
+                print(f"  {'Session':<13} {'Draw on liquidity':<18} {'Wins':>5} {'P&L ZAR':>12}")
+                print("  " + "-" * 52)
+                for sess, sgrp in wins_df.groupby("session"):
+                    for ttype, grp in sgrp.groupby("target_type"):
+                        print(f"  {sess:<13} {ttype:<18} {len(grp):>5} {grp.pnl.sum():>12.2f}")
+                print("\n=== Winning trades — totals by session ===")
+                print(f"  {'Session':<13} {'Wins':>5} {'% of wins':>10} {'P&L ZAR':>12}")
+                print("  " + "-" * 44)
+                for sess, sgrp in wins_df.groupby("session"):
+                    pct = 100 * len(sgrp) / total_wins if total_wins else 0
+                    print(f"  {sess:<13} {len(sgrp):>5} {pct:>9.1f}% {sgrp.pnl.sum():>12.2f}")
+            except Exception as e:
+                print(f"  (session breakdown skipped: {e})")
+
         print("\n=== Session-open side breakdown (above/below open) ===")
         print(f"  {'Category':<12} {'Trades':>7} {'Wins':>5} {'Losses':>7} {'WR%':>6} "
               f"{'P&L ZAR':>12} {'Avg P&L':>10}")

@@ -287,6 +287,7 @@ class Backtester:
             "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
             "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
             "session_side": leg.get("session_side", "no_open"),
+            "target_type": st.get("target_type", "unknown"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -695,6 +696,8 @@ class Backtester:
         Timeframe search order: M15 (last 48 bars) → H1 (24 bars) → H4 → D → W.
         M15/H1 lookbacks are capped to avoid O(n²) scan cost.
         """
+        # Each candidate is a (price, draw_type) tuple so the chosen target's
+        # liquidity draw can be recorded on the trade for post-hoc analysis.
         candidates = []
 
         # Fibonacci extension targets from the initiating OTE swing (Ep. 12 / SD model).
@@ -708,7 +711,7 @@ class Backtester:
                 min_distance=config.MIN_PIPS_TARGET * pip_v,
             )
             if fib_t is not None:
-                candidates.append(fib_t)
+                candidates.append((fib_t, "fib_extension"))
 
         for tf, cap in [("15T", 48), ("60T", 24), ("240T", 60), ("D", 0), ("W", 0)]:
             bars = self.bars_up_to(pair, tf, t)
@@ -723,18 +726,18 @@ class Backtester:
         d_bars = self.bars_up_to(pair, "D", t)
         if len(d_bars) >= 2:
             for db in d_bars[-4:-1]:        # last 3 completed daily candles
-                candidates.append(db.High)  # buy-side liquidity (BSL)
-                candidates.append(db.Low)   # sell-side liquidity (SSL)
+                candidates.append((db.High, "pdh_pdl"))  # buy-side liquidity (BSL)
+                candidates.append((db.Low, "pdh_pdl"))   # sell-side liquidity (SSL)
         # Previous Week High/Low (PWWH/PWWL) — higher-timeframe pools.
         w_bars = self.bars_up_to(pair, "W", t)
         if len(w_bars) >= 2:
-            candidates.append(w_bars[-2].High)
-            candidates.append(w_bars[-2].Low)
+            candidates.append((w_bars[-2].High, "pwh_pwl"))
+            candidates.append((w_bars[-2].Low, "pwh_pwl"))
 
         if direction > 0:
-            candidates = [c for c in candidates if c > price]
+            candidates = [c for c in candidates if c[0] > price]
         else:
-            candidates = [c for c in candidates if c < price]
+            candidates = [c for c in candidates if c[0] < price]
         if not candidates:
             return None
         # Prefer targets in the correct dealing range zone (premium/discount).
@@ -742,7 +745,7 @@ class Backtester:
         dr = detect_dealing_range(bars1h, lookback=100)
         if dr is not None:
             filtered = [c for c in candidates
-                        if is_valid_target_zone(c, dr.high, dr.low, direction)]
+                        if is_valid_target_zone(c[0], dr.high, dr.low, direction)]
             if filtered:
                 candidates = filtered
         # Prefer the nearest target satisfying both MIN_RR and MIN_PIPS_TARGET.
@@ -751,10 +754,10 @@ class Backtester:
                              config.MIN_PIPS_TARGET * pip_v)
         else:
             min_reward = config.MIN_PIPS_TARGET * pip_v
-        rr_ok = [c for c in candidates if abs(c - price) >= min_reward]
+        rr_ok = [c for c in candidates if abs(c[0] - price) >= min_reward]
         if rr_ok:
-            return min(rr_ok, key=lambda x: abs(x - price))
-        return min(candidates, key=lambda x: abs(x - price))
+            return min(rr_ok, key=lambda x: abs(x[0] - price))
+        return min(candidates, key=lambda x: abs(x[0] - price))
 
     @staticmethod
     def _targets_in_series(bars, pair, direction, price):
@@ -774,14 +777,14 @@ class Backtester:
         out = []
         tgt_fvg = nearest_unmitigated(fvgs, price, direction)
         if tgt_fvg is not None:
-            out.append(tgt_fvg.mid)
+            out.append((tgt_fvg.mid, "fvg"))
         tgt_ob = nearest_unmitigated_ob(detect_order_blocks(bars), price, direction)
         if tgt_ob is not None:
-            out.append(tgt_ob.mid)
+            out.append((tgt_ob.mid, "ob"))
         if direction > 0:
-            out += find_equal_highs(bars, pair, lookback=200)
+            out += [(h, "equal_hl") for h in find_equal_highs(bars, pair, lookback=200)]
         else:
-            out += find_equal_lows(bars, pair, lookback=200)
+            out += [(l, "equal_hl") for l in find_equal_lows(bars, pair, lookback=200)]
         # ICT Ep 17: round-number liquidity levels (x.x000/200/500/800 for 4-dec pairs)
         # are always present above and below price — use as fallback targets.
         pip_v = pip_size(pair)
@@ -792,19 +795,19 @@ class Backtester:
                 level_pips = base_round + offset * 100 + sub
                 level = level_pips * pip_v
                 if direction > 0 and level > price + pip_v:
-                    out.append(level)
+                    out.append((level, "round_number"))
                 elif direction < 0 and level < price - pip_v:
-                    out.append(level)
+                    out.append((level, "round_number"))
         # ICT: raw swing highs (BSL) above price and swing lows (SSL) below price
         # are liquidity pools that price gravitates toward.
         n = len(bars)
         for i in range(1, n - 1):
             if direction > 0 and bars[i].High > bars[i - 1].High and bars[i].High > bars[i + 1].High:
                 if bars[i].High > price:
-                    out.append(bars[i].High)
+                    out.append((bars[i].High, "swing"))
             elif direction < 0 and bars[i].Low < bars[i - 1].Low and bars[i].Low < bars[i + 1].Low:
                 if bars[i].Low < price:
-                    out.append(bars[i].Low)
+                    out.append((bars[i].Low, "swing"))
         return out
 
     def _maybe_open(self, pair, t):
@@ -1154,9 +1157,10 @@ class Backtester:
             stop = entry - config.FIXED_STOP_PIPS * pip if direction > 0 \
                    else entry + config.FIXED_STOP_PIPS * pip
 
-        target = self._find_target(pair, direction, t, entry, stop=stop)
-        if target is None:
+        _tgt = self._find_target(pair, direction, t, entry, stop=stop)
+        if _tgt is None:
             return
+        target, target_type = _tgt
         g["target_found"] += 1
 
         reward_pips = abs(target - entry) / pip
@@ -1199,6 +1203,7 @@ class Backtester:
         self.active[pair] = {
             "direction": direction,
             "target": target,
+            "target_type": target_type,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir,
             "profile_score": p_score,
