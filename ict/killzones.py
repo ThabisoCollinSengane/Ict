@@ -16,6 +16,9 @@ def _parse(hhmm: str) -> time:
 
 
 _KZ     = [(name, _parse(s), _parse(e)) for name, s, e in config.KILLZONES]
+if config.NY_PM_ENABLED:
+    _n, _s, _e = config.NY_PM_KILLZONE
+    _KZ.append((_n, _parse(_s), _parse(_e)))
 _KZ_AUD = [(name, _parse(s), _parse(e)) for name, s, e in config.AUD_NZD_KILLZONES]
 # NZDUSD: London Open only (03:00-05:00 ET). NY AM drains on both directions per backtest.
 _KZ_NZD = [(name, s, e) for name, s, e in _KZ if "London" in name]

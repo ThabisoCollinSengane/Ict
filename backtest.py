@@ -151,7 +151,8 @@ class Backtester:
         self._week_pair         = {}   # (iso_year, iso_week, pair) -> int
         self._day_total         = {}   # date -> int
         self._day_pair          = {}   # (date, pair) -> int  — London session slot
-        self._day_pair_ny       = {}   # (date, pair) -> int  — NY session slot (separate)
+        self._day_pair_ny       = {}   # (date, pair) -> int  — NY AM session slot
+        self._day_pair_pm       = {}   # (date, pair) -> int  — NY PM session slot
         # Session-phase AMD cycle tracker: once a Judas sweep is detected for a pair
         # on a given NY date the flag stays True for the rest of that session so the
         # breakout_eligible gate knows whether the Judas already fired.
@@ -340,6 +341,7 @@ class Backtester:
             "htf_fvg": st.get("htf_fvg", ""),
             "dxy_fvg_tf": st.get("dxy_fvg_tf", ""),
             "ny_cont": st.get("ny_cont", False),
+            "target_confluence": st.get("target_confluence", 1),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -925,9 +927,17 @@ class Backtester:
         else:
             min_reward = config.MIN_PIPS_TARGET * pip_v
         rr_ok = [c for c in candidates if abs(c[0] - price) >= min_reward]
+        # Keep the original selection: nearest target that clears MIN_RR (fewest
+        # path changes). Confluence is an analytics signal, not a selection criterion.
         if rr_ok:
-            return min(rr_ok, key=lambda x: abs(x[0] - price))
-        return min(candidates, key=lambda x: abs(x[0] - price))
+            chosen = min(rr_ok, key=lambda x: abs(x[0] - price))
+        else:
+            chosen = min(candidates, key=lambda x: abs(x[0] - price))
+        # Score the chosen target: how many distinct source families cluster within
+        # tolerance of this price? Higher score → stronger institutional draw here.
+        tol = config.TARGET_CONFLUENCE_TOL_PIPS * pip_v
+        score = self._confluence_score(candidates, chosen[0], tol)
+        return chosen[0], chosen[1], score
 
     @staticmethod
     def _targets_in_series(bars, pair, direction, price):
@@ -979,6 +989,15 @@ class Backtester:
                 if bars[i].Low < price:
                     out.append((bars[i].Low, "swing"))
         return out
+
+    @staticmethod
+    def _confluence_score(candidates, target_price, tol):
+        """Count distinct source families within `tol` price units of target_price."""
+        seen = set()
+        for price, src in candidates:
+            if abs(price - target_price) <= tol:
+                seen.add(src)
+        return len(seen)
 
     @staticmethod
     def _scan_htf_fvgs(bars, pair):
@@ -1155,12 +1174,15 @@ class Backtester:
         _ny_dt = now.astimezone(_ny_tz)
         _is_ny     = (7 <= _ny_dt.hour < 10)
         _is_london = (2 <= _ny_dt.hour < 5)
+        _is_pm     = config.NY_PM_ENABLED and (13 <= _ny_dt.hour < 16)
         # Each session evaluates price independently (clean profile handover):
-        # London detects its own AMD cycle; NY starts fresh without London's state.
+        # London, NY AM, and NY PM each track their own AMD cycle.
         if _is_london:
             _session_label = "london"
         elif _is_ny:
             _session_label = "ny"
+        elif _is_pm:
+            _session_label = "ny_pm"
         else:
             _session_label = "other"
 
@@ -1168,10 +1190,11 @@ class Backtester:
         iso = day_key.isocalendar()
         week_key   = (iso[0], iso[1])
         week_total = self._week_total.get(week_key, 0)
-        week_pair  = self._week_pair.get((week_key[0], week_key[1], pair), 0)
-        day_total  = self._day_total.get(day_key, 0)
-        day_pair   = self._day_pair.get((day_key, pair), 0)
+        week_pair   = self._week_pair.get((week_key[0], week_key[1], pair), 0)
+        day_total   = self._day_total.get(day_key, 0)
+        day_pair    = self._day_pair.get((day_key, pair), 0)
         day_pair_ny = self._day_pair_ny.get((day_key, pair), 0)
+        day_pair_pm = self._day_pair_pm.get((day_key, pair), 0)
 
         if week_pair >= config.MAX_PAIR_TRADES_PER_WEEK:
             g["weekly_pair_cap"] += 1
@@ -1179,9 +1202,13 @@ class Backtester:
         if day_total >= config.MAX_TRADES_PER_DAY:
             g["daily_cap"] += 1
             return
-        # NY uses its own per-pair daily slot so London trades don't block NY entries.
+        # Each session has its own per-pair slot so sessions don't block each other.
         if _is_ny:
             if day_pair_ny >= config.MAX_PAIR_TRADES_PER_DAY_NY:
+                g["daily_pair_cap"] += 1
+                return
+        elif _is_pm:
+            if day_pair_pm >= config.MAX_PAIR_TRADES_PER_DAY_PM:
                 g["daily_pair_cap"] += 1
                 return
         else:
@@ -1459,6 +1486,10 @@ class Backtester:
 
         if _is_ny:
             _session_phase = "ny_judas" if _judas_fired else "ny_extend"
+        elif _is_pm:
+            # PM: position squaring / mean-reversion flow (Tier 2 banks + funds).
+            # If PM has its own Judas sweep the reversal is valid; otherwise it's squaring.
+            _session_phase = "pm_reversal" if _judas_fired else "pm_squaring"
         elif _is_london:
             if _judas_fired:
                 _session_phase = "london_judas"
@@ -1695,8 +1726,21 @@ class Backtester:
         _tgt = self._find_target(pair, direction, t, entry, stop=stop)
         if _tgt is None:
             return
-        target, target_type = _tgt
+        target, target_type, _target_score = _tgt
         g["target_found"] += 1
+        # Target confluence conviction: ≥3 independent source families agreeing on
+        # the TP area adds +1 conviction; ≥4 adds +2 (max +2 from this signal).
+        # Scores 1-2 are analytics-only — backtest shows PF<1 at those tiers.
+        if _target_score >= 4:
+            conviction += 2
+        elif _target_score >= 3:
+            conviction += 1
+        # Re-evaluate max_legs to incorporate the confluence conviction bump.
+        # (max_legs was set before _find_target; this upgrades borderline trades.)
+        if conviction > 4:
+            max_legs = config.MAX_LEGS
+        elif conviction > 2:
+            max_legs = max(max_legs, 2)
 
         reward_pips = abs(target - entry) / pip
         if reward_pips < config.MIN_ENTRY_PIPS_TARGET:
@@ -1786,6 +1830,7 @@ class Backtester:
             "htf_fvg": _htf_fvg_tf,
             "dxy_fvg_tf": _dxy_fvg_tf,
             "ny_cont": _is_ny_cont,
+            "target_confluence": _target_score,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
@@ -1800,6 +1845,8 @@ class Backtester:
         self._day_total[day_key]                          = day_total + 1
         if _is_ny:
             self._day_pair_ny[(day_key, pair)] = day_pair_ny + 1
+        elif _is_pm:
+            self._day_pair_pm[(day_key, pair)] = day_pair_pm + 1
         else:
             self._day_pair[(day_key, pair)]    = day_pair + 1
 

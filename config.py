@@ -108,18 +108,33 @@ MAX_PAIR_TRADES_PER_WEEK = 999   # effectively unlimited per-pair weekly entries
 # on the same pair doesn't block the NY continuation or reversal.
 MIN_CONVICTION_NY        = 5   # lower gate: NY needs fewer confirms than London
 MAX_PAIR_TRADES_PER_DAY_NY = 1   # max NY initial entries per pair per UTC day
+MAX_PAIR_TRADES_PER_DAY_PM = 1   # max PM initial entries per pair per UTC day
 
 # --- Killzones (New York time, 24h) ---
 KILLZONES = [
     ("London Open",  "03:00", "05:00"),
     ("New York AM",  "07:00", "10:00"),
 ]
+# NY afternoon session — analytics-first, default OFF until IS/OOS validated.
+# PM character: position squaring, mean-reversion, Fedwire close flow (13:30-16:00 ET).
+# Smaller banks and Tier 2 participants are the dominant flow (CLS funding done, London closed).
+NY_PM_ENABLED   = False
+NY_PM_KILLZONE  = ("New York PM", "13:30", "16:00")
+
 # Oceanic currencies (AUD, NZD) peak during Asian session, not London/NY.
 AUD_NZD_KILLZONES = [
     ("Asian Open",  "20:00", "22:00"),   # Sydney open
     ("Tokyo Kill",  "23:00", "01:00"),   # Tokyo volume peak
 ]
 NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzone
+
+# --- Target confluence scoring ---
+# When multiple independent sources (fib extension, FVG, equal high/low, OB, round
+# number, PDH/PDL, PWH/PWL) agree on the same TP level, that level is magnetically
+# stronger — price is far more likely to reach it. Score each candidate by confluence
+# count and prefer the highest-scoring TP. Score adds directly to conviction →
+# more pyramid legs unlocked for high-confluence targets.
+TARGET_CONFLUENCE_TOL_PIPS = 8   # pips tolerance for two sources to be "at same level"
 
 # --- ICT 2022 Episode 12: Market Structure hierarchy ---
 # Episode 12 defines three swing tiers: LTH/LTL (Daily ~50 bars), ITH/ITL (1H ~20

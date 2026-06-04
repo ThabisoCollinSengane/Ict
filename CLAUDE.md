@@ -460,6 +460,55 @@ report. London profile = Judas reversal home. NY profile = continuation/breakout
 No session state bleeds across profiles — on a new day London starts clean, and when NY opens
 it starts clean regardless of what London did.
 
+### P14 — NY PM session profile (IMPLEMENTED 2026-06-04, analytics-only default OFF)
+**What:** The 13:30–16:00 ET window is fundamentally different from London/NY AM: CLS funding
+has closed, London banks are closed or squaring, only NY banks remain. Character is position-
+squaring and mean-reversion rather than directional distribution. Tier-2 participants can't
+piggyback the institutional CLS flow that creates the Judas sweep.
+
+**Implementation:**
+- Config: `NY_PM_ENABLED = False` (off by default), `NY_PM_KILLZONE = ("New York PM", "13:30", "16:00")`
+- `MAX_PAIR_TRADES_PER_DAY_PM = 1` — separate budget cap, doesn't compete with AM slots
+- `killzones.py`: conditionally appends PM killzone to `_KZ` when `NY_PM_ENABLED = True`
+- `backtest.py`: `_is_pm` detection, `_session_label = "ny_pm"`, phases `pm_reversal` / `pm_squaring`
+- `_day_pair_pm` dict tracks PM slots per (day, pair) independently
+- **Analytics-first**: enable `NY_PM_ENABLED = True` and run IS/OOS before deciding whether to keep
+
+### P15 — Target confluence scoring (IMPLEMENTED 2026-06-04, analytics-only)
+**What:** Score each chosen TP candidate by how many independent source families agree within
+`TARGET_CONFLUENCE_TOL_PIPS` of that price. Sources: fib extension, FVG mid, order block mid,
+equal H/L, round number, PDH/PDL, PWH/PWL, raw swing high/low.
+
+**Implementation:**
+- `_confluence_score(candidates, target_price, tol)` static method — counts distinct source families
+- `_find_target` preserves the original nearest-qualifying selection (no equity impact), then
+  scores the chosen target. Returns `(target, target_type, score)` instead of 2-tuple.
+- Conviction bonus coded (score≥3 → +1, score≥4 → +2) with `max_legs` re-evaluation — but
+  **inert in practice**: same saturation as P9 conviction-add (trades already at conviction>4
+  before target is scored → max_legs already at MAX_LEGS). 798/46.7%/5.03/-12.95%/R60.18M unchanged.
+- `target_confluence` column on every trade record
+- Config: `TARGET_CONFLUENCE_TOL_PIPS = 8`
+- Reporting: "Target confluence scoring" table by score showing WR/PF breakdown
+
+**Backtest finding — the score signal IS real, the conviction lever is saturated:**
+
+| Score | Trades | WR% | PF | Notes |
+|---|---|---|---|---|
+| 1 | 13 | 38.5% | 0.02 | Noise — single source, weak draw |
+| 2 | 40 | 40.0% | 0.20 | Still weak — two sources not enough |
+| 3 | 225 | 43.6% | 6.70 | Signal kicks in here — strong PF jump |
+| 4 | 325 | 50.5% | 5.73 | Best WR — most trades land here |
+| 5 | 190 | 41.6% | 3.94 | Good — more sources = tighter cluster |
+| 6 | 18 | 44.4% | 43.28 | Tiny sample, extreme PF |
+
+**ICT rationale:** Score≥3 is the minimum for a genuine institutional draw — a Fibonacci level +
+FVG + round number all pointing at the same price means EAs/bank desks from multiple frameworks
+are targeting that level. Score<3 is just noise (one source can always be found near any price).
+
+**Next lever (not yet implemented):** A sizing multiplier for score≥4 targets (analogous to
+P9's 1.25x HTF FVG multiplier) could extract value from the high-conviction TP areas without
+changing the compounding path. Requires IS/OOS validation before shipping.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

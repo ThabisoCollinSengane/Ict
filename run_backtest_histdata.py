@@ -510,6 +510,25 @@ def main():
                 print(f"  {_dxy_label.get(tf, tf):<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
 
+        if "target_confluence" in df.columns:
+            print("\n=== Target confluence scoring — TP area source agreement ===")
+            print("  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) "
+                  "within tolerance of chosen TP.")
+            print("  Higher score → more independent reasons price should reach that level.")
+            print(f"  {'Score':<8} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6} {'Avg P&L':>10}")
+            print("  " + "-" * 60)
+            for score in sorted(df["target_confluence"].unique()):
+                grp = df[df["target_confluence"] == score]
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                label = f"score={int(score)}"
+                print(f"  {label:<8} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f} {grp.pnl.mean():>10.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
