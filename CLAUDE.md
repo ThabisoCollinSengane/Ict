@@ -417,6 +417,31 @@ weak draw_score-0 subset, and the gate is correctly separating them. The user's 
 already in the system — no lever needed. `NY_CONTINUATION_GATE_EXEMPT=False`. Detection/tag
 retained as analytics (the `ny_cont` column lets us monitor continuation performance live).
 
+### P12 — Dual session-profile architecture (IMPLEMENTED 2026-06-04)
+**What:** Each session (London and NY) evaluates the market independently — a clean handover
+per the ICT Price Delivery Algorithm. Previously, London's Judas detection bled into NY's
+session-phase label because `_judas_seen` was keyed by `(pair, date)` only. NY would inherit
+`session_phase = "judas_seen"` even though it had its own fresh AMD cycle starting at 07:00 ET.
+
+**Implementation:**
+- `_judas_seen` key changed from `(pair, date)` to `(pair, session_label, date)`
+  where `session_label` is `"london"` (03:00–05:00 ET) or `"ny"` (07:00–10:00 ET)
+- `_session_label` computed early in `_maybe_open` from `_is_london`/`_is_ny`
+- Session phase vocabulary updated to be profile-prefixed:
+  - **London phases**: `london_watch` / `london_judas` / `london_breakout`
+  - **NY phases**: `ny_judas` / `ny_extend`
+- `profile` field added to every trade record (`"london"` or `"ny"`)
+- New reporting table: "Session profile breakdown (London vs NY)" showing WR/PF/P&L per profile × model
+
+**Effect on backtest numbers:** Zero — this is a pure analytics/labeling change. The entry logic,
+gates, sizing, and P&L are identical. Trade count: 798. WR: 47%. PF: 5.03. MaxDD: -12.95%.
+
+**What the new reporting reveals:**
+Each session profile's performance by entry model is now independently visible in the backtest
+report. London profile = Judas reversal home. NY profile = continuation/breakout home.
+No session state bleeds across profiles — on a new day London starts clean, and when NY opens
+it starts clean regardless of what London did.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

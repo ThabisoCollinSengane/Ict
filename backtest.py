@@ -155,7 +155,7 @@ class Backtester:
         # Session-phase AMD cycle tracker: once a Judas sweep is detected for a pair
         # on a given NY date the flag stays True for the rest of that session so the
         # breakout_eligible gate knows whether the Judas already fired.
-        self._judas_seen        = {}   # (pair, ny_date) -> bool
+        self._judas_seen        = {}   # (pair, session_label, ny_date) -> bool  [London and NY each have independent AMD cycles]
         # P10: once a London-Open Judas reversal OPENS on a pair, flag it so the
         # same-pair NY-AM breakout that day can be sized down (it's the weaker echo).
         self._london_judas_open = {}   # (pair, ny_date) -> bool
@@ -336,6 +336,7 @@ class Backtester:
             "im_scenario": st.get("im_scenario", "?"),
             "entry_model": st.get("entry_model", "judas"),
             "session_phase": st.get("session_phase", "unknown"),
+            "profile": st.get("profile", "other"),
             "htf_fvg": st.get("htf_fvg", ""),
             "ny_cont": st.get("ny_cont", False),
         }
@@ -1126,6 +1127,14 @@ class Backtester:
         _ny_dt = now.astimezone(_ny_tz)
         _is_ny     = (7 <= _ny_dt.hour < 10)
         _is_london = (2 <= _ny_dt.hour < 5)
+        # Each session evaluates price independently (clean profile handover):
+        # London detects its own AMD cycle; NY starts fresh without London's state.
+        if _is_london:
+            _session_label = "london"
+        elif _is_ny:
+            _session_label = "ny"
+        else:
+            _session_label = "other"
 
         # ── Weekly / daily trade budget ───────────────────────────────────────
         iso = day_key.isocalendar()
@@ -1385,8 +1394,9 @@ class Backtester:
                 amd_score = 1
                 conviction += 1
                 g["manipulation_correct_dir"] += 1
-            # Judas detected (any direction) — mark it sticky for the full session
-            _judas_key = (pair, _ny_dt.date())
+            # Judas detected — mark it sticky for this session's profile only.
+            # Key is session-specific so London's Judas doesn't bleed into NY.
+            _judas_key = (pair, _session_label, _ny_dt.date())
             self._judas_seen[_judas_key] = True
 
         # HTF FVG 50% draw (P9): price consolidating at the equilibrium of an
@@ -1404,19 +1414,24 @@ class Backtester:
         # If the Judas window closes with no sweep, the fallback entry is the
         # triple-confirmed breakout continuation using the bigger-TF draw.
         # Phases are keyed by (pair, NY date) so each trading day starts fresh.
-        _judas_key   = (pair, _ny_dt.date())
+        # Session profiles are independent: each session tracks its own AMD cycle.
+        # London profile: london_watch → london_judas (sweep seen) / london_breakout (no sweep)
+        # NY profile:     ny_judas (own sweep seen) / ny_extend (no own sweep — handover continuation)
+        _judas_key   = (pair, _session_label, _ny_dt.date())
         _judas_fired = self._judas_seen.get(_judas_key, False)
         _ny_hhmm     = _ny_dt.hour * 100 + _ny_dt.minute
 
-        if _judas_fired:
-            _session_phase = "judas_seen"
-        elif 7 <= _ny_dt.hour < 10:
-            _session_phase = "ny_extend"         # NY: either model valid
-        elif 3 <= _ny_dt.hour < 5:
-            # London first 30 min = prime Judas window; London 2nd half = breakout fallback
-            _session_phase = "judas_watch" if _ny_hhmm < 330 else "breakout_eligible"
+        if _is_ny:
+            _session_phase = "ny_judas" if _judas_fired else "ny_extend"
+        elif _is_london:
+            if _judas_fired:
+                _session_phase = "london_judas"
+            elif _ny_hhmm < 330:
+                _session_phase = "london_watch"    # prime Judas sweep window (03:00–03:30)
+            else:
+                _session_phase = "london_breakout" # fallback continuation (03:30–05:00)
         else:
-            _session_phase = "accumulation"      # Asian session — entries blocked by KZ anyway
+            _session_phase = "accumulation"        # Asian session — entries blocked by KZ
 
         # Session phase is tracked for analytics but NOT used as a hard gate.
         # breakout_eligible (PF 0.13) and ny_extend (PF 0.16) have negative arithmetic
@@ -1731,6 +1746,7 @@ class Backtester:
             "im_scenario": _im_scenario,
             "entry_model": "breakout" if _is_breakout else "judas",
             "session_phase": _session_phase,
+            "profile": _session_label,
             "htf_fvg": _htf_fvg_tf,
             "ny_cont": _is_ny_cont,
         }
