@@ -194,7 +194,7 @@ HTF_FVG_SCAN_BARS          = 80    # how many recent HTF bars to scan for FVGs p
 # Applied on top of any draw-cascade multiplier; same equity floor applies.
 # A continuation at the gap's equilibrium is the highest-conviction setup — the
 # HTF draw is the target, the AMD cycle confirms the timing.
-HTF_FVG_BREAKOUT_MULT      = 1.5
+HTF_FVG_BREAKOUT_MULT      = 1.25
 # Reversal filter: if an unmitigated HTF FVG exists in the opposing direction
 # (i.e., a draw that price hasn't yet delivered to), the Judas reversal is
 # fighting the HTF delivery — skip it. Gate only applies to reversals, not
