@@ -190,6 +190,16 @@ OB_LOOKBACK_BARS = 200             # how far back on HTF to scan for unmitigated
 # FVG midpoint whose direction matches the trade, award +1 conviction.
 HTF_FVG_MID_TOLERANCE_PIPS = 10    # how close to the 50% level counts as "at equilibrium"
 HTF_FVG_SCAN_BARS          = 80    # how many recent HTF bars to scan for FVGs per TF
+# Sizing multiplier when a breakout/continuation is anchored at an HTF FVG 50%.
+# Applied on top of any draw-cascade multiplier; same equity floor applies.
+# A continuation at the gap's equilibrium is the highest-conviction setup — the
+# HTF draw is the target, the AMD cycle confirms the timing.
+HTF_FVG_BREAKOUT_MULT      = 2.0
+# Reversal filter: if an unmitigated HTF FVG exists in the opposing direction
+# (i.e., a draw that price hasn't yet delivered to), the Judas reversal is
+# fighting the HTF delivery — skip it. Gate only applies to reversals, not
+# breakout continuations (which run WITH the draw).
+HTF_FVG_REVERSAL_FILTER    = True
 
 # --- AMD (Accumulation / Manipulation / Distribution) on M15 ---
 # A consolidation range must satisfy ALL of:

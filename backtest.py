@@ -969,6 +969,25 @@ class Backtester:
                     out.append((bars[i].Low, "swing"))
         return out
 
+    @staticmethod
+    def _scan_htf_fvgs(bars, pair):
+        """Scan bars for FVGs and mark mitigation (close-through, ICT Ep 9)."""
+        start = max(2, len(bars) - config.HTF_FVG_SCAN_BARS)
+        fvgs = []
+        for i in range(start, len(bars)):
+            fvg = detect_new_fvg(bars[: i + 1], pair)
+            if fvg is not None:
+                fvgs.append(fvg)
+        for fvg in fvgs:
+            for c in bars[fvg.bar_index + 1:]:
+                if fvg.direction > 0 and c.Close <= fvg.bottom:
+                    fvg.mitigated = True
+                    break
+                if fvg.direction < 0 and c.Close >= fvg.top:
+                    fvg.mitigated = True
+                    break
+        return fvgs
+
     def _htf_fvg_conviction(self, pair, direction, cur_price, t):
         """P9 — HTF FVG 50% midpoint as draw-on-liquidity conviction.
 
@@ -991,28 +1010,44 @@ class Backtester:
             bars = self.bars_up_to(pair, tf, t)
             if bars is None or len(bars) < 3:
                 continue
-            start = max(2, len(bars) - config.HTF_FVG_SCAN_BARS)
-            fvgs = []
-            for i in range(start, len(bars)):
-                fvg = detect_new_fvg(bars[: i + 1], pair)
-                if fvg is not None:
-                    fvgs.append(fvg)
-            # Mitigation = a later bar CLOSES through the far side of the gap
-            # (ICT Ep 9: wicks don't mitigate, only a close through does).
-            for fvg in fvgs:
-                for c in bars[fvg.bar_index + 1:]:
-                    if fvg.direction > 0 and c.Close <= fvg.bottom:
-                        fvg.mitigated = True
-                        break
-                    if fvg.direction < 0 and c.Close >= fvg.top:
-                        fvg.mitigated = True
-                        break
-            for fvg in fvgs:
+            for fvg in self._scan_htf_fvgs(bars, pair):
                 if fvg.mitigated or fvg.direction != direction:
                     continue
                 if abs(cur_price - fvg.mid) <= tol:
                     return 1, tf
         return 0, ""
+
+    def _htf_fvg_opposing(self, pair, direction, cur_price, t):
+        """Reversal filter: detect unmitigated HTF FVGs in the opposing direction.
+
+        When a REVERSAL trade would fade a move, it may be fighting an unmitigated
+        HTF draw. Example: going SHORT after a Judas sweep, but an unmitigated
+        BULLISH H4 FVG sits above price — the HTF draw is UP, so the reversal is
+        premature; price will likely first deliver into the FVG before reversing.
+
+        Returns True if such a blocking opposing FVG exists on any HTF.
+        The check is intentionally direction-agnostic: an opposing FVG that price
+        has already passed through (already inside or beyond) is ignored — only
+        FVGs that are still "in the path" count.
+        """
+        opp = -direction   # direction we'd be fighting
+        for tf in ("W", "D", "240T"):
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 3:
+                continue
+            for fvg in self._scan_htf_fvgs(bars, pair):
+                if fvg.mitigated or fvg.direction != opp:
+                    continue
+                # The FVG is "in the path" when price must travel through it to
+                # reach the reversal target.  For a SHORT reversal, a bullish FVG
+                # above price means price would have to rally into it before the
+                # short target is reached (it represents an unfilled draw UP).
+                # For a LONG reversal, a bearish FVG below price works the same way.
+                if opp > 0 and fvg.bottom > cur_price:   # bullish FVG above → blocks short
+                    return True
+                if opp < 0 and fvg.top < cur_price:      # bearish FVG below → blocks long
+                    return True
+        return False
 
     def _maybe_open(self, pair, t):
         g = self.gate
@@ -1360,6 +1395,16 @@ class Backtester:
         # In a compounding strategy, TWRR contribution > arithmetic P&L — these phases stay open.
         g[f"phase_{_session_phase}"] = g.get(f"phase_{_session_phase}", 0) + 1
 
+        # P9 reversal filter: skip Judas reversals that fade INTO an unmitigated HTF FVG
+        # in the opposing direction. An undelivered HTF gap above price (for a short) or
+        # below price (for a long) is a draw that must be filled before the reversal can
+        # work — the market will run to it first, stopping out the early fade.
+        # Breakout continuations are exempt: they run WITH the HTF draw, not against it.
+        if config.HTF_FVG_REVERSAL_FILTER and not _is_breakout:
+            if self._htf_fvg_opposing(pair, direction, cur_price, t):
+                g["htf_fvg_reversal_blocked"] = g.get("htf_fvg_reversal_blocked", 0) + 1
+                return
+
         # M1 fractal structure is captured via _get_limit_entry (fvg_m1/ob_m1/
         # breaker_m1) — same AMD concept at execution speed without the O(n³)
         # consolidation scan cost that would stall the main loop.
@@ -1590,6 +1635,13 @@ class Backtester:
         _draw_mult = config.DRAW_SIZE_MULT.get(_draw_score, 1.0)
         if _draw_mult != 1.0 and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
             units = max(int(units * _draw_mult), min_units)
+        # P9 sizing boost: breakout/continuation anchored at HTF FVG 50% midpoint.
+        # The FVG is the HTF draw on liquidity — the AMD cycle forming exactly at the
+        # gap's equilibrium is the highest-conviction continuation setup. Scale up,
+        # same equity floor as the draw-cascade multiplier.
+        if _is_breakout and _htf_fvg_pts and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
+            units = max(int(units * config.HTF_FVG_BREAKOUT_MULT), min_units)
+            g["htf_fvg_breakout_sized"] = g.get("htf_fvg_breakout_sized", 0) + 1
         if units == 0:
             return
         g["units_nonzero"] += 1
