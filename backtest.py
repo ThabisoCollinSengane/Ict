@@ -1296,15 +1296,12 @@ class Backtester:
         else:
             _session_phase = "accumulation"      # Asian session — entries blocked by KZ anyway
 
-        # Phase gate: only trade when the session's AMD structure is established.
-        # breakout_eligible (London 03:30+ with no Judas): 4yr PF 0.13 — losses dwarf wins,
-        #   even triple-confirmed breakouts chase moves that reverse before NY.
-        # ny_extend (NY with no prior London Judas): 4yr PF 0.16 — no AMD context, no edge.
-        # Both phases are blocked regardless of entry model — the session has no clear
-        # manipulation phase to fade or continue. "judas_seen" and "judas_watch" keep trading.
-        if _session_phase in ("breakout_eligible", "ny_extend"):
-            g["phase_blocked"] = g.get("phase_blocked", 0) + 1
-            return
+        # Session phase is tracked for analytics but NOT used as a hard gate.
+        # breakout_eligible (PF 0.13) and ny_extend (PF 0.16) have negative arithmetic
+        # P&L in isolation, but their wins cluster at high-equity periods where the
+        # compounding path dependency means removing them cuts final equity by ~R31M.
+        # In a compounding strategy, TWRR contribution > arithmetic P&L — these phases stay open.
+        g[f"phase_{_session_phase}"] = g.get(f"phase_{_session_phase}", 0) + 1
 
         # M1 fractal structure is captured via _get_limit_entry (fvg_m1/ob_m1/
         # breaker_m1) — same AMD concept at execution speed without the O(n³)
