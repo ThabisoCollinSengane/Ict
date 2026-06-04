@@ -1217,6 +1217,22 @@ class Backtester:
                 return
         # ─────────────────────────────────────────────────────────────────────
 
+        # PM precision gate: afternoon session only fires on the exact confluence
+        # described by the user — London+NY AM still within internal range, with a
+        # HTF draw (FVG) still in play and a news catalyst to deliver the final leg.
+        # Without all three, PM is position-squaring noise (IS PF 1.64, MaxDD -17.66%).
+        #   1. EURUSD only — GBPUSD PM is PF 0.69, a proven loser (GBP liquidity
+        #      dries up after London close; cable tracks equities, not FX flow).
+        #   2. High-impact news only — the catalyst that forces price to deliver
+        #      into the HTF target. Without it, PM moves are random squaring.
+        #   3. HTF FVG conviction (checked below after _htf_fvg_pts is computed).
+        if _is_pm:
+            if pair != "EURUSD":
+                return
+            if news_impact != "High":
+                return
+        g["pm_gate_pair_news"] = g.get("pm_gate_pair_news", 0) + (1 if _is_pm else 0)
+
         # Intermarket: DXY gives USD direction.
         # EUR/GBP family (unchanged): EURGBP selects EURUSD vs GBPUSD.
         # NZDUSD family (independent): AUDNZD selects NZD as preferred vs AUD; DXY confirms direction.
@@ -1462,6 +1478,11 @@ class Backtester:
         if _htf_fvg_pts:
             conviction += _htf_fvg_pts
             g["htf_fvg_5050_hit"] += 1
+        # PM gate condition 3: HTF FVG must be active — price inside an unmitigated
+        # W/D/H4 FVG midpoint in the trade direction = external draw still in play.
+        # Without it, the PM trade has no evidence the day's range is unfinished.
+        if _is_pm and not _htf_fvg_pts:
+            return
 
         # DXY level context (P13): DXY's own W/D/H4 FVG in its direction means the
         # dollar itself has an undelivered HTF draw — the move has structural room.
