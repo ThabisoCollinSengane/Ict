@@ -208,6 +208,14 @@ def main():
 
     if backtester.trades:
         df = pd.DataFrame(backtester.trades)
+        # Full trade dump for offline analysis (Judas vs continuation, session
+        # breakdowns, same-day co-occurrence). Set TRADE_CSV to override path.
+        _csv_path = os.environ.get("TRADE_CSV", os.path.join(DATA_DIR, "trades_dump.csv"))
+        try:
+            df.to_csv(_csv_path, index=False)
+            print(f"\n[trade dump → {_csv_path}]")
+        except Exception as _e:
+            print(f"\n[trade dump skipped: {_e}]")
         print(f"\n=== Trade log ({len(backtester.trades)} trades) ===")
         cols = ["opened_at", "closed_at", "pair", "direction",
                 "leg_idx", "entry", "exit", "units", "pnl", "reason",
