@@ -1296,17 +1296,15 @@ class Backtester:
         else:
             _session_phase = "accumulation"      # Asian session — entries blocked by KZ anyway
 
-        if _session_phase == "breakout_eligible":
-            if not _is_breakout:
-                # Past the Judas window with no sweep seen and no triple breakout.
-                # Entering here means fading a real directional move — skip.
-                g["phase_no_signal"] = g.get("phase_no_signal", 0) + 1
-                return
-            # Missed-Judas + triple-confirmed breakout = continuation entry.
-            # The move is real (not manipulation), price is running for the bigger
-            # TF draw on liquidity. Boost conviction to reflect the higher quality.
-            conviction += 1
-            g["phase_breakout"] = g.get("phase_breakout", 0) + 1
+        # Phase gate: only trade when the session's AMD structure is established.
+        # breakout_eligible (London 03:30+ with no Judas): 4yr PF 0.13 — losses dwarf wins,
+        #   even triple-confirmed breakouts chase moves that reverse before NY.
+        # ny_extend (NY with no prior London Judas): 4yr PF 0.16 — no AMD context, no edge.
+        # Both phases are blocked regardless of entry model — the session has no clear
+        # manipulation phase to fade or continue. "judas_seen" and "judas_watch" keep trading.
+        if _session_phase in ("breakout_eligible", "ny_extend"):
+            g["phase_blocked"] = g.get("phase_blocked", 0) + 1
+            return
 
         # M1 fractal structure is captured via _get_limit_entry (fvg_m1/ob_m1/
         # breaker_m1) — same AMD concept at execution speed without the O(n³)
