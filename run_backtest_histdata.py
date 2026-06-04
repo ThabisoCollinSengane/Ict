@@ -529,6 +529,34 @@ def main():
                 print(f"  {label:<8} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>14.2f} {pf:>6.2f} {grp.pnl.mean():>10.2f}")
 
+        if "mstruct_pts" in df.columns:
+            print("\n=== Market structure (Ep 12 LTH/ITH/STH fractal) ===")
+            print("  Couples the fractal swing-tier read with the draw cascade. HTF")
+            print("  intermediate structure agreeing with the trade = bigger draw in our favour.")
+
+            def _ms_row(label, grp):
+                if len(grp) == 0:
+                    return
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                print(f"  {label:<22} {len(grp):>6} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>7.2f}")
+
+            print(f"  {'Bucket':<22} {'Trades':>6} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>7}")
+            print("  " + "-" * 64)
+            df["_htf_agree"] = df["mstruct_htf_dir"] == df["direction"]
+            _ms_row("HTF struct agrees",   df[df["_htf_agree"]])
+            _ms_row("HTF struct disagrees", df[~df["_htf_agree"]])
+            _ms_row("minor-sweep (Judas)", df[df["mstruct_minor_sweep"] == True])
+            _ms_row("no minor-sweep",      df[df["mstruct_minor_sweep"] != True])
+            print("  ── highest intact-structure timeframe ──")
+            for tf in ("W", "D", "240T", "60T", "15T"):
+                _ms_row(f"intact @ {tf}", df[df["mstruct_intact_tf"] == tf])
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "

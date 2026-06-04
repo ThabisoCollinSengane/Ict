@@ -21,6 +21,7 @@ from ict.fvg import detect_new_fvg, nearest_unmitigated
 from ict.order_block import detect_order_blocks, nearest_unmitigated_ob, find_breaker_zone
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
+from ict import market_structure as mstruct
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup, detect_breakout
 from ict.ote import in_ote, find_swing
@@ -342,6 +343,11 @@ class Backtester:
             "dxy_fvg_tf": st.get("dxy_fvg_tf", ""),
             "ny_cont": st.get("ny_cont", False),
             "target_confluence": st.get("target_confluence", 1),
+            "mstruct_pts": st.get("mstruct_pts", 0),
+            "mstruct_align": st.get("mstruct_align", ""),
+            "mstruct_htf_dir": st.get("mstruct_htf_dir", 0),
+            "mstruct_minor_sweep": st.get("mstruct_minor_sweep", False),
+            "mstruct_intact_tf": st.get("mstruct_intact_tf", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -1110,6 +1116,78 @@ class Backtester:
                     return 1, tf
         return 0, ""
 
+    # Timeframes scanned for market-structure conviction (Ep 12), HTF → LTF.
+    # M5 (5T) is excluded per the trader's spec — too noisy for tier classification;
+    # M1 (1T) is used only for stop anchoring, not structural read. Weighting is
+    # hierarchical: the bigger the timeframe agreeing, the stronger the draw.
+    _MSTRUCT_TFS = (
+        ("W",    3),   # weekly structure — the macro draw, highest weight
+        ("D",    2),   # daily structure
+        ("240T", 1),   # H4 structure
+        ("60T",  1),   # H1 structure — session bias tier
+        ("15T",  1),   # M15 structure — entry tier
+    )
+
+    def _structure_conviction(self, pair, direction, t):
+        """Ep 12 — couple the fractal LTH/ITH/STH read with the draw cascade.
+
+        For each timeframe (W→M15, M5 excluded) classify the swing structure and
+        check whether its intermediate-tier direction agrees with the trade. The
+        bigger the timeframe agreeing, the bigger the draw → more conviction.
+
+        Also detects the double-sweep / Judas continuation: when an entry-tier
+        (M15/H1) short-term swing was swept but the intermediate swing in the
+        trade direction is still INTACT, the move is a minor liquidity run, not a
+        reversal — a continuation confirmation.
+
+        Returns a dict:
+          points        — conviction to add (capped to keep it saturation-safe)
+          align_tfs     — list of TF names whose structure agrees with direction
+          htf_dir       — daily/weekly combined structural direction (+1/-1/0)
+          minor_sweep   — True if an entry-tier Judas left HTF structure intact
+          ltf_intact_tf — highest TF whose intact LTL/LTH supports the direction
+        """
+        align = []
+        weight = 0
+        htf_dir = 0
+        minor_sweep = False
+        intact_tf = ""
+        for tf, w in self._MSTRUCT_TFS:
+            bars = self.bars_up_to(pair, tf, t, max_bars=300)
+            if len(bars) < 5:
+                continue
+            res = mstruct.classify(bars)
+            sdir = mstruct.structure_direction(res)
+            if sdir == direction:
+                align.append(tf)
+                weight += w
+                if tf in ("W", "D"):
+                    htf_dir = direction
+                # The most recent intact intermediate level supporting the trade.
+                tier = "ITL" if direction > 0 else "ITH"
+                if mstruct.last_intact(res, tier) is not None and not intact_tf:
+                    intact_tf = tf
+            # Minor-sweep (Judas continuation) read on the entry tiers only.
+            if tf in ("60T", "15T") and mstruct.is_minor_sweep(res, direction):
+                minor_sweep = True
+        # Conviction: +1 when any HTF agrees, +1 more when a big TF (W/D) agrees,
+        # +1 for a confirmed minor-sweep continuation. Capped at +3 — additive and
+        # saturation-aware (mirrors the draw-cascade scale, doesn't double-count it).
+        points = 0
+        if weight >= 1:
+            points += 1
+        if htf_dir == direction:
+            points += 1
+        if minor_sweep:
+            points += 1
+        return {
+            "points": points,
+            "align_tfs": align,
+            "htf_dir": htf_dir,
+            "minor_sweep": minor_sweep,
+            "ltf_intact_tf": intact_tf,
+        }
+
     def _maybe_open(self, pair, t):
         g = self.gate
         g["checks"] += 1
@@ -1494,6 +1572,18 @@ class Backtester:
             conviction += _dxy_fvg_pts
             g["dxy_fvg_room"] = g.get("dxy_fvg_room", 0) + 1
 
+        # Ep 12 market structure: fractal LTH/ITH/STH read across W→M15, coupled
+        # with the inverted draw cascade. Higher-TF intermediate structure agreeing
+        # with the trade = a bigger draw on liquidity in our favour → more conviction.
+        # The minor-sweep flag identifies Judas continuations (STH/STL swept but the
+        # ITH/ITL still intact = trend continues). Analytics columns recorded below.
+        _ms = self._structure_conviction(pair, direction, t)
+        if _ms["points"]:
+            conviction += _ms["points"]
+            g["mstruct_align"] = g.get("mstruct_align", 0) + 1
+        if _ms["minor_sweep"]:
+            g["mstruct_minor_sweep"] = g.get("mstruct_minor_sweep", 0) + 1
+
         # ── Session-phase AMD cycle tracking ──────────────────────────────────
         # ICT price delivery:  Asian accumulation → London Judas (manipulation)
         #                       → Distribution / breakout continuation.
@@ -1854,6 +1944,11 @@ class Backtester:
             "dxy_fvg_tf": _dxy_fvg_tf,
             "ny_cont": _is_ny_cont,
             "target_confluence": _target_score,
+            "mstruct_pts": _ms["points"],
+            "mstruct_align": "|".join(_ms["align_tfs"]),
+            "mstruct_htf_dir": _ms["htf_dir"],
+            "mstruct_minor_sweep": _ms["minor_sweep"],
+            "mstruct_intact_tf": _ms["ltf_intact_tf"],
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
