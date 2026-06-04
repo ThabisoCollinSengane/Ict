@@ -1478,11 +1478,13 @@ class Backtester:
         if _htf_fvg_pts:
             conviction += _htf_fvg_pts
             g["htf_fvg_5050_hit"] += 1
-        # PM gate condition 3: HTF FVG must be active — price inside an unmitigated
-        # W/D/H4 FVG midpoint in the trade direction = external draw still in play.
-        # Without it, the PM trade has no evidence the day's range is unfinished.
-        if _is_pm and not _htf_fvg_pts:
-            return
+        # PM gate condition 3 (reserved): HTF FVG active = external draw still in play.
+        # Tested triple gate (EURUSD + High news + HTF FVG) and 2-condition (EURUSD +
+        # High news): both produced 0 trades in 4yr. High-impact news during 13:30-16:00
+        # ET never co-occurs with a passing DXY/conviction check in this dataset.
+        # Gate left as analytics comment — do not enable without new data evidence.
+        # if _is_pm and not _htf_fvg_pts:
+        #     return
 
         # DXY level context (P13): DXY's own W/D/H4 FVG in its direction means the
         # dollar itself has an undelivered HTF draw — the move has structural room.

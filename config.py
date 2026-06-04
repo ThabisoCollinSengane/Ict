@@ -118,7 +118,7 @@ KILLZONES = [
 # NY afternoon session — analytics-first, default OFF until IS/OOS validated.
 # PM character: position squaring, mean-reversion, Fedwire close flow (13:30-16:00 ET).
 # Smaller banks and Tier 2 participants are the dominant flow (CLS funding done, London closed).
-NY_PM_ENABLED   = True
+NY_PM_ENABLED   = False
 NY_PM_KILLZONE  = ("New York PM", "13:30", "16:00")
 
 # Oceanic currencies (AUD, NZD) peak during Asian session, not London/NY.
