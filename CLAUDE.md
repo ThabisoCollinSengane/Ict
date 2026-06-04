@@ -12,8 +12,9 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 798 trades, WR 47%, PF 5.03, MaxDD -12.95%, R500 → R59.4M.
-(Two entry models: Judas reversal + intermarket breakout continuation — see §5.)
+**Backtest result (4 years, 2022–2025):** 798 trades, WR 47%, PF 5.03, MaxDD -12.95%, R500 → R60.18M.
+(Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
+HTF-FVG 1.25× sizing bump: +R825k vs the R59.35M pre-P9 baseline, MaxDD unchanged.)
 
 ---
 
@@ -320,16 +321,33 @@ continuation moves deliver INTO these gaps. Two behaviours inside the zone:
 - When current price is within `HTF_FVG_MID_TOLERANCE_PIPS` of an unmitigated FVG midpoint
   whose direction matches the trade → +1 conviction, and the trade is tagged with the
   hit timeframe (`htf_fvg` column: "W"/"D"/"240T"/"").
-- Sizing bump (`HTF_FVG_BREAKOUT_MULT=2.0`): when a breakout/continuation is anchored at
-  an HTF FVG 50%, lot size is doubled. Same equity floor as draw-cascade (R3k+). The FVG
-  is the HTF draw — the AMD cycle at the gap's equilibrium is the highest-conviction
-  continuation setup. Fires ~15×/yr; validated IS/OOS (pending full 4yr confirmation).
+- Sizing bump (`HTF_FVG_BREAKOUT_MULT=1.25`, SHIPPED): when a breakout/continuation is
+  anchored at an HTF FVG 50%, lot size is scaled 1.25×. Same equity floor as draw-cascade
+  (R3k+). The FVG is the HTF draw — the AMD cycle at the gap's equilibrium is the
+  highest-conviction continuation setup. Fires 15× over 4yr (34 trades hit the FVG, 15 of
+  those are breakouts above the R3k floor).
 - Reporting: "HTF FVG 50% draw-on-liquidity conviction" breakdown table by timeframe.
 
-**Backtest finding — conviction-add is INERT, sizing bump is active:**
+**Backtest finding — conviction-add is INERT, sizing bump is the active lever:**
 The +1 conviction signal fires 34× over 4yr but is byte-identical to baseline because
-any open trade already has conviction ≥ 5+ bucket (3 legs). The sizing bump IS active:
-15 breakout trades over 4yr get 2x size when they coincide with an HTF FVG 50%.
+any open trade already has conviction ≥ 5+ bucket (3 legs). The sizing bump IS active.
+
+**Multiplier tuning (full 4yr is the deployment-relevant path; OOS-only is a stress test):**
+
+| Mult | Full 4yr MaxDD | Full equity | OOS MaxDD | OOS PF | Verdict |
+|---|---|---|---|---|---|
+| baseline | -12.95% | R59.35M | -15.20% | 5.02 | — |
+| 2.0× | **-15.82%** | R55.85M | -16.95% | 5.05 | ❌ full run breaches -15% |
+| 1.5× | -12.95% | R60.99M | -16.95% | 5.05 | ⚠️ OOS stress +1.75pp |
+| **1.25×** | **-12.95%** | **R60.18M** | **-15.62%** | **5.06** | ✅ shipped |
+
+At 1.25× the full continuous run is identical to baseline on WR/PF/MaxDD (46.7% / 5.03 /
+-12.95%) and adds +R825k of compounding upside. IS PF 3.01, OOS PF 5.06 — both positive,
+OOS beats baseline. OOS-only MaxDD -15.62% is +0.42pp over the baseline stress path
+(-15.20%, which already exceeds the breaker — the OOS-from-R500 restart is inherently
+fragile and not the live path). Lesson: 2.0× proved a sizing multiplier CAN breach the
+breaker on the real path; size bumps amplify tail risk and must be tuned against the full
+continuous run, not just per-split PF.
 
 **Reversal filter — REVERTED (same path-dependency trap as P8):**
 Implemented and tested: skip Judas reversals fighting an unmitigated HTF FVG in the
