@@ -338,6 +338,7 @@ class Backtester:
             "session_phase": st.get("session_phase", "unknown"),
             "profile": st.get("profile", "other"),
             "htf_fvg": st.get("htf_fvg", ""),
+            "dxy_fvg_tf": st.get("dxy_fvg_tf", ""),
             "ny_cont": st.get("ny_cont", False),
         }
         self.trades.append(record)
@@ -1063,6 +1064,33 @@ class Backtester:
                         return True
         return False
 
+    def _dxy_htf_context(self, trade_direction, t):
+        """P13 — DXY's own HTF FVG as a 'room to run' signal.
+
+        DXY underlies all three traded pairs (EURUSD/GBPUSD/NZDUSD move inverse to DXY).
+        When DXY is sitting at the midpoint of an unmitigated W/D/H4 FVG in its own
+        direction, the dollar has a clear HTF delivery draw ahead — the move has room.
+        Same concept as P9 (pair FVG draw) but applied directly to the dollar index.
+
+        trade_direction: +1 = long pair (DXY needs to fall), -1 = short pair (DXY rises).
+        Returns (score, tf_hit): +1 when DXY has clear HTF room, 0 otherwise.
+        """
+        dxy_direction = -trade_direction   # DXY moves inverse to EUR/GBP/NZD pairs
+        dxy_pip = 0.001                    # DXY ~100 scale; pip = 0.001 points
+        tol = config.DXY_FVG_MID_TOLERANCE_PIPS * dxy_pip
+        for tf in ("W", "D", "240T"):
+            bars = self._dxy_bars(tf, t)
+            if not bars or len(bars) < 3:
+                continue
+            fvgs = self._scan_htf_fvgs(bars, "UDXUSD")
+            cur = bars[-1].Close
+            for fvg in fvgs:
+                if fvg.mitigated or fvg.direction != dxy_direction:
+                    continue
+                if abs(cur - fvg.mid) <= tol:
+                    return 1, tf
+        return 0, ""
+
     def _maybe_open(self, pair, t):
         g = self.gate
         g["checks"] += 1
@@ -1408,6 +1436,14 @@ class Backtester:
             conviction += _htf_fvg_pts
             g["htf_fvg_5050_hit"] += 1
 
+        # DXY level context (P13): DXY's own W/D/H4 FVG in its direction means the
+        # dollar itself has an undelivered HTF draw — the move has structural room.
+        # When DXY is sitting at the 50% of its own gap, every correlated pair benefits.
+        _dxy_fvg_pts, _dxy_fvg_tf = self._dxy_htf_context(direction, t)
+        if _dxy_fvg_pts:
+            conviction += _dxy_fvg_pts
+            g["dxy_fvg_room"] = g.get("dxy_fvg_room", 0) + 1
+
         # ── Session-phase AMD cycle tracking ──────────────────────────────────
         # ICT price delivery:  Asian accumulation → London Judas (manipulation)
         #                       → Distribution / breakout continuation.
@@ -1748,6 +1784,7 @@ class Backtester:
             "session_phase": _session_phase,
             "profile": _session_label,
             "htf_fvg": _htf_fvg_tf,
+            "dxy_fvg_tf": _dxy_fvg_tf,
             "ny_cont": _is_ny_cont,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo

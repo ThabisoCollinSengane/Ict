@@ -417,6 +417,24 @@ weak draw_score-0 subset, and the gate is correctly separating them. The user's 
 already in the system — no lever needed. `NY_CONTINUATION_GATE_EXEMPT=False`. Detection/tag
 retained as analytics (the `ny_cont` column lets us monitor continuation performance live).
 
+### P13 — DXY level tracking / room-to-run context (IMPLEMENTED 2026-06-04)
+**What:** The strategy's hard gate is DXY H1 BOS direction, but that only tells you WHICH WAY
+the dollar is moving — not WHETHER it has structural room to continue. If DXY just broke a key
+H4 FVG to the upside and is now sitting at the 50% midpoint with clear air above, that's a
+different quality trade than DXY extended 200 pips from its last BOS into a major resistance.
+
+**Implementation:**
+- `_dxy_htf_context(trade_direction, t)` scans DXY's own W/D/H4 bars for unmitigated FVGs
+- When DXY price is within `DXY_FVG_MID_TOLERANCE_PIPS` of an unmitigated FVG midpoint
+  in DXY's direction → +1 conviction (`dxy_fvg_tf` column: "W"/"D"/"240T"/"")
+- Uses the same `_scan_htf_fvgs` static method as P9, but pointed at UDXUSD bars
+- DXY pip size fixed in `ict/fvg.py`: UDXUSD returns 0.001 (DXY is ~100 scale, not 1.0)
+- `HistdataBacktester` now registers UDXUSD at Weekly TF (was missing, only went up to D)
+- `DXY_FVG_MID_TOLERANCE_PIPS = 100` → 0.10 DXY points (≈ 10 EURUSD pips)
+- Analytics-only until IS/OOS validated; conviction-add approach (not a gate)
+
+**Reporting:** "DXY level context — room to run (P13)" table by timeframe in backtest report.
+
 ### P12 — Dual session-profile architecture (IMPLEMENTED 2026-06-04)
 **What:** Each session (London and NY) evaluates the market independently — a clean handover
 per the ICT Price Delivery Algorithm. Previously, London's Judas detection bled into NY's

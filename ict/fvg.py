@@ -32,7 +32,11 @@ class FVG:
 
 
 def _pip_size(symbol: str) -> float:
-    return 0.01 if symbol.endswith("JPY") else 0.0001
+    if symbol.endswith("JPY"):
+        return 0.01
+    if symbol == "UDXUSD":
+        return 0.001   # DXY ~100 scale; 1 pip = 0.001 points
+    return 0.0001
 
 
 def detect_new_fvg(candles, symbol: str) -> FVG | None:

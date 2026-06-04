@@ -190,6 +190,11 @@ OB_LOOKBACK_BARS = 200             # how far back on HTF to scan for unmitigated
 # FVG midpoint whose direction matches the trade, award +1 conviction.
 HTF_FVG_MID_TOLERANCE_PIPS = 10    # how close to the 50% level counts as "at equilibrium"
 HTF_FVG_SCAN_BARS          = 80    # how many recent HTF bars to scan for FVGs per TF
+
+# DXY level tracking (P13): DXY's own W/D/H4 FVGs reveal where the dollar has
+# an undelivered HTF draw — room to run vs approaching a key opposing level.
+# DXY pip = 0.001 (DXY trades ~100 scale with 3 decimal places).
+DXY_FVG_MID_TOLERANCE_PIPS = 100  # 100 * 0.001 = 0.10 DXY points tolerance (≈10 EURUSD pips)
 # Sizing multiplier when a breakout/continuation is anchored at an HTF FVG 50%.
 # Applied on top of any draw-cascade multiplier; same equity floor applies.
 # A continuation at the gap's equilibrium is the highest-conviction setup — the

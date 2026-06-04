@@ -83,10 +83,10 @@ class HistdataBacktester(bt_module.Backtester):
                 self.tf_dfs[(sym, "1T")]   = df
                 self.tf_bars[(sym, "1T")]  = df_to_bars(df)
                 self.tf_index[(sym, "1T")] = df.index
-        # Register UDXUSD at all needed timeframes.
+        # Register UDXUSD at all needed timeframes (including W for DXY FVG context).
         for tf_name, rule in [
             ("5T", None), ("15T", "15min"), ("60T", "60min"),
-            ("240T", "240min"), ("D", "1D"),
+            ("240T", "240min"), ("D", "1D"), ("W", "1W"),
         ]:
             d = dxy_5m if rule is None else _resample(dxy_5m, rule)
             self.tf_dfs[("UDXUSD", tf_name)] = d
@@ -489,6 +489,25 @@ def main():
                 gross_loss = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
                 pf = (gross_win / gross_loss) if gross_loss > 0 else float("inf")
                 print(f"  {_fvg_label.get(tf, tf):<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
+
+        if "dxy_fvg_tf" in df.columns:
+            print("\n=== DXY level context — room to run (P13) ===")
+            print("  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.")
+            print(f"  {'DXY FVG TF':<14} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6}")
+            print("  " + "-" * 56)
+            _dxy_label = {"W": "W1 FVG", "D": "D1 FVG", "240T": "H4 FVG", "": "none"}
+            for tf in ("W", "D", "240T", ""):
+                grp = df[df["dxy_fvg_tf"] == tf]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                print(f"  {_dxy_label.get(tf, tf):<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
 
         if "target_type" in df.columns:
