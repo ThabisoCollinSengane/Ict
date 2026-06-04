@@ -286,9 +286,19 @@ phases chase mature moves that reverse (losses 4-7x larger than wins despite 40-
 a conviction bonus. Without it, the AMD cycle has no directional anchor.
 
 **IS/OOS validation (2026-06-04):**
-- IS (2022-23): judas_seen 346 trades, WR 46.5%, PF 3.26 | judas_watch 7 trades, PF 2.68
-- OOS (2024-25): judas_seen 387 trades, WR 47.0%, PF 5.44 | judas_watch 8 trades, PF 35.33
-- OOS PF (5.44) > IS PF (3.26) — textbook not-curve-fit result.
+
+| Metric | IS 2022–23 | OOS 2024–25 |
+|---|---|---|
+| Total trades | 353 | 395 |
+| Win rate | 46.5% | 46.8% |
+| Profit factor | 3.24 | **5.47** |
+| Max drawdown | -12.93% | **-11.82%** |
+| R500 → | R89,023 | R543,064 |
+| judas_seen PF | 3.26 (346 trades) | **5.44** (387 trades) |
+| judas_watch PF | 2.68 (7 trades) | 35.33 (8 trades) |
+
+OOS beats IS on every metric (PF, WR, MaxDD). Textbook not-curve-fit: the session phase gate
+removed the noise, not the signal.
 
 **Analytics**: `session_phase` column added to trade records; breakdown table in reporting.
 
