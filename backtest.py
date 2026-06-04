@@ -159,6 +159,11 @@ class Backtester:
         # P10: once a London-Open Judas reversal OPENS on a pair, flag it so the
         # same-pair NY-AM breakout that day can be sized down (it's the weaker echo).
         self._london_judas_open = {}   # (pair, ny_date) -> bool
+        # P11: the day's London/DXY USD direction (DXY-wide). Set from the first
+        # London-session position that opens. A NY-AM entry in this same direction is
+        # a continuation of the day's move (handover consolidation → MSS → continue),
+        # not a reversal — even when it "looks like a small Judas swing".
+        self._london_dir = {}          # ny_date -> direction (+1/-1)
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -332,6 +337,7 @@ class Backtester:
             "entry_model": st.get("entry_model", "judas"),
             "session_phase": st.get("session_phase", "unknown"),
             "htf_fvg": st.get("htf_fvg", ""),
+            "ny_cont": st.get("ny_cont", False),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -1249,6 +1255,15 @@ class Backtester:
         if _is_breakout:
             g["breakout_confirmed"] = g.get("breakout_confirmed", 0) + 1
 
+        # P11: NY-AM continuation of the day's London/DXY direction. London sets the
+        # day's USD direction (DXY-wide); into NY price consolidates over the handover
+        # then shifts structure (MSS) and continues the SAME way. Such a trade runs
+        # WITH the daily draw — it only "looks like" a reversal (micro-Judas) but is a
+        # continuation, so the inverted-draw 0/3 reversal gate would wrongly kill it.
+        # ANALYTICS-ONLY for now: tagged + counted, no gate/size change yet.
+        _is_ny_cont = (_is_ny and not _is_breakout
+                       and self._london_dir.get(_ny_dt.date(), 0) == direction)
+
         # MSS: 2-of-3 using both pairs in the family + DXY inverse.
         sym1_mss  = self._pair_has_mss(mss_sym1, t, direction)
         sym2_mss  = self._pair_has_mss(mss_sym2, t, direction)
@@ -1318,6 +1333,9 @@ class Backtester:
             self._draw_cache[_draw_key] = (_cached_draw, direction)
         _draw_score = _cached_draw
         if _draw_score == 0 and not _is_breakout:
+            if _is_ny_cont:
+                # Measure how many NY-AM continuations the reversal gate is killing.
+                g["ny_continuation_gated"] = g.get("ny_continuation_gated", 0) + 1
             g["htf_draw_counter"] += 1
             return   # hard gate: no HTF draw alignment → skip (reversal logic).
             # Breakout continuations are exempt: a strong continuation move runs
@@ -1709,11 +1727,16 @@ class Backtester:
             "entry_model": "breakout" if _is_breakout else "judas",
             "session_phase": _session_phase,
             "htf_fvg": _htf_fvg_tf,
+            "ny_cont": _is_ny_cont,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
         if not _is_breakout and _is_london:
             self._london_judas_open[(pair, _ny_dt.date())] = True
+        # P11: record the day's London/DXY direction from the first London position
+        # so NY-AM continuations in the same direction can be recognised.
+        if _is_london and _ny_dt.date() not in self._london_dir:
+            self._london_dir[_ny_dt.date()] = direction
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
         self._day_total[day_key]                          = day_total + 1

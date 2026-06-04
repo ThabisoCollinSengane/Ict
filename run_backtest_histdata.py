@@ -395,6 +395,32 @@ def main():
                 print(f"  {ph:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
 
+        if "ny_cont" in df.columns:
+            print("\n=== NY-AM continuation of London/DXY direction (P11) ===")
+            print("  NY-AM entry in the same direction London set that day (DXY-wide).")
+            print(f"  {'NY continuation':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6}")
+            print("  " + "-" * 58)
+            for is_cont, label in [(True, "yes"), (False, "no")]:
+                grp = df[df["ny_cont"] == is_cont]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                print(f"  {label:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
+            # Of the captured NY continuations, how were they classified?
+            cont = df[df["ny_cont"] == True]
+            if len(cont) and "entry_model" in cont.columns:
+                print("  -- captured NY continuations by entry_model --")
+                for m, g in cont.groupby("entry_model"):
+                    w = (g.pnl > 0).sum()
+                    print(f"     {m:<12} {len(g):>4} trades  WR {100*w/len(g):>4.1f}%  "
+                          f"P&L R{g.pnl.sum():>12.2f}")
+
         if "htf_fvg" in df.columns:
             print("\n=== HTF FVG 50% draw-on-liquidity conviction (P9) ===")
             print("  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.")
