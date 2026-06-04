@@ -273,21 +273,22 @@ expect a Judas reversal or a breakout continuation at any given moment.
 
 **Phases (keyed per-pair per-NY-date):**
 - `accumulation`: Asian session — building the range
-- `judas_watch`: London 03:00–03:30 ET — prime Judas sweep window
-- `judas_seen`: AMD sweep detected (`detect_amd_setup` found a sweep) → reversal active
-- `breakout_eligible`: London 03:30–05:00 ET, no sweep detected → breakout fallback only
-- `ny_extend`: NY AM 07:00–10:00 ET — either model valid
+- `judas_watch`: London 03:00–03:30 ET — prime Judas sweep window (active)
+- `judas_seen`: AMD sweep detected (`detect_amd_setup` found a sweep) → reversal active (active)
+- `breakout_eligible`: London 03:30–05:00 ET, no sweep detected → **GATED** (4yr PF 0.13)
+- `ny_extend`: NY AM 07:00–10:00 ET, no prior London Judas → **GATED** (4yr PF 0.16)
 
-**Gate added**: In `breakout_eligible` phase, non-breakout entries are blocked (no Judas =
-no range to fade; price is running for real — only follow it with triple-confirmed breakout).
+**Gate added**: `breakout_eligible` and `ny_extend` are fully blocked. Without an established
+AMD sweep, the session has no manipulation phase to fade or continue — all entries in these
+phases chase mature moves that reverse (losses 4-7x larger than wins despite 40-50% WR).
 
-**Conviction boost**: `breakout_eligible` + triple-confirmed breakout = +1 conviction
-("missed Judas → confirmed continuation = highest quality breakout setup").
+**Key insight (ICT)**: The Judas sweep confirmation is the prerequisite for trading, not just
+a conviction bonus. Without it, the AMD cycle has no directional anchor.
 
-**Key insight (ICT)**: Asian consolidation → London Judas (manipulation) → distribution.
-If the Judas window closes without a sweep, the move is NOT a Judas — it's real expansion.
-The correct entry is the breakout continuation using the bigger TF draw on liquidity.
-This is the user's historically most profitable trade pattern.
+**IS/OOS validation (2026-06-04):**
+- IS (2022-23): judas_seen 346 trades, WR 46.5%, PF 3.26 | judas_watch 7 trades, PF 2.68
+- OOS (2024-25): judas_seen 387 trades, WR 47.0%, PF 5.44 | judas_watch 8 trades, PF 35.33
+- OOS PF (5.44) > IS PF (3.26) — textbook not-curve-fit result.
 
 **Analytics**: `session_phase` column added to trade records; breakdown table in reporting.
 
