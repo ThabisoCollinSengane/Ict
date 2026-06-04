@@ -349,6 +349,21 @@ def main():
                 print(f"  {sc:<12} {desc:<34} {len(grp):>7} {w:>5} "
                       f"{wr:>5.1f}% {grp.pnl.sum():>12.2f} {pf:>6.2f}")
 
+        if "entry_model" in df.columns:
+            print("\n=== Entry model (Judas reversal vs intermarket breakout) ===")
+            print("  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)")
+            print(f"  {'Model':<12} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'Avg P&L':>11} {'PF':>6}")
+            print("  " + "-" * 64)
+            for model, grp in df.groupby("entry_model"):
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gross_win  = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gross_loss = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gross_win / gross_loss) if gross_loss > 0 else float("inf")
+                print(f"  {model:<12} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {grp.pnl.mean():>11.2f} {pf:>6.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "

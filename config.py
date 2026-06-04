@@ -199,6 +199,18 @@ AMD_MIN_TOUCHES = 2                # the high and low each tagged at least twice
 AMD_RANGE_END_LOOKBACK = 96        # range can have ended up to 24 H ago (Asia → London)
 AMD_SWEEP_LOOKBACK = 48            # sweep must be within last 48 M15 bars (12 H) from now
 
+# --- Breakout (continuation) model ---
+# The inverse of the Judas sweep. After a consolidation, a genuine multi-pair
+# breakout means price CLOSES beyond a range extreme by at least BREAKOUT_HOLD_PIPS
+# and holds, rather than sweeping and rejecting back inside. Validated by the
+# intermarket triple-confirmation (EURUSD + GBPUSD + DXY all break in agreement) —
+# a single-pair breakout is usually a fakeout/Judas; three together is real
+# USD-driven expansion. Breakout trades are continuation (follow the break) and are
+# therefore exempted from the inverted-draw 0/3 hard gate (which is reversal logic).
+BREAKOUT_MODEL_ENABLED = True
+BREAKOUT_HOLD_PIPS     = 3.0       # min close beyond the range extreme to call it a hold
+BREAKOUT_CONVICTION    = 2         # conviction credit when the intermarket breakout confirms
+
 # --- Market Profile ---
 # Weekly AMD: when the weekly Judas swing is confirmed (Monday range swept on
 # Tue/Wed/Thu and close back inside), pyramid legs use FULL lots regardless of

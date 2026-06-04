@@ -22,7 +22,7 @@ from ict.order_block import detect_order_blocks, nearest_unmitigated_ob, find_br
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
-from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup
+from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup, detect_breakout
 from ict.ote import in_ote, find_swing
 from ict.liquidity_divergence import judas_sweep_divergence
 from ict.fib_targets import nearest_fib_target
@@ -320,6 +320,7 @@ class Backtester:
             "target_type": st.get("target_type", "unknown"),
             "draw_score": st.get("draw_score", 0),
             "im_scenario": st.get("im_scenario", "?"),
+            "entry_model": st.get("entry_model", "judas"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -356,6 +357,44 @@ class Backtester:
             return +1   # EUR outperforming → synthetic EURGBP rising
         if divergence < -threshold_pips:
             return -1   # GBP outperforming → synthetic EURGBP falling
+        return 0
+
+    def _intermarket_breakout(self, t) -> int:
+        """Triple-confirmed intermarket breakout on M15.
+
+        A single-pair breakout from consolidation is usually a Judas fakeout. A
+        genuine USD-driven expansion shows up in ALL THREE legs at once:
+
+            EURUSD clears range HIGH + GBPUSD clears range HIGH + DXY clears LOW
+              → USD weakness expansion → +1 (look long EURUSD/GBPUSD)
+            EURUSD clears range LOW  + GBPUSD clears range LOW  + DXY clears HIGH
+              → USD strength expansion → -1 (look short EURUSD/GBPUSD)
+
+        Returns +1, -1, or 0 (no confirmed triple breakout). Fractal: M15 ranges,
+        but the same structure recurses on any timeframe.
+        """
+        if not config.BREAKOUT_MODEL_ENABLED:
+            return 0
+        eu = self.bars_up_to("EURUSD", "15T", t)
+        gu = self.bars_up_to("GBPUSD", "15T", t)
+        if not eu or not gu:
+            return 0
+        eu_brk = detect_breakout(eu, "EURUSD")
+        gu_brk = detect_breakout(gu, "GBPUSD")
+        if not (eu_brk and gu_brk):
+            return 0
+        eu_dir, gu_dir = eu_brk[1], gu_brk[1]
+        # DXY confirmation = its M15 BOS direction. The synthetic DXY is on a ~100-point
+        # scale, so the forex-pip range detection in detect_breakout can't be applied to
+        # it directly; the M15 structural bias ("the dollar takes out a low" = DXY making
+        # lower lows → bias -1) is the correct, scale-independent confirmation.
+        dxy_dir = self._dxy_bias("15T", t, lookback=config.SWING_LOOKBACK_STH)
+        # Bullish USD pairs: both pairs broke high (+1), DXY breaking lows (-1).
+        if eu_dir == +1 and gu_dir == +1 and dxy_dir == -1:
+            return +1
+        # Bearish USD pairs: both pairs broke low (-1), DXY breaking highs (+1).
+        if eu_dir == -1 and gu_dir == -1 and dxy_dir == +1:
+            return -1
         return 0
 
     def _dxy_bias(self, tf, t, lookback: int = None):
@@ -1104,6 +1143,17 @@ class Backtester:
         g["intermarket_signal"] += 1
         g["pair_matches"] += 1
 
+        # Intermarket breakout: triple-confirmed continuation (EURUSD + GBPUSD + DXY
+        # all clear their M15 ranges in agreement). When it fires in the trade
+        # direction the setup is a continuation/expansion, not a reversal — it gets
+        # its own entry_model tag, extra conviction, and an exemption from the
+        # inverted-draw 0/3 hard gate below (which is reversal logic that would
+        # otherwise block every continuation trade).
+        _brk_dir = self._intermarket_breakout(t)
+        _is_breakout = (_brk_dir != 0 and _brk_dir == direction)
+        if _is_breakout:
+            g["breakout_confirmed"] = g.get("breakout_confirmed", 0) + 1
+
         # MSS: 2-of-3 using both pairs in the family + DXY inverse.
         sym1_mss  = self._pair_has_mss(mss_sym1, t, direction)
         sym2_mss  = self._pair_has_mss(mss_sym2, t, direction)
@@ -1172,9 +1222,11 @@ class Backtester:
             _cached_draw = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
             self._draw_cache[_draw_key] = (_cached_draw, direction)
         _draw_score = _cached_draw
-        if _draw_score == 0:
+        if _draw_score == 0 and not _is_breakout:
             g["htf_draw_counter"] += 1
-            return   # hard gate: no HTF draw alignment → skip
+            return   # hard gate: no HTF draw alignment → skip (reversal logic).
+            # Breakout continuations are exempt: a strong continuation move runs
+            # WITH the HTF, which scores low on the inverted draw cascade by design.
         # 2a variants gated entirely — move too extended by the time synthetic confirms.
         # 2a_h4: H1 flat but H4 EURGBP confirms EUR>GBP (PF 0.01, WR 25%). Gate.
         # 2a_ip: H1+H4 both flat, synthetic momentum fires — even more extended. Gate.
@@ -1192,8 +1244,12 @@ class Backtester:
         conviction += _draw_score
         if _draw_score == 3:
             g["htf_draw_full_cascade"] += 1
-        else:
+        elif _draw_score > 0:
             g["htf_draw_partial"] += 1
+        # Breakout continuations earn conviction from the triple-confirmation instead
+        # of the (low/zero) inverted-draw score — the intermarket agreement IS the edge.
+        if _is_breakout:
+            conviction += config.BREAKOUT_CONVICTION
 
         # Open-level profile score: daily/weekly/session opens agreeing (0-1).
         # _session_open is returned from the same call so we don't duplicate mp_session_open.
@@ -1488,6 +1544,7 @@ class Backtester:
             "max_legs": max_legs,
             "draw_score": _draw_score,
             "im_scenario": _im_scenario,
+            "entry_model": "breakout" if _is_breakout else "judas",
         }
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1

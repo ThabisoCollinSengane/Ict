@@ -230,6 +230,106 @@ def detect_amd_setup(
     return None
 
 
+def detect_breakout(
+    candles,
+    symbol: str,
+    min_bars: int = None,
+    max_bars: int = None,
+    max_range_pips: float = None,
+    min_touches: int = None,
+    range_end_lookback: int = None,
+    sweep_lookback: int = None,
+    hold_pips: float = None,
+) -> Optional[tuple]:
+    """Find a consolidation range that price has CLEARED and is HOLDING beyond.
+
+    This is the inverse of detect_amd_setup. Where the Judas model wants a sweep
+    that closes BACK inside the range (manipulation → fade), the breakout model
+    wants price to clear an extreme and HOLD outside it (expansion → follow):
+
+        ACCUMULATION   tight range forms (same as Judas detection).
+        EXPANSION      price closes beyond an extreme by at least `hold_pips`
+                       and the last close is still holding on that side
+                       (no rejection back into the range).
+
+    Returns (Range, direction) where:
+        +1  the HIGH was cleared and held  → bullish continuation (look long)
+        -1  the LOW was cleared and held   → bearish continuation (look short)
+        None if no clean held breakout exists.
+
+    A pullback into the old range is allowed AFTER the hold is confirmed — that
+    retest is where breakers/FVGs form for the entry. The hold is judged from the
+    breakout extreme of the tail, not the very last bar, so a retest still
+    qualifies as long as price cleared and held earlier in the window.
+    """
+    min_bars = min_bars or config.AMD_MIN_RANGE_BARS
+    max_bars = max_bars or config.AMD_MAX_RANGE_BARS
+    max_range_pips = max_range_pips or config.AMD_MAX_RANGE_PIPS
+    min_touches = min_touches or config.AMD_MIN_TOUCHES
+    range_end_lookback = range_end_lookback or config.AMD_RANGE_END_LOOKBACK
+    sweep_lookback = sweep_lookback or config.AMD_SWEEP_LOOKBACK
+    hold_pips = hold_pips if hold_pips is not None else config.BREAKOUT_HOLD_PIPS
+
+    n = len(candles)
+    if n < min_bars + 1:
+        return None
+
+    pip = _pip(symbol)
+    max_width = max_range_pips * pip
+    touch_tol = 1.0 * pip
+    hold_dist = hold_pips * pip
+    last = candles[-1]
+
+    earliest_end = max(min_bars, n - range_end_lookback)
+
+    for end in range(n - 1, earliest_end - 1, -1):
+        lo_start = max(0, end - max_bars)
+        best: Optional[Range] = None
+        for start in range(lo_start, end - min_bars + 1):
+            window = candles[start:end]
+            hi = max(c.High for c in window)
+            lo = min(c.Low for c in window)
+            if (hi - lo) > max_width:
+                continue
+            th = sum(1 for c in window if abs(c.High - hi) <= touch_tol)
+            tl = sum(1 for c in window if abs(c.Low - lo) <= touch_tol)
+            if th < min_touches or tl < min_touches:
+                continue
+            length = end - start
+            if best is None or length > best.length_bars:
+                best = Range(high=hi, low=lo, start_idx=start, end_idx=end,
+                             touches_high=th, touches_low=tl)
+
+        if best is None:
+            continue
+
+        tail_end = min(end + sweep_lookback, n)
+        tail = candles[end:tail_end]
+        if not tail:
+            continue
+
+        # A bar must have CLOSED beyond the extreme by at least hold_pips (not just
+        # wicked through — that would be a sweep). The current price must still be on
+        # the breakout side (a pullback into the range is allowed; a full reversal
+        # back through the opposite extreme is not).
+        high_break = (
+            any(c.Close > best.high + hold_dist for c in tail)
+            and last.Close > best.low
+        )
+        low_break = (
+            any(c.Close < best.low - hold_dist for c in tail)
+            and last.Close < best.high
+        )
+
+        if high_break and not low_break:
+            return (best, +1)
+        if low_break and not high_break:
+            return (best, -1)
+        # Range found but no clean held breakout — keep scanning older ranges.
+
+    return None
+
+
 def classify_phase(
     candles,
     symbol: str,
