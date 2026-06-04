@@ -320,25 +320,26 @@ continuation moves deliver INTO these gaps. Two behaviours inside the zone:
 - When current price is within `HTF_FVG_MID_TOLERANCE_PIPS` of an unmitigated FVG midpoint
   whose direction matches the trade → +1 conviction, and the trade is tagged with the
   hit timeframe (`htf_fvg` column: "W"/"D"/"240T"/"").
+- Sizing bump (`HTF_FVG_BREAKOUT_MULT=2.0`): when a breakout/continuation is anchored at
+  an HTF FVG 50%, lot size is doubled. Same equity floor as draw-cascade (R3k+). The FVG
+  is the HTF draw — the AMD cycle at the gap's equilibrium is the highest-conviction
+  continuation setup. Fires ~15×/yr; validated IS/OOS (pending full 4yr confirmation).
 - Reporting: "HTF FVG 50% draw-on-liquidity conviction" breakdown table by timeframe.
 
-**Backtest finding — currently INERT as a conviction-add (IS/OOS confirmed):**
-The signal fires 34× over 4yr (9 IS / 25 OOS) but the full and per-split results are
-**byte-identical to baseline** (4yr: 798 trades, PF 5.03, R59.35M, -12.95%; OOS: 411
-trades, PF 5.02, R573k). Reason: any trade that opens already has conviction ≥ MIN_CONVICTION
-(6 London / 5 NY), which is in the `5+` bucket → already 3 legs (MAX_LEGS). A +1 cannot
-change leg count or the open/skip decision, so it never alters an outcome. The signal is
-correct ICT logic, harmless, and now computed + tagged for analysis — but to make it BITE it
-must feed a lever that isn't already saturated:
-- **(A) Position sizing** — bump lots when at HTF FVG 50% (like DRAW_SIZE_MULT). Raises edge
-  AND drawdown; needs full IS/OOS and the -15% breaker must hold.
-- **(B) Entry-gate reducer for continuations** — let a marginal breakout/continuation in when
-  it's anchored at an HTF FVG midpoint (its draw target). Adds trades; needs full IS/OOS.
-- **(C) Reversal filter** — reduce size / skip a REVERSAL fading INTO an unmitigated HTF FVG
-  (price likely continues to the gap, not reverses). Risk-reducing; gate-style, so watch the
-  compounding path-dependency lesson from P8.
+**Backtest finding — conviction-add is INERT, sizing bump is active:**
+The +1 conviction signal fires 34× over 4yr but is byte-identical to baseline because
+any open trade already has conviction ≥ 5+ bucket (3 legs). The sizing bump IS active:
+15 breakout trades over 4yr get 2x size when they coincide with an HTF FVG 50%.
 
-Lever choice is a live-money risk decision — pending user direction before wiring.
+**Reversal filter — REVERTED (same path-dependency trap as P8):**
+Implemented and tested: skip Judas reversals fighting an unmitigated HTF FVG in the
+opposing direction. Per-split MaxDD passed: IS -12.95%, OOS -13.47% (improved from -15.2%).
+But full 4yr continuous run hit **-20.15% MaxDD** (hard fail, breaches -15% breaker).
+Root cause: same as P8 — removed trades at high-equity points were buffering later
+drawdowns. The per-split results don't reveal path-dependency; only the 4yr run does.
+Gate reverted. `HTF_FVG_REVERSAL_FILTER=False` (config param retained for future use).
+The opposing-FVG signal is kept as analytics; `_htf_fvg_opposing` method available if
+a non-gate lever is found (e.g., sizing-down reversals vs skipping them entirely).
 
 ---
 

@@ -199,10 +199,11 @@ HTF_FVG_BREAKOUT_MULT      = 2.0
 # (i.e., a draw that price hasn't yet delivered to), the Judas reversal is
 # fighting the HTF delivery — skip it. Gate only applies to reversals, not
 # breakout continuations (which run WITH the draw).
-HTF_FVG_REVERSAL_FILTER    = True
-# Max distance (pips) an opposing HTF FVG may be from current price to block a
-# reversal. An opposing W1 FVG 400 pips away is irrelevant to a 15-pip-stop
-# trade — only block if the draw is close enough to be reached this session.
+HTF_FVG_REVERSAL_FILTER    = False   # REVERTED — hard gate disrupts compounding path
+# A hard reversal gate passes per-split MaxDD validation (-12.95% IS, -13.47% OOS)
+# but the full 4yr continuous run hits -20.15% MaxDD (hard fail). Same path-dependency
+# trap as P8: trades removed by the gate are winners at high-equity that buffer later
+# drawdowns. The opposing-FVG signal is retained as an analytics tag (future use).
 HTF_FVG_OPPOSING_MAX_PIPS  = 80
 
 # --- AMD (Accumulation / Manipulation / Distribution) on M15 ---
