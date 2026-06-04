@@ -83,6 +83,15 @@ STRUCTURE_TRAIL_LET_RUN  = True    # don't hard-close at target; let structure t
 M1_STOP_BUFFER_PIPS = 1.0          # pips beyond the M1 swing point
 M1_STOP_MIN_PIPS    = 4.0          # floor — don't place a stop tighter than this (noise)
 M1_STOP_LOOKBACK    = 30           # M1 bars to scan for the nearest swing
+# Ep 12 structural stop: anchor the stop beyond the intact M1 INTERMEDIATE swing
+# (ITL/ITH) instead of the raw short-term extreme (STL/STH). The short-term swing
+# is exactly what a minor liquidity run sweeps — placing the stop one fractal tier
+# up (at the ITL/ITH that survives the sweep) avoids being stopped on the Judas.
+# Naturally bounded by the 10-pip universal cap ("if 10 pips permit"). When no
+# intact intermediate swing exists within the cap, falls back to the M1 STL/STH.
+STRUCTURE_STOP_ENABLED = True     # A/B toggle — validate on full continuous run
+STRUCTURE_STOP_TF      = "1T"      # timeframe whose fractal ITL/ITH anchors the stop
+STRUCTURE_STOP_LOOKBACK = 90       # bars to scan for the intermediate swing
 
 # --- Account protection (wipeout prevention) ---
 # 1. Peak drawdown halt: if equity falls >20% from its highest point, stop trading

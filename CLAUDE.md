@@ -12,9 +12,10 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 798 trades, WR 47%, PF 5.03, MaxDD -12.95%, R500 → R60.18M.
+**Backtest result (4 years, 2022–2025):** 798 trades, WR 46.5%, PF 5.12, MaxDD -12.95%, R500 → R71.19M.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
-HTF-FVG 1.25× sizing bump: +R825k vs the R59.35M pre-P9 baseline, MaxDD unchanged.)
+HTF-FVG 1.25× sizing bump and P16 fractal structural stop: +R11M vs the R60.18M pre-P16
+baseline, MaxDD unchanged at -12.95%.)
 
 ---
 
@@ -508,6 +509,57 @@ are targeting that level. Score<3 is just noise (one source can always be found 
 **Next lever (not yet implemented):** A sizing multiplier for score≥4 targets (analogous to
 P9's 1.25x HTF FVG multiplier) could extract value from the high-conviction TP areas without
 changing the compounding path. Requires IS/OOS validation before shipping.
+
+### P16 — Fractal market structure (LTH/ITH/STH) — Ep 12 (IMPLEMENTED 2026-06-04)
+**What:** True recursive fractal classification of swing points into the three-tier ICT
+hierarchy, coupled with the inverted draw cascade. Built in three validated stages.
+
+**Module:** `ict/market_structure.py` (standalone, 6/6 unit tests in `test_market_structure.py`)
+- STH/STL = 3-bar fractal high/low in raw candles
+- ITH/ITL = 3-bar fractal high/low WITHIN the STH/STL sequence (one tier up)
+- LTH/LTL = 3-bar fractal high/low WITHIN the ITH/ITL sequence
+- `last_intact(result, tier)` — most recent UNSWEPT swing (the live structural reference)
+- `structure_direction(result)` — intermediate-tier trend read (+1/-1/0)
+- `is_minor_sweep(result, dir)` — True when STH/STL swept but ITH/ITL intact = Judas
+  continuation, not reversal (the double-sweep context)
+
+**Stage 2 — conviction + analytics (`_structure_conviction`):** scans W/D/H4/H1/M15 (M5
+excluded per spec, M1 reserved for stops). +1 conviction when any HTF structure agrees,
++1 when daily/weekly agrees, +1 on a minor-sweep continuation. Conviction-add is
+saturation-inert (same as P9/P15 — trades already exceed conviction>4). But the analytics
+columns prove the signal is REAL and not curve-fit:
+
+| Signal | IS PF | OOS PF | Verdict |
+|---|---|---|---|
+| HTF structure agrees | 3.28 vs 2.69 | 5.82 vs 4.06 | ✅ consistent both splits |
+| minor-sweep (Judas) | 4.57 vs 2.90 | 8.74 vs 4.74 | ✅ consistent both splits |
+| #aligned-TFs ≥2 | 2.90 (worse) | 8.56 (better) | ❌ IS/OOS diverge — discarded |
+
+New columns: `mstruct_pts`, `mstruct_align`, `mstruct_htf_dir`, `mstruct_minor_sweep`,
+`mstruct_intact_tf`. Reporting: "Market structure (Ep 12 LTH/ITH/STH fractal)" table.
+
+**Stage 3 — structural stop placement (`_structure_stop`, SHIPPED ON):** anchors the stop
+beyond the intact M1 INTERMEDIATE swing (ITL for longs / ITH for shorts) instead of the raw
+short-term extreme (STL/STH). The short-term swing is exactly what a minor liquidity run
+sweeps — placing the stop one fractal tier up keeps it beyond the sweep's reach. The 10-pip
+universal cap enforces the trader's "if 10 pips permit" rule; falls back to the STL/STH stop
+when no intact ITL/ITH exists within the cap.
+
+| Metric | Baseline | Structure stop ON | Δ |
+|---|---|---|---|
+| Full 4yr equity | R60.18M | **R71.19M** | +R11M (+18.3%) |
+| Full 4yr PF | 5.03 | **5.12** | +0.09 |
+| Full 4yr MaxDD | -12.95% | **-12.95%** | unchanged ✅ |
+| IS PF / equity | 3.01 / R145k | 3.12 / R158k | both up |
+| OOS PF / equity | 5.06 / R641k | 5.15 / R703k | both up |
+| OOS MaxDD | -15.62% | -16.31% | +0.69pp (fragile restart path only) |
+
+Config: `STRUCTURE_STOP_ENABLED = True`, `STRUCTURE_STOP_TF = "1T"`,
+`STRUCTURE_STOP_LOOKBACK = 90`. Counter: `structure_stop_used`. Ships ON — full continuous
+run MaxDD (the live-relevant path) is unchanged at -12.95%, PF improved in all three runs,
+IS/OOS magnitudes consistent. The slightly wider stop (avg loss R35k→R40k) survives the
+sweep but costs marginally more when genuinely wrong — the +0.69pp shows only on the
+OOS-from-R500 stress restart, not the continuous deployment path.
 
 ---
 

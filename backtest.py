@@ -837,6 +837,49 @@ class Backtester:
                 stop = entry + min_dist
             return stop if stop > entry else None
 
+    def _structure_stop(self, pair, direction, entry, pip, t):
+        """Ep 12 — anchor the stop beyond the intact INTERMEDIATE swing (ITL/ITH).
+
+        The short-term swing (STL/STH) is precisely what a minor liquidity run
+        sweeps, forming a new short-term extreme while leaving the intermediate
+        and long-term structure intact (the double-sweep / Judas). A stop placed
+        at the raw STL/STH is therefore frequently taken out on a continuation
+        that was never actually invalidated. Anchoring one fractal tier up — at
+        the most recent INTACT ITL (for longs) / ITH (for shorts) — keeps the
+        stop beyond the sweep's reach.
+
+        LONG  → stop below the intact M1 ITL, minus the buffer.
+        SHORT → stop above the intact M1 ITH, plus the buffer.
+
+        Returns the stop price, or None if no intact intermediate swing sits on
+        the correct side of entry (caller then falls back to the STL/STH stop).
+        The universal 10-pip cap downstream enforces the "if 10 pips permit"
+        rule — a structural stop wider than the cap is pulled in to 10 pips.
+        """
+        bars = self.bars_up_to(pair, config.STRUCTURE_STOP_TF, t,
+                               max_bars=config.STRUCTURE_STOP_LOOKBACK)
+        if len(bars) < 5:
+            return None
+        res = mstruct.classify(bars)
+        buf = config.M1_STOP_BUFFER_PIPS * pip
+        min_dist = config.M1_STOP_MIN_PIPS * pip
+        if direction > 0:
+            itl = mstruct.last_intact(res, "ITL")
+            if itl is None:
+                return None
+            stop = itl.price - buf
+            if (entry - stop) < min_dist:       # too tight → floor it
+                stop = entry - min_dist
+            return stop if stop < entry else None
+        else:
+            ith = mstruct.last_intact(res, "ITH")
+            if ith is None:
+                return None
+            stop = ith.price + buf
+            if (stop - entry) < min_dist:
+                stop = entry + min_dist
+            return stop if stop > entry else None
+
     def _structure_trail_stop(self, bars5, direction, pip):
         """Most recent CONFIRMED M5 swing point, for trailing the stop off structure.
 
@@ -1814,10 +1857,19 @@ class Backtester:
         # entry pattern came from M5/M15/H1; the STOP comes from the nearest 1-minute
         # swing, which keeps it naturally tight. Fall back to the pattern stop if no
         # valid M1 swing is found.
-        _m1_stop = self._m1_structure_stop(bars1m, direction, entry, pip)
-        if _m1_stop is not None:
-            stop = _m1_stop
-            g["m1_stop_used"] = g.get("m1_stop_used", 0) + 1
+        # Stage 3 (toggle): prefer the intact INTERMEDIATE swing (ITL/ITH) so the
+        # stop survives a minor short-term sweep; fall back to the STL/STH stop.
+        _struct_stop = None
+        if config.STRUCTURE_STOP_ENABLED:
+            _struct_stop = self._structure_stop(pair, direction, entry, pip, t)
+        if _struct_stop is not None:
+            stop = _struct_stop
+            g["structure_stop_used"] = g.get("structure_stop_used", 0) + 1
+        else:
+            _m1_stop = self._m1_structure_stop(bars1m, direction, entry, pip)
+            if _m1_stop is not None:
+                stop = _m1_stop
+                g["m1_stop_used"] = g.get("m1_stop_used", 0) + 1
 
         # High-impact news nearby: override to fixed 10-pip stop (protects against
         # spread widening while still trading the news catalyst).
