@@ -1030,6 +1030,7 @@ class Backtester:
         has already passed through (already inside or beyond) is ignored — only
         FVGs that are still "in the path" count.
         """
+        pip_v = pip_size(pair)
         opp = -direction   # direction we'd be fighting
         for tf in ("W", "D", "240T"):
             bars = self.bars_up_to(pair, tf, t)
@@ -1043,10 +1044,13 @@ class Backtester:
                 # above price means price would have to rally into it before the
                 # short target is reached (it represents an unfilled draw UP).
                 # For a LONG reversal, a bearish FVG below price works the same way.
+                max_dist = config.HTF_FVG_OPPOSING_MAX_PIPS * pip_v
                 if opp > 0 and fvg.bottom > cur_price:   # bullish FVG above → blocks short
-                    return True
+                    if fvg.bottom - cur_price <= max_dist:
+                        return True
                 if opp < 0 and fvg.top < cur_price:      # bearish FVG below → blocks long
-                    return True
+                    if cur_price - fvg.top <= max_dist:
+                        return True
         return False
 
     def _maybe_open(self, pair, t):

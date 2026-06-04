@@ -200,6 +200,10 @@ HTF_FVG_BREAKOUT_MULT      = 2.0
 # fighting the HTF delivery — skip it. Gate only applies to reversals, not
 # breakout continuations (which run WITH the draw).
 HTF_FVG_REVERSAL_FILTER    = True
+# Max distance (pips) an opposing HTF FVG may be from current price to block a
+# reversal. An opposing W1 FVG 400 pips away is irrelevant to a 15-pip-stop
+# trade — only block if the draw is close enough to be reached this session.
+HTF_FVG_OPPOSING_MAX_PIPS  = 80
 
 # --- AMD (Accumulation / Manipulation / Distribution) on M15 ---
 # A consolidation range must satisfy ALL of:
