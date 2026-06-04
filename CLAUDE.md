@@ -12,7 +12,8 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 698 trades, WR 48%, PF 5.25, MaxDD -13.26%, R500 → R32.5M.
+**Backtest result (4 years, 2022–2025):** 798 trades, WR 47%, PF 5.03, MaxDD -12.95%, R500 → R59.4M.
+(Two entry models: Judas reversal + intermarket breakout continuation — see §5.)
 
 ---
 
@@ -86,12 +87,28 @@ Scores 0–3 based on how many of Weekly/Daily/H4 agree with trade direction (in
 
 `DRAW_SIZE_MIN_EQUITY = 3000` — multipliers disabled below R3k to protect small account.
 
-### 5. AMD + MSS entry
+### 5. AMD + MSS entry (two entry models)
+Every trade is tagged `entry_model` = **judas** (default) or **breakout**.
+
+**Judas reversal** (the original model):
 - M15 consolidation range must exist (8–96 bars, ≤35 pips, both extremes touched ≥2x)
-- M15 sweep of one extreme (Judas swing) then close back inside
+- M15 sweep of one extreme (Judas swing) then close back inside → fade the sweep
 - M5/M15/H1 FVG or OB in the distribution direction for limit entry
 - 2-of-3 MSS: EURUSD + GBPUSD + DXY inverse must show structure shift
 - Stop placed at nearest M1 swing + 1 pip buffer (min 4 pips)
+
+**Intermarket breakout / continuation** (`detect_breakout` in ict/amd.py):
+- Inverse of Judas: price CLOSES beyond a range extreme by ≥ `BREAKOUT_HOLD_PIPS`
+  and holds (no rejection back inside) → follow the break. Pullback/retest allowed.
+- **Triple-confirmation** (`_intermarket_breakout`): a single-pair breakout is usually
+  a fakeout. Requires EURUSD + GBPUSD to BOTH break their M15 ranges in agreement AND
+  DXY M15 BOS to confirm (DXY breaking lows for USD-pair longs / highs for shorts).
+  DXY leg uses BOS direction, not range detection — synthetic DXY is ~100-scale so
+  forex-pip range detection can't apply.
+- Breakout-confirmed trades are EXEMPT from the inverted-draw 0/3 hard gate (that gate
+  is reversal logic; continuations run WITH the HTF and score low on the inverted
+  cascade). They earn `BREAKOUT_CONVICTION` instead of draw-score conviction.
+- IS/OOS validated: breakout PF 3.20 (IS) / 3.43 (OOS) — not curve-fit.
 
 ### 6. Killzones
 - **EURUSD/GBPUSD**: London Open (03:00–05:00 ET) + NY AM (07:00–10:00 ET)
@@ -275,6 +292,7 @@ A feature is NOT curve-fit when:
 
 Features gated because they failed this test: `2a_h4` (IS PF 0.83, OOS PF 0.01), `N-long_h4` (WR 0% both).
 Features kept despite IS < OOS: `1a_ip` (IS PF 6.10 at small equity critical for compounding path).
+Breakout model is a textbook pass: PF 3.20 (IS) / 3.43 (OOS) — near-identical magnitude both periods.
 
 ---
 
