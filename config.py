@@ -206,6 +206,20 @@ HTF_FVG_REVERSAL_FILTER    = False   # REVERTED — hard gate disrupts compoundi
 # drawdowns. The opposing-FVG signal is retained as an analytics tag (future use).
 HTF_FVG_OPPOSING_MAX_PIPS  = 80
 
+# --- London-Judas priority (P10): size down the same-day NY-AM breakout echo ---
+# REVERTED — set to 1.0 (no-op). The counter below stays as analytics.
+# Hypothesis: when a London-Open Judas already fired on a pair that day, the
+# same-pair NY-AM breakout is the weaker echo (on dual-model days the London Judas
+# runs WR 62.7% / PF 16.4 vs the breakout's WR 46.9%) — so size the echo down.
+# Result (4yr, downsize 0.5): the SAME path-dependency trap as P8/P9. MaxDD did
+# NOT improve (full -12.95%, IS -12.95%, OOS -15.62% — all identical to baseline),
+# while equity FELL R60.18M → R54.33M (-R5.84M, -9.7%) and PF 5.03 → 4.98. The
+# "weaker" echoes are still net-positive to the compounding path: their wins land
+# at high-equity points and compound forward, and they weren't driving the
+# drawdowns, so shrinking them was pure lost upside. Lever disabled.
+# 1.0 = no change (shipped); <1.0 = size the same-day NY breakout echo down.
+LONDON_JUDAS_NY_BREAKOUT_DOWNSIZE = 1.0
+
 # --- AMD (Accumulation / Manipulation / Distribution) on M15 ---
 # A consolidation range must satisfy ALL of:
 #   - at least AMD_MIN_RANGE_BARS consecutive M15 bars,

@@ -156,6 +156,9 @@ class Backtester:
         # on a given NY date the flag stays True for the rest of that session so the
         # breakout_eligible gate knows whether the Judas already fired.
         self._judas_seen        = {}   # (pair, ny_date) -> bool
+        # P10: once a London-Open Judas reversal OPENS on a pair, flag it so the
+        # same-pair NY-AM breakout that day can be sized down (it's the weaker echo).
+        self._london_judas_open = {}   # (pair, ny_date) -> bool
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -1646,6 +1649,17 @@ class Backtester:
         if _is_breakout and _htf_fvg_pts and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
             units = max(int(units * config.HTF_FVG_BREAKOUT_MULT), min_units)
             g["htf_fvg_breakout_sized"] = g.get("htf_fvg_breakout_sized", 0) + 1
+        # P10 London-Judas priority (REVERTED — downsize multiplier defaults to 1.0,
+        # so this is a no-op + analytics counter). Hypothesis was that a NY-AM breakout
+        # on a pair whose London Judas already fired today is the weaker echo and should
+        # be sized down. Backtest disproved it (lost R5.84M / 4yr, no MaxDD benefit —
+        # the echoes still compound). Counter retained to measure how often the
+        # same-day London-Judas → NY-breakout echo occurs.
+        if (_is_breakout and _is_ny
+                and self._london_judas_open.get((pair, _ny_dt.date()), False)):
+            if config.LONDON_JUDAS_NY_BREAKOUT_DOWNSIZE != 1.0:
+                units = max(int(units * config.LONDON_JUDAS_NY_BREAKOUT_DOWNSIZE), min_units)
+            g["london_judas_ny_echo"] = g.get("london_judas_ny_echo", 0) + 1
         if units == 0:
             return
         g["units_nonzero"] += 1
@@ -1696,6 +1710,10 @@ class Backtester:
             "session_phase": _session_phase,
             "htf_fvg": _htf_fvg_tf,
         }
+        # P10: record a London-Open Judas opening so the same-day NY breakout echo
+        # can be sized down. Only Judas (not breakout) reversals in London qualify.
+        if not _is_breakout and _is_london:
+            self._london_judas_open[(pair, _ny_dt.date())] = True
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
         self._day_total[day_key]                          = day_total + 1

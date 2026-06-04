@@ -359,6 +359,32 @@ Gate reverted. `HTF_FVG_REVERSAL_FILTER=False` (config param retained for future
 The opposing-FVG signal is kept as analytics; `_htf_fvg_opposing` method available if
 a non-gate lever is found (e.g., sizing-down reversals vs skipping them entirely).
 
+### P10 — London-Judas priority sizing (TESTED + REVERTED 2026-06-04)
+**Hypothesis:** On a pair whose London-Open Judas already fired that day, the same-pair
+NY-AM breakout is the weaker "echo." 4yr data on the 85 dual-model days: London Judas
+WR 62.7% / PF 16.4 vs the NY breakout's WR 46.9%. So size the NY echo DOWN (0.5×) rather
+than gate it (to avoid the path-dependency trap).
+
+**Result — REVERTED (third confirmation of the path-dependency trap):**
+
+| Metric | Baseline (P9 1.25×) | P10 downsize 0.5× |
+|---|---|---|
+| Full 4yr equity | R60.18M | **R54.33M** (−R5.84M, −9.7%) |
+| Full 4yr PF | 5.03 | 4.98 |
+| Full 4yr MaxDD | -12.95% | -12.95% (no change) |
+| IS PF / equity | 3.01 / R145.4k | 3.01 / R141.5k |
+| OOS PF / equity | 5.06 / R641k | 5.00 / R614k |
+| OOS MaxDD | -15.62% | -15.62% (no change) |
+
+The downsize cost equity in ALL THREE runs while improving MaxDD in NONE. Same lesson as
+P8 / P9-reversal-filter: the "weaker" NY echoes are still net-positive to the compounding
+path (their wins land at high-equity points and compound forward), and they were never
+driving the drawdowns — so shrinking them is pure lost upside. `LONDON_JUDAS_NY_BREAKOUT_DOWNSIZE
+=1.0` (no-op). The `_london_judas_open` flag + `london_judas_ny_echo` counter are kept as
+analytics. **NOTE (2026-06-04): user has real-world experience trading this London→NY
+relationship and is providing detail to model it correctly — the naive same-pair downsize
+was too blunt. Revisit with the corrected entry/direction rules once captured.**
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
