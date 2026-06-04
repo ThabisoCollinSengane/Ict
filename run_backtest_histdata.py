@@ -364,6 +364,29 @@ def main():
                 print(f"  {model:<12} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>14.2f} {grp.pnl.mean():>11.2f} {pf:>6.2f}")
 
+        if "session_phase" in df.columns:
+            print("\n=== Session phase at entry (AMD cycle position) ===")
+            print("  judas_watch      = London 03:00–03:30 ET — prime Judas sweep window")
+            print("  judas_seen       = AMD sweep detected this session → reversal active")
+            print("  breakout_eligible= London 03:30+ ET, no sweep → breakout fallback")
+            print("  ny_extend        = NY AM — either model valid")
+            print(f"  {'Phase':<20} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6}")
+            print("  " + "-" * 60)
+            _phase_order = ["judas_watch", "judas_seen", "breakout_eligible",
+                            "ny_extend", "accumulation", "unknown"]
+            for ph in _phase_order:
+                grp = df[df["session_phase"] == ph]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gross_win  = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gross_loss = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gross_win / gross_loss) if gross_loss > 0 else float("inf")
+                print(f"  {ph:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "

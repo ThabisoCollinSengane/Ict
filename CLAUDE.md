@@ -267,6 +267,51 @@ no parameters are curve-fit to a specific year.
 
 **Not urgent** — current OOS validation is sufficient for now. Revisit when adding new features.
 
+### P8 — Session-phase AMD cycle sequencer (IMPLEMENTED 2026-06-04)
+**What:** Track where each pair is in the AMD cycle per session so the algo knows whether to
+expect a Judas reversal or a breakout continuation at any given moment.
+
+**Phases (keyed per-pair per-NY-date):**
+- `accumulation`: Asian session — building the range
+- `judas_watch`: London 03:00–03:30 ET — prime Judas sweep window
+- `judas_seen`: AMD sweep detected (`detect_amd_setup` found a sweep) → reversal active
+- `breakout_eligible`: London 03:30–05:00 ET, no sweep detected → breakout fallback only
+- `ny_extend`: NY AM 07:00–10:00 ET — either model valid
+
+**Gate added**: In `breakout_eligible` phase, non-breakout entries are blocked (no Judas =
+no range to fade; price is running for real — only follow it with triple-confirmed breakout).
+
+**Conviction boost**: `breakout_eligible` + triple-confirmed breakout = +1 conviction
+("missed Judas → confirmed continuation = highest quality breakout setup").
+
+**Key insight (ICT)**: Asian consolidation → London Judas (manipulation) → distribution.
+If the Judas window closes without a sweep, the move is NOT a Judas — it's real expansion.
+The correct entry is the breakout continuation using the bigger TF draw on liquidity.
+This is the user's historically most profitable trade pattern.
+
+**Analytics**: `session_phase` column added to trade records; breakdown table in reporting.
+
+### P9 — HTF FVG 50% consolidation zone as conviction signal (NOT YET IMPLEMENTED)
+**What:** When price enters an H4/D1/W1 FVG it typically consolidates at ~50% of the FVG
+range before continuing (the "equilibrium" of the inefficiency). This 50% zone is the
+natural Accumulation anchor for the next AMD cycle. Two behaviours inside that zone:
+1. Consolidation at 50% → micro-Judas sweep of the range → continuation through the FVG
+2. Consolidation at 50% → reversal (FVG partially filled, mission complete)
+
+**What's hard to code**: Distinguishing "stalling before continuation" vs "reversing" at
+the 50% level in real-time. The AMD detection (`detect_amd_setup`) already catches the
+micro-Judas setup inside the FVG — but without the FVG context, we don't know WHY the
+consolidation formed there (which makes it higher quality).
+
+**Proposed implementation**: Add +1 conviction when:
+- Current price is within N pips of an H4/D1/W1 FVG midpoint (50% level)
+- The FVG direction aligns with the trade direction
+- The `detect_amd_setup` detected an AMD setup (consolidation + sweep near the 50%)
+This tells us: "this AMD cycle formed at the natural HTF delivery zone, not random."
+The stop-run inside the 50% (mini-Judas within the FVG) is the highest-quality AMD entry.
+
+**Not urgent** — requires FVG detection on H4/D1/W1 bars and midpoint proximity check.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

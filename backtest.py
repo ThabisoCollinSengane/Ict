@@ -150,6 +150,10 @@ class Backtester:
         self._day_total         = {}   # date -> int
         self._day_pair          = {}   # (date, pair) -> int  — London session slot
         self._day_pair_ny       = {}   # (date, pair) -> int  — NY session slot (separate)
+        # Session-phase AMD cycle tracker: once a Judas sweep is detected for a pair
+        # on a given NY date the flag stays True for the rest of that session so the
+        # breakout_eligible gate knows whether the Judas already fired.
+        self._judas_seen        = {}   # (pair, ny_date) -> bool
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -321,6 +325,7 @@ class Backtester:
             "draw_score": st.get("draw_score", 0),
             "im_scenario": st.get("im_scenario", "?"),
             "entry_model": st.get("entry_model", "judas"),
+            "session_phase": st.get("session_phase", "unknown"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -1267,6 +1272,41 @@ class Backtester:
                 amd_score = 1
                 conviction += 1
                 g["manipulation_correct_dir"] += 1
+            # Judas detected (any direction) — mark it sticky for the full session
+            _judas_key = (pair, _ny_dt.date())
+            self._judas_seen[_judas_key] = True
+
+        # ── Session-phase AMD cycle tracking ──────────────────────────────────
+        # ICT price delivery:  Asian accumulation → London Judas (manipulation)
+        #                       → Distribution / breakout continuation.
+        # If the Judas window closes with no sweep, the fallback entry is the
+        # triple-confirmed breakout continuation using the bigger-TF draw.
+        # Phases are keyed by (pair, NY date) so each trading day starts fresh.
+        _judas_key   = (pair, _ny_dt.date())
+        _judas_fired = self._judas_seen.get(_judas_key, False)
+        _ny_hhmm     = _ny_dt.hour * 100 + _ny_dt.minute
+
+        if _judas_fired:
+            _session_phase = "judas_seen"
+        elif 7 <= _ny_dt.hour < 10:
+            _session_phase = "ny_extend"         # NY: either model valid
+        elif 3 <= _ny_dt.hour < 5:
+            # London first 30 min = prime Judas window; London 2nd half = breakout fallback
+            _session_phase = "judas_watch" if _ny_hhmm < 330 else "breakout_eligible"
+        else:
+            _session_phase = "accumulation"      # Asian session — entries blocked by KZ anyway
+
+        if _session_phase == "breakout_eligible":
+            if not _is_breakout:
+                # Past the Judas window with no sweep seen and no triple breakout.
+                # Entering here means fading a real directional move — skip.
+                g["phase_no_signal"] = g.get("phase_no_signal", 0) + 1
+                return
+            # Missed-Judas + triple-confirmed breakout = continuation entry.
+            # The move is real (not manipulation), price is running for the bigger
+            # TF draw on liquidity. Boost conviction to reflect the higher quality.
+            conviction += 1
+            g["phase_breakout"] = g.get("phase_breakout", 0) + 1
 
         # M1 fractal structure is captured via _get_limit_entry (fvg_m1/ob_m1/
         # breaker_m1) — same AMD concept at execution speed without the O(n³)
@@ -1545,6 +1585,7 @@ class Backtester:
             "draw_score": _draw_score,
             "im_scenario": _im_scenario,
             "entry_model": "breakout" if _is_breakout else "judas",
+            "session_phase": _session_phase,
         }
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
