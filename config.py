@@ -182,6 +182,15 @@ EQ_HIGH_LOW_TOLERANCE_PIPS = 5     # max pip diff to call two highs "equal"
 FVG_MIN_SIZE_PIPS = 3              # ignore micro FVGs
 OB_LOOKBACK_BARS = 200             # how far back on HTF to scan for unmitigated OB
 
+# --- HTF FVG 50% draw-on-liquidity conviction (P9) ---
+# Unmitigated H4/D1/W1 FVGs are the bigger-timeframe draw on liquidity.
+# Continuation moves deliver INTO the gap and consolidate at ~50% (its
+# equilibrium) before continuing — the natural HTF Accumulation anchor for the
+# next AMD cycle. When price sits within this tolerance of an unmitigated HTF
+# FVG midpoint whose direction matches the trade, award +1 conviction.
+HTF_FVG_MID_TOLERANCE_PIPS = 10    # how close to the 50% level counts as "at equilibrium"
+HTF_FVG_SCAN_BARS          = 80    # how many recent HTF bars to scan for FVGs per TF
+
 # --- AMD (Accumulation / Manipulation / Distribution) on M15 ---
 # A consolidation range must satisfy ALL of:
 #   - at least AMD_MIN_RANGE_BARS consecutive M15 bars,

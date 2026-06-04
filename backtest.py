@@ -129,6 +129,8 @@ class Backtester:
             "weekly_amd_confirmed": 0, "session_handover_closed": 0,
             # HTF draw cascade counters (0-3 per trade)
             "htf_draw_full_cascade": 0, "htf_draw_partial": 0, "htf_draw_counter": 0,
+            # HTF FVG 50% draw-on-liquidity conviction (P9)
+            "htf_fvg_5050_hit": 0,
             # conviction signal counters
             "ote_zone": 0, "choch_confirmed": 0, "low_conviction": 0,
             "judas_divergence": 0, "ny_continuation": 0,
@@ -326,6 +328,7 @@ class Backtester:
             "im_scenario": st.get("im_scenario", "?"),
             "entry_model": st.get("entry_model", "judas"),
             "session_phase": st.get("session_phase", "unknown"),
+            "htf_fvg": st.get("htf_fvg", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -966,6 +969,51 @@ class Backtester:
                     out.append((bars[i].Low, "swing"))
         return out
 
+    def _htf_fvg_conviction(self, pair, direction, cur_price, t):
+        """P9 — HTF FVG 50% midpoint as draw-on-liquidity conviction.
+
+        Unmitigated H4/D1/W1 FVGs are the bigger-timeframe draw on liquidity that
+        continuation moves deliver into. Price entering an HTF FVG typically
+        consolidates at ~50% (the gap's equilibrium) before continuing — that 50%
+        zone is the natural HTF Accumulation anchor for the next AMD cycle.
+
+        When current price sits within HTF_FVG_MID_TOLERANCE_PIPS of an unmitigated
+        HTF FVG midpoint whose direction matches the trade, the AMD consolidation
+        has formed at the natural HTF delivery zone (not random) → +1 conviction.
+
+        Returns (points, timeframe_hit) where timeframe_hit is "" on no hit.
+        Highest timeframe wins ties — W draw > D draw > H4 draw.
+        """
+        pip_v = pip_size(pair)
+        tol   = config.HTF_FVG_MID_TOLERANCE_PIPS * pip_v
+        # Scan biggest TF first so the reported hit reflects the strongest draw.
+        for tf in ("W", "D", "240T"):
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 3:
+                continue
+            start = max(2, len(bars) - config.HTF_FVG_SCAN_BARS)
+            fvgs = []
+            for i in range(start, len(bars)):
+                fvg = detect_new_fvg(bars[: i + 1], pair)
+                if fvg is not None:
+                    fvgs.append(fvg)
+            # Mitigation = a later bar CLOSES through the far side of the gap
+            # (ICT Ep 9: wicks don't mitigate, only a close through does).
+            for fvg in fvgs:
+                for c in bars[fvg.bar_index + 1:]:
+                    if fvg.direction > 0 and c.Close <= fvg.bottom:
+                        fvg.mitigated = True
+                        break
+                    if fvg.direction < 0 and c.Close >= fvg.top:
+                        fvg.mitigated = True
+                        break
+            for fvg in fvgs:
+                if fvg.mitigated or fvg.direction != direction:
+                    continue
+                if abs(cur_price - fvg.mid) <= tol:
+                    return 1, tf
+        return 0, ""
+
     def _maybe_open(self, pair, t):
         g = self.gate
         g["checks"] += 1
@@ -1276,6 +1324,15 @@ class Backtester:
             _judas_key = (pair, _ny_dt.date())
             self._judas_seen[_judas_key] = True
 
+        # HTF FVG 50% draw (P9): price consolidating at the equilibrium of an
+        # unmitigated H4/D1/W1 FVG aligned with the trade. These gaps are the
+        # bigger-timeframe draw on liquidity continuation moves deliver into —
+        # the AMD cycle forming here is anchored to a real HTF delivery zone. +1.
+        _htf_fvg_pts, _htf_fvg_tf = self._htf_fvg_conviction(pair, direction, cur_price, t)
+        if _htf_fvg_pts:
+            conviction += _htf_fvg_pts
+            g["htf_fvg_5050_hit"] += 1
+
         # ── Session-phase AMD cycle tracking ──────────────────────────────────
         # ICT price delivery:  Asian accumulation → London Judas (manipulation)
         #                       → Distribution / breakout continuation.
@@ -1581,6 +1638,7 @@ class Backtester:
             "im_scenario": _im_scenario,
             "entry_model": "breakout" if _is_breakout else "judas",
             "session_phase": _session_phase,
+            "htf_fvg": _htf_fvg_tf,
         }
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1

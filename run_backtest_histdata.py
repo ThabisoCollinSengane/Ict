@@ -387,6 +387,25 @@ def main():
                 print(f"  {ph:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
 
+        if "htf_fvg" in df.columns:
+            print("\n=== HTF FVG 50% draw-on-liquidity conviction (P9) ===")
+            print("  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.")
+            print(f"  {'HTF FVG draw':<14} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6}")
+            print("  " + "-" * 56)
+            _fvg_label = {"W": "W1 FVG", "D": "D1 FVG", "240T": "H4 FVG", "": "none"}
+            for tf in ("W", "D", "240T", ""):
+                grp = df[df["htf_fvg"] == tf]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gross_win  = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gross_loss = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gross_win / gross_loss) if gross_loss > 0 else float("inf")
+                print(f"  {_fvg_label.get(tf, tf):<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "

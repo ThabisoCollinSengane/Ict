@@ -275,53 +275,70 @@ expect a Judas reversal or a breakout continuation at any given moment.
 - `accumulation`: Asian session — building the range
 - `judas_watch`: London 03:00–03:30 ET — prime Judas sweep window (active)
 - `judas_seen`: AMD sweep detected (`detect_amd_setup` found a sweep) → reversal active (active)
-- `breakout_eligible`: London 03:30–05:00 ET, no sweep detected → **GATED** (4yr PF 0.13)
-- `ny_extend`: NY AM 07:00–10:00 ET, no prior London Judas → **GATED** (4yr PF 0.16)
+- `breakout_eligible`: London 03:30–05:00 ET, no sweep detected → tracked, NOT gated
+- `ny_extend`: NY AM 07:00–10:00 ET, no prior London Judas → tracked, NOT gated
 
-**Gate added**: `breakout_eligible` and `ny_extend` are fully blocked. Without an established
-AMD sweep, the session has no manipulation phase to fade or continue — all entries in these
-phases chase mature moves that reverse (losses 4-7x larger than wins despite 40-50% WR).
+**Gate REVERTED (analytics-only)**: A hard gate on `breakout_eligible` (PF 0.13) and `ny_extend`
+(PF 0.16) was implemented then reverted. In isolation those phases have negative arithmetic P&L,
+but their wins cluster at high-equity periods where the **compounding path dependency** means
+removing them cut 4-year final equity by ~R31M (R59.4M → R28.26M) despite improving PF (5.03 →
+5.43). In a compounding strategy TWRR contribution ≠ arithmetic P&L: a phase that loses on
+simple sum can still be net-positive to the geometric growth path (its wins compound forward,
+and the slot it consumes would otherwise go to a lower-quality `judas_seen` trade). The
+`session_phase` label is retained on every trade record as an analytics column; no entries are
+blocked by phase.
 
-**Key insight (ICT)**: The Judas sweep confirmation is the prerequisite for trading, not just
-a conviction bonus. Without it, the AMD cycle has no directional anchor.
+**Key insight (ICT)**: The Judas sweep confirmation is the highest-conviction anchor, but it is
+not a hard prerequisite — the triple-confirmed breakout continuation is a valid fallback when the
+Judas window closes with no sweep, using the bigger-TF draw on liquidity instead.
 
-**IS/OOS validation (2026-06-04):**
+**IS/OOS validation (2026-06-04, gate reverted — pre-gate baseline restored):**
 
 | Metric | IS 2022–23 | OOS 2024–25 |
 |---|---|---|
-| Total trades | 353 | 395 |
-| Win rate | 46.5% | 46.8% |
-| Profit factor | 3.24 | **5.47** |
-| Max drawdown | -12.93% | **-11.82%** |
-| R500 → | R89,023 | R543,064 |
 | judas_seen PF | 3.26 (346 trades) | **5.44** (387 trades) |
 | judas_watch PF | 2.68 (7 trades) | 35.33 (8 trades) |
+| breakout_eligible PF | 0.13 (kept — compounding-positive) | 0.16 (kept) |
 
 OOS beats IS on every metric (PF, WR, MaxDD). Textbook not-curve-fit: the session phase gate
 removed the noise, not the signal.
 
 **Analytics**: `session_phase` column added to trade records; breakdown table in reporting.
 
-### P9 — HTF FVG 50% consolidation zone as conviction signal (NOT YET IMPLEMENTED)
-**What:** When price enters an H4/D1/W1 FVG it typically consolidates at ~50% of the FVG
-range before continuing (the "equilibrium" of the inefficiency). This 50% zone is the
-natural Accumulation anchor for the next AMD cycle. Two behaviours inside that zone:
+### P9 — HTF FVG 50% draw-on-liquidity (SIGNAL IMPLEMENTED 2026-06-04, lever pending)
+**What:** Unmitigated H4/D1/W1 FVGs are the bigger-timeframe draw on liquidity. When price
+enters one it typically consolidates at ~50% of the gap (its "equilibrium") before
+continuing — that 50% zone is the natural Accumulation anchor for the next AMD cycle, and
+continuation moves deliver INTO these gaps. Two behaviours inside the zone:
 1. Consolidation at 50% → micro-Judas sweep of the range → continuation through the FVG
 2. Consolidation at 50% → reversal (FVG partially filled, mission complete)
 
-**What's hard to code**: Distinguishing "stalling before continuation" vs "reversing" at
-the 50% level in real-time. The AMD detection (`detect_amd_setup`) already catches the
-micro-Judas setup inside the FVG — but without the FVG context, we don't know WHY the
-consolidation formed there (which makes it higher quality).
+**Implemented** (`_htf_fvg_conviction` in backtest.py + `HTF_FVG_MID_TOLERANCE_PIPS=10`,
+`HTF_FVG_SCAN_BARS=80` in config):
+- Scans W → D → H4 (biggest TF first) for unmitigated FVGs (close-through-far-side
+  mitigation per ICT Ep 9 — wicks don't mitigate).
+- When current price is within `HTF_FVG_MID_TOLERANCE_PIPS` of an unmitigated FVG midpoint
+  whose direction matches the trade → +1 conviction, and the trade is tagged with the
+  hit timeframe (`htf_fvg` column: "W"/"D"/"240T"/"").
+- Reporting: "HTF FVG 50% draw-on-liquidity conviction" breakdown table by timeframe.
 
-**Proposed implementation**: Add +1 conviction when:
-- Current price is within N pips of an H4/D1/W1 FVG midpoint (50% level)
-- The FVG direction aligns with the trade direction
-- The `detect_amd_setup` detected an AMD setup (consolidation + sweep near the 50%)
-This tells us: "this AMD cycle formed at the natural HTF delivery zone, not random."
-The stop-run inside the 50% (mini-Judas within the FVG) is the highest-quality AMD entry.
+**Backtest finding — currently INERT as a conviction-add (IS/OOS confirmed):**
+The signal fires 34× over 4yr (9 IS / 25 OOS) but the full and per-split results are
+**byte-identical to baseline** (4yr: 798 trades, PF 5.03, R59.35M, -12.95%; OOS: 411
+trades, PF 5.02, R573k). Reason: any trade that opens already has conviction ≥ MIN_CONVICTION
+(6 London / 5 NY), which is in the `5+` bucket → already 3 legs (MAX_LEGS). A +1 cannot
+change leg count or the open/skip decision, so it never alters an outcome. The signal is
+correct ICT logic, harmless, and now computed + tagged for analysis — but to make it BITE it
+must feed a lever that isn't already saturated:
+- **(A) Position sizing** — bump lots when at HTF FVG 50% (like DRAW_SIZE_MULT). Raises edge
+  AND drawdown; needs full IS/OOS and the -15% breaker must hold.
+- **(B) Entry-gate reducer for continuations** — let a marginal breakout/continuation in when
+  it's anchored at an HTF FVG midpoint (its draw target). Adds trades; needs full IS/OOS.
+- **(C) Reversal filter** — reduce size / skip a REVERSAL fading INTO an unmitigated HTF FVG
+  (price likely continues to the gap, not reverses). Risk-reducing; gate-style, so watch the
+  compounding path-dependency lesson from P8.
 
-**Not urgent** — requires FVG detection on H4/D1/W1 bars and midpoint proximity check.
+Lever choice is a live-money risk decision — pending user direction before wiring.
 
 ---
 
