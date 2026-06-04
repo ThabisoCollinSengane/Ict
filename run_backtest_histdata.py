@@ -132,30 +132,26 @@ def main():
     core_syms     = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
     optional_syms = ["AUDUSD", "NZDUSD", "AUDNZD"]
 
-    # Abort only if core pairs are completely absent for recent years.
-    core_missing = [
-        os.path.join(DATA_DIR, f"{s}_{yr}.csv")
-        for s in core_syms for yr in years
-        if not os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv"))
-        and yr in ("2024", "2025")
-    ]
-    if core_missing:
-        for p in core_missing:
-            print(f"ERROR: missing {p}")
-        sys.exit(1)
+    import glob as _glob
 
-    # Filter to years where all core pairs are present.
-    years = [yr for yr in years
-             if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv"))
-                    for s in core_syms)]
+    def _year_has_data(sym, yr):
+        """True if annual OR at least one monthly file exists for this sym/year."""
+        if os.path.exists(os.path.join(DATA_DIR, f"{sym}_{yr}.csv")):
+            return True
+        return bool(_glob.glob(os.path.join(DATA_DIR, f"{sym}_{yr}_*.csv")))
+
+    # Filter to years where all core pairs have at least some data.
+    years = [yr for yr in years if all(_year_has_data(s, yr) for s in core_syms)]
     if not years:
-        print("ERROR: no complete years found for core pairs")
+        print("ERROR: no data found for core pairs in requested years")
+        print(f"  Core pairs needed: {core_syms}")
+        print(f"  Data directory: {DATA_DIR}")
         sys.exit(1)
 
-    # Determine which optional pairs have complete coverage for the same years.
+    # Determine which optional pairs have coverage for the same years.
     available_optional = [
         s for s in optional_syms
-        if all(os.path.exists(os.path.join(DATA_DIR, f"{s}_{yr}.csv")) for yr in years)
+        if all(_year_has_data(s, yr) for yr in years)
     ]
     if available_optional:
         print(f"  Optional pairs available: {', '.join(available_optional)}")
@@ -173,8 +169,21 @@ def main():
     for sym in syms:
         frames = []
         for yr in years:
-            path = os.path.join(DATA_DIR, f"{sym}_{yr}.csv")
-            frames.append(load_m1(path))
+            annual = os.path.join(DATA_DIR, f"{sym}_{yr}.csv")
+            if os.path.exists(annual):
+                frames.append(load_m1(annual))
+            else:
+                # Fall back to monthly files: PAIR_YYYY_MM.csv (for partial years)
+                import glob as _glob
+                monthly = sorted(_glob.glob(os.path.join(DATA_DIR, f"{sym}_{yr}_*.csv")))
+                if monthly:
+                    for mp in monthly:
+                        frames.append(load_m1(mp))
+                else:
+                    # Year data genuinely missing — skip silently (already gated above)
+                    pass
+        if not frames:
+            continue
         m1 = pd.concat(frames).sort_index()
         m1 = m1[~m1.index.duplicated(keep='first')]
         m5 = _resample(m1, "5min")
