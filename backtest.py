@@ -1333,11 +1333,16 @@ class Backtester:
             self._draw_cache[_draw_key] = (_cached_draw, direction)
         _draw_score = _cached_draw
         if _draw_score == 0 and not _is_breakout:
-            if _is_ny_cont:
-                # Measure how many NY-AM continuations the reversal gate is killing.
-                g["ny_continuation_gated"] = g.get("ny_continuation_gated", 0) + 1
-            g["htf_draw_counter"] += 1
-            return   # hard gate: no HTF draw alignment → skip (reversal logic).
+            if _is_ny_cont and config.NY_CONTINUATION_GATE_EXEMPT:
+                # Exempt: this runs WITH the daily draw (continuation of London's
+                # move), not a fresh reversal — the 0/3 rule is reversal logic.
+                g["ny_continuation_exempt"] = g.get("ny_continuation_exempt", 0) + 1
+            else:
+                if _is_ny_cont:
+                    # Measure how many NY-AM continuations the reversal gate kills.
+                    g["ny_continuation_gated"] = g.get("ny_continuation_gated", 0) + 1
+                g["htf_draw_counter"] += 1
+                return   # hard gate: no HTF draw alignment → skip (reversal logic).
             # Breakout continuations are exempt: a strong continuation move runs
             # WITH the HTF, which scores low on the inverted draw cascade by design.
         # 2a variants gated entirely — move too extended by the time synthetic confirms.

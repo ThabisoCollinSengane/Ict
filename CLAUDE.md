@@ -385,6 +385,38 @@ analytics. **NOTE (2026-06-04): user has real-world experience trading this Lond
 relationship and is providing detail to model it correctly — the naive same-pair downsize
 was too blunt. Revisit with the corrected entry/direction rules once captured.**
 
+### P11 — NY-AM continuation of the London/DXY direction (MODELLED 2026-06-04)
+**User's setup (captured via Q&A):** London Judas/DXY sweep sets the day's USD direction
+(DXY-wide). Over the London-NY handover (05:00–07:00 ET) price consolidates; at NY open it
+shifts structure (MSS/BOS on M5/M15) and continues the SAME direction, entered on the
+retrace into the FVG/OB. It "looks like a small Judas swing" but is a continuation. Taken
+regardless of how the London trade ended; same size as a normal trade.
+
+**Detection + tagging (shipped, analytics):** `_london_dir[ny_date]` records the first
+London position's direction; a NY-AM entry in that same direction is tagged `ny_cont=True`.
+Reporting: "NY-AM continuation of London/DXY direction" table.
+
+**Finding — the algo ALREADY captures the user's edge:** 34 NY continuations over 4yr, ALL
+classified `entry_model="judas"` (confirms "looks like a Judas swing"), **WR 52.9% vs 46.5%**
+for everything else. These are profitable and already pass the gate (they carry draw_score > 0).
+
+**Gate-exemption test — REVERTED (False):** Hypothesis was that the inverted-draw 0/3
+hard gate (reversal logic) wrongly kills these continuations. Tested exempting the
+draw_score-EXACTLY-0 NY continuations from the gate:
+
+| Metric | Baseline | Gate-exempt |
+|---|---|---|
+| Full 4yr equity | R60.18M | **R49.85M** (−R10.3M, −17%) |
+| Full 4yr PF / MaxDD | 5.03 / -12.95% | 5.02 / **-13.56%** |
+| IS equity / PF | R145.4k / 3.01 | R121.8k / 2.96 |
+| OOS equity / PF | R641k / 5.06 | R634k / 5.05 |
+
+Only 6 trades exempted but path-dependency turned it into a R10.3M loss. **Conclusion:** the
+profitable continuations already pass the gate; the ones the 0/3 rule blocks are the genuinely
+weak draw_score-0 subset, and the gate is correctly separating them. The user's edge is
+already in the system — no lever needed. `NY_CONTINUATION_GATE_EXEMPT=False`. Detection/tag
+retained as analytics (the `ny_cont` column lets us monitor continuation performance live).
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

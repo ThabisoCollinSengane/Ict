@@ -220,6 +220,22 @@ HTF_FVG_OPPOSING_MAX_PIPS  = 80
 # 1.0 = no change (shipped); <1.0 = size the same-day NY breakout echo down.
 LONDON_JUDAS_NY_BREAKOUT_DOWNSIZE = 1.0
 
+# --- NY-AM continuation gate exemption (P11) ---
+# The inverted-draw 0/3 hard gate is REVERSAL logic: it kills trades that run WITH
+# the HTF daily draw (draw_score 0 = trade agrees with the trend = continuation).
+# That's correct for a fresh fade, but a NY-AM trade that continues the direction
+# London already established (handover consolidation → MSS → continue) is a real
+# continuation that only LOOKS like a Judas swing. Exempt those from the 0/3 gate
+# the same way breakout continuations are exempt.
+# RESULT — REVERTED (False). Exempting the draw_score-EXACTLY-0 NY continuations
+# cost R10.3M over 4yr (R60.18M → R49.85M), worse MaxDD (-12.95% → -13.56%), lower
+# PF (5.03 → 5.02). Only 6 trades exempted but path-dependency amplified the damage.
+# Key learning: the PROFITABLE NY continuations (34 trades, WR 52.9%) already pass
+# the gate because they have draw_score > 0 — the algo ALREADY captures the user's
+# edge (tagged "judas" in NY-AM, see ny_cont column). The ones the 0/3 gate blocks
+# are the genuinely weak draw_score-0 subset; the gate is correctly separating them.
+NY_CONTINUATION_GATE_EXEMPT = False
+
 # --- AMD (Accumulation / Manipulation / Distribution) on M15 ---
 # A consolidation range must satisfy ALL of:
 #   - at least AMD_MIN_RANGE_BARS consecutive M15 bars,
