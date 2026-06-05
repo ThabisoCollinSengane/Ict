@@ -957,14 +957,17 @@ class Backtester:
             candidates.append((w_bars[-2].High, "pwh_pwl"))
             candidates.append((w_bars[-2].Low, "pwh_pwl"))
 
-        # ICT: unswept ITH/ITL are primary institutional liquidity draws.
-        # Bigger TF = stronger magnet. config.ITHL_TARGET_TFS selects which timeframes
-        # contribute ITH/ITL target candidates (empty = none). max_bars=300 cap is
-        # essential: the M15/H1 series run to ~100k bars over 4yr and mstruct.classify
-        # is O(n) — uncapped, this dominates runtime. The recent 300 bars hold every
-        # intermediate swing price could realistically be drawn to.
+        # ICT: unswept ITH/ITL are primary institutional liquidity draws (P17). Bigger
+        # TF = stronger magnet. config.ITHL_TARGET_TFS selects which timeframes contribute
+        # ITH/ITL target candidates (empty = none); default is H4/D/W. The full history is
+        # scanned — the valuable draws are OLDER major intermediate highs/lows, so capping
+        # the lookback removes the edge (300-bar H4 ≈ 50 days lost most of it: R76M→R71M).
+        # H4/D/W bar counts are small (~6k/1k/200 over 4yr) so full-history classify is
+        # cheap. Do NOT add 15T/60T here without a cap — those series run to ~100k bars and
+        # uncapped mstruct.classify (O(n)) dominates runtime; they also hurt PnL (-R10M).
+        _ithl_cap = config.ITHL_TARGET_MAX_BARS or None
         for _itf in config.ITHL_TARGET_TFS:
-            _ibars = self.bars_up_to(pair, _itf, t, max_bars=300)
+            _ibars = self.bars_up_to(pair, _itf, t, max_bars=_ithl_cap)
             if len(_ibars) < 5:
                 continue
             candidates += self._ithl_targets(_ibars, direction, price, pair, _itf)

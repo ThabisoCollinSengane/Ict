@@ -152,11 +152,17 @@ TARGET_CONFLUENCE_TOL_PIPS = 8   # pips tolerance for two sources to be "at same
 # Env-overridable for sweeps: TARGET_SCORE_MULT / TARGET_SCORE_MULT_THRESHOLD.
 TARGET_SCORE_MULT           = float(_os.environ.get("TARGET_SCORE_MULT", 1.25))
 TARGET_SCORE_MULT_THRESHOLD = int(_os.environ.get("TARGET_SCORE_MULT_THRESHOLD", 4))
-# Timeframes that contribute unswept ITH/ITL target candidates. Empty tuple = none
-# (pure P16 target set). Env override: ITHL_TARGET_TFS="240T,D,W" (comma-separated).
+# Timeframes that contribute unswept ITH/ITL target candidates (P17). Default H4/D/W
+# (full history — the edge is in older major intermediate highs/lows). Empty tuple =
+# none (pure P16 target set). Env override: ITHL_TARGET_TFS="240T,D,W" (comma-separated).
+# Do NOT add 15T/60T without also setting ITHL_TARGET_MAX_BARS (those series are ~100k
+# bars — uncapped classify dominates runtime — and they hurt PnL by ~R10M in testing).
 ITHL_TARGET_TFS = tuple(
-    _tf for _tf in _os.environ.get("ITHL_TARGET_TFS", "15T,60T,240T,D,W").split(",") if _tf
+    _tf for _tf in _os.environ.get("ITHL_TARGET_TFS", "240T,D,W").split(",") if _tf
 )
+# Lookback cap (bars) for ITH/ITL target scanning. 0 = full history (correct for H4/D/W).
+# Set >0 only if including large intraday TFs (15T/60T) to bound runtime.
+ITHL_TARGET_MAX_BARS = int(_os.environ.get("ITHL_TARGET_MAX_BARS", 0))
 
 # --- ICT 2022 Episode 12: Market Structure hierarchy ---
 # Episode 12 defines three swing tiers: LTH/LTL (Daily ~50 bars), ITH/ITL (1H ~20
