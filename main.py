@@ -19,6 +19,11 @@ from datetime import timedelta
 import json
 import pytz
 
+try:
+    from scripts.notify import send_message as _notify
+except Exception:
+    def _notify(msg): return False  # noqa: E731
+
 import config
 from ict.killzones import can_open_new_trade, current_killzone
 from ict.fvg import detect_new_fvg, nearest_unmitigated
@@ -102,6 +107,11 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         self._daily_opens   = {}   # pair -> float
         self._weekly_opens  = {}   # pair -> float
         self._session_opens = {}   # pair -> float
+
+        # Notification dedup: track which circuit-breaker alerts have been sent
+        # so we don't spam on every 5m bar while the halt is active.
+        self._notified_halt_until: str | None = None
+        self._notified_day_halt  = False
 
         # Weekly and daily trade budgets
         self._week_key       = None
@@ -206,12 +216,21 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         self._day_total = 0
         self._day_pair  = {}
         self._day_halted = False
+        self._notified_day_halt = False
         self._peak_equity = max(self._peak_equity, equity)
         # Record reference opens for all tradeable pairs at session start
         for pair in config.PAIRS:
             bars5 = self._asc(self.bars_5m[pair])
             if bars5:
                 self._daily_opens[pair] = bars5[-1].Close
+        dd_pct = ((self._peak_equity - equity) / self._peak_equity * 100
+                  if self._peak_equity > 0 else 0.0)
+        _notify(
+            f"DAY START: {today}\n"
+            f"Equity:  R{equity:,.2f}\n"
+            f"Peak:    R{self._peak_equity:,.2f}\n"
+            f"DD from peak: {dd_pct:.1f}%"
+        )
 
     def _weekly_reset(self):
         equity = self.Portfolio.TotalPortfolioValue
@@ -222,6 +241,12 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             bars5 = self._asc(self.bars_5m[pair])
             if bars5:
                 self._weekly_opens[pair] = bars5[-1].Close
+        _notify(
+            f"WEEK START\n"
+            f"Equity: R{equity:,.2f}\n"
+            f"Peak:   R{self._peak_equity:,.2f}\n"
+            f"Consecutive losses: {self._consec_losses}"
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Main bar trigger
@@ -270,6 +295,14 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 resume = (self.UtcTime + timedelta(days=config.DRAWDOWN_PAUSE_DAYS))
                 self._halt_until_date = resume.strftime("%Y-%m-%d")
                 self.Debug(f"Drawdown halt: {dd:.1f}% — resume {self._halt_until_date}")
+                if self._notified_halt_until != self._halt_until_date:
+                    self._notified_halt_until = self._halt_until_date
+                    _notify(
+                        f"CIRCUIT BREAKER: MAX DRAWDOWN HALT\n"
+                        f"Drawdown: {dd:.1f}% from peak\n"
+                        f"Equity:   R{equity:,.2f}\n"
+                        f"Halt until: {self._halt_until_date}"
+                    )
                 return False
 
         # 2. Daily halt flag (set by session drawdown or daily loss)
@@ -282,6 +315,14 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             if day_loss >= config.MAX_DAILY_LOSS_PCT:
                 self._day_halted = True
                 self.Debug(f"Daily loss cap hit: {day_loss:.1f}%")
+                if not self._notified_day_halt:
+                    self._notified_day_halt = True
+                    _notify(
+                        f"CIRCUIT BREAKER: DAILY LOSS CAP\n"
+                        f"Daily loss: {day_loss:.1f}%\n"
+                        f"Equity: R{equity:,.2f}\n"
+                        f"No new entries until tomorrow"
+                    )
                 return False
 
         # 4. Session drawdown kill switch
@@ -290,12 +331,28 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             if sess_loss >= config.SESSION_DRAWDOWN_PCT:
                 self._day_halted = True
                 self.Debug(f"Session drawdown kill: {sess_loss:.1f}% — halting day")
+                if not self._notified_day_halt:
+                    self._notified_day_halt = True
+                    _notify(
+                        f"CIRCUIT BREAKER: SESSION KILL SWITCH\n"
+                        f"Session loss: {sess_loss:.1f}%\n"
+                        f"Equity: R{equity:,.2f}\n"
+                        f"All positions closed — halted for the day"
+                    )
                 self._close_all_positions()
                 return False
 
         # 5. Consecutive loss pause
         if self._consec_losses >= config.MAX_CONSECUTIVE_LOSSES:
             self._day_halted = True
+            if not self._notified_day_halt:
+                self._notified_day_halt = True
+                _notify(
+                    f"CIRCUIT BREAKER: CONSECUTIVE LOSSES\n"
+                    f"{self._consec_losses} losses in a row\n"
+                    f"Equity: R{equity:,.2f}\n"
+                    f"Paused for the rest of the day"
+                )
             return False
 
         return True
@@ -723,6 +780,21 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         self._order_index[sl_ticket.OrderId] = (pair, "sl")
         self._order_index[tp_ticket.OrderId] = (pair, "tp")
 
+        _pip       = pip_size(pair)
+        _stop_pips = abs(fill_price - stop) / _pip
+        _rwd_pips  = abs(st["target"] - fill_price) / _pip
+        _dir_str   = "LONG" if st["direction"] > 0 else "SHORT"
+        _leg_n     = info["leg_idx"]
+        _equity    = self.Portfolio.TotalPortfolioValue
+        _notify(
+            f"TRADE OPENED\n"
+            f"{pair} {_dir_str} | Leg {_leg_n}/{st['max_legs']}\n"
+            f"Entry:  {fill_price:.5f}\n"
+            f"Stop:   {stop:.5f} ({_stop_pips:.1f} pips)\n"
+            f"Target: {st['target']:.5f} ({_rwd_pips:.1f} pips)\n"
+            f"Equity: R{_equity:,.2f}"
+        )
+
     def _on_exit_fill(self, pair: str, exit_id: int, fill_price: float, role: str):
         st = self.active.get(pair)
         if st is None:
@@ -760,6 +832,19 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 self._consec_losses += 1
             else:
                 self._consec_losses = 0
+
+            _pnl_zar   = pnl_est * config.USD_ZAR
+            _sign      = "+" if _pnl_zar >= 0 else ""
+            _dir_str   = "LONG" if st["direction"] > 0 else "SHORT"
+            _reason_str = "TARGET" if role == "tp" else "STOP"
+            _equity    = self.Portfolio.TotalPortfolioValue
+            _notify(
+                f"TRADE CLOSED [{_reason_str}]\n"
+                f"{pair} {_dir_str} | Leg {leg['leg_idx']}\n"
+                f"Entry: {leg['entry']:.5f} | Exit: {fill_price:.5f}\n"
+                f"P&L:  {_sign}R{_pnl_zar:,.2f}\n"
+                f"Equity: R{_equity:,.2f}"
+            )
 
             st["legs"].remove(leg)
             break

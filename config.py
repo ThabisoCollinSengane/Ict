@@ -344,3 +344,9 @@ DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 # the more-moved pair determines the synthetic EURGBP direction.
 EURGBP_SYNTHETIC_LOOKBACK         = 6    # H1 bars to look back
 EURGBP_SYNTHETIC_THRESHOLD_PIPS   = 10   # minimum divergence (pips) to fire
+
+# --- Telegram notifications (P6) ---
+# Create a bot via @BotFather, then get your chat ID via @userinfobot.
+# Leave empty to disable all notifications (backtest / no-live mode).
+TELEGRAM_BOT_TOKEN = ""   # e.g. "123456789:AABBccDDeeFFggHHiiJJkkLLmmNNoo"
+TELEGRAM_CHAT_ID   = ""   # e.g. "987654321"  (your personal chat ID)
