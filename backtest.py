@@ -957,6 +957,16 @@ class Backtester:
             candidates.append((w_bars[-2].High, "pwh_pwl"))
             candidates.append((w_bars[-2].Low, "pwh_pwl"))
 
+        # ICT: unswept ITH/ITL from H4/D/W are the primary institutional liquidity draws.
+        # For longs: buy-side pools above unswept intermediate highs (ITHs).
+        # For shorts: sell-side pools below unswept intermediate lows (ITLs).
+        # Bigger TF = stronger magnet (weekly ITH above price is a major draw for longs).
+        for tf in ("240T", "D", "W"):
+            bars = self.bars_up_to(pair, tf, t)
+            if len(bars) < 5:
+                continue
+            candidates += self._ithl_targets(bars, direction, price)
+
         if direction > 0:
             candidates = [c for c in candidates if c[0] > price]
         else:
@@ -1049,6 +1059,38 @@ class Backtester:
             if abs(price - target_price) <= tol:
                 seen.add(src)
         return len(seen)
+
+    @staticmethod
+    def _ithl_targets(bars, direction, price):
+        """Unswept ITH (longs) / ITL (shorts) as primary liquidity draw candidates.
+
+        ICT: price is drawn toward resting buy-side liquidity ABOVE unswept intermediate
+        highs (ITHs) for longs, and sell-side liquidity BELOW unswept intermediate lows
+        (ITLs) for shorts. The fractal tier confirms institutional order flow stopped
+        there — these are stronger magnets than plain swing highs/lows.
+
+        Vice versa for protection: the same ITL levels below entry are where stops
+        belong for longs (price must break the ITL to invalidate the setup), and ITH
+        levels above entry are the stop reference for shorts. The structural stop
+        (_structure_stop) already anchors to the most recent intact M1 ITL/ITH.
+
+        Returns (price, source_tag) tuples — source families "ith_liquidity" /
+        "itl_liquidity" are distinct from "swing" so the confluence scorer counts
+        them separately.
+        """
+        if len(bars) < 5:
+            return []
+        res = mstruct.classify(bars)
+        out = []
+        if direction > 0:
+            for s in res.get("ith", []):
+                if not s.swept and s.price > price:
+                    out.append((s.price, "ith_liquidity"))
+        else:
+            for s in res.get("itl", []):
+                if not s.swept and s.price < price:
+                    out.append((s.price, "itl_liquidity"))
+        return out
 
     @staticmethod
     def _scan_htf_fvgs(bars, pair):

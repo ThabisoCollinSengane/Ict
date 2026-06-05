@@ -1233,8 +1233,32 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         return htf_bias(series)
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Target finding (unchanged from original)
+    # Target finding
     # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _ithl_targets(bars, direction, price) -> list:
+        """Unswept ITH (longs) / ITL (shorts) as primary liquidity draw targets.
+
+        Price is drawn toward buy-side pools above unswept ITHs (longs) and
+        sell-side pools below unswept ITLs (shorts). Bigger TF = stronger magnet.
+        Vice versa: the intact ITL below entry is stop protection for longs;
+        intact ITH above entry is stop protection for shorts (_structure_stop handles this).
+        Returns plain price floats.
+        """
+        if len(bars) < 5:
+            return []
+        res = mstruct.classify(bars)
+        out = []
+        if direction > 0:
+            for s in res.get("ith", []):
+                if not s.swept and s.price > price:
+                    out.append(s.price)
+        else:
+            for s in res.get("itl", []):
+                if not s.swept and s.price < price:
+                    out.append(s.price)
+        return out
 
     def _find_target(self, pair, direction, cur_price):
         stores = (self.bars_4h, self.bars_1d, self.bars_1w)
@@ -1244,6 +1268,12 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             if len(bars) < 5:
                 continue
             candidates += self._targets_in_series(bars, pair, direction, cur_price)
+
+        # ITH/ITL liquidity draws from H4/D/W — primary institutional magnets.
+        for store in (self.bars_4h, self.bars_1d, self.bars_1w):
+            bars = self._asc(store[pair])
+            candidates += self._ithl_targets(bars, direction, cur_price)
+
         candidates = [c for c in candidates if
                       (direction > 0 and c > cur_price) or (direction < 0 and c < cur_price)]
         if not candidates:
