@@ -12,10 +12,11 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 798 trades, WR 46.5%, PF 5.12, MaxDD -12.95%, R500 → R71.19M.
+**Backtest result (4 years, 2022–2025):** 798 trades, WR 46.6%, PF 5.18, MaxDD -12.95%, R500 → R178.70M.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
-HTF-FVG 1.25× sizing bump and P16 fractal structural stop: +R11M vs the R60.18M pre-P16
-baseline, MaxDD unchanged at -12.95%.)
+HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
+targets, and P18 score≥4 confluence sizing (1.25×). MaxDD unchanged at -12.95% across all
+additions. See P18 for the cache-bug post-mortem that corrected a phantom regression.)
 
 ---
 
@@ -506,9 +507,9 @@ equal H/L, round number, PDH/PDL, PWH/PWL, raw swing high/low.
 FVG + round number all pointing at the same price means EAs/bank desks from multiple frameworks
 are targeting that level. Score<3 is just noise (one source can always be found near any price).
 
-**Next lever (not yet implemented):** A sizing multiplier for score≥4 targets (analogous to
-P9's 1.25x HTF FVG multiplier) could extract value from the high-conviction TP areas without
-changing the compounding path. Requires IS/OOS validation before shipping.
+**Next lever (SHIPPED as P18):** A sizing multiplier for score≥4 targets (analogous to P9's
+1.25x HTF FVG multiplier) — extracts value from the high-conviction TP bucket without changing
+target selection. Implemented and IS/OOS-validated: see P18 (R76M→R178.7M, MaxDD-neutral).
 
 ### P16 — Fractal market structure (LTH/ITH/STH) — Ep 12 (IMPLEMENTED 2026-06-04)
 **What:** True recursive fractal classification of swing points into the three-tier ICT
@@ -560,6 +561,69 @@ run MaxDD (the live-relevant path) is unchanged at -12.95%, PF improved in all t
 IS/OOS magnitudes consistent. The slightly wider stop (avg loss R35k→R40k) survives the
 sweep but costs marginally more when genuinely wrong — the +0.69pp shows only on the
 OOS-from-R500 stress restart, not the continuous deployment path.
+
+### P17 — ITH/ITL levels as primary liquidity-draw targets (SHIPPED 2026-06-05)
+**What:** Unswept INTERMEDIATE-tier highs/lows (ITH/ITL from the Ep-12 fractal classifier)
+are the resting buy-side / sell-side liquidity pools price is institutionally drawn toward.
+For LONG: unswept ITH ABOVE price = buy-side draw. For SHORT: unswept ITL BELOW price =
+sell-side draw. These register as distinct confluence source families (`ith_liquidity` /
+`itl_liquidity`) so an ITH that clusters with a fib extension scores as multi-source.
+
+**Implementation:** `_ithl_targets(bars, direction, price, pair, tf)` adds unswept ITH/ITL
+as `_find_target` candidates, scanned on W/D/H4. `config.ITHL_TARGET_TFS = ("240T","D","W")`
+(env-overridable). **Full history is scanned (`ITHL_TARGET_MAX_BARS = 0`)** — the edge is in
+OLDER major intermediate swings; a 300-bar cap (H4 ≈ 50 days) loses most of it (R76M→R71M).
+H4/D/W bar counts are small (~6k/1k/200 over 4yr) so uncapped classify is cheap. **Do NOT add
+15T/60T without a cap** — those series run to ~100k bars (uncapped classify hangs) AND they
+hurt PnL (−R10M, tested + dropped 2026-06-05).
+
+**Result:** 798 / 46.6% / PF 5.20 / **R76.05M** / -12.95% — +R4.86M vs P16 baseline R71.19M,
+PF up, MaxDD unchanged. IS PF identical to baseline (nearest-qualifying target rarely changed
+in 2022-23), OOS +R48k. Textbook non-curve-fit add. The nearest-qualifying TARGET selection is
+preserved (ITH/ITL are added candidates only) — the value comes through confluence scoring, not
+through choosing further targets (which would wreck the compounding path).
+
+### P18 — Confluence sizing (score≥4 1.25×) + cache-bug post-mortem (SHIPPED 2026-06-05)
+**What (active lever):** When the chosen TP's confluence score (P15) is ≥4 — i.e. ≥4 distinct
+source families (fib / FVG / OB / equal-H/L / round number / PDH-PDL / PWH-PWL / ITH-ITL) agree
+within `TARGET_CONFLUENCE_TOL_PIPS` of the same price — scale the position 1.25×. Score 4 is the
+highest-WR confluence bucket (P15: WR 50.5% / PF 5.73). Same equity floor as the draw cascade
+(`DRAW_SIZE_MIN_EQUITY = 3000`). Config: `TARGET_SCORE_MULT = 1.25`,
+`TARGET_SCORE_MULT_THRESHOLD = 4` (both env-overridable). Counter: `target_score_sized`.
+
+**Result (full 4yr, on the corrected base):**
+
+| Config | Trades | WR | PF | Equity | MaxDD |
+|---|---|---|---|---|---|
+| P17 (mult off) | 798 | 46.6% | 5.20 | R76.05M | -12.95% |
+| **P18 (score≥4, 1.25×)** | 798 | 46.6% | **5.18** | **R178.70M** | **-12.95%** |
+
+Equity +135% with PF, WR, and MaxDD all essentially unchanged — the hallmark of a clean sizing
+lever (amplifies compounding on the high-conviction bucket without degrading quality or risk).
+IS/OOS: IS PF 3.14 (>baseline 3.12), OOS PF 5.20 (>baseline 5.15), both splits positive and same
+ballpark; full-4yr and IS MaxDD -12.95%, OOS-restart MaxDD -16.75% (the known fragile R500-restart
+stress path — P16's was -16.31%; the live continuous path is -12.95%).
+
+**⚠️ Cache-bug post-mortem (the phantom "tune-down" regression):** A memoised `_classify_cached`
+was added to avoid re-running `mstruct.classify` (O(n)) per trade eval. The key used
+`bars[-1].name`, but `Bar = namedtuple("Open High Low Close")` has **no timestamp** — the lookup
+always raised `AttributeError` and fell back to `len(bars)`, which **saturates at the `max_bars`
+cap (300/90)**. Once each series passed its cap the key `(pair, tf, 300)` became constant for the
+whole run, so the cache returned the FIRST classification forever — freezing `_structure_stop` and
+`_structure_conviction` at early-2022 structure for all 4 years. This silently degraded PF
+5.20→4.19 and MaxDD -12.95→-13.89, which looked like the score-mult "over-leveraging the book."
+Bisect (full 4yr, mult off) isolated it: P16 / DXY-structure / P17 all clean at 5.12–5.20; the
+regression appeared only in the commit that introduced the cache. **Fix:** removed the cache —
+the `max_bars` cap at every call site is the real perf fix (classify is O(≤300), ~1.7k calls
+over 4yr; no memoisation needed). `_classify_cached` is now a direct passthrough.
+**Lesson:** a namedtuple-based bar with no timestamp can't be cache-keyed by `.name`; and any
+length-based key silently collapses under a `max_bars` cap. Validate perf optimisations against
+a known-good full-run number, not just runtime.
+
+**Live-engine gap (TODO):** `main.py` has NO confluence scoring and NO sizing multipliers
+(P9 HTF-FVG 1.25×, P18 score≥4 1.25×, and the draw-cascade 2×/3×). The live engine will NOT
+match the backtest's compounding until these are ported and validated. `main.py` ITH/ITL targets
+ARE aligned to H4/D/W (P17). Porting the sizing levers to the live engine is the next build.
 
 ---
 
