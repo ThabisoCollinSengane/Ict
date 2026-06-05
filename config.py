@@ -144,6 +144,11 @@ NO_NEW_TRADES_LAST_MIN = 15        # skip new entries in final N min of a killzo
 # count and prefer the highest-scoring TP. Score adds directly to conviction →
 # more pyramid legs unlocked for high-confluence targets.
 TARGET_CONFLUENCE_TOL_PIPS = 8   # pips tolerance for two sources to be "at same level"
+# When the chosen TP has score≥threshold (fib + ITH/ITL + FVG/OB agreeing at same price),
+# scale up the position. Same equity floor as draw-cascade (DRAW_SIZE_MIN_EQUITY).
+# Mirrors P9's 1.25× HTF FVG multiplier logic. Set to 1.0 to disable.
+TARGET_SCORE_MULT           = 1.25
+TARGET_SCORE_MULT_THRESHOLD = 3
 
 # --- ICT 2022 Episode 12: Market Structure hierarchy ---
 # Episode 12 defines three swing tiers: LTH/LTL (Daily ~50 bars), ITH/ITL (1H ~20

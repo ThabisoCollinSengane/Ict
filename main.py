@@ -1269,8 +1269,8 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 continue
             candidates += self._targets_in_series(bars, pair, direction, cur_price)
 
-        # ITH/ITL liquidity draws from H4/D/W — primary institutional magnets.
-        for store in (self.bars_4h, self.bars_1d, self.bars_1w):
+        # ITH/ITL liquidity draws from M15→W — include session-level structure.
+        for store in (self.bars_15m, self.bars_1h, self.bars_4h, self.bars_1d, self.bars_1w):
             bars = self._asc(store[pair])
             candidates += self._ithl_targets(bars, direction, cur_price)
 

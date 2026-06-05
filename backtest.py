@@ -147,6 +147,10 @@ class Backtester:
         self._weekly_amd        = {}   # pair -> WeeklyAMD or None
         # HTF draw cascade cache: (pair, date) -> score; W/D/H4 draw doesn't change intraday
         self._draw_cache        = {}   # (pair, date) -> int
+        # Market-structure classify cache: (pair_or_"DXY", tf, last_bar_ts) -> result dict.
+        # mstruct.classify is O(n) and called 10+ times per trade eval — cache by the
+        # last bar's timestamp so re-runs within the same M5 bar cost nothing.
+        self._mstruct_cache     = {}   # (pair, tf, last_ts) -> classify result
         # Weekly trade budget (3-of-5 pattern)
         self._week_total        = {}   # (iso_year, iso_week) -> int
         self._week_pair         = {}   # (iso_year, iso_week, pair) -> int
@@ -862,7 +866,7 @@ class Backtester:
                                max_bars=config.STRUCTURE_STOP_LOOKBACK)
         if len(bars) < 5:
             return None
-        res = mstruct.classify(bars)
+        res = self._classify_cached(bars, pair, config.STRUCTURE_STOP_TF)
         buf = config.M1_STOP_BUFFER_PIPS * pip
         min_dist = config.M1_STOP_MIN_PIPS * pip
         if direction > 0:
@@ -957,15 +961,14 @@ class Backtester:
             candidates.append((w_bars[-2].High, "pwh_pwl"))
             candidates.append((w_bars[-2].Low, "pwh_pwl"))
 
-        # ICT: unswept ITH/ITL from H4/D/W are the primary institutional liquidity draws.
-        # For longs: buy-side pools above unswept intermediate highs (ITHs).
-        # For shorts: sell-side pools below unswept intermediate lows (ITLs).
-        # Bigger TF = stronger magnet (weekly ITH above price is a major draw for longs).
-        for tf in ("240T", "D", "W"):
-            bars = self.bars_up_to(pair, tf, t)
-            if len(bars) < 5:
+        # ICT: unswept ITH/ITL are primary institutional liquidity draws.
+        # Bigger TF = stronger magnet. Include H1/M15 (session-level draws) down to
+        # the entry tier — smaller-TF ITHs/ITLs align with the intraday AMD cycle.
+        for _itf in ("15T", "60T", "240T", "D", "W"):
+            _ibars = self.bars_up_to(pair, _itf, t)
+            if len(_ibars) < 5:
                 continue
-            candidates += self._ithl_targets(bars, direction, price)
+            candidates += self._ithl_targets(_ibars, direction, price, pair, _itf)
 
         if direction > 0:
             candidates = [c for c in candidates if c[0] > price]
@@ -1060,8 +1063,7 @@ class Backtester:
                 seen.add(src)
         return len(seen)
 
-    @staticmethod
-    def _ithl_targets(bars, direction, price):
+    def _ithl_targets(self, bars, direction, price, pair: str = "", tf: str = ""):
         """Unswept ITH (longs) / ITL (shorts) as primary liquidity draw candidates.
 
         ICT: price is drawn toward resting buy-side liquidity ABOVE unswept intermediate
@@ -1080,7 +1082,8 @@ class Backtester:
         """
         if len(bars) < 5:
             return []
-        res = mstruct.classify(bars)
+        res = (self._classify_cached(bars, pair, tf)
+               if pair and tf else mstruct.classify(bars))
         out = []
         if direction > 0:
             for s in res.get("ith", []):
@@ -1203,6 +1206,27 @@ class Backtester:
                     return 1, tf
         return 0, ""
 
+    def _classify_cached(self, bars, pair: str, tf: str) -> dict:
+        """Return mstruct.classify(bars), cached by (pair, tf, last_bar_timestamp).
+
+        Within a single M5 bar the H4/D/W bars haven't changed — re-classifying
+        them for every trade evaluation is wasteful. The cache is bounded to 5 000
+        entries; beyond that we clear and rebuild (a single day's worth of lookups).
+        """
+        _empty = {k: [] for k in ("sth", "stl", "ith", "itl", "lth", "ltl")}
+        if not bars or len(bars) < 3:
+            return _empty
+        try:
+            last_ts = bars[-1].name       # pandas row: .name is the index timestamp
+        except AttributeError:
+            last_ts = len(bars)           # fallback: use series length as proxy
+        key = (pair, tf, last_ts)
+        if key not in self._mstruct_cache:
+            if len(self._mstruct_cache) > 5_000:
+                self._mstruct_cache.clear()
+            self._mstruct_cache[key] = mstruct.classify(bars)
+        return self._mstruct_cache[key]
+
     # Timeframes scanned for market-structure conviction (Ep 12), HTF → LTF.
     # M5 (5T) is excluded per the trader's spec — too noisy for tier classification;
     # M1 (1T) is used only for stop anchoring, not structural read. Weighting is
@@ -1252,7 +1276,7 @@ class Backtester:
             bars = self.bars_up_to(pair, tf, t, max_bars=300)
             if len(bars) < 5:
                 continue
-            res = mstruct.classify(bars)
+            res = self._classify_cached(bars, pair, tf)
             sdir = mstruct.structure_direction(res)
             if sdir == direction:
                 align.append(tf)
@@ -1275,7 +1299,7 @@ class Backtester:
             dxy_bars = self.bars_up_to("UDXUSD", tf, t, max_bars=300)
             if len(dxy_bars) < 5:
                 continue
-            dxy_res = mstruct.classify(dxy_bars)
+            dxy_res = self._classify_cached(dxy_bars, "UDXUSD", tf)
             dxy_sdir = mstruct.structure_direction(dxy_res)
             if dxy_sdir == -direction:
                 dxy_align.append(tf)
@@ -2008,6 +2032,13 @@ class Backtester:
         if _is_breakout and _htf_fvg_pts and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
             units = max(int(units * config.HTF_FVG_BREAKOUT_MULT), min_units)
             g["htf_fvg_breakout_sized"] = g.get("htf_fvg_breakout_sized", 0) + 1
+        # Target confluence sizing: when the chosen TP has score≥3 (fib + ITH/ITL +
+        # FVG/OB all pointing at the same price), multiple institutional frameworks
+        # agree this is the draw — scale up. Same equity floor as draw-cascade.
+        if (_target_score >= config.TARGET_SCORE_MULT_THRESHOLD
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            units = max(int(units * config.TARGET_SCORE_MULT), min_units)
+            g["target_score_sized"] = g.get("target_score_sized", 0) + 1
         # P10 London-Judas priority (REVERTED — downsize multiplier defaults to 1.0,
         # so this is a no-op + analytics counter). Hypothesis was that a NY-AM breakout
         # on a pair whose London Judas already fired today is the weaker echo and should
