@@ -1269,8 +1269,10 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 continue
             candidates += self._targets_in_series(bars, pair, direction, cur_price)
 
-        # ITH/ITL liquidity draws from M15→W — include session-level structure.
-        for store in (self.bars_15m, self.bars_1h, self.bars_4h, self.bars_1d, self.bars_1w):
+        # ITH/ITL liquidity draws from H4/D/W (P17) — the edge is in OLDER major
+        # intermediate highs/lows, so the full rolling window is scanned. M15/H1 were
+        # tested and dropped: they hurt PnL (~R10M in the 4yr backtest) and add noise.
+        for store in (self.bars_4h, self.bars_1d, self.bars_1w):
             bars = self._asc(store[pair])
             candidates += self._ithl_targets(bars, direction, cur_price)
 
