@@ -964,8 +964,11 @@ class Backtester:
         # ICT: unswept ITH/ITL are primary institutional liquidity draws.
         # Bigger TF = stronger magnet. Include H1/M15 (session-level draws) down to
         # the entry tier — smaller-TF ITHs/ITLs align with the intraday AMD cycle.
+        # max_bars=300 cap is essential: the M15/H1 series run to ~100k bars over 4yr
+        # and mstruct.classify is O(n) — uncapped, this dominates runtime. The recent
+        # 300 bars hold every intermediate swing price could realistically be drawn to.
         for _itf in ("15T", "60T", "240T", "D", "W"):
-            _ibars = self.bars_up_to(pair, _itf, t)
+            _ibars = self.bars_up_to(pair, _itf, t, max_bars=300)
             if len(_ibars) < 5:
                 continue
             candidates += self._ithl_targets(_ibars, direction, price, pair, _itf)
