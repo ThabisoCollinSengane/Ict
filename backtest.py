@@ -147,10 +147,6 @@ class Backtester:
         self._weekly_amd        = {}   # pair -> WeeklyAMD or None
         # HTF draw cascade cache: (pair, date) -> score; W/D/H4 draw doesn't change intraday
         self._draw_cache        = {}   # (pair, date) -> int
-        # Market-structure classify cache: (pair_or_"DXY", tf, last_bar_ts) -> result dict.
-        # mstruct.classify is O(n) and called 10+ times per trade eval — cache by the
-        # last bar's timestamp so re-runs within the same M5 bar cost nothing.
-        self._mstruct_cache     = {}   # (pair, tf, last_ts) -> classify result
         # Weekly trade budget (3-of-5 pattern)
         self._week_total        = {}   # (iso_year, iso_week) -> int
         self._week_pair         = {}   # (iso_year, iso_week, pair) -> int
@@ -1210,25 +1206,25 @@ class Backtester:
         return 0, ""
 
     def _classify_cached(self, bars, pair: str, tf: str) -> dict:
-        """Return mstruct.classify(bars), cached by (pair, tf, last_bar_timestamp).
+        """Return mstruct.classify(bars).
 
-        Within a single M5 bar the H4/D/W bars haven't changed — re-classifying
-        them for every trade evaluation is wasteful. The cache is bounded to 5 000
-        entries; beyond that we clear and rebuild (a single day's worth of lookups).
+        NOTE: this was previously a memoised cache keyed by (pair, tf, len(bars)),
+        but Bar is a namedtuple("Open High Low Close") with no timestamp — the
+        intended bars[-1].name key always raised AttributeError and fell back to
+        len(bars), which saturates at the max_bars cap (300/90). The key became
+        constant for the whole run, so the cache returned the FIRST classification
+        forever, freezing _structure_stop and _structure_conviction at early-2022
+        structure and silently degrading PF 5.20→4.19 / MaxDD -12.95→-13.89.
+
+        The real performance fix is the max_bars cap at every call site (classify
+        is O(n) on ≤300 bars, called ~1.7k times over 4yr) — no cache is needed.
+        Direct passthrough is provably correct; the method is retained as a thin
+        wrapper so call sites stay unchanged.
         """
         _empty = {k: [] for k in ("sth", "stl", "ith", "itl", "lth", "ltl")}
         if not bars or len(bars) < 3:
             return _empty
-        try:
-            last_ts = bars[-1].name       # pandas row: .name is the index timestamp
-        except AttributeError:
-            last_ts = len(bars)           # fallback: use series length as proxy
-        key = (pair, tf, last_ts)
-        if key not in self._mstruct_cache:
-            if len(self._mstruct_cache) > 5_000:
-                self._mstruct_cache.clear()
-            self._mstruct_cache[key] = mstruct.classify(bars)
-        return self._mstruct_cache[key]
+        return mstruct.classify(bars)
 
     # Timeframes scanned for market-structure conviction (Ep 12), HTF → LTF.
     # M5 (5T) is excluded per the trader's spec — too noisy for tier classification;
