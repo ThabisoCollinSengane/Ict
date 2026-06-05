@@ -13,7 +13,6 @@ from collections import namedtuple
 from datetime import timedelta
 
 import pandas as pd
-import yfinance as yf
 
 import config
 from ict.killzones import can_open_new_trade, current_killzone
@@ -63,6 +62,7 @@ SynBar = namedtuple("SynBar", "Open High Low Close")
 
 
 def fetch_data(period="60d", interval="5m"):
+    import yfinance as yf  # optional dep — only needed for the yfinance backtest path
     out = {}
     for name, ticker in YF_TICKERS.items():
         df = yf.download(ticker, period=period, interval=interval,
