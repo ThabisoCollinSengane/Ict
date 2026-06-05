@@ -1,0 +1,7 @@
+# Live trading runtime (Windows VPS + MT5 terminal). Install inside a venv:
+#   python -m venv .venv
+#   .venv\Scripts\activate
+#   pip install -r requirements_live.txt
+MetaTrader5>=5.0.45     # broker API — Windows only, needs the MT5 terminal installed
+pandas>=2.0
+numpy>=1.24
