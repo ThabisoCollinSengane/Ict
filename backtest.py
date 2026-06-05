@@ -348,6 +348,8 @@ class Backtester:
             "mstruct_htf_dir": st.get("mstruct_htf_dir", 0),
             "mstruct_minor_sweep": st.get("mstruct_minor_sweep", False),
             "mstruct_intact_tf": st.get("mstruct_intact_tf", ""),
+            "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
+            "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -1170,31 +1172,40 @@ class Backtester:
         ("60T",  1),   # H1 structure — session bias tier
         ("15T",  1),   # M15 structure — entry tier
     )
+    # DXY structure is read at H1 and above — M15 is too noisy for the dollar index.
+    # No weighting needed: DXY agreement is binary (aligned / not aligned).
+    _DXY_MSTRUCT_TFS = ("W", "D", "240T", "60T")
 
     def _structure_conviction(self, pair, direction, t):
         """Ep 12 — couple the fractal LTH/ITH/STH read with the draw cascade.
 
-        For each timeframe (W→M15, M5 excluded) classify the swing structure and
-        check whether its intermediate-tier direction agrees with the trade. The
-        bigger the timeframe agreeing, the bigger the draw → more conviction.
+        Scans the TRADED PAIR and DXY independently:
+        - Pair structure: does this pair's own swing hierarchy agree with direction?
+        - DXY structure: is the dollar's fractal hierarchy confirming USD strength/weakness?
+          DXY up (higher ITLs) = USD strong = pairs fall → agrees when direction == -1.
+          DXY down (lower ITHs) = USD weak = pairs rise → agrees when direction == +1.
+          DXY is the PRIMARY driver — its alignment is the most important structural read.
 
-        Also detects the double-sweep / Judas continuation: when an entry-tier
-        (M15/H1) short-term swing was swept but the intermediate swing in the
-        trade direction is still INTACT, the move is a minor liquidity run, not a
-        reversal — a continuation confirmation.
+        Minor-sweep detection: when a short-term swing was taken (Judas) but the
+        intermediate swing in the trade direction is still INTACT, the move is a
+        minor liquidity run confirming the trend continues.
 
         Returns a dict:
-          points        — conviction to add (capped to keep it saturation-safe)
-          align_tfs     — list of TF names whose structure agrees with direction
-          htf_dir       — daily/weekly combined structural direction (+1/-1/0)
-          minor_sweep   — True if an entry-tier Judas left HTF structure intact
-          ltf_intact_tf — highest TF whose intact LTL/LTH supports the direction
+          points          — conviction to add
+          align_tfs       — pair TFs whose structure agrees with direction
+          htf_dir         — daily/weekly structural direction (+1/-1/0)
+          minor_sweep     — True if a Judas continuation is confirmed (pair or DXY)
+          ltf_intact_tf   — highest TF with an intact intermediate level supporting trade
+          dxy_align       — DXY TFs whose structure agrees with trade direction
+          dxy_minor_sweep — True if DXY itself shows a Judas confirmation
         """
         align = []
         weight = 0
         htf_dir = 0
         minor_sweep = False
         intact_tf = ""
+
+        # ── Pair structure ────────────────────────────────────────────────────
         for tf, w in self._MSTRUCT_TFS:
             bars = self.bars_up_to(pair, tf, t, max_bars=300)
             if len(bars) < 5:
@@ -1206,18 +1217,39 @@ class Backtester:
                 weight += w
                 if tf in ("W", "D"):
                     htf_dir = direction
-                # The most recent intact intermediate level supporting the trade.
                 tier = "ITL" if direction > 0 else "ITH"
                 if mstruct.last_intact(res, tier) is not None and not intact_tf:
                     intact_tf = tf
-            # Minor-sweep (Judas continuation) read on the entry tiers only.
             if tf in ("60T", "15T") and mstruct.is_minor_sweep(res, direction):
                 minor_sweep = True
-        # Conviction: +1 when any HTF agrees, +1 more when a big TF (W/D) agrees,
-        # +1 for a confirmed minor-sweep continuation. Capped at +3 — additive and
-        # saturation-aware (mirrors the draw-cascade scale, doesn't double-count it).
+
+        # ── DXY structure (primary USD driver) ───────────────────────────────
+        # DXY rising  → USD strong → pairs fall  → agrees with direction == -1
+        # DXY falling → USD weak   → pairs rise  → agrees with direction == +1
+        # "DXY agrees" ≡ structure_direction(dxy) == -direction
+        dxy_align = []
+        dxy_minor_sweep = False
+        for tf in self._DXY_MSTRUCT_TFS:
+            dxy_bars = self.bars_up_to("UDXUSD", tf, t, max_bars=300)
+            if len(dxy_bars) < 5:
+                continue
+            dxy_res = mstruct.classify(dxy_bars)
+            dxy_sdir = mstruct.structure_direction(dxy_res)
+            if dxy_sdir == -direction:
+                dxy_align.append(tf)
+                # DXY W/D agreement is as strong as the pair's — update htf_dir
+                if tf in ("W", "D") and not htf_dir:
+                    htf_dir = direction
+            # DXY Judas: short-term sweep against the trade direction, but DXY's
+            # intermediate swing in the trade-supporting direction is still intact.
+            if tf in ("240T", "60T") and mstruct.is_minor_sweep(dxy_res, -direction):
+                dxy_minor_sweep = True
+                minor_sweep = True
+
+        # Conviction: +1 when pair structure has any HTF agreement,
+        # +1 when W/D (pair or DXY) confirms, +1 for minor-sweep continuation.
         points = 0
-        if weight >= 1:
+        if weight >= 1 or dxy_align:
             points += 1
         if htf_dir == direction:
             points += 1
@@ -1229,6 +1261,8 @@ class Backtester:
             "htf_dir": htf_dir,
             "minor_sweep": minor_sweep,
             "ltf_intact_tf": intact_tf,
+            "dxy_align": dxy_align,
+            "dxy_minor_sweep": dxy_minor_sweep,
         }
 
     def _maybe_open(self, pair, t):
@@ -2001,6 +2035,8 @@ class Backtester:
             "mstruct_htf_dir": _ms["htf_dir"],
             "mstruct_minor_sweep": _ms["minor_sweep"],
             "mstruct_intact_tf": _ms["ltf_intact_tf"],
+            "dxy_mstruct_align": "|".join(_ms["dxy_align"]),
+            "dxy_mstruct_sweep": _ms["dxy_minor_sweep"],
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.

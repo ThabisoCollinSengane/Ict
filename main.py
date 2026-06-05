@@ -34,6 +34,7 @@ from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_amd_setup
 from ict.ote import in_ote
 from ict.market_profile import detect_weekly_amd, profile_score
+from ict import market_structure as mstruct
 from ict.dealing_range import (
     detect_dealing_range, is_valid_entry_zone, is_valid_target_zone,
     is_nfp_week_low_probability, is_post_fomc_low_probability,
@@ -495,6 +496,10 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             if (direction > 0 and cur_price < _session_open) or (direction < 0 and cur_price > _session_open):
                 conviction += 1
 
+        # Ep 12 market structure: pair fractal + DXY fractal alignment
+        _ms = self._structure_conviction(pair, direction)
+        conviction += _ms["points"]
+
         # Conviction gate
         min_conv = (config.MIN_CONVICTION_LATE_WEEK
                     if week_total >= config.WEEKLY_SOFT_CAP
@@ -663,10 +668,14 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             return
 
         entry = cur_price
-        # Anchor the pyramid stop to M1 market structure too (same as initial entries).
-        _m1_stop = self._m1_structure_stop(bars1m, st["direction"], entry, pip)
-        if _m1_stop is not None:
-            stop = _m1_stop
+        # Ep 12 Stage 3: prefer intact M1 ITL/ITH over raw STL/STH.
+        _struct_stop = self._structure_stop(pair, st["direction"], entry, pip)
+        if _struct_stop is not None:
+            stop = _struct_stop
+        else:
+            _m1_stop = self._m1_structure_stop(bars1m, st["direction"], entry, pip)
+            if _m1_stop is not None:
+                stop = _m1_stop
         if pyr_news == "High":
             stop = (entry - config.FIXED_STOP_PIPS * pip if st["direction"] > 0
                     else entry + config.FIXED_STOP_PIPS * pip)
@@ -735,12 +744,20 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if st.get("news_impact") == "High":
             stop = (fill_price - config.FIXED_STOP_PIPS * pip if st["direction"] > 0
                     else fill_price + config.FIXED_STOP_PIPS * pip)
+        else:
+            # Ep 12 Stage 3: re-anchor stop to intact M1 ITL/ITH (survives Judas sweeps).
+            # Falls back to the M1 STL/STH raw-swing stop when no intermediate swing
+            # is within the 10-pip cap. News entries always use the fixed stop above.
+            _struct_stop = self._structure_stop(pair, st["direction"], fill_price, pip)
+            if _struct_stop is not None:
+                stop = _struct_stop
+            else:
+                bars1m = self._asc(self.bars_1m[pair])
+                _m1_stop = self._m1_structure_stop(bars1m, st["direction"], fill_price, pip)
+                if _m1_stop is not None:
+                    stop = _m1_stop
 
-        # Universal stop cap measured from the ACTUAL broker fill price. The fill
-        # already sits on the far side of the spread (bought at ask / sold at bid),
-        # so a 10-pip stop from fill_price gives a true 10 pips of adverse room
-        # rather than having the spread eat into the buffer. Only wider stops are
-        # pulled in; tighter structural stops are kept.
+        # Universal stop cap measured from the ACTUAL broker fill price.
         _max_stop = config.FIXED_STOP_PIPS * pip
         if abs(fill_price - stop) > _max_stop:
             stop = (fill_price - _max_stop if st["direction"] > 0
@@ -884,6 +901,148 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             self.Liquidate(qc_sym, tag=f"{pair}-session_handover")
             self.active.pop(pair, None)
             self.Debug(f"Session handover close: {pair} fighting weekly AMD")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Ep 12 fractal market structure (P16) — conviction + stop placement
+    # ──────────────────────────────────────────────────────────────────────────
+
+    _MSTRUCT_TFS = (
+        ("W",    3),
+        ("D",    2),
+        ("240T", 1),
+        ("60T",  1),
+        ("15T",  1),
+    )
+    _DXY_MSTRUCT_TFS = ("W", "D", "240T", "60T")
+
+    def _dxy_bars_for(self, store) -> list:
+        """Build a synthetic DXY bar list from the given rolling-window store."""
+        rolls = {s: self._asc(store[s]) for s in config.DXY_CONSTITUENTS}
+        n = min((len(v) for v in rolls.values()), default=0)
+        out = []
+        for i in range(-n, 0):
+            c = compute_dxy({s: rolls[s][i].Close for s in config.DXY_CONSTITUENTS})
+            o = compute_dxy({s: rolls[s][i].Open  for s in config.DXY_CONSTITUENTS})
+            h, l = compute_dxy_range(
+                {s: rolls[s][i].High for s in config.DXY_CONSTITUENTS},
+                {s: rolls[s][i].Low  for s in config.DXY_CONSTITUENTS},
+            )
+            if None in (c, o, h, l):
+                continue
+            out.append(_SynBar(o, h, l, c))
+        return out
+
+    _TF_TO_STORE = None  # lazily built in _structure_conviction
+
+    def _structure_conviction(self, pair: str, direction: int) -> dict:
+        """Read fractal market structure on the traded pair AND on DXY.
+
+        DXY is the primary USD driver:
+          DXY higher ITLs = USD strong = pairs fall → agrees when direction == -1
+          DXY lower ITHs  = USD weak   = pairs rise → agrees when direction == +1
+        """
+        tf_to_store = {
+            "W":    (self.bars_1w,  None),
+            "D":    (self.bars_1d,  None),
+            "240T": (self.bars_4h,  None),
+            "60T":  (self.bars_1h,  None),
+            "15T":  (self.bars_15m, None),
+        }
+        dxy_tf_to_store = {
+            "W":    self.bars_1w,
+            "D":    self.bars_1d,
+            "240T": self.bars_4h,
+            "60T":  self.bars_1h,
+        }
+
+        align = []
+        weight = 0
+        htf_dir = 0
+        minor_sweep = False
+        intact_tf = ""
+
+        for tf, w in self._MSTRUCT_TFS:
+            store, _ = tf_to_store[tf]
+            bars = self._asc(store[pair])
+            if len(bars) < 5:
+                continue
+            res = mstruct.classify(bars)
+            sdir = mstruct.structure_direction(res)
+            if sdir == direction:
+                align.append(tf)
+                weight += w
+                if tf in ("W", "D"):
+                    htf_dir = direction
+                tier = "ITL" if direction > 0 else "ITH"
+                if mstruct.last_intact(res, tier) is not None and not intact_tf:
+                    intact_tf = tf
+            if tf in ("60T", "15T") and mstruct.is_minor_sweep(res, direction):
+                minor_sweep = True
+
+        dxy_align = []
+        dxy_minor_sweep = False
+        for tf in self._DXY_MSTRUCT_TFS:
+            dxy_bars = self._dxy_bars_for(dxy_tf_to_store[tf])
+            if len(dxy_bars) < 5:
+                continue
+            dxy_res = mstruct.classify(dxy_bars)
+            dxy_sdir = mstruct.structure_direction(dxy_res)
+            if dxy_sdir == -direction:
+                dxy_align.append(tf)
+                if tf in ("W", "D") and not htf_dir:
+                    htf_dir = direction
+            if tf in ("240T", "60T") and mstruct.is_minor_sweep(dxy_res, -direction):
+                dxy_minor_sweep = True
+                minor_sweep = True
+
+        points = 0
+        if weight >= 1 or dxy_align:
+            points += 1
+        if htf_dir == direction:
+            points += 1
+        if minor_sweep:
+            points += 1
+        return {
+            "points": points,
+            "align_tfs": align,
+            "htf_dir": htf_dir,
+            "minor_sweep": minor_sweep,
+            "ltf_intact_tf": intact_tf,
+            "dxy_align": dxy_align,
+            "dxy_minor_sweep": dxy_minor_sweep,
+        }
+
+    def _structure_stop(self, pair: str, direction: int, entry: float, pip: float) -> float | None:
+        """Ep 12 Stage 3 — anchor the stop beyond the intact M1 INTERMEDIATE swing.
+
+        The short-term swing (STL/STH) is what a Judas sweep takes. The intermediate
+        swing (ITL/ITH) is the level that survives. Stop here = no premature exits on
+        minor liquidity runs. Falls back to None when no intact intermediate swing is
+        within the 10-pip universal cap (caller then uses _m1_structure_stop instead).
+        """
+        bars1m = self._asc(self.bars_1m[pair])
+        if len(bars1m) < 5:
+            return None
+        bars = bars1m[-config.STRUCTURE_STOP_LOOKBACK:]
+        res  = mstruct.classify(bars)
+        buf  = config.M1_STOP_BUFFER_PIPS * pip
+        min_dist = config.M1_STOP_MIN_PIPS * pip
+        if direction > 0:
+            itl = mstruct.last_intact(res, "ITL")
+            if itl is None:
+                return None
+            stop = itl.price - buf
+            if (entry - stop) < min_dist:
+                stop = entry - min_dist
+            return stop if stop < entry else None
+        else:
+            ith = mstruct.last_intact(res, "ITH")
+            if ith is None:
+                return None
+            stop = ith.price + buf
+            if (stop - entry) < min_dist:
+                stop = entry + min_dist
+            return stop if stop > entry else None
 
     # ──────────────────────────────────────────────────────────────────────────
     # Pattern detection helpers (ported from backtest.py)
