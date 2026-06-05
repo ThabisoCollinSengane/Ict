@@ -1,5 +1,7 @@
 """Strategy parameters. Tweak here, no other code changes needed."""
 
+import os as _os
+
 # --- Capital + risk ---
 STARTING_CASH = 500                # R500 ZAR starting capital
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
@@ -147,8 +149,9 @@ TARGET_CONFLUENCE_TOL_PIPS = 8   # pips tolerance for two sources to be "at same
 # When the chosen TP has score≥threshold (fib + ITH/ITL + FVG/OB agreeing at same price),
 # scale up the position. Same equity floor as draw-cascade (DRAW_SIZE_MIN_EQUITY).
 # Mirrors P9's 1.25× HTF FVG multiplier logic. Set to 1.0 to disable.
-TARGET_SCORE_MULT           = 1.25
-TARGET_SCORE_MULT_THRESHOLD = 3
+# Env-overridable for sweeps: TARGET_SCORE_MULT / TARGET_SCORE_MULT_THRESHOLD.
+TARGET_SCORE_MULT           = float(_os.environ.get("TARGET_SCORE_MULT", 1.25))
+TARGET_SCORE_MULT_THRESHOLD = int(_os.environ.get("TARGET_SCORE_MULT_THRESHOLD", 4))
 
 # --- ICT 2022 Episode 12: Market Structure hierarchy ---
 # Episode 12 defines three swing tiers: LTH/LTL (Daily ~50 bars), ITH/ITL (1H ~20
