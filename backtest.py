@@ -2098,6 +2098,14 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.TARGET_SCORE_MULT), min_units)
             g["target_score_sized"] = g.get("target_score_sized", 0) + 1
+        # P19 CRT sizing boost: H4 Turtle Soup is the HTF Judas swing — the bigger-TF
+        # manipulation phase already fired in our direction. It's the highest-WR
+        # HTF-timing bucket (WR 50.4%), so scale it up like the P9/P18 buckets. Gated
+        # to the H4 sweep only (CRT_SWEEP_MULT_TF); same equity floor as draw-cascade.
+        if (_crt_tf == config.CRT_SWEEP_MULT_TF and config.CRT_SWEEP_MULT != 1.0
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            units = max(int(units * config.CRT_SWEEP_MULT), min_units)
+            g["crt_sweep_sized"] = g.get("crt_sweep_sized", 0) + 1
         # P10 London-Judas priority (REVERTED — downsize multiplier defaults to 1.0,
         # so this is a no-op + analytics counter). Hypothesis was that a NY-AM breakout
         # on a pair whose London Judas already fired today is the weaker echo and should

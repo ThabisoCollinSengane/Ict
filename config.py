@@ -265,6 +265,16 @@ HTF_FVG_OPPOSING_MAX_PIPS  = 80
 # H4 sweep = +1 conviction
 CRT_SWEEP_ENABLED  = True
 CRT_SWEEP_MIN_PIPS = 2.0   # minimum wick beyond CRT H/L to qualify as a genuine sweep
+# Sizing multiplier for the H4-CRT-sweep bucket (P19 active lever). The H4 Turtle
+# Soup is the highest-WR HTF-timing bucket (WR 50.4%, PF 3.40 IS / 3.80 OOS — both
+# splits positive, same ballpark). Scale that bucket up the same way P9 (HTF-FVG)
+# and P18 (score≥4 confluence) size their high-conviction buckets. Same equity floor
+# (DRAW_SIZE_MIN_EQUITY). MUST be tuned against the FULL continuous 4yr run, not
+# per-split — size bumps amplify tail risk on the compounding path (P9 2.0× lesson).
+# 1.0 = no-op (analytics only); >1.0 = active lever. CRT_SWEEP_MULT_TF picks which
+# sweep timeframe earns the bump ("240T" = H4 only; the D1 bucket is weaker).
+CRT_SWEEP_MULT     = float(_os.environ.get("CRT_SWEEP_MULT", "1.25"))
+CRT_SWEEP_MULT_TF  = "240T"   # H4 CRT sweep is the lever; D1 bucket excluded
 
 # --- London-Judas priority (P10): size down the same-day NY-AM breakout echo ---
 # REVERTED — set to 1.0 (no-op). The counter below stays as analytics.

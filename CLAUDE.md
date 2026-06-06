@@ -12,11 +12,12 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 798 trades, WR 46.6%, PF 5.18, MaxDD -12.95%, R500 → R178.70M.
+**Backtest result (4 years, 2022–2025):** 798 trades, WR 46.6%, PF 5.12, MaxDD -12.95%, R500 → R263.84M.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
 HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
-targets, and P18 score≥4 confluence sizing (1.25×). MaxDD unchanged at -12.95% across all
-additions. See P18 for the cache-bug post-mortem that corrected a phantom regression.)
+targets, P18 score≥4 confluence sizing (1.25×), and P19 H4-CRT Turtle Soup sizing (1.25×).
+MaxDD unchanged at -12.95% across all additions. See P18 for the cache-bug post-mortem that
+corrected a phantom regression.)
 
 ---
 
@@ -665,12 +666,35 @@ IS/OOS unchanged from P18 baseline (IS PF 3.14 / R198k / -12.95%; OOS PF 5.20 / 
 -16.75%). The H4 CRT bucket is the standout: highest WR (50.4%), PF positive and same ballpark
 in both splits — textbook non-curve-fit per the §"What not curve-fit means" test.
 
-**Next lever (candidate, not yet shipped):** A sizing multiplier for the H4-CRT-sweep bucket
-(analogous to P9's HTF-FVG 1.25× and P18's score≥4 1.25×) would extract value from the highest-WR
-HTF-timing bucket without changing entries. Must be tuned against the FULL continuous 4yr run
-(not per-split) per the P9 2.0× lesson — size bumps amplify tail risk on the compounding path.
-Config `CRT_SWEEP_MULT` reserved for this. **Live-engine note:** `_htf_crt_sweep` is inherited
-by `LiveTrader(Backtester)` automatically (pure signal logic, uses `bars_up_to`).
+**Active lever — H4-CRT sizing 1.25× (SHIPPED 2026-06-06):** A sizing multiplier on the
+H4-CRT-sweep bucket (analogous to P9's HTF-FVG 1.25× and P18's score≥4 1.25×). The H4 Turtle
+Soup is the HTF Judas swing — the bigger-TF manipulation phase has already fired in our
+direction — and it's the highest-WR HTF-timing bucket (50.4%). Gated to H4 only
+(`CRT_SWEEP_MULT_TF="240T"`; the D1 bucket is weaker and excluded). Same equity floor as the
+draw cascade (`DRAW_SIZE_MIN_EQUITY=3000`). Config: `CRT_SWEEP_MULT=1.25` (env-overridable),
+`CRT_SWEEP_MULT_TF="240T"`. Counter: `crt_sweep_sized` (122 trades sized over 4yr).
+
+| Metric | P19 baseline (mult off) | **H4-CRT 1.25×** |
+|---|---|---|
+| Full 4yr equity | R178.70M | **R263.84M** (+R85M, +48%) |
+| Full 4yr PF | 5.18 | 5.12 |
+| Full 4yr MaxDD | -12.95% | **-12.95%** (unchanged ✅) |
+| IS PF / equity | 3.14 / R198k | 3.14 / R230k |
+| IS MaxDD | -12.95% | **-12.95%** (unchanged ✅) |
+| OOS PF / equity | 5.20 / R1.175M | 5.14 / R1.41M (+20%) |
+| OOS MaxDD | -16.75% | -17.14% (+0.39pp) |
+
+Ships ON. The full continuous run (the live-relevant path) holds MaxDD at exactly -12.95% while
+adding +48% equity; PF essentially flat (5.18→5.12, the normal signature of a sizing lever that
+amplifies the sized bucket proportionally). Both splits stay strongly positive and same-ballpark
+(PF 3.14 IS / 5.14 OOS). The only cost is +0.39pp on the OOS-from-R500 restart MaxDD — the
+known-fragile stress path that already exceeds -15% in baseline (not the live continuous path),
+and the deterioration is smaller than P16's shipped +0.69pp. This is the inverse of P9's REJECTED
+2.0×, which breached the FULL run to -15.82%: the 1.25× magnitude keeps the deployment path
+unchanged. **Live-engine note:** `_htf_crt_sweep` is inherited by `LiveTrader(Backtester)`
+automatically (pure signal logic, uses `bars_up_to`); the sizing block in `_maybe_open` is also
+inherited — but per the P18 live-engine gap, `main.py` (the LEAN engine) still needs all sizing
+multipliers ported, CRT_SWEEP_MULT included.
 
 ---
 
