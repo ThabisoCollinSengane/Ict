@@ -32,7 +32,9 @@ from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_amd_setup
-from ict.ote import in_ote
+from ict.ote import in_ote, find_swing
+from ict.fib_targets import nearest_fib_target
+from ict.htf_draw import draw_cascade_score
 from ict.market_profile import detect_weekly_amd, profile_score
 from ict import market_structure as mstruct
 from ict.dealing_range import (
@@ -547,7 +549,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             stop = (cur_price - _max_stop if direction > 0
                     else cur_price + _max_stop)
 
-        target = self._find_target(pair, direction, cur_price)
+        target, _target_score = self._find_target(pair, direction, cur_price)
         if target is None:
             return
 
@@ -562,6 +564,38 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         units      = max(units_raw, min_units)
         if units == 0:
             return
+
+        # ── Sizing levers (ported from backtest — match the compounding path) ────
+        # Account is ZAR-denominated, so TotalPortfolioValue is already in ZAR and
+        # compares directly to DRAW_SIZE_MIN_EQUITY (the R3,000 multiplier floor).
+        equity_zar = self.Portfolio.TotalPortfolioValue
+        if equity_zar >= config.DRAW_SIZE_MIN_EQUITY:
+            # Draw-cascade 2×/3×: HTF W→D→H4 draw agreeing with the trade.
+            bars_w  = self._asc(self.bars_1w[pair])
+            bars_d  = self._asc(self.bars_1d[pair])
+            bars_h4 = self._asc(self.bars_4h[pair])
+            _draw_score = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
+            _draw_mult  = config.DRAW_SIZE_MULT.get(_draw_score, 1.0)
+            if _draw_mult != 1.0:
+                units = max(int(units * _draw_mult), min_units)
+
+            # P9 HTF-FVG 1.25× — breakout/continuation anchored at an HTF FVG 50%.
+            # The live engine is Judas-only (no breakout model ported), so _is_breakout
+            # is False and this is dormant; kept faithful for when the breakout model
+            # is ported. _htf_fvg_conviction is still evaluated for parity.
+            _is_breakout = False
+            _htf_fvg_pts, _ = self._htf_fvg_conviction(pair, direction, cur_price)
+            if _is_breakout and _htf_fvg_pts:
+                units = max(int(units * config.HTF_FVG_BREAKOUT_MULT), min_units)
+
+            # P18 score≥4 confluence 1.25× — ≥4 source families cluster at the TP.
+            if _target_score >= config.TARGET_SCORE_MULT_THRESHOLD:
+                units = max(int(units * config.TARGET_SCORE_MULT), min_units)
+
+            # P19 H4-CRT 1.25× — H4 Turtle Soup (HTF Judas swing) in our direction.
+            _crt_pts, _crt_tf = self._htf_crt_sweep(pair, direction, cur_price)
+            if _crt_tf == config.CRT_SWEEP_MULT_TF and config.CRT_SWEEP_MULT != 1.0:
+                units = max(int(units * config.CRT_SWEEP_MULT), min_units)
 
         # ── Place market order ────────────────────────────────────────────────
         qc_sym       = self.symbols[pair]
@@ -1244,7 +1278,8 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         sell-side pools below unswept ITLs (shorts). Bigger TF = stronger magnet.
         Vice versa: the intact ITL below entry is stop protection for longs;
         intact ITH above entry is stop protection for shorts (_structure_stop handles this).
-        Returns plain price floats.
+        Returns (price, source_tag) tuples so confluence scoring counts ITH/ITL as
+        distinct source families from plain swings.
         """
         if len(bars) < 5:
             return []
@@ -1253,43 +1288,166 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if direction > 0:
             for s in res.get("ith", []):
                 if not s.swept and s.price > price:
-                    out.append(s.price)
+                    out.append((s.price, "ith_liquidity"))
         else:
             for s in res.get("itl", []):
                 if not s.swept and s.price < price:
-                    out.append(s.price)
+                    out.append((s.price, "itl_liquidity"))
         return out
 
+    @staticmethod
+    def _scan_htf_fvgs(bars, pair):
+        """Scan bars for FVGs and mark mitigation (close-through, ICT Ep 9).
+
+        Mirrors backtest._scan_htf_fvgs exactly.
+        """
+        start = max(2, len(bars) - config.HTF_FVG_SCAN_BARS)
+        fvgs = []
+        for i in range(start, len(bars)):
+            fvg = detect_new_fvg(bars[: i + 1], pair)
+            if fvg is not None:
+                fvgs.append(fvg)
+        for fvg in fvgs:
+            for c in bars[fvg.bar_index + 1:]:
+                if fvg.direction > 0 and c.Close <= fvg.bottom:
+                    fvg.mitigated = True
+                    break
+                if fvg.direction < 0 and c.Close >= fvg.top:
+                    fvg.mitigated = True
+                    break
+        return fvgs
+
+    def _htf_fvg_conviction(self, pair, direction, cur_price):
+        """P9 — HTF FVG 50% midpoint as draw-on-liquidity (live store version).
+
+        Returns (points, tf_hit). Biggest TF first so the hit reflects the strongest
+        draw. Used for the P9 sizing bump (breakout-anchored only).
+        """
+        pip_v = pip_size(pair)
+        tol   = config.HTF_FVG_MID_TOLERANCE_PIPS * pip_v
+        for tf, store in (("W", self.bars_1w), ("D", self.bars_1d), ("240T", self.bars_4h)):
+            bars = self._asc(store[pair])
+            if len(bars) < 3:
+                continue
+            for fvg in self._scan_htf_fvgs(bars, pair):
+                if fvg.mitigated or fvg.direction != direction:
+                    continue
+                if abs(cur_price - fvg.mid) <= tol:
+                    return 1, tf
+        return 0, ""
+
+    def _htf_crt_sweep(self, pair, direction, cur_price):
+        """P19 — HTF CRT Turtle Soup sweep of prior H4/D range (live store version).
+
+        A recent H4/D candle wicks beyond the prior 2-bar range extreme then closes
+        back inside = the HTF Judas swing. Returns (points, tf_hit): D=2, H4=1.
+        Mirrors backtest._htf_crt_sweep (max_bars=10 → last 10 stored bars).
+        """
+        if not config.CRT_SWEEP_ENABLED:
+            return 0, ""
+        pip_v = pip_size(pair)
+        min_sweep = config.CRT_SWEEP_MIN_PIPS * pip_v
+        for tf, store, points in (("D", self.bars_1d, 2), ("240T", self.bars_4h, 1)):
+            bars = self._asc(store[pair])
+            if len(bars) < 4:
+                continue
+            bars = bars[-10:]
+            for i in range(len(bars) - 1, max(len(bars) - 3, 1), -1):
+                sweep_bar = bars[i]
+                ref_bars = bars[max(0, i - 2):i]
+                if not ref_bars:
+                    continue
+                crt_high = max(b.High for b in ref_bars)
+                crt_low  = min(b.Low  for b in ref_bars)
+                if direction < 0:
+                    if (sweep_bar.High >= crt_high + min_sweep
+                            and sweep_bar.Close < crt_high
+                            and cur_price < crt_high):
+                        return points, tf
+                else:
+                    if (sweep_bar.Low <= crt_low - min_sweep
+                            and sweep_bar.Close > crt_low
+                            and cur_price > crt_low):
+                        return points, tf
+        return 0, ""
+
+    @staticmethod
+    def _confluence_score(candidates, target_price, tol):
+        """Count distinct source families within `tol` price units of target_price."""
+        seen = set()
+        for price, src in candidates:
+            if abs(price - target_price) <= tol:
+                seen.add(src)
+        return len(seen)
+
     def _find_target(self, pair, direction, cur_price):
-        stores = (self.bars_4h, self.bars_1d, self.bars_1w)
+        """Return (target_price, confluence_score) — mirrors backtest._find_target.
+
+        Candidates are (price, source) tuples. The nearest-qualifying candidate is
+        chosen (selection unchanged), then scored by how many distinct source families
+        cluster within TARGET_CONFLUENCE_TOL_PIPS of it (P15/P18 sizing input).
+        Returns (None, 0) when no candidate qualifies.
+        """
+        pip_v = pip_size(pair)
         candidates = []
-        for store in stores:
+
+        # Fibonacci extension from the initiating M15 OTE swing (100/127/162/200%).
+        bars15 = self._asc(self.bars_15m[pair])
+        swing = find_swing(bars15, direction, lookback=config.SWING_LOOKBACK)
+        if swing is not None:
+            fib_t = nearest_fib_target(
+                swing[0], swing[1], direction, cur_price,
+                min_distance=config.MIN_PIPS_TARGET * pip_v,
+            )
+            if fib_t is not None:
+                candidates.append((fib_t, "fib_extension"))
+
+        for store in (self.bars_4h, self.bars_1d, self.bars_1w):
             bars = self._asc(store[pair])
             if len(bars) < 5:
                 continue
             candidates += self._targets_in_series(bars, pair, direction, cur_price)
 
-        # ITH/ITL liquidity draws from H4/D/W (P17) — the edge is in OLDER major
-        # intermediate highs/lows, so the full rolling window is scanned. M15/H1 were
-        # tested and dropped: they hurt PnL (~R10M in the 4yr backtest) and add noise.
+        # PDH/PDL — primary buy/sell-side pools (last 3 completed daily candles).
+        d_bars = self._asc(self.bars_1d[pair])
+        if len(d_bars) >= 2:
+            for db in d_bars[-4:-1]:
+                candidates.append((db.High, "pdh_pdl"))
+                candidates.append((db.Low,  "pdh_pdl"))
+        # PWH/PWL — prior-week pools.
+        w_bars = self._asc(self.bars_1w[pair])
+        if len(w_bars) >= 2:
+            candidates.append((w_bars[-2].High, "pwh_pwl"))
+            candidates.append((w_bars[-2].Low,  "pwh_pwl"))
+
+        # ITH/ITL liquidity draws from H4/D/W (P17) — full window (older majors matter).
         for store in (self.bars_4h, self.bars_1d, self.bars_1w):
             bars = self._asc(store[pair])
             candidates += self._ithl_targets(bars, direction, cur_price)
 
         candidates = [c for c in candidates if
-                      (direction > 0 and c > cur_price) or (direction < 0 and c < cur_price)]
+                      (direction > 0 and c[0] > cur_price) or (direction < 0 and c[0] < cur_price)]
         if not candidates:
-            return None
+            return None, 0
         bars1h = self._asc(self.bars_1h[pair])
         dr = detect_dealing_range(bars1h, lookback=100)
         if dr is not None:
-            filtered = [c for c in candidates if is_valid_target_zone(c, dr.high, dr.low, direction)]
+            filtered = [c for c in candidates if is_valid_target_zone(c[0], dr.high, dr.low, direction)]
             if filtered:
                 candidates = filtered
-        return min(candidates, key=lambda x: abs(x - cur_price))
+        chosen = min(candidates, key=lambda x: abs(x[0] - cur_price))
+        tol = config.TARGET_CONFLUENCE_TOL_PIPS * pip_v
+        score = self._confluence_score(candidates, chosen[0], tol)
+        return chosen[0], score
 
     @staticmethod
     def _targets_in_series(bars, pair, direction, price):
+        """Liquidity-draw candidates as (price, source_tag) tuples.
+
+        Mirrors backtest._targets_in_series exactly so the live confluence score
+        (P15/P18 sizing) matches the backtest: fvg / ob / equal_hl / round_number /
+        swing source families.
+        """
         fvgs = []
         for i in range(2, len(bars)):
             g = detect_new_fvg(bars[:i+1], pair)
@@ -1304,14 +1462,34 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         out = []
         tgt = nearest_unmitigated(fvgs, price, direction)
         if tgt:
-            out.append(tgt.mid)
+            out.append((tgt.mid, "fvg"))
         tgt_ob = nearest_unmitigated_ob(detect_order_blocks(bars), price, direction)
         if tgt_ob:
-            out.append(tgt_ob.mid)
+            out.append((tgt_ob.mid, "ob"))
         if direction > 0:
-            out += find_equal_highs(bars, pair, lookback=200)
+            out += [(h, "equal_hl") for h in find_equal_highs(bars, pair, lookback=200)]
         else:
-            out += find_equal_lows(bars, pair, lookback=200)
+            out += [(l, "equal_hl") for l in find_equal_lows(bars, pair, lookback=200)]
+        # ICT Ep 17: round-number liquidity (x.x000/200/500/800 for 4-dec pairs).
+        pip_v = pip_size(pair)
+        base_pips = int(round(price / pip_v))
+        base_round = (base_pips // 100) * 100
+        for offset in range(-2, 6):
+            for sub in (0, 20, 50, 80):
+                level = (base_round + offset * 100 + sub) * pip_v
+                if direction > 0 and level > price + pip_v:
+                    out.append((level, "round_number"))
+                elif direction < 0 and level < price - pip_v:
+                    out.append((level, "round_number"))
+        # Raw swing highs (BSL above) / lows (SSL below) as liquidity pools.
+        n = len(bars)
+        for i in range(1, n - 1):
+            if direction > 0 and bars[i].High > bars[i-1].High and bars[i].High > bars[i+1].High:
+                if bars[i].High > price:
+                    out.append((bars[i].High, "swing"))
+            elif direction < 0 and bars[i].Low < bars[i-1].Low and bars[i].Low < bars[i+1].Low:
+                if bars[i].Low < price:
+                    out.append((bars[i].Low, "swing"))
         return out
 
     # ──────────────────────────────────────────────────────────────────────────

@@ -621,10 +621,27 @@ over 4yr; no memoisation needed). `_classify_cached` is now a direct passthrough
 length-based key silently collapses under a `max_bars` cap. Validate perf optimisations against
 a known-good full-run number, not just runtime.
 
-**Live-engine gap (TODO):** `main.py` has NO confluence scoring and NO sizing multipliers
-(P9 HTF-FVG 1.25×, P18 score≥4 1.25×, and the draw-cascade 2×/3×). The live engine will NOT
-match the backtest's compounding until these are ported and validated. `main.py` ITH/ITL targets
-ARE aligned to H4/D/W (P17). Porting the sizing levers to the live engine is the next build.
+**Live-engine sizing levers (PORTED 2026-06-06):** `main.py` (the QuantConnect LEAN engine)
+now carries confluence scoring + all sizing multipliers, matching the backtest compounding path:
+- **Confluence scoring**: `_find_target` returns `(target, score)`; `_targets_in_series` and
+  `_ithl_targets` now emit `(price, source_family)` tuples across the full source set
+  (fib / fvg / ob / equal_hl / round_number / swing / pdh_pdl / pwh_pwl / ith/itl_liquidity) —
+  byte-faithful to the backtest. Added `_confluence_score`, `_scan_htf_fvgs`,
+  `_htf_fvg_conviction` (P9), `_htf_crt_sweep` (P19); imports `find_swing`, `nearest_fib_target`,
+  `draw_cascade_score`.
+- **Sizing block** in `_maybe_open` (single application point, carried to fill via
+  `_pending_entry`): draw-cascade 2×/3× (computes `_draw_score` from W/D/H4), P18 score≥4 1.25×,
+  P19 H4-CRT 1.25×. All gated by `equity_zar >= DRAW_SIZE_MIN_EQUITY` (R3,000). **Account is
+  ZAR-denominated** so `Portfolio.TotalPortfolioValue` is already ZAR and compares directly to
+  the R3,000 floor (no conversion).
+- **P9 HTF-FVG 1.25× is dormant** in live: it fires only on breakout/continuation entries, and
+  the LEAN engine is Judas-only (the breakout model isn't ported). The P9 code path is wired
+  faithfully (`_is_breakout = False`) so it activates automatically if/when the breakout model
+  is ported. The other three levers are fully active.
+- **Not ported (separate scope — entry logic, not sizing):** the draw-cascade 0/3 hard gate and
+  the breakout continuation model. These change WHICH trades fire; the sizing port only changes
+  HOW MUCH is risked on trades the live engine already takes. ITH/ITL targets were already
+  H4/D/W-aligned (P17).
 
 ### P19 — HTF CRT Turtle Soup timing conviction (IMPLEMENTED 2026-06-06, analytics-only)
 **What:** ICT Candlestick Range Theory (CRT). The High/Low of a completed HTF candle (or its
