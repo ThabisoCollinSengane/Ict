@@ -254,6 +254,18 @@ HTF_FVG_REVERSAL_FILTER    = False   # REVERTED — hard gate disrupts compoundi
 # drawdowns. The opposing-FVG signal is retained as an analytics tag (future use).
 HTF_FVG_OPPOSING_MAX_PIPS  = 80
 
+# --- HTF CRT Turtle Soup timing conviction (P19) ---
+# ICT Candlestick Range Theory: the High/Low of a completed H4/D candle (or prior
+# 2-bar range) define CRT H / CRT L. A "Turtle Soup" = price wicks BEYOND CRT H
+# (for shorts) or below CRT L (for longs), then CLOSES BACK INSIDE — the same
+# Judas sweep logic applied at the bigger timeframe. When this pattern fires on a
+# H4 or Daily bar within the last 2-3 completed bars, the trade has HTF timing
+# confluence: the manipulation phase already happened on the higher timeframe.
+# D1 sweep = +2 conviction (bigger TF = stronger manipulation signal)
+# H4 sweep = +1 conviction
+CRT_SWEEP_ENABLED  = True
+CRT_SWEEP_MIN_PIPS = 2.0   # minimum wick beyond CRT H/L to qualify as a genuine sweep
+
 # --- London-Judas priority (P10): size down the same-day NY-AM breakout echo ---
 # REVERTED — set to 1.0 (no-op). The counter below stays as analytics.
 # Hypothesis: when a London-Open Judas already fired on a pair that day, the

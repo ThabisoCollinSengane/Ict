@@ -625,6 +625,53 @@ a known-good full-run number, not just runtime.
 match the backtest's compounding until these are ported and validated. `main.py` ITH/ITL targets
 ARE aligned to H4/D/W (P17). Porting the sizing levers to the live engine is the next build.
 
+### P19 — HTF CRT Turtle Soup timing conviction (IMPLEMENTED 2026-06-06, analytics-only)
+**What:** ICT Candlestick Range Theory (CRT). The High/Low of a completed HTF candle (or its
+prior 2-bar range) define **CRT H / CRT L** — the institutional delivery range. A **Turtle
+Soup** = price wicks BEYOND CRT H (for shorts) or below CRT L (for longs), then CLOSES BACK
+INSIDE. This is the **Judas swing on a bigger timeframe** — the exact same manipulation logic
+that drives our M15 entry, one tier up. When it fires on a recent H4/D bar in our direction,
+the HTF manipulation phase has already happened: the trade has higher-TF timing confluence.
+
+**User's framing (captured via the Time Frame Alignments notes + Q&A):** "this is basically the
+Judas swing on a bigger time frame… we'd see these moves on judas swings… [it] can help time
+moves better and also have genuine liquidity targets, which we already have." The draw-on-
+liquidity targets (PDH/PDL = daily CRT H/L, PWH/PWL = weekly CRT H/L, ITH/ITL = intermediate
+CRT) were already in the system from P15/P17; what P19 adds is **active detection of WHEN the
+HTF sweep happens** (the trigger/timing), not just the passive target levels.
+
+**Implementation (`_htf_crt_sweep` in backtest.py + `CRT_SWEEP_ENABLED=True`,
+`CRT_SWEEP_MIN_PIPS=2.0` in config):**
+- Scans D → H4. CRT range = the 2 completed bars before the candidate sweep bar.
+- A sweep bar's WICK must exceed CRT H/L by ≥ `CRT_SWEEP_MIN_PIPS` AND its CLOSE must be back
+  inside the range AND current price still inside → Turtle Soup confirmed.
+- Checks the last 2–3 completed HTF bars (fresh sweeps only).
+- Daily sweep = +2 conviction, H4 sweep = +1 conviction. `crt_tf` column ("D"/"240T"/"").
+- Reporting: "HTF CRT Turtle Soup timing (P19)" table by timeframe.
+
+**Backtest finding — conviction-add is INERT (4th confirmation of saturation), signal is REAL:**
+Full 4yr byte-identical to P18 baseline: **798 / 46.6% / PF 5.18 / R178.70M / -12.95%**. Same
+saturation as P9/P15/P16 — any open trade already sits at conviction > 4 before CRT is scored,
+so the +1/+2 never changes `max_legs`. But the analytics prove the signal is genuine and not
+curve-fit:
+
+| CRT sweep | Trades (4yr) | WR% | PF 4yr | IS PF | OOS PF | Verdict |
+|---|---|---|---|---|---|---|
+| D1 range | 234 | 46.6% | 3.02 | 2.88 | 3.02 | ✅ consistent both splits |
+| H4 range | 137 | **50.4%** | 3.80 | 3.40 | 3.80 | ✅ consistent both splits, best WR |
+| no sweep | 427 | 45.4% | 8.05 | 3.21 | 8.11 | baseline |
+
+IS/OOS unchanged from P18 baseline (IS PF 3.14 / R198k / -12.95%; OOS PF 5.20 / R1.175M /
+-16.75%). The H4 CRT bucket is the standout: highest WR (50.4%), PF positive and same ballpark
+in both splits — textbook non-curve-fit per the §"What not curve-fit means" test.
+
+**Next lever (candidate, not yet shipped):** A sizing multiplier for the H4-CRT-sweep bucket
+(analogous to P9's HTF-FVG 1.25× and P18's score≥4 1.25×) would extract value from the highest-WR
+HTF-timing bucket without changing entries. Must be tuned against the FULL continuous 4yr run
+(not per-split) per the P9 2.0× lesson — size bumps amplify tail risk on the compounding path.
+Config `CRT_SWEEP_MULT` reserved for this. **Live-engine note:** `_htf_crt_sweep` is inherited
+by `LiveTrader(Backtester)` automatically (pure signal logic, uses `bars_up_to`).
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

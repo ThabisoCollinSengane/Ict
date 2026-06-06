@@ -557,6 +557,26 @@ def main():
             for tf in ("W", "D", "240T", "60T", "15T"):
                 _ms_row(f"intact @ {tf}", df[df["mstruct_intact_tf"] == tf])
 
+        if "crt_tf" in df.columns:
+            print("\n=== HTF CRT Turtle Soup timing (P19) ===")
+            print("  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.")
+            print("  D1 sweep = +2 conviction, H4 sweep = +1 conviction.")
+            print(f"  {'CRT sweep TF':<14} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6}")
+            print("  " + "-" * 56)
+            _crt_label = {"D": "D1 range", "240T": "H4 range", "": "no sweep"}
+            for tf in ("D", "240T", ""):
+                grp = df[df["crt_tf"] == tf]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                print(f"  {_crt_label.get(tf, tf):<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "

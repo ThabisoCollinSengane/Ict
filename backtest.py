@@ -350,6 +350,7 @@ class Backtester:
             "mstruct_intact_tf": st.get("mstruct_intact_tf", ""),
             "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
+            "crt_tf": st.get("crt_tf", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -1208,6 +1209,53 @@ class Backtester:
                     return 1, tf
         return 0, ""
 
+    def _htf_crt_sweep(self, pair, direction, cur_price, t):
+        """P19 — HTF CRT Turtle Soup: sweep of prior H4/D candle range extreme.
+
+        ICT CRT (Candlestick Range Theory): the High and Low of a completed HTF
+        candle define CRT H / CRT L — the institutional delivery range. A Turtle
+        Soup = price wicks BEYOND CRT H (for shorts) or below CRT L (for longs)
+        on a WICK, then CLOSES BACK INSIDE. This is the HTF Judas swing —
+        manipulation on the bigger timeframe confirms the reversal is real.
+
+        When detected within the last 2–3 completed bars in agreement with the
+        trade direction → award conviction points.
+
+        Returns (score, tf_hit): Daily sweep = 2 pts, H4 sweep = 1 pt.
+        """
+        if not config.CRT_SWEEP_ENABLED:
+            return 0, ""
+        pip_v = pip_size(pair)
+        min_sweep = config.CRT_SWEEP_MIN_PIPS * pip_v
+
+        for tf, points in [("D", 2), ("240T", 1)]:
+            bars = self.bars_up_to(pair, tf, t, max_bars=10)
+            if len(bars) < 4:
+                continue
+            # Check last 2 completed bars (bars[-1] is the bar that just closed)
+            for i in range(len(bars) - 1, max(len(bars) - 3, 1), -1):
+                sweep_bar = bars[i]
+                # CRT range = the 2 bars immediately before the sweep bar
+                ref_bars = bars[max(0, i - 2):i]
+                if not ref_bars:
+                    continue
+                crt_high = max(b.High for b in ref_bars)
+                crt_low  = min(b.Low  for b in ref_bars)
+
+                if direction < 0:
+                    # SHORT: wick above CRT H, close back inside, price still below CRT H
+                    if (sweep_bar.High >= crt_high + min_sweep
+                            and sweep_bar.Close < crt_high
+                            and cur_price < crt_high):
+                        return points, tf
+                else:
+                    # LONG: wick below CRT L, close back inside, price still above CRT L
+                    if (sweep_bar.Low <= crt_low - min_sweep
+                            and sweep_bar.Close > crt_low
+                            and cur_price > crt_low):
+                        return points, tf
+        return 0, ""
+
     def _classify_cached(self, bars, pair: str, tf: str) -> dict:
         """Return mstruct.classify(bars).
 
@@ -1717,6 +1765,15 @@ class Backtester:
             conviction += _dxy_fvg_pts
             g["dxy_fvg_room"] = g.get("dxy_fvg_room", 0) + 1
 
+        # CRT Turtle Soup (P19): HTF Judas sweep of the prior H4/D candle range.
+        # A wick beyond CRT H/L that closes back inside = manipulation on the bigger
+        # TF — the same Judas logic that drives our M15 entry, one tier higher.
+        # D1 sweep = +2 conviction, H4 sweep = +1 conviction (analytics-first).
+        _crt_pts, _crt_tf = self._htf_crt_sweep(pair, direction, cur_price, t)
+        if _crt_pts:
+            conviction += _crt_pts
+            g["crt_turtle_soup"] = g.get("crt_turtle_soup", 0) + 1
+
         # Ep 12 market structure: fractal LTH/ITH/STH read across W→M15, coupled
         # with the inverted draw cascade. Higher-TF intermediate structure agreeing
         # with the trade = a bigger draw on liquidity in our favour → more conviction.
@@ -2112,6 +2169,7 @@ class Backtester:
             "mstruct_intact_tf": _ms["ltf_intact_tf"],
             "dxy_mstruct_align": "|".join(_ms["dxy_align"]),
             "dxy_mstruct_sweep": _ms["dxy_minor_sweep"],
+            "crt_tf": _crt_tf,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
