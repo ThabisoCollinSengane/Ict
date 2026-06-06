@@ -634,14 +634,28 @@ now carries confluence scoring + all sizing multipliers, matching the backtest c
   P19 H4-CRT 1.25×. All gated by `equity_zar >= DRAW_SIZE_MIN_EQUITY` (R3,000). **Account is
   ZAR-denominated** so `Portfolio.TotalPortfolioValue` is already ZAR and compares directly to
   the R3,000 floor (no conversion).
-- **P9 HTF-FVG 1.25× is dormant** in live: it fires only on breakout/continuation entries, and
-  the LEAN engine is Judas-only (the breakout model isn't ported). The P9 code path is wired
-  faithfully (`_is_breakout = False`) so it activates automatically if/when the breakout model
-  is ported. The other three levers are fully active.
-- **Not ported (separate scope — entry logic, not sizing):** the draw-cascade 0/3 hard gate and
-  the breakout continuation model. These change WHICH trades fire; the sizing port only changes
-  HOW MUCH is risked on trades the live engine already takes. ITH/ITL targets were already
-  H4/D/W-aligned (P17).
+- **All four sizing levers fully active** (incl. P9 HTF-FVG 1.25×) now that the breakout model
+  is ported (see below). `_is_breakout` is computed live, so P9's breakout-anchored bump fires.
+
+**Live-engine entry logic (PORTED 2026-06-06):** the breakout continuation model and the
+draw-cascade 0/3 hard gate are now in `main.py`, bringing live entries into alignment with the
+backtest trade set (not just sizing):
+- **Breakout model**: `_intermarket_breakout()` (triple-confirmed EURUSD + GBPUSD M15 range
+  breaks + DXY M15 BOS) → `_is_breakout`. Earns `BREAKOUT_CONVICTION`, tags `entry_model="breakout"`,
+  and is EXEMPT from the 0/3 gate (continuations run WITH the HTF draw). Added `_dxy_bias_15m()`
+  (synthetic DXY M15 BOS, `SWING_LOOKBACK_STH`); imports `detect_breakout`.
+- **Draw-cascade 0/3 hard gate**: `_draw_score = draw_cascade_score(W, D, H4, …)` computed during
+  conviction; `if _draw_score == 0 and not _is_breakout: return` (reversal logic — no HTF draw
+  alignment → skip). `_draw_score` also feeds conviction (+0–3) and the 2×/3× sizing lever (reused,
+  computed once). `draw_score` + `entry_model` recorded on every trade.
+- **NOT ported (deliberate — needs the scenario cascade main.py lacks):** the 2a/2a_h4/2a_ip
+  surgical gates and the full EURGBP/AUDNZD escalation cascade (`_im_scenario` classification).
+  main.py uses single-H1 `resolve_pair_direction`; porting the multi-level cascade + scenario
+  gates is a larger separate build. The 0/3 gate and breakout model are scenario-independent, so
+  they port cleanly on their own.
+- **Verified off-platform**: stubbed `AlgorithmImports`, exercised `_htf_crt_sweep` (correct
+  Turtle-Soup detection + negative case), `_confluence_score`, `_intermarket_breakout`,
+  `_find_target`, `_htf_fvg_conviction` (graceful empty-store paths). `py_compile` clean.
 
 ### P19 — HTF CRT Turtle Soup timing conviction (IMPLEMENTED 2026-06-06, analytics-only)
 **What:** ICT Candlestick Range Theory (CRT). The High/Low of a completed HTF candle (or its

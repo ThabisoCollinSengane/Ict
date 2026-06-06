@@ -31,7 +31,7 @@ from ict.order_block import detect_order_blocks, nearest_unmitigated_ob, find_br
 from ict.liquidity import find_equal_highs, find_equal_lows
 from ict.bias import htf_bias
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
-from ict.amd import detect_amd_setup
+from ict.amd import detect_amd_setup, detect_breakout
 from ict.ote import in_ote, find_swing
 from ict.fib_targets import nearest_fib_target
 from ict.htf_draw import draw_cascade_score
@@ -451,6 +451,14 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         elif im_score >= 0.75:
             conviction += 1
 
+        # Intermarket breakout: triple-confirmed continuation (EURUSD + GBPUSD + DXY
+        # all clear their M15 ranges in agreement). When it fires in the trade
+        # direction the setup is a continuation/expansion, not a reversal — it earns
+        # extra conviction, a "breakout" entry_model tag, and an exemption from the
+        # inverted-draw 0/3 hard gate below (which is reversal logic).
+        _brk_dir = self._intermarket_breakout()
+        _is_breakout = (_brk_dir != 0 and _brk_dir == direction)
+
         # MSS (0-2): M15 + M5 structure
         if self._bias_stk(bars15, config.SWING_LOOKBACK_STH) == direction:
             conviction += 1
@@ -464,6 +472,21 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         weekly_amd_dir = wamd.direction if wamd is not None else 0
         if wamd is not None and wamd.direction == direction:
             conviction += 2
+
+        # HTF Draw on Liquidity cascade: W → D → H4 (0-3). The single most important
+        # directional factor. Each TF that agrees with trade direction adds +1.
+        # 0/3 = no HTF draw alignment → hard gate (reversal logic): skip unless this
+        # is a breakout continuation (which runs WITH the HTF and scores 0 by design).
+        pip_v0  = pip_size(pair)
+        bars_h4_d = self._asc(self.bars_4h[pair])
+        _draw_score = draw_cascade_score(bars1w, bars1d_full, bars_h4_d, pair, direction, pip_v0)
+        if _draw_score == 0 and not _is_breakout:
+            return
+        conviction += _draw_score
+
+        # Breakout continuation conviction credit (continuation runs WITH the draw).
+        if _is_breakout:
+            conviction += config.BREAKOUT_CONVICTION
 
         # Profile score + session open (0-2)
         cur_price = bars5[-1].Close if bars5 else None
@@ -568,22 +591,16 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         # ── Sizing levers (ported from backtest — match the compounding path) ────
         # Account is ZAR-denominated, so TotalPortfolioValue is already in ZAR and
         # compares directly to DRAW_SIZE_MIN_EQUITY (the R3,000 multiplier floor).
+        # _draw_score and _is_breakout were computed during conviction scoring above.
         equity_zar = self.Portfolio.TotalPortfolioValue
         if equity_zar >= config.DRAW_SIZE_MIN_EQUITY:
             # Draw-cascade 2×/3×: HTF W→D→H4 draw agreeing with the trade.
-            bars_w  = self._asc(self.bars_1w[pair])
-            bars_d  = self._asc(self.bars_1d[pair])
-            bars_h4 = self._asc(self.bars_4h[pair])
-            _draw_score = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
-            _draw_mult  = config.DRAW_SIZE_MULT.get(_draw_score, 1.0)
+            _draw_mult = config.DRAW_SIZE_MULT.get(_draw_score, 1.0)
             if _draw_mult != 1.0:
                 units = max(int(units * _draw_mult), min_units)
 
             # P9 HTF-FVG 1.25× — breakout/continuation anchored at an HTF FVG 50%.
-            # The live engine is Judas-only (no breakout model ported), so _is_breakout
-            # is False and this is dormant; kept faithful for when the breakout model
-            # is ported. _htf_fvg_conviction is still evaluated for parity.
-            _is_breakout = False
+            # Now active: the breakout model is ported (_is_breakout above).
             _htf_fvg_pts, _ = self._htf_fvg_conviction(pair, direction, cur_price)
             if _is_breakout and _htf_fvg_pts:
                 units = max(int(units * config.HTF_FVG_BREAKOUT_MULT), min_units)
@@ -621,6 +638,8 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             "legs": [],
             "weekly_amd_dir": weekly_amd_dir,
             "news_impact": news_impact,
+            "entry_model": "breakout" if _is_breakout else "judas",
+            "draw_score": _draw_score,
         }
         self._pending_entry[entry_ticket.OrderId] = {
             "pair": pair, "stop": stop, "units": units,
@@ -1265,6 +1284,61 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if len(series) < lb + 2:
             return 0
         return htf_bias(series)
+
+    def _dxy_bias_15m(self) -> int:
+        """Synthetic DXY M15 BOS bias (lookback = SWING_LOOKBACK_STH).
+
+        Used by the breakout model's DXY confirmation leg. Mirrors the backtest's
+        _dxy_bias("15T", lookback=SWING_LOOKBACK_STH): the synthetic DXY is on a
+        ~100-point scale so forex-pip range detection can't apply — the M15
+        structural bias is the scale-independent confirmation.
+        """
+        lb = config.SWING_LOOKBACK_STH
+        rolls = {s: self._asc(self.bars_15m[s]) for s in config.DXY_CONSTITUENTS}
+        n = min((len(v) for v in rolls.values()), default=0)
+        if n < lb + 2:
+            return 0
+        series = []
+        for i in range(-n, 0):
+            c = compute_dxy({s: rolls[s][i].Close for s in config.DXY_CONSTITUENTS})
+            o = compute_dxy({s: rolls[s][i].Open  for s in config.DXY_CONSTITUENTS})
+            h, l = compute_dxy_range(
+                {s: rolls[s][i].High for s in config.DXY_CONSTITUENTS},
+                {s: rolls[s][i].Low  for s in config.DXY_CONSTITUENTS},
+            )
+            if None in (c, o, h, l):
+                continue
+            series.append(_SynBar(o, h, l, c))
+        if len(series) < lb + 2:
+            return 0
+        return htf_bias(series, lookback=lb)
+
+    def _intermarket_breakout(self) -> int:
+        """Triple-confirmed intermarket breakout on M15 (live store version).
+
+        A single-pair breakout from consolidation is usually a Judas fakeout; a
+        genuine USD-driven expansion shows in all three legs at once:
+          EURUSD HIGH + GBPUSD HIGH + DXY LOW  → +1 (USD weakness → look long)
+          EURUSD LOW  + GBPUSD LOW  + DXY HIGH → -1 (USD strength → look short)
+        Returns +1, -1, or 0. Mirrors backtest._intermarket_breakout.
+        """
+        if not config.BREAKOUT_MODEL_ENABLED:
+            return 0
+        eu = self._asc(self.bars_15m["EURUSD"])
+        gu = self._asc(self.bars_15m["GBPUSD"])
+        if not eu or not gu:
+            return 0
+        eu_brk = detect_breakout(eu, "EURUSD")
+        gu_brk = detect_breakout(gu, "GBPUSD")
+        if not (eu_brk and gu_brk):
+            return 0
+        eu_dir, gu_dir = eu_brk[1], gu_brk[1]
+        dxy_dir = self._dxy_bias_15m()
+        if eu_dir == +1 and gu_dir == +1 and dxy_dir == -1:
+            return +1
+        if eu_dir == -1 and gu_dir == -1 and dxy_dir == +1:
+            return -1
+        return 0
 
     # ──────────────────────────────────────────────────────────────────────────
     # Target finding
