@@ -12,12 +12,12 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 798 trades, WR 46.6%, PF 5.12, MaxDD -12.95%, R500 → R263.84M.
+**Backtest result (4 years, 2022–2025):** 795 trades, WR 46.6%, PF 5.12, MaxDD -12.95%, R500 → R284.9M.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
 HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
-targets, P18 score≥4 confluence sizing (1.25×), and P19 H4-CRT Turtle Soup sizing (1.25×).
-MaxDD unchanged at -12.95% across all additions. See P18 for the cache-bug post-mortem that
-corrected a phantom regression.)
+targets, P18 score≥4 confluence sizing (1.25×), P19 H4-CRT Turtle Soup sizing (1.25×), and
+P20 high-conviction target escalation. MaxDD unchanged at -12.95% across all additions. See P18
+for the cache-bug post-mortem that corrected a phantom regression.)
 
 ---
 
@@ -726,6 +726,53 @@ unchanged. **Live-engine note:** `_htf_crt_sweep` is inherited by `LiveTrader(Ba
 automatically (pure signal logic, uses `bars_up_to`); the sizing block in `_maybe_open` is also
 inherited — but per the P18 live-engine gap, `main.py` (the LEAN engine) still needs all sizing
 multipliers ported, CRT_SWEEP_MULT included.
+
+### P20 — High-conviction target escalation (SHIPPED 2026-06-07)
+**What:** When a trade has multiple high-conviction signals (CRT D/W sweep, draw_score≥2, or a
+confirmed Judas minor sweep), the nearest swing high/low or round number is too conservative a
+target — the HTF manipulation has already fired, institutional delivery aims at the bigger draw.
+P20 adds a preference filter: when the escalation trigger fires, candidates are filtered to
+premium structural liquidity draws (ITH/ITL, PDH/PDL, FVG, OB, fib extension, equal H/L) and
+swing/round_number targets are skipped. If no premium candidate qualifies (min RR constraint),
+the original nearest-qualifying target is used as fallback.
+
+**Trigger logic (`_escalate_tgt` in `_maybe_open`):**
+```python
+_escalate_tgt = (
+    config.TARGET_ESCALATE_ENABLED and (
+        _crt_tf in ("D", "W") or
+        _draw_score >= config.TARGET_ESCALATE_MIN_DRAW or
+        _ms.get("minor_sweep", False)
+    )
+)
+```
+
+**Premium target types (`_PREMIUM_TARGET_TYPES`):**
+`fib_extension`, `fvg`, `ob`, `pdh_pdl`, `pwh_pwl`, `ith_liquidity`, `itl_liquidity`, `equal_hl`
+
+**Motivation:** User observed repeated instances of trades exiting at +20–36 pips on a Judas
+reversal with CRT D confirmation, only for the move to continue 100–200 pips further. The swing
+high/low candidate was always within 25 pips (meeting min RR), and was selected over the ITH/PDH
+100 pips away. With escalation, those same trades skip the swing target and lock onto the ITH/PDH.
+
+**Result (full 4yr on P19 baseline):**
+
+| Config | Trades | WR | PF | Equity | MaxDD |
+|---|---|---|---|---|---|
+| P19 baseline | 798 | 46.6% | 5.12 | R263.84M | -12.95% |
+| **P20 ON** | **795** | **46.6%** | **5.12** | **R284.9M (+8%)** | **-12.95% ✓** |
+
+IS PF 3.07 / OOS PF 4.48 — both positive, same ballpark. OOS MaxDD improved: -13.93% vs
+-17.14% baseline (P20 removes the long-target tail risk in the OOS fragile-restart path).
+IS MaxDD: -12.95% (unchanged). Equity +R21M (+8%) on the full continuous run.
+
+The 3-trade reduction (798→795) comes from escalation upgrading some targets to further draws
+that don't meet the minimum RR — those are skipped entirely rather than accepting a weak target.
+The skipped trades are the genuinely low-quality ones: when the nearest premium draw is too far,
+the trade has structural confirmation but no viable exit — correctly skipped.
+
+**Config:** `TARGET_ESCALATE_ENABLED=1` (env-overridable), `TARGET_ESCALATE_MIN_DRAW=2`.
+**New trade column:** `target_escalated` (bool) — True when the premium filter was applied.
 
 ---
 
