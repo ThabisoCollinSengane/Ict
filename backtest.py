@@ -293,13 +293,25 @@ class Backtester:
                 # winners can extend past the first objective.
                 let_run = config.STRUCTURE_TRAIL_LET_RUN and leg.get("trail_engaged")
                 if direction > 0:
-                    sl_hit = bar.Low <= sl
-                    tp_hit = (not let_run) and bar.High >= target
+                    sl_hit  = bar.Low <= sl
+                    tp1_hit = (not leg.get("tp1_hit") and leg.get("tp1") is not None
+                               and not sl_hit and bar.High >= leg["tp1"])
+                    tp_hit  = (not let_run) and bar.High >= target
                 else:
-                    sl_hit = bar.High >= sl
-                    tp_hit = (not let_run) and bar.Low <= target
-                if sl_hit:                       # worst-case: SL first
+                    sl_hit  = bar.High >= sl
+                    tp1_hit = (not leg.get("tp1_hit") and leg.get("tp1") is not None
+                               and not sl_hit and bar.Low <= leg["tp1"])
+                    tp_hit  = (not let_run) and bar.Low <= target
+                if sl_hit:
                     self._exit_leg(pair, leg, sl, t, "stop")
+                elif tp1_hit:
+                    self._partial_exit_leg(pair, leg, leg["tp1"], t)
+                    # If TP2 also hit on the same bar (big candle), close the runner
+                    if pair in self.active:
+                        if direction > 0 and (not let_run) and bar.High >= target:
+                            self._exit_leg(pair, leg, target, t, "target")
+                        elif direction < 0 and (not let_run) and bar.Low <= target:
+                            self._exit_leg(pair, leg, target, t, "target")
                 elif tp_hit:
                     self._exit_leg(pair, leg, target, t, "target")
             if not self.active.get(pair, {}).get("legs"):
@@ -352,6 +364,7 @@ class Backtester:
             "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
             "crt_tf": st.get("crt_tf", ""),
+            "target_escalated": st.get("target_escalated", False),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -361,6 +374,61 @@ class Backtester:
             self.log.delete_position(pair)
         else:
             self.log.upsert_position(pair, st)
+
+    def _partial_exit_leg(self, pair, leg, exit_price, t):
+        """Close the TP1 fraction of a leg; leave the remaining units running to TP2."""
+        st        = self.active[pair]
+        direction = st["direction"]
+        _spread   = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        _friction = (_spread / 2) * pip_size(pair)
+        eff_exit  = exit_price - direction * _friction
+
+        units_tp1 = leg["_units_tp1"]
+        pnl_usd   = (eff_exit - leg["entry"]) * units_tp1 * direction
+        pnl_zar   = pnl_usd * config.USD_ZAR
+        self.equity += pnl_zar
+        self._peak_equity = max(self._peak_equity, self.equity)
+        self._consec_losses = 0   # partial TP is a win
+
+        record = {
+            "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
+            "entry": leg["entry"], "exit": eff_exit, "units": units_tp1,
+            "stop": leg["stop"], "target": st["target"],
+            "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
+            "reason": "tp1_partial",
+            "entry_type": leg.get("entry_type", "unknown"),
+            "session_side": leg.get("session_side", "no_open"),
+            "target_type": st.get("target_type", "unknown"),
+            "draw_score": st.get("draw_score", 0),
+            "im_scenario": st.get("im_scenario", "?"),
+            "entry_model": st.get("entry_model", "judas"),
+            "session_phase": st.get("session_phase", "unknown"),
+            "profile": st.get("profile", "other"),
+            "htf_fvg": st.get("htf_fvg", ""),
+            "dxy_fvg_tf": st.get("dxy_fvg_tf", ""),
+            "ny_cont": st.get("ny_cont", False),
+            "target_confluence": st.get("target_confluence", 1),
+            "mstruct_pts": st.get("mstruct_pts", 0),
+            "mstruct_align": st.get("mstruct_align", ""),
+            "mstruct_htf_dir": st.get("mstruct_htf_dir", 0),
+            "mstruct_minor_sweep": st.get("mstruct_minor_sweep", False),
+            "mstruct_intact_tf": st.get("mstruct_intact_tf", ""),
+            "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
+            "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
+            "crt_tf": st.get("crt_tf", ""),
+            "target_escalated": st.get("target_escalated", False),
+        }
+        self.trades.append(record)
+        self.log.write_trade(record, equity_after=self.equity)
+
+        # Reduce to TP2 units and mark TP1 done
+        leg["units"]    = leg["_units_tp2"]
+        leg["tp1_hit"]  = True
+        if config.SCALE_OUT_MOVE_BE:
+            if direction > 0:
+                leg["stop"] = max(leg["stop"], leg["entry"])
+            else:
+                leg["stop"] = min(leg["stop"], leg["entry"])
 
     def _force_close(self, pair, price, t, reason):
         for leg in list(self.active[pair]["legs"]):
@@ -2182,10 +2250,22 @@ class Backtester:
             _so_side = "judas"
         else:
             _so_side = "momentum"
+        _pip_sz      = pip_size(pair)
+        _tgt_pips    = abs(target - entry) / _pip_sz
+        _so_applies  = (config.SCALE_OUT_ENABLED and
+                        _tgt_pips >= config.SCALE_OUT_MIN_TARGET_PIPS)
+        _units_tp1   = int(units * config.SCALE_OUT_RATIO) if _so_applies else 0
+        _units_tp2   = units - _units_tp1
+        _so_applies  = _so_applies and _units_tp1 > 0
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
             "session_side": _so_side,
+            "tp1":       (entry + config.SCALE_OUT_PIPS * _pip_sz * direction)
+                         if _so_applies else None,
+            "tp1_hit":   not _so_applies,
+            "_units_tp1": _units_tp1,
+            "_units_tp2": _units_tp2,
         }
         self.active[pair] = {
             "direction": direction,
@@ -2380,12 +2460,24 @@ class Backtester:
         prior = st["legs"][-1]
         prior["stop"] = prior["entry"]
 
-        wamd_tag = "wamd" if st.get("weekly_amd_dir") == st["direction"] else "im"
-        news_tag = "news" if pyr_news_impact == "High" else ""
+        wamd_tag     = "wamd" if st.get("weekly_amd_dir") == st["direction"] else "im"
+        news_tag     = "news" if pyr_news_impact == "High" else ""
+        _pip_sz      = pip_size(pair)
+        _tgt_pips    = abs(st["target"] - entry) / _pip_sz
+        _so_applies  = (config.SCALE_OUT_ENABLED and
+                        _tgt_pips >= config.SCALE_OUT_MIN_TARGET_PIPS)
+        _units_tp1   = int(units * config.SCALE_OUT_RATIO) if _so_applies else 0
+        _units_tp2   = units - _units_tp1
+        _so_applies  = _so_applies and _units_tp1 > 0
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
             "entry_type": f"pyramid_{wamd_tag}{news_tag}{im_score:.1f}_{pyr_pattern}",
+            "tp1":       (entry + config.SCALE_OUT_PIPS * _pip_sz * st["direction"])
+                         if _so_applies else None,
+            "tp1_hit":   not _so_applies,
+            "_units_tp1": _units_tp1,
+            "_units_tp2": _units_tp2,
         }
         st["legs"].append(leg)
 
