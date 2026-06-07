@@ -107,26 +107,35 @@ def _window(ohlc: pd.DataFrame, entry_t, exit_t, before: int, after: int) -> pd.
 # Chart builder
 # ---------------------------------------------------------------------------
 
-def _candle_colours(df: pd.DataFrame):
-    bull = df["Close"] >= df["Open"]
-    inc_colour = ["#26a69a" if b else "#000000" for b in bull]  # green / black
-    inc_line   = ["#26a69a" if b else "#000000" for b in bull]
-    return inc_colour, inc_line
+_BG        = "#0d1117"   # page background
+_PLOT_BG   = "#161b22"   # chart area
+_GRID      = "#21262d"   # grid lines
+_TEXT      = "#c9d1d9"   # labels
+_GREEN     = "#3fb950"   # bullish candle / long entry
+_BLACK_C   = "#161b22"   # bearish candle body (dark, visible on dark bg via white wick)
+_WICK      = "#8b949e"   # candle wick colour
+_STOP_COL  = "#f85149"   # stop line
+_TARGET_COL= "#58a6ff"   # target line
+_ENTRY_COL = "#e3b341"   # entry level line
+_WIN_COL   = "#3fb950"
+_LOSS_COL  = "#f85149"
+
+CHART_H = 320  # px per trade chart
 
 
-def _trade_label(row) -> str:
+def _hover(row) -> str:
     direction = "LONG" if row["direction"] > 0 else "SHORT"
-    win       = "WIN" if row["pnl"] > 0 else "LOSS"
+    win = "WIN" if row["pnl"] > 0 else "LOSS"
+    stop = row.get("stop", float("nan"))
+    tgt  = row.get("target", float("nan"))
     return (
-        f"{row['pair']} {direction} {win}<br>"
+        f"<b>{row['pair']} {direction} — {win}  R{row['pnl']:+.2f}</b><br>"
+        f"Entry {row['entry']:.5f}  →  Exit {row['exit']:.5f}<br>"
+        f"Stop {stop:.5f}  |  Target {tgt:.5f}<br>"
         f"Scenario: {row.get('im_scenario','?')}  Model: {row.get('entry_model','?')}<br>"
-        f"Entry: {row['entry']:.5f}  Stop: {row.get('stop', float('nan')):.5f}  "
-        f"Target: {row.get('target', float('nan')):.5f}<br>"
-        f"Exit: {row['exit']:.5f}  P&L: R{row['pnl']:+.2f}<br>"
-        f"Opened: {row['opened_at']}  Closed: {row['closed_at']}<br>"
-        f"Draw: {row.get('draw_score',0)}/3  "
-        f"Confluence: {row.get('target_confluence',0)}  "
-        f"CRT: {row.get('crt_tf','')}"
+        f"Draw {row.get('draw_score',0)}/3  Confluence {row.get('target_confluence',0)}"
+        f"  CRT {row.get('crt_tf','—')}<br>"
+        f"{str(row['opened_at'])[:16]}  →  {str(row['closed_at'])[:16]}"
     )
 
 
@@ -134,36 +143,35 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
     n = len(trades_df)
     if n == 0:
         fig = go.Figure()
-        fig.update_layout(title="No trades matched filter")
+        fig.update_layout(title="No trades matched filter",
+                          paper_bgcolor=_BG, font=dict(color=_TEXT))
         return fig
 
-    cols = min(3, n)
-    rows = (n + cols - 1) // cols
-
+    # One row per trade, single column
+    v_space = min(0.04, 0.9 / max(n - 1, 1)) if n > 1 else 0.04
     titles = []
     for _, row in trades_df.iterrows():
         direction = "▲ LONG" if row["direction"] > 0 else "▼ SHORT"
-        win = "✓" if row["pnl"] > 0 else "✗"
+        badge = "✓ WIN" if row["pnl"] > 0 else "✗ LOSS"
+        dt = str(row["opened_at"])[:16]
         titles.append(
-            f"{win} {row['pair']} {direction}  R{row['pnl']:+.0f}  "
-            f"{str(row['opened_at'])[:16]}"
+            f"{badge}  {row['pair']} {direction}  R{row['pnl']:+.0f}  "
+            f"| {row.get('im_scenario','?')} {row.get('entry_model','?')}  "
+            f"draw {row.get('draw_score',0)}/3  {dt}"
         )
 
-    v_space = min(0.06, 0.8 / max(rows - 1, 1)) if rows > 1 else 0.06
     fig = make_subplots(
-        rows=rows, cols=cols,
+        rows=n, cols=1,
         subplot_titles=titles,
         shared_xaxes=False,
         vertical_spacing=v_space,
-        horizontal_spacing=0.04,
     )
 
     for idx, (_, row) in enumerate(trades_df.iterrows()):
-        r = idx // cols + 1
-        c = idx  % cols + 1
+        r = idx + 1
 
-        pair   = row["pair"]
-        ohlc   = ohlc_cache.get(pair)
+        pair = row["pair"]
+        ohlc = ohlc_cache.get(pair)
         if ohlc is None or ohlc.empty:
             continue
 
@@ -172,90 +180,103 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
         if win_df.empty:
             continue
 
-        inc_colour, inc_line = _candle_colours(win_df)
+        bull = win_df["Close"] >= win_df["Open"]
 
-        # Candlestick
         fig.add_trace(go.Candlestick(
             x=win_df.index,
             open=win_df["Open"], high=win_df["High"],
             low=win_df["Low"],   close=win_df["Close"],
-            increasing=dict(line=dict(color="#26a69a"), fillcolor="#26a69a"),
-            decreasing=dict(line=dict(color="#000000"), fillcolor="#000000"),
+            increasing=dict(line=dict(color=_GREEN,   width=1), fillcolor=_GREEN),
+            decreasing=dict(line=dict(color=_WICK,    width=1), fillcolor=_BLACK_C),
             name=pair, showlegend=False,
-            hovertext=_trade_label(row),
-        ), row=r, col=c)
+            hovertext=_hover(row), hoverinfo="text",
+        ), row=r, col=1)
 
         entry_t = _to_utc(row["opened_at"])
         exit_t  = _to_utc(row["closed_at"])
-
-        entry_price = row["entry"]
-        exit_price  = row["exit"]
-        stop_price  = row.get("stop", None)
+        entry_price  = row["entry"]
+        exit_price   = row["exit"]
+        stop_price   = row.get("stop",   None)
         target_price = row.get("target", None)
-        direction   = row["direction"]
-
-        # Entry marker
-        marker_sym = "triangle-up" if direction > 0 else "triangle-down"
-        marker_col = "#00c853" if direction > 0 else "#ff1744"
-        fig.add_trace(go.Scatter(
-            x=[entry_t], y=[entry_price],
-            mode="markers",
-            marker=dict(symbol=marker_sym, size=14, color=marker_col),
-            name="Entry", showlegend=False,
-            hovertext=f"ENTRY {entry_price:.5f}",
-        ), row=r, col=c)
-
-        # Exit marker
-        exit_col = "#00c853" if row["pnl"] > 0 else "#ff1744"
-        fig.add_trace(go.Scatter(
-            x=[exit_t], y=[exit_price],
-            mode="markers",
-            marker=dict(symbol="x", size=12, color=exit_col, line=dict(width=2, color=exit_col)),
-            name="Exit", showlegend=False,
-            hovertext=f"EXIT {exit_price:.5f}  P&L R{row['pnl']:+.2f}",
-        ), row=r, col=c)
-
+        direction    = row["direction"]
         x0 = win_df.index[0]
         x1 = win_df.index[-1]
 
-        # Stop line (red dashed)
-        if stop_price and not pd.isna(stop_price):
-            fig.add_shape(type="line", x0=x0, x1=x1, y0=stop_price, y1=stop_price,
-                          line=dict(color="#ff1744", width=1, dash="dash"),
-                          row=r, col=c)
-
-        # Target line (blue dashed)
-        if target_price and not pd.isna(target_price):
-            fig.add_shape(type="line", x0=x0, x1=x1, y0=target_price, y1=target_price,
-                          line=dict(color="#2196f3", width=1, dash="dot"),
-                          row=r, col=c)
-
-        # Entry line (thin grey)
+        # Entry level (gold dotted)
         fig.add_shape(type="line", x0=x0, x1=x1, y0=entry_price, y1=entry_price,
-                      line=dict(color="#888888", width=1, dash="dot"),
-                      row=r, col=c)
+                      line=dict(color=_ENTRY_COL, width=1, dash="dot"),
+                      row=r, col=1)
+
+        # Stop line (red)
+        if stop_price is not None and not pd.isna(stop_price):
+            fig.add_shape(type="line", x0=x0, x1=x1, y0=stop_price, y1=stop_price,
+                          line=dict(color=_STOP_COL, width=1.5, dash="dash"),
+                          row=r, col=1)
+
+        # Target line (blue)
+        if target_price is not None and not pd.isna(target_price):
+            fig.add_shape(type="line", x0=x0, x1=x1, y0=target_price, y1=target_price,
+                          line=dict(color=_TARGET_COL, width=1.5, dash="dot"),
+                          row=r, col=1)
+
+        # Shaded entry→exit zone
+        zone_col = "rgba(63,185,80,0.07)" if row["pnl"] > 0 else "rgba(248,81,73,0.07)"
+        fig.add_shape(type="rect", x0=entry_t, x1=exit_t,
+                      y0=min(entry_price, exit_price) * 0.9999,
+                      y1=max(entry_price, exit_price) * 1.0001,
+                      fillcolor=zone_col, line=dict(width=0),
+                      row=r, col=1)
+
+        # Entry marker
+        sym = "triangle-up" if direction > 0 else "triangle-down"
+        col = _WIN_COL if direction > 0 else _STOP_COL
+        fig.add_trace(go.Scatter(
+            x=[entry_t], y=[entry_price], mode="markers",
+            marker=dict(symbol=sym, size=16, color=col,
+                        line=dict(color="#ffffff", width=1)),
+            showlegend=False, hovertext=f"ENTRY {entry_price:.5f}", hoverinfo="text",
+        ), row=r, col=1)
+
+        # Exit marker
+        exit_col = _WIN_COL if row["pnl"] > 0 else _LOSS_COL
+        fig.add_trace(go.Scatter(
+            x=[exit_t], y=[exit_price], mode="markers",
+            marker=dict(symbol="x-thin", size=14, color=exit_col,
+                        line=dict(color=exit_col, width=3)),
+            showlegend=False,
+            hovertext=f"EXIT {exit_price:.5f}  P&L R{row['pnl']:+.2f}", hoverinfo="text",
+        ), row=r, col=1)
+
+    # Style subplot titles: green for win, red for loss
+    for i, (ann, (_, row)) in enumerate(
+            zip(fig.layout.annotations, trades_df.iterrows())):
+        ann.font = dict(size=11,
+                        color=_WIN_COL if row["pnl"] > 0 else _LOSS_COL)
+        ann.x = 0
+        ann.xanchor = "left"
 
     fig.update_layout(
-        title=dict(
-            text=(
-                f"ICT Strategy — {n} trades  |  "
-                f"Green candle = bullish · Black candle = bearish  |  "
-                f"▲/▼ = entry · X = exit · red dash = stop · blue dot = target"
-            ),
-            font=dict(size=13),
-        ),
-        height=max(500, rows * 420),
-        paper_bgcolor="#1a1a2e",
-        plot_bgcolor="#16213e",
-        font=dict(color="#e0e0e0"),
+        height=max(600, n * (CHART_H + 40)),
+        margin=dict(l=60, r=20, t=30, b=20),
+        paper_bgcolor=_BG,
+        plot_bgcolor=_PLOT_BG,
+        font=dict(color=_TEXT, size=11),
         showlegend=False,
     )
     fig.update_xaxes(
         rangeslider_visible=False,
-        gridcolor="#2a2a4a",
-        tickfont=dict(size=9),
+        gridcolor=_GRID, gridwidth=1,
+        zeroline=False,
+        tickfont=dict(size=9, color=_TEXT),
+        showline=True, linecolor=_GRID,
     )
-    fig.update_yaxes(gridcolor="#2a2a4a", tickfont=dict(size=9))
+    fig.update_yaxes(
+        gridcolor=_GRID, gridwidth=1,
+        zeroline=False,
+        tickfont=dict(size=9, color=_TEXT),
+        showline=True, linecolor=_GRID,
+        tickformat=".5f",
+    )
 
     return fig
 
@@ -271,7 +292,7 @@ def main():
     ap.add_argument("--result",   choices=["win", "loss"], help="Filter win or loss only")
     ap.add_argument("--scenario", help="Filter im_scenario (e.g. 1a, 2b, N-long)")
     ap.add_argument("--model",    help="Filter entry_model (judas/breakout)")
-    ap.add_argument("--max",      type=int, default=200, help="Max trades to chart (default 200)")
+    ap.add_argument("--max",      type=int, default=30,  help="Max trades to chart (default 30)")
     ap.add_argument("--tf",       default=TF_DEFAULT, help="Candle timeframe (default 15T)")
     ap.add_argument("--out",      default=os.path.join(DATA_DIR, "trades_chart.html"))
     args = ap.parse_args()
@@ -318,8 +339,10 @@ def main():
     out = os.path.abspath(args.out)
     fig.write_html(out, include_plotlyjs="cdn")
     print(f"\nChart saved → {out}")
-    print("Open in any browser. Each subplot = one trade.")
-    print("Hover over candles/markers for trade details.")
+    print("Open in browser. Scroll down for each trade.")
+    print("Legend: green candle=bullish | dark candle=bearish")
+    print("        ▲▼ = entry  ✕ = exit  gold dot = entry level")
+    print("        red dash = stop  blue dot = target")
 
 
 if __name__ == "__main__":
