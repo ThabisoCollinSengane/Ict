@@ -320,22 +320,14 @@ class Backtester:
                             self._exit_leg(pair, leg, target, t, "target")
                 elif tp_hit:
                     if config.TRAIL_AT_TP:
-                        # TP touched — find last M5 swing and engage trail instead of exiting.
-                        trail_stop = (self._structure_trail_stop(bars5_trail, direction, pip)
+                        # TP touched — find the M5 swing closest to TP (not nearest in
+                        # time) that is above entry. Only engages when meaningful
+                        # structure formed near the TP during the delivery phase.
+                        trail_stop = (self._trail_stop_near_target(
+                                          bars5_trail, direction, pip,
+                                          leg["entry"], target)
                                       if bars5_trail else None)
-                        min_dist = config.TRAIL_AT_TP_MIN_PIPS * pip
-                        entry_px = leg["entry"]
-                        can_trail = (
-                            trail_stop is not None and (
-                                # Long: swing must be above entry (locks in win) and ≥min_dist below TP
-                                (direction > 0 and trail_stop > entry_px
-                                 and (target - trail_stop) >= min_dist) or
-                                # Short: swing must be below entry and ≥min_dist above TP
-                                (direction < 0 and trail_stop < entry_px
-                                 and (trail_stop - target) >= min_dist)
-                            )
-                        )
-                        if can_trail:
+                        if trail_stop is not None:
                             if direction > 0:
                                 leg["stop"] = max(leg["stop"], trail_stop)
                             else:
@@ -343,7 +335,7 @@ class Backtester:
                             leg["trail_engaged"] = True
                             # Do NOT exit — trail takes over from here
                         else:
-                            # No qualifying swing (too close or absent) — exit normally
+                            # No qualifying swing (fast spike, no structure near TP)
                             self._exit_leg(pair, leg, target, t, "target")
                     else:
                         self._exit_leg(pair, leg, target, t, "target")
@@ -1015,6 +1007,41 @@ class Backtester:
                 if c.High > recent[i - 1].High and c.High > recent[i + 1].High:
                     return c.High + buf
         return None
+
+    def _trail_stop_near_target(self, bars5, direction, pip, entry, target):
+        """For TRAIL_AT_TP: find the M5 swing structurally closest to the TP.
+
+        The user's intent is the M5 swing that formed NEAR the target during the
+        delivery phase — not the most recent in time (which may be near entry on a
+        fast Judas spike).  We collect ALL confirmed M5 swings that are:
+          • above entry (longs) / below entry (shorts) → guaranteed-win stop
+          • at least TRAIL_AT_TP_MIN_PIPS from target  → gives the runner room
+        and return the one whose stop-level is CLOSEST to the target (highest STL
+        for longs / lowest STH for shorts).  If no such swing exists → None, and
+        the trade exits normally at the TP.
+        """
+        if not bars5 or len(bars5) < 3:
+            return None
+        buf     = config.STRUCTURE_TRAIL_BUFFER * pip
+        min_gap = config.TRAIL_AT_TP_MIN_PIPS * pip
+        recent  = bars5[-config.STRUCTURE_TRAIL_LOOKBACK:]
+        best    = None
+        for i in range(len(recent) - 2, 0, -1):
+            c = recent[i]
+            if direction > 0:
+                if c.Low < recent[i - 1].Low and c.Low < recent[i + 1].Low:
+                    candidate = c.Low - buf
+                    # Must lock in a win (above entry) and leave room below TP
+                    if candidate > entry and (target - candidate) >= min_gap:
+                        if best is None or candidate > best:
+                            best = candidate   # keep the highest (closest to TP)
+            else:
+                if c.High > recent[i - 1].High and c.High > recent[i + 1].High:
+                    candidate = c.High + buf
+                    if candidate < entry and (candidate - target) >= min_gap:
+                        if best is None or candidate < best:
+                            best = candidate   # keep the lowest (closest to TP)
+        return best
 
     # P20: source families considered "premium" institutional draws.
     # When escalation is active, raw swing / round-number candidates are bypassed
