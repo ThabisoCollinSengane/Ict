@@ -51,6 +51,12 @@ _TF_ALIASES = {
 def _norm_tf(tf: str) -> str:
     return _TF_ALIASES.get(tf, tf)
 
+def _to_utc(t) -> pd.Timestamp:
+    ts = pd.Timestamp(t)
+    if ts.tzinfo is None:
+        return ts.tz_localize("UTC")
+    return ts.tz_convert("UTC")
+
 
 # ---------------------------------------------------------------------------
 # Data helpers
@@ -87,8 +93,8 @@ def _resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
 
 def _window(ohlc: pd.DataFrame, entry_t, exit_t, before: int, after: int) -> pd.DataFrame:
     """Slice BARS_BEFORE bars before entry and BARS_AFTER bars after exit."""
-    entry_t = pd.Timestamp(entry_t, tz="UTC") if not hasattr(entry_t, "tzinfo") else entry_t
-    exit_t  = pd.Timestamp(exit_t,  tz="UTC") if not hasattr(exit_t,  "tzinfo") else exit_t
+    entry_t = _to_utc(entry_t)
+    exit_t  = _to_utc(exit_t)
     idx = ohlc.index
     i_entry = idx.searchsorted(entry_t)
     i_exit  = idx.searchsorted(exit_t)
@@ -179,8 +185,8 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
             hovertext=_trade_label(row),
         ), row=r, col=c)
 
-        entry_t = pd.Timestamp(row["opened_at"], tz="UTC")
-        exit_t  = pd.Timestamp(row["closed_at"],  tz="UTC")
+        entry_t = _to_utc(row["opened_at"])
+        exit_t  = _to_utc(row["closed_at"])
 
         entry_price = row["entry"]
         exit_price  = row["exit"]
