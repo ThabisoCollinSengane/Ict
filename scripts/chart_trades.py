@@ -38,9 +38,18 @@ BARS_BEFORE = 60
 BARS_AFTER  = 30
 
 PAIRS = ["EURUSD", "GBPUSD", "NZDUSD"]
-TF_DEFAULT = "15T"
+TF_DEFAULT = "15min"
 
 _EST_OFFSET = pd.Timedelta(hours=5)
+
+_TF_ALIASES = {
+    "1T": "1min", "5T": "5min", "15T": "15min",
+    "30T": "30min", "60T": "60min", "240T": "240min",
+    "1H": "1h", "4H": "4h",
+}
+
+def _norm_tf(tf: str) -> str:
+    return _TF_ALIASES.get(tf, tf)
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +80,7 @@ def _load_m1(pair: str, years: list[int]) -> pd.DataFrame:
 
 
 def _resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
-    return df.resample(rule).agg(
+    return df.resample(_norm_tf(rule)).agg(
         {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
     ).dropna()
 
@@ -152,7 +161,7 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
         if ohlc is None or ohlc.empty:
             continue
 
-        ohlc_tf = _resample(ohlc, tf) if tf != "1T" else ohlc
+        ohlc_tf = _resample(ohlc, tf) if _norm_tf(tf) != "1min" else ohlc
         win_df  = _window(ohlc_tf, row["opened_at"], row["closed_at"], BARS_BEFORE, BARS_AFTER)
         if win_df.empty:
             continue
