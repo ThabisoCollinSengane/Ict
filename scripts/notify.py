@@ -19,8 +19,17 @@ How to get your credentials (one-time setup):
 """
 import json
 import os
+import ssl
 import urllib.error
 import urllib.request
+
+# Windows VPS environments often ship with a stale CA bundle. Use certifi's
+# up-to-date Mozilla bundle when available, otherwise fall back to the default.
+try:
+    import certifi as _certifi
+    _SSL_CTX = ssl.create_default_context(cafile=_certifi.where())
+except ImportError:
+    _SSL_CTX = ssl.create_default_context()
 
 # Read from config at import time; env vars are re-read on every send (allows
 # runtime injection without restarting the process).
@@ -69,7 +78,7 @@ def send_message(text: str) -> bool:
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=8, context=_SSL_CTX) as resp:
             return resp.status == 200
     except urllib.error.HTTPError as exc:
         # Log the Telegram error body so misconfiguration is diagnosable
