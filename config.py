@@ -401,6 +401,16 @@ EURGBP_SYNTHETIC_THRESHOLD_PIPS   = 10   # minimum divergence (pips) to fire
 TRAIL_AT_TP          = bool(int(_os.environ.get("TRAIL_AT_TP",          0)))
 TRAIL_AT_TP_MIN_PIPS = float(_os.environ.get("TRAIL_AT_TP_MIN_PIPS",    5.0))
 
+# --- TP Runner (partial exit AT TP1, runner to TP2) ---
+# At the original institutional draw (TP1): close TP_RUNNER_RATIO of the position
+# and move the stop to break-even.  The remaining units run to TP2 — the next
+# premium structural draw (ITH/ITL/PDH/PDL/FVG/fib) at least TP_RUNNER_MIN_PIPS
+# beyond TP1.  When no qualifying TP2 exists, exits 100% at TP1 (no change vs
+# baseline).  Mutually exclusive with SCALE_OUT_ENABLED.
+TP_RUNNER_ENABLED  = bool(int(_os.environ.get("TP_RUNNER_ENABLED",  0)))
+TP_RUNNER_RATIO    = float(_os.environ.get("TP_RUNNER_RATIO",       0.5))   # fraction out at TP1
+TP_RUNNER_MIN_PIPS = float(_os.environ.get("TP_RUNNER_MIN_PIPS",   20.0))  # TP2 must be ≥20 pips beyond TP1
+
 # --- Scale-out (partial TP1 close) ---
 # Close SCALE_OUT_RATIO of the position at SCALE_OUT_PIPS profit, then let the
 # remainder run to the structural target.  Only fires when the target is at

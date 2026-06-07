@@ -398,6 +398,8 @@ class Backtester:
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
             "crt_tf": st.get("crt_tf", ""),
             "target_escalated": st.get("target_escalated", False),
+            "tp_runner": st.get("tp_runner", False),
+            "tp1_price": st.get("tp1_price"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -450,6 +452,8 @@ class Backtester:
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
             "crt_tf": st.get("crt_tf", ""),
             "target_escalated": st.get("target_escalated", False),
+            "tp_runner": st.get("tp_runner", False),
+            "tp1_price": st.get("tp1_price"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -457,7 +461,7 @@ class Backtester:
         # Reduce to TP2 units and mark TP1 done
         leg["units"]    = leg["_units_tp2"]
         leg["tp1_hit"]  = True
-        if config.SCALE_OUT_MOVE_BE:
+        if config.SCALE_OUT_MOVE_BE or leg.get("runner_be_after_tp1"):
             if direction > 0:
                 leg["stop"] = max(leg["stop"], leg["entry"])
             else:
@@ -1022,7 +1026,7 @@ class Backtester:
         "equal_hl",
     })
 
-    def _find_target(self, pair, direction, t, price, stop=None, escalate=False):
+    def _find_target(self, pair, direction, t, price, stop=None, escalate=False, beyond=None):
         """Find the nearest target that satisfies the RR requirement.
 
         If `stop` is supplied, selects the nearest candidate where
@@ -1088,10 +1092,11 @@ class Backtester:
                 continue
             candidates += self._ithl_targets(_ibars, direction, price, pair, _itf)
 
+        _floor = beyond if beyond is not None else price
         if direction > 0:
-            candidates = [c for c in candidates if c[0] > price]
+            candidates = [c for c in candidates if c[0] > _floor]
         else:
-            candidates = [c for c in candidates if c[0] < price]
+            candidates = [c for c in candidates if c[0] < _floor]
         if not candidates:
             return None
         # Prefer targets in the correct dealing range zone (premium/discount).
@@ -2285,24 +2290,47 @@ class Backtester:
             _so_side = "momentum"
         _pip_sz      = pip_size(pair)
         _tgt_pips    = abs(target - entry) / _pip_sz
-        _so_applies  = (config.SCALE_OUT_ENABLED and
+
+        # TP Runner: partial exit AT the original institutional draw (TP1), stop
+        # moved to break-even, remainder runs to the next premium structural draw
+        # (TP2) found at least TP_RUNNER_MIN_PIPS beyond TP1.  Mutually exclusive
+        # with SCALE_OUT_ENABLED.
+        _runner_tp2 = None
+        if config.TP_RUNNER_ENABLED and not config.SCALE_OUT_ENABLED:
+            _tp2_beyond = target + config.TP_RUNNER_MIN_PIPS * _pip_sz * direction
+            _tp2_res    = self._find_target(pair, direction, t, entry, stop=stop,
+                                             escalate=True, beyond=_tp2_beyond)
+            if _tp2_res is not None:
+                _runner_tp2 = _tp2_res[0]
+        _runner_applies = _runner_tp2 is not None
+        _r_units_1   = int(units * config.TP_RUNNER_RATIO) if _runner_applies else 0
+        _r_units_2   = units - _r_units_1
+        _runner_applies = _runner_applies and _r_units_1 > 0
+
+        _so_applies  = (config.SCALE_OUT_ENABLED and not _runner_applies and
                         _tgt_pips >= config.SCALE_OUT_MIN_TARGET_PIPS)
         _units_tp1   = int(units * config.SCALE_OUT_RATIO) if _so_applies else 0
         _units_tp2   = units - _units_tp1
         _so_applies  = _so_applies and _units_tp1 > 0
+
+        _active_target = _runner_tp2 if _runner_applies else target
         leg = {
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
             "session_side": _so_side,
-            "tp1":       (entry + config.SCALE_OUT_PIPS * _pip_sz * direction)
-                         if _so_applies else None,
-            "tp1_hit":   not _so_applies,
-            "_units_tp1": _units_tp1,
-            "_units_tp2": _units_tp2,
+            "tp1":       (target if _runner_applies else
+                          (entry + config.SCALE_OUT_PIPS * _pip_sz * direction)
+                          if _so_applies else None),
+            "tp1_hit":   not (_runner_applies or _so_applies),
+            "_units_tp1": (_r_units_1 if _runner_applies else _units_tp1),
+            "_units_tp2": (_r_units_2 if _runner_applies else _units_tp2),
+            "runner_be_after_tp1": _runner_applies,
         }
         self.active[pair] = {
             "direction": direction,
-            "target": target,
+            "target": _active_target,
+            "tp1_price": target if _runner_applies else None,
+            "tp_runner": _runner_applies,
             "target_type": target_type,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir,
@@ -2497,7 +2525,8 @@ class Backtester:
         news_tag     = "news" if pyr_news_impact == "High" else ""
         _pip_sz      = pip_size(pair)
         _tgt_pips    = abs(st["target"] - entry) / _pip_sz
-        _so_applies  = (config.SCALE_OUT_ENABLED and
+        # Pyramid legs when TP_RUNNER is active: no tp1 partial — they target TP2 directly.
+        _so_applies  = (config.SCALE_OUT_ENABLED and not config.TP_RUNNER_ENABLED and
                         _tgt_pips >= config.SCALE_OUT_MIN_TARGET_PIPS)
         _units_tp1   = int(units * config.SCALE_OUT_RATIO) if _so_applies else 0
         _units_tp2   = units - _units_tp1
@@ -2511,6 +2540,7 @@ class Backtester:
             "tp1_hit":   not _so_applies,
             "_units_tp1": _units_tp1,
             "_units_tp2": _units_tp2,
+            "runner_be_after_tp1": False,
         }
         st["legs"].append(leg)
 
