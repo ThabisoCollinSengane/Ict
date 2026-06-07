@@ -911,12 +911,25 @@ class Backtester:
                     return c.High + buf
         return None
 
-    def _find_target(self, pair, direction, t, price, stop=None):
+    # P20: source families considered "premium" institutional draws.
+    # When escalation is active, raw swing / round-number candidates are bypassed
+    # in favour of these if any qualify above the RR floor.
+    _PREMIUM_TARGET_TYPES = frozenset({
+        "fib_extension", "fvg", "ob",
+        "pdh_pdl", "pwh_pwl",
+        "ith_liquidity", "itl_liquidity",
+        "equal_hl",
+    })
+
+    def _find_target(self, pair, direction, t, price, stop=None, escalate=False):
         """Find the nearest target that satisfies the RR requirement.
 
         If `stop` is supplied, selects the nearest candidate where
         |target - price| >= |price - stop| * MIN_RR (RR-aware selection).
         Falls back to the plain-nearest candidate if nothing satisfies RR.
+
+        If `escalate=True` (P20), prefers premium liquidity draws over raw
+        swing / round-number targets when both are available above the RR floor.
 
         Timeframe search order: M15 (last 48 bars) → H1 (24 bars) → H4 → D → W.
         M15/H1 lookbacks are capped to avoid O(n²) scan cost.
@@ -995,6 +1008,16 @@ class Backtester:
         else:
             min_reward = config.MIN_PIPS_TARGET * pip_v
         rr_ok = [c for c in candidates if abs(c[0] - price) >= min_reward]
+        # P20: when high-conviction signals fire, prefer premium liquidity draws
+        # (ITH/ITL, PDH/PDL, FVG, OB, fib) over raw swing / round-number targets.
+        # Only applies when a premium candidate clears the RR floor — never skips
+        # the trade entirely (falls back to full rr_ok if no premium qualifies).
+        _used_escalation = False
+        if escalate and config.TARGET_ESCALATE_ENABLED and rr_ok:
+            _premium_ok = [c for c in rr_ok if c[1] in self._PREMIUM_TARGET_TYPES]
+            if _premium_ok:
+                rr_ok = _premium_ok
+                _used_escalation = True
         # Keep the original selection: nearest target that clears MIN_RR (fewest
         # path changes). Confluence is an analytics signal, not a selection criterion.
         if rr_ok:
@@ -1005,7 +1028,7 @@ class Backtester:
         # tolerance of this price? Higher score → stronger institutional draw here.
         tol = config.TARGET_CONFLUENCE_TOL_PIPS * pip_v
         score = self._confluence_score(candidates, chosen[0], tol)
-        return chosen[0], chosen[1], score
+        return chosen[0], chosen[1], score, _used_escalation
 
     @staticmethod
     def _targets_in_series(bars, pair, direction, price):
@@ -2048,10 +2071,20 @@ class Backtester:
             stop = entry - _max_stop if direction > 0 else entry + _max_stop
             g["stop_capped_10pip"] = g.get("stop_capped_10pip", 0) + 1
 
-        _tgt = self._find_target(pair, direction, t, entry, stop=stop)
+        # P20: escalate to premium liquidity draws when high-conviction signals fire.
+        # CRT-D/W (HTF Judas on Daily/Weekly), draw≥2 (2+ HTF levels agree), or
+        # mstruct_minor_sweep (M15 Judas sweep with ITH/ITL still intact) each trigger.
+        _escalate_tgt = (
+            config.TARGET_ESCALATE_ENABLED and (
+                _crt_tf in ("D", "W") or
+                _draw_score >= config.TARGET_ESCALATE_MIN_DRAW or
+                _ms.get("minor_sweep", False)
+            )
+        )
+        _tgt = self._find_target(pair, direction, t, entry, stop=stop, escalate=_escalate_tgt)
         if _tgt is None:
             return
-        target, target_type, _target_score = _tgt
+        target, target_type, _target_score, _tgt_escalated = _tgt
         g["target_found"] += 1
         # Target confluence conviction: ≥3 independent source families agreeing on
         # the TP area adds +1 conviction; ≥4 adds +2 (max +2 from this signal).
@@ -2179,6 +2212,7 @@ class Backtester:
             "dxy_mstruct_align": "|".join(_ms["dxy_align"]),
             "dxy_mstruct_sweep": _ms["dxy_minor_sweep"],
             "crt_tf": _crt_tf,
+            "target_escalated": _tgt_escalated,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.

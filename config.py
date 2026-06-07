@@ -152,6 +152,13 @@ TARGET_CONFLUENCE_TOL_PIPS = 8   # pips tolerance for two sources to be "at same
 # Env-overridable for sweeps: TARGET_SCORE_MULT / TARGET_SCORE_MULT_THRESHOLD.
 TARGET_SCORE_MULT           = float(_os.environ.get("TARGET_SCORE_MULT", 1.25))
 TARGET_SCORE_MULT_THRESHOLD = int(_os.environ.get("TARGET_SCORE_MULT_THRESHOLD", 4))
+# P20 — high-conviction target escalation.
+# When strong confluence signals fire (CRT-D/W, draw≥2, Judas minor sweep), skip raw
+# swing / round-number targets and require a structural liquidity draw (ITH/ITL,
+# PDH/PDL, PWH/PWL, FVG, OB, fib) to be available.  Falls back to the full candidate
+# list if no premium target clears the RR floor — so this is strictly additive.
+TARGET_ESCALATE_ENABLED  = bool(int(_os.environ.get("TARGET_ESCALATE_ENABLED", 1)))
+TARGET_ESCALATE_MIN_DRAW = int(_os.environ.get("TARGET_ESCALATE_MIN_DRAW", 2))
 # Timeframes that contribute unswept ITH/ITL target candidates (P17). Default H4/D/W
 # (full history — the edge is in older major intermediate highs/lows). Empty tuple =
 # none (pure P16 target set). Env override: ITHL_TARGET_TFS="240T,D,W" (comma-separated).
