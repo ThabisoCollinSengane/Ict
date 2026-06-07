@@ -31,7 +31,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 DATA_DIR   = os.path.join(os.path.dirname(__file__), "..", "data", "histdata")
-TRADES_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "trades_dump.csv")
+TRADES_CSV = os.path.join(DATA_DIR, "trades_dump.csv")
 
 # Candle window: bars before entry and after exit
 BARS_BEFORE = 60
