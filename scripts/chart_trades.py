@@ -120,7 +120,8 @@ _ENTRY_COL = "#e3b341"   # entry level line
 _WIN_COL   = "#3fb950"
 _LOSS_COL  = "#f85149"
 
-CHART_H = 320  # px per trade chart
+CHART_H_PX = 280   # desired px per chart
+GAP_PX     = 55    # px between charts (includes title row)
 
 
 def _hover(row) -> str:
@@ -147,8 +148,11 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
                           paper_bgcolor=_BG, font=dict(color=_TEXT))
         return fig
 
-    # One row per trade, single column
-    v_space = min(0.04, 0.9 / max(n - 1, 1)) if n > 1 else 0.04
+    # Compute height and spacing so gaps stay fixed at GAP_PX regardless of n
+    total_h  = n * CHART_H_PX + (n - 1) * GAP_PX + 60  # 60 = top/bottom margin
+    v_space  = (GAP_PX / total_h) if n > 1 else 0.02
+
+    tf_label = tf.replace("min", "M").replace("T", "M")
     titles = []
     for _, row in trades_df.iterrows():
         direction = "▲ LONG" if row["direction"] > 0 else "▼ SHORT"
@@ -156,7 +160,7 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
         dt = str(row["opened_at"])[:16]
         titles.append(
             f"{badge}  {row['pair']} {direction}  R{row['pnl']:+.0f}  "
-            f"| {row.get('im_scenario','?')} {row.get('entry_model','?')}  "
+            f"[{tf_label}]  {row.get('im_scenario','?')} {row.get('entry_model','?')}  "
             f"draw {row.get('draw_score',0)}/3  {dt}"
         )
 
@@ -256,7 +260,7 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
         ann.xanchor = "left"
 
     fig.update_layout(
-        height=max(600, n * (CHART_H + 40)),
+        height=total_h,
         margin=dict(l=60, r=20, t=30, b=20),
         paper_bgcolor=_BG,
         plot_bgcolor=_PLOT_BG,
@@ -337,7 +341,15 @@ def main():
     fig = build_chart(df, ohlc_cache, args.tf)
 
     out = os.path.abspath(args.out)
-    fig.write_html(out, include_plotlyjs="cdn")
+    html = fig.to_html(include_plotlyjs="cdn", full_html=True)
+    # Inject mobile viewport so chart is readable on phone
+    html = html.replace(
+        "<head>",
+        '<head>\n<meta name="viewport" content="width=device-width, initial-scale=1">',
+        1,
+    )
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(html)
     print(f"\nChart saved → {out}")
     print("Open in browser. Scroll down for each trade.")
     print("Legend: green candle=bullish | dark candle=bearish")
