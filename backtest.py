@@ -2464,7 +2464,8 @@ class Backtester:
                 im_score = 1.0      # weekly AMD confirms — full pyramid lots
 
         if im_score < 1.0:
-            _draw_unlock = (st.get("draw_score", 0) >= 3 and im_score >= 0.75)
+            _draw_unlock = (st.get("draw_score", 0) >= config.PYRAMID_DRAW_UNLOCK_MIN
+                            and im_score >= 0.75)
             if not _draw_unlock:
                 self.gate["pyramid_blocked_low_im"] = self.gate.get("pyramid_blocked_low_im", 0) + 1
                 return
@@ -2490,6 +2491,7 @@ class Backtester:
         last_entry = st["legs"][-1]["entry"]
         favour_pips = (cur_price - last_entry) * st["direction"] / pip
         if favour_pips < config.PYRAMID_MIN_FAVOUR_PIPS:
+            self.gate["pyramid_blocked_favour"] = self.gate.get("pyramid_blocked_favour", 0) + 1
             return
 
         # Entry pattern from M5/M15/H1 (same as normal entries); the stop is then
@@ -2502,6 +2504,7 @@ class Backtester:
             bars1m=bars1m, for_pyramid=False,
         )
         if pyr_pattern is None:
+            self.gate["pyramid_blocked_no_pattern"] = self.gate.get("pyramid_blocked_no_pattern", 0) + 1
             return
 
         # Apply entry friction to pyramid fills too (widen for news, same as initial entries).
@@ -2528,6 +2531,7 @@ class Backtester:
 
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < config.MIN_PIPS_TARGET:
+            self.gate["pyramid_blocked_min_target"] = self.gate.get("pyramid_blocked_min_target", 0) + 1
             return
 
         # High-impact news = distribution catalyst: upgrade to full lots.

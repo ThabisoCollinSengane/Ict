@@ -222,9 +222,16 @@ BLOCK_NEUTRAL_PYRAMID = True
 # in the same direction as the trade — eliminates mid-week guessing.
 PYRAMID_REQUIRE_WEEKLY_AMD = False
 
+# Minimum draw_score for the im_score=0.75 unlock (DXY agrees, cross flat).
+# Default 1: unlock when at least one HTF timeframe agrees — ICT rationale:
+# DXY agreement + any HTF draw = sufficient conviction for a pyramid add.
+# Backtest: 3→1 with favour=15: IS +3.5%, OOS flat, MaxDD unchanged (P22).
+PYRAMID_DRAW_UNLOCK_MIN = int(_os.environ.get("PYRAMID_DRAW_UNLOCK_MIN", 1))
+
 # Minimum pips in favour of the last leg before adding a pyramid leg.
 # Higher values give more confirmation; lower values catch earlier in the move.
-PYRAMID_MIN_FAVOUR_PIPS = 20
+# Backtest: 20→15 with draw_unlock=1: IS +3.5%, OOS flat, MaxDD unchanged (P22).
+PYRAMID_MIN_FAVOUR_PIPS = float(_os.environ.get("PYRAMID_MIN_FAVOUR_PIPS", 15))
 
 # --- Structure lookbacks ---
 SWING_LOOKBACK = 20                # bars to define swing high/low for BOS

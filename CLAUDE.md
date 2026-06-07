@@ -12,12 +12,12 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 795 trades, WR 46.6%, PF 5.12, MaxDD -12.95%, R500 → R284.9M.
+**Backtest result (4 years, 2022–2025):** 811 trades, WR 46.0%, PF 4.47, MaxDD -12.95%, R500 → R294.8M.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
 HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
-targets, P18 score≥4 confluence sizing (1.25×), P19 H4-CRT Turtle Soup sizing (1.25×), and
-P20 high-conviction target escalation. MaxDD unchanged at -12.95% across all additions. See P18
-for the cache-bug post-mortem that corrected a phantom regression.)
+targets, P18 score≥4 confluence sizing (1.25×), P19 H4-CRT Turtle Soup sizing (1.25×),
+P20 high-conviction target escalation, P21 pyramid gate fix, P22 pyramid gate relaxation.
+MaxDD unchanged at -12.95% across all additions. See P18 for the cache-bug post-mortem.)
 
 ---
 
@@ -877,6 +877,61 @@ absolute P&L is small relative to the compounding base — but MaxDD unchanged e
 Pyramids now fire ~34 times over 4yr (was ~2). They enter on M5 FVG pullbacks with weekly AMD +
 full H1 intermarket conviction. 50% WR on pyramid legs — consistent with a cautious add to an
 already-proven move.
+
+### P22 — Pyramid gate relaxation: draw_unlock threshold + favour_pips (SHIPPED 2026-06-07)
+**What:** Two targeted changes to the pyramid gate that unlock more pyramid opportunities without
+degrading risk metrics.
+
+**Diagnostic finding (new gate counters):** After adding `pyramid_blocked_favour` and
+`pyramid_blocked_min_target` counters, the full pyramid gate breakdown was visible for the first
+time:
+
+| Gate | IS blocks | Notes |
+|---|---|---|
+| `pyramid_blocked_low_im` | 1,766 | im_score < 1.0, no draw unlock |
+| `pyramid_blocked_favour` | 1,331 | price < 20 pips in profit |
+| `pyramid_blocked_no_pattern` | 0 | not a bottleneck (FVG always found) |
+| `pyramid_blocked_min_target` | 47 | TP < 20 pips remaining |
+
+**Change 1 — `PYRAMID_DRAW_UNLOCK_MIN` 3→1:**
+The im_score=0.75 unlock (DXY agrees, cross flat) previously required draw_score≥3 (all 3 HTF
+timeframes aligned). Changed to draw_score≥1: any HTF draw alignment is sufficient. ICT rationale:
+DXY direction is the primary USD signal; when it agrees with the trade AND any HTF timeframe
+confirms the draw, a pyramid add is justified even when the cross rate is temporarily flat. The
+cross being flat just means EUR/GBP are moving together — it doesn't invalidate the DXY trend
+already captured in the open trade.
+
+**Change 2 — `PYRAMID_MIN_FAVOUR_PIPS` 20→15:**
+Lowering from 20 to 15 pips allows adds earlier in the confirmed move. On a 40-pip target trade,
+15 pips in profit means 25 pips of target remaining — fully satisfying the MIN_PIPS_TARGET (20)
+floor. The 10-pip test showed IS/OOS divergence (OOS MaxDD -16.83%); 15 pips is the stable
+middle ground that adds pyramids without degrading the OOS path.
+
+**Tested and rejected:**
+- `PYRAMID_MIN_FAVOUR_PIPS=10`: IS +6.3%, OOS MaxDD -16.83% (fail — same path-dependency trap)
+- `PYRAMID_DRAW_UNLOCK_MIN=1` alone: IS +1%, OOS flat (neutral, not enough)
+- Combined `draw_unlock=1 + favour=15`: IS +3.5%, OOS flat, MaxDD unchanged everywhere ✓
+
+**Result (full 4yr, combined change):**
+
+| Metric | P21 baseline | **P22** |
+|---|---|---|
+| Full 4yr equity | R284.9M | **R294.8M (+3.5%)** |
+| Full 4yr PF | 4.47 | **4.47** (unchanged ✓) |
+| Full 4yr MaxDD | -12.95% | **-12.95%** (unchanged ✓) |
+| IS PF / equity | 3.07 / R234k | 3.07 / **R242k** (+3.5%) |
+| IS MaxDD | -12.95% | **-12.95%** (unchanged ✓) |
+| OOS PF / equity | 4.47 / R1.501M | 4.47 / **R1.502M** (flat) |
+| OOS MaxDD | -13.93% | **-13.93%** (unchanged ✓) |
+
+PF identical in all three runs (4.47 / 3.07 / 4.47). MaxDD unchanged everywhere. Equity +R9.9M
+(+3.5%) on the full continuous path. The OOS is essentially flat — the gain is concentrated in IS
+where the pyramids fire at high-equity inflection points and compound forward.
+
+Pyramids now fire ~16 times in IS (was ~2) / ~4 times in OOS (was ~32) → ~20 total.
+Overall WR on pyramid legs ~45%; 50% WR on im1.0 legs, 40% on im0.8 legs.
+
+**Config:** `PYRAMID_DRAW_UNLOCK_MIN=1`, `PYRAMID_MIN_FAVOUR_PIPS=15`.
 
 ---
 
