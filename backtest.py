@@ -330,6 +330,7 @@ class Backtester:
         record = {
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
             "entry": leg["entry"], "exit": effective_exit, "units": leg["units"],
+            "stop": leg["stop"], "target": st["target"],
             "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
             "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
             "session_side": leg.get("session_side", "no_open"),
