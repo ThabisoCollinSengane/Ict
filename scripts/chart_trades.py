@@ -134,11 +134,12 @@ def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure
             f"{str(row['opened_at'])[:16]}"
         )
 
+    v_space = min(0.06, 0.8 / max(rows - 1, 1)) if rows > 1 else 0.06
     fig = make_subplots(
         rows=rows, cols=cols,
         subplot_titles=titles,
         shared_xaxes=False,
-        vertical_spacing=0.06,
+        vertical_spacing=v_space,
         horizontal_spacing=0.04,
     )
 
@@ -257,7 +258,7 @@ def main():
     ap.add_argument("--model",    help="Filter entry_model (judas/breakout)")
     ap.add_argument("--max",      type=int, default=200, help="Max trades to chart (default 200)")
     ap.add_argument("--tf",       default=TF_DEFAULT, help="Candle timeframe (default 15T)")
-    ap.add_argument("--out",      default=os.path.join(os.path.dirname(__file__), "..", "data", "trades_chart.html"))
+    ap.add_argument("--out",      default=os.path.join(DATA_DIR, "trades_chart.html"))
     args = ap.parse_args()
 
     if not os.path.exists(TRADES_CSV):
