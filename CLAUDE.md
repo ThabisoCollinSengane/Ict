@@ -780,41 +780,50 @@ move stop to last M5 swing ≥ `TRAIL_AT_TP_MIN_PIPS` (5 pips) from TP and let t
 until M5 structure breaks. User observed price continuing 100–200 pips past TP on high-conviction
 setups. Fires on wick touch (no close required) for both Judas and breakout models.
 
-**Bug discovered (v1 — bankrupt):** The initial `can_trail` check only verified the M5 swing
-was ≥5 pips from TP. On fast Judas-style TP spikes that immediately reversed, the last M5 STL
-was still below entry — trail engaged with stop below entry, turning winners into losers. Result:
-IS MaxDD -71.61%, OOS MaxDD **-100.62% (account bankrupted)**.
+**Three implementations tested, all reverted:**
 
-**Fix (v2):** Added `trail_stop > entry` requirement for longs / `trail_stop < entry` for shorts,
-guaranteeing at least break-even before the trail engages. Fast TP spikes without M5 structure
-above entry fall through to normal TP exit.
+**v1 — bankrupt:** Initial `can_trail` check only verified M5 swing ≥5 pips from TP. On fast
+Judas-style TP spikes that immediately reversed, the last M5 STL was still below entry — trail
+engaged with stop below entry, turning winners into losers. IS MaxDD -71.61%, OOS MaxDD
+**-100.62% (account bankrupted)**.
 
-**Result after fix — still worse than baseline (REVERTED):**
+**v2 — entry check added:** Added `trail_stop > entry` requirement for longs / `trail_stop < entry`
+for shorts, guaranteeing at least break-even before trail engages. Still worse than baseline:
 
-| Metric | Baseline (P20) | TRAIL_AT_TP fixed |
+| Metric | Baseline (P20/P21) | v2 (entry check) |
 |---|---|---|
 | Full 4yr equity | R284.9M | R137.8M (−52%) |
 | Full 4yr PF | 5.12 | 4.49 |
 | Full 4yr MaxDD | -12.95% | -13.26% |
-| IS PF / equity | 3.07 / ~R198k | 2.87 / R196k |
+
+**v3 — near-TP swing (correct implementation):** `_trail_stop_near_target` collects ALL confirmed
+M5 swings above entry with ≥min_gap from TP and returns the HIGHEST (closest to TP in price, not
+most recent in time). Fast spikes with no structure near TP return None → normal exit. Still worse:
+
+| Metric | Baseline (P20/P21) | v3 (near-TP swing) |
+|---|---|---|
+| Full 4yr equity | R284.9M | **R144.8M (−49%)** |
+| Full 4yr PF | 5.12 | 4.48 |
+| Full 4yr MaxDD | -12.95% | -13.26% |
+| IS PF / equity | 3.07 / R234k | 2.94 / R209k |
 | IS MaxDD | -12.95% | -13.26% |
-| OOS PF / equity | 4.48 / — | 4.35 / R800k |
+| OOS PF / equity | 4.48 / R1.501M | 4.34 / R788k |
 | OOS MaxDD | -13.93% | -18.07% |
 
-Every metric worse in every split. **Root cause: the TP is the end of the AMD delivery cycle.**
-When price delivers to the institutional draw on liquidity, the cycle is complete — distribution
-has occurred. Holding past it means sitting through the reversal/consolidation phase where the
-strategy has no edge. The trail runners exit at a lower level than the TP on average, reducing
-average win. Unlike the P8/P10/P11 reverts (path-dependency — the removed trades were
-compounding-positive despite weak arithmetic P&L), this is a genuine per-trade degradation:
-the average exit after a TP wick is worse than just taking the TP.
+Every metric worse in every split across all three implementations. **Root cause: the TP is the
+end of the AMD delivery cycle.** When price delivers to the institutional draw on liquidity, the
+cycle is complete — distribution has occurred. Holding past it means sitting through the
+reversal/consolidation phase where the strategy has no edge. The trail runners exit at a lower
+level than the TP on average, reducing average win. Unlike the P8/P10/P11 reverts
+(path-dependency — removed trades were compounding-positive despite weak arithmetic P&L), this is
+a genuine per-trade degradation: the average exit after a TP wick is worse than just taking the TP.
 
 **ICT lesson:** "price doesn't come back to these points" is true from the perspective of the
 big-TF draw, but the strategy's TP IS that draw. Once price delivers to the draw, the trader
 should exit — the next move belongs to a new AMD setup, not a continuation of the old one.
 
 **Config:** `TRAIL_AT_TP=0` (off by default), `TRAIL_AT_TP_MIN_PIPS=5.0`. Code retained for
-reference; the entry-gate fix is committed so v1's bankrupt bug doesn't exist in the codebase.
+reference; `_trail_stop_near_target` method available. v1's bankrupt bug does not exist in codebase.
 
 ### TP Runner — partial exit at TP1, runner to next premium draw (TESTED + REVERTED 2026-06-07)
 **Hypothesis:** Exit 50% at the original institutional draw (TP1), move stop to break-even, run the
