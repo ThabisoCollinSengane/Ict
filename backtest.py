@@ -324,10 +324,15 @@ class Backtester:
                         trail_stop = (self._structure_trail_stop(bars5_trail, direction, pip)
                                       if bars5_trail else None)
                         min_dist = config.TRAIL_AT_TP_MIN_PIPS * pip
+                        entry_px = leg["entry"]
                         can_trail = (
                             trail_stop is not None and (
-                                (direction > 0 and (target - trail_stop) >= min_dist) or
-                                (direction < 0 and (trail_stop - target) >= min_dist)
+                                # Long: swing must be above entry (locks in win) and ≥min_dist below TP
+                                (direction > 0 and trail_stop > entry_px
+                                 and (target - trail_stop) >= min_dist) or
+                                # Short: swing must be below entry and ≥min_dist above TP
+                                (direction < 0 and trail_stop < entry_px
+                                 and (trail_stop - target) >= min_dist)
                             )
                         )
                         if can_trail:
