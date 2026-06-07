@@ -816,6 +816,59 @@ should exit — the next move belongs to a new AMD setup, not a continuation of 
 **Config:** `TRAIL_AT_TP=0` (off by default), `TRAIL_AT_TP_MIN_PIPS=5.0`. Code retained for
 reference; the entry-gate fix is committed so v1's bankrupt bug doesn't exist in the codebase.
 
+### TP Runner — partial exit at TP1, runner to next premium draw (TESTED + REVERTED 2026-06-07)
+**Hypothesis:** Exit 50% at the original institutional draw (TP1), move stop to break-even, run the
+remaining 50% to the next premium structural target (TP2 — ITH/ITL/PDH/PDL/FVG/fib ≥ 20 pips beyond
+TP1). Reuses the scale-out infrastructure. `_find_target` gained a `beyond` param to search past TP1.
+
+**Result — REVERTED:**
+
+| Metric | Baseline (P20) | TP Runner |
+|---|---|---|
+| Full 4yr equity | R284.9M | R70M (−75%) |
+| Full 4yr PF | 5.12 | 4.19 |
+| Full 4yr MaxDD | -12.95% | -13.63% |
+| IS PF / equity | 3.07 / R198k | 2.71 / R184k |
+| OOS PF / equity | 4.48 / R1.2M | 3.85 / R211k |
+| OOS MaxDD | -13.93% | -18.7% |
+
+**Root cause:** Same as TRAIL_AT_TP. The TP1 IS the AMD delivery draw — exiting 50% there and running the
+rest to TP2 means half the position misses the guaranteed exit. The runner 50% frequently stalls between
+TP1 and TP2 (closing at BE) rather than continuing to TP2. Net effect: most trades yield 50% of their
+normal P&L, and the occasional TP2 hit doesn't compensate. Every exit modification tested confirms the
+same conclusion: take the full position off at the institutional draw.
+
+**Config:** `TP_RUNNER_ENABLED=0` (off by default). Code + `beyond` param in `_find_target` retained.
+
+### P21 — Pyramid gate fix (SHIPPED 2026-06-07)
+**Bug found:** Lines in `_maybe_pyramid` blocked pyramids when `weekly_amd_dir == direction` — exactly
+the CONFIRMED case where the weekly distribution supports the trade (+2 conviction at entry). The
+`WEEKLY_AMD_FULL_PYRAMID` im_score upgrade below it was permanently dead code (never reached due to
+early return). This reduced 4-year pyramids to ~2.
+
+**Fix:** Move the `WEEKLY_AMD_FULL_PYRAMID` upgrade to run BEFORE the `im_score < 1.0` gate, remove
+the inverted block. Weekly-confirmed setups get im_score promoted to 1.0 and pass the pyramid gate.
+
+**Result (pyramid fix, baseline config):**
+
+| Metric | Baseline (P20) | Pyramid fix |
+|---|---|---|
+| Full 4yr equity | R284.9M | **R284.9M** (unchanged ✓) |
+| Full 4yr PF | 5.12 | 4.47 |
+| Full 4yr MaxDD | -12.95% | **-12.95%** (unchanged ✓) |
+| IS PF / equity | 3.07 / ~R198k | **3.07 / R234k (+18%)** |
+| IS MaxDD | -12.95% | **-12.95%** (unchanged ✓) |
+| OOS PF / equity | 4.48 / ~R1.175M | **4.48 / R1.501M (+28%)** |
+| OOS MaxDD | -13.93% | **-13.93%** (unchanged ✓) |
+
+PF unchanged in both splits. Equity up +18% IS / +28% OOS (pyramid legs firing at high-equity periods
+compound the advantage). Full-run equity flat because pyramids fire at very high equity where their
+absolute P&L is small relative to the compounding base — but MaxDD unchanged everywhere. Ships ON.
+
+Pyramids now fire ~34 times over 4yr (was ~2). They enter on M5 FVG pullbacks with weekly AMD +
+full H1 intermarket conviction. 50% WR on pyramid legs — consistent with a cautious add to an
+already-proven move.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
