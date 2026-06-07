@@ -398,7 +398,7 @@ EURGBP_SYNTHETIC_THRESHOLD_PIPS   = 10   # minimum divergence (pips) to fire
 # remainder run to the structural target.  Only fires when the target is at
 # least SCALE_OUT_MIN_TARGET_PIPS away (avoids trivial TP2 sliver).
 # SCALE_OUT_MOVE_BE: move stop to entry after TP1 fires (risk-free runner).
-SCALE_OUT_ENABLED          = bool(int(_os.environ.get("SCALE_OUT_ENABLED",         1)))
+SCALE_OUT_ENABLED          = bool(int(_os.environ.get("SCALE_OUT_ENABLED",         0)))
 SCALE_OUT_PIPS             = float(_os.environ.get("SCALE_OUT_PIPS",               20.0))
 SCALE_OUT_RATIO            = float(_os.environ.get("SCALE_OUT_RATIO",              0.5))
 SCALE_OUT_MOVE_BE          = bool(int(_os.environ.get("SCALE_OUT_MOVE_BE",         1)))

@@ -96,52 +96,81 @@ def _f(v):
         return None
 
 
-def _build_trade(row, ohlc_cache: dict, tf: str) -> dict | None:
+def _build_trade(row, ohlc_cache: dict, tf: str, pyramid_rows=None) -> dict | None:
     pair = row["pair"]
     ohlc = ohlc_cache.get(pair)
     if ohlc is None or ohlc.empty:
         return None
-    win = _window(ohlc, row["opened_at"], row["closed_at"])
+    # Extend window to cover all pyramid legs too
+    closed_at = row["closed_at"]
+    if pyramid_rows:
+        for pr in pyramid_rows:
+            if pd.notna(pr["closed_at"]):
+                closed_at = max(closed_at, pr["closed_at"])
+    win = _window(ohlc, row["opened_at"], closed_at)
     if win.empty:
         return None
 
     entry_t = _to_utc(row["opened_at"]).strftime("%Y-%m-%d %H:%M:%S")
     exit_t  = _to_utc(row["closed_at"]).strftime("%Y-%m-%d %H:%M:%S")
 
+    # Build pyramid leg data for chart overlay
+    pyrs = []
+    if pyramid_rows:
+        for pr in pyramid_rows:
+            try:
+                pyrs.append({
+                    "leg_idx": int(pr.get("leg_idx", 2)),
+                    "entry":   _f(pr["entry"]),
+                    "stop":    _f(pr.get("stop")),
+                    "exit":    _f(pr["exit"]),
+                    "pnl":     round(float(pr["pnl"]), 2),
+                    "entry_t": _to_utc(pr["opened_at"]).strftime("%Y-%m-%d %H:%M:%S"),
+                    "exit_t":  _to_utc(pr["closed_at"]).strftime("%Y-%m-%d %H:%M:%S"),
+                })
+            except Exception:
+                pass
+
+    total_pnl = round(float(row["pnl"]) + sum(p["pnl"] for p in pyrs), 2)
+
     return {
         # core
-        "pair":      str(row["pair"]),
-        "direction": int(row["direction"]),
-        "pnl":       round(float(row["pnl"]), 2),
-        "entry":     _f(row["entry"]),
-        "exit":      _f(row["exit"]),
-        "stop":      _f(row.get("stop")),
-        "target":    _f(row.get("target")),
+        "pair":        str(row["pair"]),
+        "direction":   int(row["direction"]),
+        "pnl":         round(float(row["pnl"]), 2),
+        "total_pnl":   total_pnl,
+        "entry":       _f(row["entry"]),
+        "exit":        _f(row["exit"]),
+        "stop":        _f(row.get("stop")),
+        "target":      _f(row.get("target")),
         # classification
-        "scenario":  str(row.get("im_scenario", "") or ""),
-        "model":     str(row.get("entry_model", "") or ""),
-        "pattern":   _parse_entry_pattern(str(row.get("entry_type", "") or "")),
-        "draw":      int(row.get("draw_score", 0) or 0),
-        "conf":      int(row.get("target_confluence", 0) or 0),
-        "crt":       str(row.get("crt_tf", "") or ""),
+        "scenario":    str(row.get("im_scenario", "") or ""),
+        "model":       str(row.get("entry_model", "") or ""),
+        "pattern":     _parse_entry_pattern(str(row.get("entry_type", "") or "")),
+        "draw":        int(row.get("draw_score", 0) or 0),
+        "conf":        int(row.get("target_confluence", 0) or 0),
+        "crt":         str(row.get("crt_tf", "") or ""),
         "target_type": str(row.get("target_type", "") or ""),
         # session
-        "profile":   str(row.get("profile", "") or ""),
-        "phase":     str(row.get("session_phase", "") or ""),
+        "profile":     str(row.get("profile", "") or ""),
+        "phase":       str(row.get("session_phase", "") or ""),
         # market structure
-        "ms_tf":     str(row.get("mstruct_intact_tf", "") or ""),
-        "ms_align":  str(row.get("mstruct_align", "") or ""),
-        "ms_sweep":  bool(row.get("mstruct_minor_sweep", False)),
-        "ms_pts":    int(row.get("mstruct_pts", 0) or 0),
-        "ms_dir":    int(row.get("mstruct_htf_dir", 0) or 0),
+        "ms_tf":       str(row.get("mstruct_intact_tf", "") or ""),
+        "ms_align":    str(row.get("mstruct_align", "") or ""),
+        "ms_sweep":    bool(row.get("mstruct_minor_sweep", False)),
+        "ms_pts":      int(row.get("mstruct_pts", 0) or 0),
+        "ms_dir":      int(row.get("mstruct_htf_dir", 0) or 0),
         # HTF FVG
-        "htf_fvg":   str(row.get("htf_fvg", "") or ""),
+        "htf_fvg":     str(row.get("htf_fvg", "") or ""),
         # timing
-        "entry_t":   entry_t,
-        "exit_t":    exit_t,
-        "opened_at": str(row["opened_at"])[:16],
-        "closed_at": str(row["closed_at"])[:16],
-        "tf":        tf.replace("min", "M"),
+        "entry_t":     entry_t,
+        "exit_t":      exit_t,
+        "opened_at":   str(row["opened_at"])[:16],
+        "closed_at":   str(row["closed_at"])[:16],
+        "tf":          tf.replace("min", "M"),
+        # pyramids
+        "pyramids":    pyrs,
+        "has_pyramid": len(pyrs) > 0,
         # ohlc window
         "ohlc": {
             "x": [t.strftime("%Y-%m-%d %H:%M:%S") for t in win.index],
@@ -245,6 +274,11 @@ body{background:#0d1117;color:#c9d1d9;font-family:ui-monospace,monospace;font-si
       <option value="win">Wins ✓</option>
       <option value="loss">Losses ✗</option>
     </select>
+    <select id="fpyram">
+      <option value="">All Legs</option>
+      <option value="yes">Has Pyramids</option>
+      <option value="no">No Pyramid</option>
+    </select>
     <select id="fpp">
       <option value="10">10 / page</option>
       <option value="20" selected>20 / page</option>
@@ -260,7 +294,9 @@ body{background:#0d1117;color:#c9d1d9;font-family:ui-monospace,monospace;font-si
   <span class="leg"><span class="ldash" style="border-color:#e3b341"></span>Entry level</span>
   <span class="leg"><span class="ldash" style="border-color:#f85149"></span>Stop</span>
   <span class="leg"><span class="ldash" style="border-color:#58a6ff;border-style:dotted"></span>Target</span>
-  <span class="leg">▲▼ entry &nbsp; ✕ exit</span>
+  <span class="leg">▲▼ L1 entry &nbsp; ✕ exit</span>
+  <span class="leg" style="color:#00bcd4">▲▼ L2 pyramid</span>
+  <span class="leg" style="color:#ce93d8">▲▼ L3 pyramid</span>
   <span class="leg" style="color:#3fb950">■ green=bullish</span>
   <span class="leg" style="color:#4d5360">■ dark=bearish</span>
 </div>
@@ -293,19 +329,22 @@ function filt(){
   const pt = document.getElementById('fpat').value;
   const pr = document.getElementById('fprof').value;
   const r  = document.getElementById('fr').value;
+  const py = document.getElementById('fpyram').value;
   vis = ALL.filter(t=>{
     if(p  && t.pair!==p)     return false;
     if(m  && t.model!==m)    return false;
     if(s  && t.scenario!==s) return false;
     if(pt && t.pattern!==pt) return false;
     if(pr && t.profile!==pr) return false;
-    if(r==='win'  && t.pnl<=0) return false;
-    if(r==='loss' && t.pnl>0)  return false;
+    if(r==='win'  && t.pnl<=0)       return false;
+    if(r==='loss' && t.pnl>0)        return false;
+    if(py==='yes' && !t.has_pyramid) return false;
+    if(py==='no'  && t.has_pyramid)  return false;
     return true;
   });
   page=1; render();
 }
-['fp','fm','fs','fpat','fprof','fr','fpp'].forEach(id=>
+['fp','fm','fs','fpat','fprof','fr','fpyram','fpp'].forEach(id=>
   document.getElementById(id).addEventListener('change', filt));
 
 function pp(){ return +document.getElementById('fpp').value }
@@ -353,9 +392,14 @@ function render(){
 
   slice.forEach((t,i)=>{
     const win=t.pnl>0, lng=t.direction>0;
-    const pnlHtml=win
-      ?`<span class="ppos">R+${t.pnl.toFixed(0)}</span>`
-      :`<span class="pneg">R${t.pnl.toFixed(0)}</span>`;
+    // Show total P&L (L1 + pyramids) if there are pyramids
+    const dispPnl = t.has_pyramid ? t.total_pnl : t.pnl;
+    const dispWin = dispPnl > 0;
+    const pyrTag = t.has_pyramid
+      ? `<span class="tag" style="color:#00bcd4">L1+${t.pyramids.length}pyr</span>` : '';
+    const pnlHtml=dispWin
+      ?`<span class="ppos">R+${dispPnl.toFixed(0)}</span>`
+      :`<span class="pneg">R${dispPnl.toFixed(0)}</span>`;
 
     // row 2 tags — structure + HTF context
     const r2parts=[];
@@ -380,6 +424,7 @@ function render(){
           <span class="tag">[${t.tf}]</span>
           <span class="tag">${t.scenario}</span>
           <span class="tag">${t.model}</span>
+          ${pyrTag}
           <span class="tag">draw&nbsp;${t.draw}/3</span>
           <span class="tag">conf&nbsp;${t.conf}</span>
           ${t.crt?`<span class="tag">CRT&nbsp;${t.crt}</span>`:''}
@@ -414,6 +459,27 @@ function render(){
       {x:t.exit_t, y:t.exit, text:'✕',showarrow:false,
        font:{size:13,color:win?'#3fb950':'#f85149'}},
     ];
+    // Pyramid leg markers (L2=cyan, L3=purple)
+    const pyrColors={2:'#00bcd4',3:'#ce93d8'};
+    (t.pyramids||[]).forEach(p=>{
+      const pc=pyrColors[p.leg_idx]||'#00bcd4';
+      const pw=p.pnl>0;
+      // pyramid entry level line
+      lvlShapes.push({type:'line',x0:t.ohlc.x[0],x1:t.ohlc.x[t.ohlc.x.length-1],
+        y0:p.entry,y1:p.entry,line:{color:pc,width:1,dash:'dashdot'}});
+      // entry marker
+      tradeAnns.push({x:p.entry_t,y:p.entry,
+        text:lng?'▲':'▼',showarrow:false,
+        font:{size:13,color:pc},yshift:lng?-13:13});
+      // exit marker
+      tradeAnns.push({x:p.exit_t,y:p.exit,text:'✕',showarrow:false,
+        font:{size:11,color:pw?pc:'#f85149'}});
+      // trade zone for pyramid
+      if(p.entry!=null&&p.exit!=null) lvlShapes.push({
+        type:'rect',x0:p.entry_t,x1:p.exit_t,
+        y0:Math.min(p.entry,p.exit)*0.99995,y1:Math.max(p.entry,p.exit)*1.00005,
+        fillcolor:pw?'rgba(0,188,212,0.06)':'rgba(248,81,73,0.06)',line:{width:0}});
+    });
 
     Plotly.newPlot(cid,[{
       type:'candlestick',
@@ -484,17 +550,52 @@ def main():
             ohlc_cache[pair] = _resample(raw, norm) if norm != "1min" else raw
             print(f"  {pair}: {len(ohlc_cache[pair]):,} {args.tf} bars")
 
-    print(f"Building data for {len(df)} trades...")
+    # Group legs into positions: leg_idx=1 is the primary card,
+    # leg_idx>1 are pyramids attached to the preceding L1 for the same pair+direction.
+    df_s = df.sort_values("opened_at").reset_index(drop=True)
+    pos_id_col = []
+    cur_pos: dict = {}  # (pair, direction) -> position_id of most recent L1
+    for _, row in df_s.iterrows():
+        key = (row["pair"], int(row.get("leg_idx", 1) > 1 or 0),
+               str(row["pair"]), int(row["direction"]))
+        pk = (str(row["pair"]), int(row["direction"]))
+        li = int(row.get("leg_idx", 1) or 1)
+        if li == 1:
+            pid = len(pos_id_col)
+            cur_pos[pk] = pid
+        else:
+            pid = cur_pos.get(pk, len(pos_id_col))
+        pos_id_col.append(pid)
+    df_s["_pos_id"] = pos_id_col
+
+    # Build pyramid lookup: pos_id -> list of pyramid rows
+    pyr_map: dict[int, list] = {}
+    for _, row in df_s[df_s.get("leg_idx", pd.Series(1, index=df_s.index)) > 1
+                        if "leg_idx" in df_s.columns
+                        else df_s.iloc[0:0]].iterrows():
+        pid = int(row["_pos_id"])
+        pyr_map.setdefault(pid, []).append(row)
+
+    # Only show L1 (initial legs) as chart cards; pyramids are overlaid
+    if "leg_idx" in df_s.columns:
+        df_l1 = df_s[df_s["leg_idx"].fillna(1).astype(int) == 1].copy()
+    else:
+        df_l1 = df_s.copy()
+
+    print(f"Building data for {len(df_l1)} positions ({len(df_s)} total legs)...")
     trades, skipped = [], 0
-    for _, row in df.iterrows():
-        t = _build_trade(row, ohlc_cache, args.tf)
+    for _, row in df_l1.iterrows():
+        pid = int(row["_pos_id"])
+        pyrs = pyr_map.get(pid, [])
+        t = _build_trade(row, ohlc_cache, args.tf, pyramid_rows=pyrs if pyrs else None)
         if t:
             trades.append(t)
         else:
             skipped += 1
     if skipped:
         print(f"  Skipped {skipped} (no OHLC for that date)")
-    print(f"  {len(trades)} trades embedded")
+    pyr_count = sum(1 for t in trades if t["has_pyramid"])
+    print(f"  {len(trades)} positions embedded ({pyr_count} with pyramids)")
 
     data_js = json.dumps(trades).replace("</script>", r"<\/script>")
     html    = _HTML.replace("__DATA__", data_js)
