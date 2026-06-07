@@ -774,6 +774,48 @@ the trade has structural confirmation but no viable exit — correctly skipped.
 **Config:** `TARGET_ESCALATE_ENABLED=1` (env-overridable), `TARGET_ESCALATE_MIN_DRAW=2`.
 **New trade column:** `target_escalated` (bool) — True when the premium filter was applied.
 
+### TRAIL_AT_TP — structural runner on TP wick (TESTED + REVERTED 2026-06-07)
+**Hypothesis:** When price wicks the TP level, engage M5 structural trail instead of exiting:
+move stop to last M5 swing ≥ `TRAIL_AT_TP_MIN_PIPS` (5 pips) from TP and let the trade run
+until M5 structure breaks. User observed price continuing 100–200 pips past TP on high-conviction
+setups. Fires on wick touch (no close required) for both Judas and breakout models.
+
+**Bug discovered (v1 — bankrupt):** The initial `can_trail` check only verified the M5 swing
+was ≥5 pips from TP. On fast Judas-style TP spikes that immediately reversed, the last M5 STL
+was still below entry — trail engaged with stop below entry, turning winners into losers. Result:
+IS MaxDD -71.61%, OOS MaxDD **-100.62% (account bankrupted)**.
+
+**Fix (v2):** Added `trail_stop > entry` requirement for longs / `trail_stop < entry` for shorts,
+guaranteeing at least break-even before the trail engages. Fast TP spikes without M5 structure
+above entry fall through to normal TP exit.
+
+**Result after fix — still worse than baseline (REVERTED):**
+
+| Metric | Baseline (P20) | TRAIL_AT_TP fixed |
+|---|---|---|
+| Full 4yr equity | R284.9M | R137.8M (−52%) |
+| Full 4yr PF | 5.12 | 4.49 |
+| Full 4yr MaxDD | -12.95% | -13.26% |
+| IS PF / equity | 3.07 / ~R198k | 2.87 / R196k |
+| IS MaxDD | -12.95% | -13.26% |
+| OOS PF / equity | 4.48 / — | 4.35 / R800k |
+| OOS MaxDD | -13.93% | -18.07% |
+
+Every metric worse in every split. **Root cause: the TP is the end of the AMD delivery cycle.**
+When price delivers to the institutional draw on liquidity, the cycle is complete — distribution
+has occurred. Holding past it means sitting through the reversal/consolidation phase where the
+strategy has no edge. The trail runners exit at a lower level than the TP on average, reducing
+average win. Unlike the P8/P10/P11 reverts (path-dependency — the removed trades were
+compounding-positive despite weak arithmetic P&L), this is a genuine per-trade degradation:
+the average exit after a TP wick is worse than just taking the TP.
+
+**ICT lesson:** "price doesn't come back to these points" is true from the perspective of the
+big-TF draw, but the strategy's TP IS that draw. Once price delivers to the draw, the trader
+should exit — the next move belongs to a new AMD setup, not a continuation of the old one.
+
+**Config:** `TRAIL_AT_TP=0` (off by default), `TRAIL_AT_TP_MIN_PIPS=5.0`. Code retained for
+reference; the entry-gate fix is committed so v1's bankrupt bug doesn't exist in the codebase.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
