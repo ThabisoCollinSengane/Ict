@@ -2426,24 +2426,21 @@ class Backtester:
         # Exception: if the parent trade had a 3/3 HTF draw cascade, the draw itself
         # is the higher-level confirmation — allow adds even when EURGBP is temporarily
         # flat (im_score = 0.75), as long as DXY still agrees and cross hasn't reversed.
+        # Weekly AMD upgrade: if the confirmed weekly distribution direction agrees
+        # with this position, upgrade im_score to 1.0 (full lots) even when the
+        # H1 intermarket is temporarily neutral.  The weekly profile is the higher-
+        # timeframe authority — if the Judas swing already fired, price SHOULD
+        # distribute toward PWWH/PWWL for the rest of the week.
+        if config.WEEKLY_AMD_FULL_PYRAMID:
+            wamd_dir = st.get("weekly_amd_dir", 0)
+            if wamd_dir == st["direction"]:
+                im_score = 1.0      # weekly AMD confirms — full pyramid lots
+
         if im_score < 1.0:
             _draw_unlock = (st.get("draw_score", 0) >= 3 and im_score >= 0.75)
             if not _draw_unlock:
                 self.gate["pyramid_blocked_low_im"] = self.gate.get("pyramid_blocked_low_im", 0) + 1
                 return
-        if st.get("weekly_amd_dir") == st["direction"]:
-            self.gate["pyramid_blocked_wamd"] = self.gate.get("pyramid_blocked_wamd", 0) + 1
-            return
-
-        # Weekly AMD override: if the confirmed weekly distribution direction
-        # agrees with this position, upgrade im_score to 1.0 (full lots) even
-        # when the intermarket is neutral. The weekly profile is the higher-
-        # timeframe authority — if the Judas swing already fired, the market
-        # SHOULD distribute toward PWWH/PWWL for the rest of the week.
-        if config.WEEKLY_AMD_FULL_PYRAMID:
-            wamd_dir = st.get("weekly_amd_dir", 0)
-            if wamd_dir == st["direction"]:
-                im_score = 1.0      # weekly AMD confirms — full pyramid lots
 
         # Block neutral-conviction pyramid adds (im_score=0.5 = no clear signal).
         # Backtest: pyramid_im0.5 → 0W/5L across 4 years. No edge without a clear bias.
