@@ -1,51 +1,39 @@
-"""Trade chart viewer — plots backtest trades on M15 candlestick charts.
+"""ICT Trade Chart Viewer — interactive HTML dashboard.
 
-Reads data/trades_dump.csv (output of run_backtest_histdata.py) and the
-HistData M1 CSVs, then generates a self-contained HTML file you can open
-in any browser.
-
-Candle colours: green = bullish (close ≥ open), black = bearish (close < open).
-Each trade shows: entry arrow, initial stop line, target line, exit marker.
+All filtering (pair / model / scenario / result) and pagination happen
+inside the browser. Run once to generate the HTML, then open and use
+the dropdowns to slice the trade set without re-running Python.
 
 Usage:
-    python scripts/chart_trades.py                        # all trades → data/trades_chart.html
-    python scripts/chart_trades.py --pair EURUSD          # filter pair
-    python scripts/chart_trades.py --years 2024 2025      # filter years
-    python scripts/chart_trades.py --result win           # win / loss
-    python scripts/chart_trades.py --scenario 1a          # filter im_scenario
-    python scripts/chart_trades.py --max 50               # limit to first N trades
-    python scripts/chart_trades.py --out my_chart.html
-    python scripts/chart_trades.py --tf 60T               # candle timeframe (default 15T)
+    python scripts/chart_trades.py                        # 400 trades → data/histdata/trades_chart.html
+    python scripts/chart_trades.py --years 2024 2025      # OOS only
+    python scripts/chart_trades.py --max 800              # all trades
+    python scripts/chart_trades.py --tf 60T               # H1 candles (default 15min)
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 DATA_DIR   = os.path.join(os.path.dirname(__file__), "..", "data", "histdata")
 TRADES_CSV = os.path.join(DATA_DIR, "trades_dump.csv")
 
-# Candle window: bars before entry and after exit
-BARS_BEFORE = 60
-BARS_AFTER  = 30
-
-PAIRS = ["EURUSD", "GBPUSD", "NZDUSD"]
-TF_DEFAULT = "15min"
+BARS_BEFORE = 50
+BARS_AFTER  = 25
 
 _EST_OFFSET = pd.Timedelta(hours=5)
 
 _TF_ALIASES = {
-    "1T": "1min", "5T": "5min", "15T": "15min",
-    "30T": "30min", "60T": "60min", "240T": "240min",
-    "1H": "1h", "4H": "4h",
+    "1T": "1min",  "5T": "5min",   "15T": "15min",
+    "30T": "30min","60T": "60min", "240T": "240min",
+    "1H": "1h",    "4H": "4h",
 }
 
 def _norm_tf(tf: str) -> str:
@@ -53,36 +41,27 @@ def _norm_tf(tf: str) -> str:
 
 def _to_utc(t) -> pd.Timestamp:
     ts = pd.Timestamp(t)
-    if ts.tzinfo is None:
-        return ts.tz_localize("UTC")
-    return ts.tz_convert("UTC")
+    return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
 
 
-# ---------------------------------------------------------------------------
-# Data helpers
-# ---------------------------------------------------------------------------
+# ── data helpers ────────────────────────────────────────────────────────────
 
 def _load_m1(pair: str, years: list[int]) -> pd.DataFrame:
     frames = []
     for yr in years:
-        for suffix in ("", f"_{yr}"):
-            path = os.path.join(DATA_DIR, f"{pair}{suffix}.csv")
-            if not os.path.exists(path):
-                path = os.path.join(DATA_DIR, f"{pair}_{yr}.csv")
-            if os.path.exists(path):
-                df = pd.read_csv(
-                    path, sep=";", header=None,
-                    names=["dt", "Open", "High", "Low", "Close", "Volume"],
-                    dtype={"Open": float, "High": float, "Low": float, "Close": float},
-                )
-                df["dt"] = pd.to_datetime(df["dt"], format="%Y%m%d %H%M%S") + _EST_OFFSET
-                df = df.set_index("dt")[["Open", "High", "Low", "Close"]]
-                df.index = df.index.tz_localize("UTC")
-                frames.append(df)
-                break
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames).sort_index()
+        path = os.path.join(DATA_DIR, f"{pair}_{yr}.csv")
+        if not os.path.exists(path):
+            continue
+        df = pd.read_csv(
+            path, sep=";", header=None,
+            names=["dt", "Open", "High", "Low", "Close", "Volume"],
+            dtype={"Open": float, "High": float, "Low": float, "Close": float},
+        )
+        df["dt"] = pd.to_datetime(df["dt"], format="%Y%m%d %H%M%S") + _EST_OFFSET
+        df = df.set_index("dt")[["Open", "High", "Low", "Close"]]
+        df.index = df.index.tz_localize("UTC")
+        frames.append(df)
+    return pd.concat(frames).sort_index() if frames else pd.DataFrame()
 
 
 def _resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
@@ -91,214 +70,328 @@ def _resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
     ).dropna()
 
 
-def _window(ohlc: pd.DataFrame, entry_t, exit_t, before: int, after: int) -> pd.DataFrame:
-    """Slice BARS_BEFORE bars before entry and BARS_AFTER bars after exit."""
+def _window(ohlc: pd.DataFrame, entry_t, exit_t) -> pd.DataFrame:
     entry_t = _to_utc(entry_t)
     exit_t  = _to_utc(exit_t)
     idx = ohlc.index
-    i_entry = idx.searchsorted(entry_t)
-    i_exit  = idx.searchsorted(exit_t)
-    lo = max(0, i_entry - before)
-    hi = min(len(idx), i_exit + after + 1)
-    return ohlc.iloc[lo:hi]
+    i0  = idx.searchsorted(entry_t)
+    i1  = idx.searchsorted(exit_t)
+    return ohlc.iloc[max(0, i0 - BARS_BEFORE): min(len(idx), i1 + BARS_AFTER + 1)]
 
 
-# ---------------------------------------------------------------------------
-# Chart builder
-# ---------------------------------------------------------------------------
-
-_BG        = "#0d1117"   # page background
-_PLOT_BG   = "#161b22"   # chart area
-_GRID      = "#21262d"   # grid lines
-_TEXT      = "#c9d1d9"   # labels
-_GREEN     = "#3fb950"   # bullish candle / long entry
-_BLACK_C   = "#161b22"   # bearish candle body (dark, visible on dark bg via white wick)
-_WICK      = "#8b949e"   # candle wick colour
-_STOP_COL  = "#f85149"   # stop line
-_TARGET_COL= "#58a6ff"   # target line
-_ENTRY_COL = "#e3b341"   # entry level line
-_WIN_COL   = "#3fb950"
-_LOSS_COL  = "#f85149"
-
-CHART_H_PX = 280   # desired px per chart
-GAP_PX     = 55    # px between charts (includes title row)
+def _f(v):
+    try:
+        return None if pd.isna(v) else round(float(v), 5)
+    except Exception:
+        return None
 
 
-def _hover(row) -> str:
-    direction = "LONG" if row["direction"] > 0 else "SHORT"
-    win = "WIN" if row["pnl"] > 0 else "LOSS"
-    stop = row.get("stop", float("nan"))
-    tgt  = row.get("target", float("nan"))
-    return (
-        f"<b>{row['pair']} {direction} — {win}  R{row['pnl']:+.2f}</b><br>"
-        f"Entry {row['entry']:.5f}  →  Exit {row['exit']:.5f}<br>"
-        f"Stop {stop:.5f}  |  Target {tgt:.5f}<br>"
-        f"Scenario: {row.get('im_scenario','?')}  Model: {row.get('entry_model','?')}<br>"
-        f"Draw {row.get('draw_score',0)}/3  Confluence {row.get('target_confluence',0)}"
-        f"  CRT {row.get('crt_tf','—')}<br>"
-        f"{str(row['opened_at'])[:16]}  →  {str(row['closed_at'])[:16]}"
-    )
+def _build_trade(row, ohlc_cache: dict, tf: str) -> dict | None:
+    pair = row["pair"]
+    ohlc = ohlc_cache.get(pair)
+    if ohlc is None or ohlc.empty:
+        return None
+    ohlc_tf = _resample(ohlc, tf) if _norm_tf(tf) != "1min" else ohlc
+    win = _window(ohlc_tf, row["opened_at"], row["closed_at"])
+    if win.empty:
+        return None
+
+    entry_t = _to_utc(row["opened_at"]).strftime("%Y-%m-%d %H:%M:%S")
+    exit_t  = _to_utc(row["closed_at"]).strftime("%Y-%m-%d %H:%M:%S")
+
+    return {
+        "pair":      str(row["pair"]),
+        "direction": int(row["direction"]),
+        "pnl":       round(float(row["pnl"]), 2),
+        "entry":     _f(row["entry"]),
+        "exit":      _f(row["exit"]),
+        "stop":      _f(row.get("stop")),
+        "target":    _f(row.get("target")),
+        "scenario":  str(row.get("im_scenario", "")),
+        "model":     str(row.get("entry_model", "")),
+        "draw":      int(row.get("draw_score", 0) or 0),
+        "conf":      int(row.get("target_confluence", 0) or 0),
+        "crt":       str(row.get("crt_tf", "") or ""),
+        "entry_t":   entry_t,
+        "exit_t":    exit_t,
+        "opened_at": str(row["opened_at"])[:16],
+        "closed_at": str(row["closed_at"])[:16],
+        "tf":        tf.replace("min", "M"),
+        "ohlc": {
+            "x": [t.strftime("%Y-%m-%d %H:%M:%S") for t in win.index],
+            "o": [round(v, 5) for v in win["Open"]],
+            "h": [round(v, 5) for v in win["High"]],
+            "l": [round(v, 5) for v in win["Low"]],
+            "c": [round(v, 5) for v in win["Close"]],
+        },
+    }
 
 
-def build_chart(trades_df: pd.DataFrame, ohlc_cache: dict, tf: str) -> go.Figure:
-    n = len(trades_df)
-    if n == 0:
-        fig = go.Figure()
-        fig.update_layout(title="No trades matched filter",
-                          paper_bgcolor=_BG, font=dict(color=_TEXT))
-        return fig
+# ── HTML template ────────────────────────────────────────────────────────────
 
-    # Compute height and spacing so gaps stay fixed at GAP_PX regardless of n
-    total_h  = n * CHART_H_PX + (n - 1) * GAP_PX + 60  # 60 = top/bottom margin
-    v_space  = (GAP_PX / total_h) if n > 1 else 0.02
+_HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ICT Trade Viewer</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#c9d1d9;font-family:ui-monospace,monospace;font-size:13px}
 
-    tf_label = tf.replace("min", "M").replace("T", "M")
-    titles = []
-    for _, row in trades_df.iterrows():
-        direction = "▲ LONG" if row["direction"] > 0 else "▼ SHORT"
-        badge = "✓ WIN" if row["pnl"] > 0 else "✗ LOSS"
-        dt = str(row["opened_at"])[:16]
-        titles.append(
-            f"{badge}  {row['pair']} {direction}  R{row['pnl']:+.0f}  "
-            f"[{tf_label}]  {row.get('im_scenario','?')} {row.get('entry_model','?')}  "
-            f"draw {row.get('draw_score',0)}/3  {dt}"
-        )
+#topbar{
+  background:#161b22;border-bottom:1px solid #30363d;
+  padding:10px 14px;position:sticky;top:0;z-index:200
+}
+#topbar h1{font-size:14px;color:#58a6ff;margin-bottom:9px}
 
-    fig = make_subplots(
-        rows=n, cols=1,
-        subplot_titles=titles,
-        shared_xaxes=False,
-        vertical_spacing=v_space,
-    )
+#filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#filters select{
+  background:#21262d;color:#c9d1d9;border:1px solid #30363d;
+  padding:5px 9px;border-radius:6px;font-size:12px;cursor:pointer;min-width:130px
+}
+#filters select:focus{outline:none;border-color:#58a6ff}
 
-    for idx, (_, row) in enumerate(trades_df.iterrows()):
-        r = idx + 1
+#stats{margin-top:7px;font-size:11px;color:#8b949e}
 
-        pair = row["pair"]
-        ohlc = ohlc_cache.get(pair)
-        if ohlc is None or ohlc.empty:
-            continue
+#charts{padding:12px 14px}
 
-        ohlc_tf = _resample(ohlc, tf) if _norm_tf(tf) != "1min" else ohlc
-        win_df  = _window(ohlc_tf, row["opened_at"], row["closed_at"], BARS_BEFORE, BARS_AFTER)
-        if win_df.empty:
-            continue
+.card{
+  border-radius:8px;margin-bottom:14px;overflow:hidden;
+  border:1px solid #21262d
+}
+.card.win {border-left:3px solid #3fb950}
+.card.loss{border-left:3px solid #f85149}
 
-        bull = win_df["Close"] >= win_df["Open"]
+.card-hdr{
+  padding:7px 11px;display:flex;flex-wrap:wrap;gap:6px;
+  align-items:center;background:#161b22;border-bottom:1px solid #21262d
+}
+.badge{padding:2px 7px;border-radius:4px;font-weight:700;font-size:11px}
+.bwin {background:rgba(63,185,80,.2);color:#3fb950}
+.bloss{background:rgba(248,81,73,.2);color:#f85149}
+.blong{background:rgba(88,166,255,.15);color:#58a6ff}
+.bshrt{background:rgba(255,166,88,.15);color:#ffa657}
+.tag{background:#21262d;padding:2px 6px;border-radius:4px;font-size:11px;color:#8b949e}
+.ppos{color:#3fb950;font-weight:700}
+.pneg{color:#f85149;font-weight:700}
+.dt{color:#6e7681;font-size:11px;margin-left:auto}
 
-        fig.add_trace(go.Candlestick(
-            x=win_df.index,
-            open=win_df["Open"], high=win_df["High"],
-            low=win_df["Low"],   close=win_df["Close"],
-            increasing=dict(line=dict(color=_GREEN,   width=1), fillcolor=_GREEN),
-            decreasing=dict(line=dict(color=_WICK,    width=1), fillcolor=_BLACK_C),
-            name=pair, showlegend=False,
-            hovertext=_hover(row), hoverinfo="text",
-        ), row=r, col=1)
+.chart-box{height:270px;background:#161b22}
 
-        entry_t = _to_utc(row["opened_at"])
-        exit_t  = _to_utc(row["closed_at"])
-        entry_price  = row["entry"]
-        exit_price   = row["exit"]
-        stop_price   = row.get("stop",   None)
-        target_price = row.get("target", None)
-        direction    = row["direction"]
-        x0 = win_df.index[0]
-        x1 = win_df.index[-1]
+#pgbar{
+  display:flex;justify-content:center;align-items:center;gap:12px;
+  padding:12px;background:#0d1117;border-top:1px solid #21262d;
+  position:sticky;bottom:0
+}
+#pgbar button{
+  background:#21262d;color:#c9d1d9;border:1px solid #30363d;
+  padding:5px 15px;border-radius:6px;cursor:pointer;font-size:12px
+}
+#pgbar button:hover{border-color:#58a6ff}
+#pgbar button:disabled{opacity:.3;cursor:default}
+#pginfo{color:#8b949e;font-size:12px;min-width:180px;text-align:center}
 
-        # Entry level (gold dotted)
-        fig.add_shape(type="line", x0=x0, x1=x1, y0=entry_price, y1=entry_price,
-                      line=dict(color=_ENTRY_COL, width=1, dash="dot"),
-                      row=r, col=1)
+/* legend strip */
+#legend{
+  display:flex;flex-wrap:wrap;gap:10px;padding:6px 14px;
+  background:#0d1117;border-bottom:1px solid #21262d;font-size:11px;color:#8b949e
+}
+.leg{display:flex;align-items:center;gap:4px}
+.lline{display:inline-block;width:22px;height:2px;border-radius:1px}
+</style>
+</head>
+<body>
 
-        # Stop line (red)
-        if stop_price is not None and not pd.isna(stop_price):
-            fig.add_shape(type="line", x0=x0, x1=x1, y0=stop_price, y1=stop_price,
-                          line=dict(color=_STOP_COL, width=1.5, dash="dash"),
-                          row=r, col=1)
+<div id="topbar">
+  <h1>ICT Strategy — Trade Chart Viewer</h1>
+  <div id="filters">
+    <select id="fp">
+      <option value="">All Pairs</option>
+      <option>EURUSD</option><option>GBPUSD</option><option>NZDUSD</option>
+    </select>
+    <select id="fm">
+      <option value="">All Entry Models</option>
+      <option value="judas">Judas Reversal</option>
+      <option value="breakout">Breakout</option>
+    </select>
+    <select id="fs"></select>
+    <select id="fr">
+      <option value="">All Results</option>
+      <option value="win">Wins Only ✓</option>
+      <option value="loss">Losses Only ✗</option>
+    </select>
+    <select id="fpp">
+      <option value="10">10 / page</option>
+      <option value="20" selected>20 / page</option>
+      <option value="50">50 / page</option>
+    </select>
+  </div>
+  <div id="stats"></div>
+</div>
 
-        # Target line (blue)
-        if target_price is not None and not pd.isna(target_price):
-            fig.add_shape(type="line", x0=x0, x1=x1, y0=target_price, y1=target_price,
-                          line=dict(color=_TARGET_COL, width=1.5, dash="dot"),
-                          row=r, col=1)
+<div id="legend">
+  <span class="leg"><span class="lline" style="background:#e3b341;border-top:2px dotted #e3b341"></span>Entry level</span>
+  <span class="leg"><span class="lline" style="background:#f85149;border-top:2px dashed #f85149"></span>Stop loss</span>
+  <span class="leg"><span class="lline" style="background:#58a6ff;border-top:2px dotted #58a6ff"></span>Target</span>
+  <span class="leg">▲▼ = entry bar &nbsp; ✕ = exit bar</span>
+  <span class="leg" style="color:#3fb950">■ green candle = bullish</span>
+  <span class="leg" style="color:#8b949e">■ dark candle = bearish</span>
+</div>
 
-        # Shaded entry→exit zone
-        zone_col = "rgba(63,185,80,0.07)" if row["pnl"] > 0 else "rgba(248,81,73,0.07)"
-        fig.add_shape(type="rect", x0=entry_t, x1=exit_t,
-                      y0=min(entry_price, exit_price) * 0.9999,
-                      y1=max(entry_price, exit_price) * 1.0001,
-                      fillcolor=zone_col, line=dict(width=0),
-                      row=r, col=1)
+<div id="charts"></div>
 
-        # Entry marker
-        sym = "triangle-up" if direction > 0 else "triangle-down"
-        col = _WIN_COL if direction > 0 else _STOP_COL
-        fig.add_trace(go.Scatter(
-            x=[entry_t], y=[entry_price], mode="markers",
-            marker=dict(symbol=sym, size=16, color=col,
-                        line=dict(color="#ffffff", width=1)),
-            showlegend=False, hovertext=f"ENTRY {entry_price:.5f}", hoverinfo="text",
-        ), row=r, col=1)
+<div id="pgbar">
+  <button id="bprev" onclick="go(-1)">◀ Prev</button>
+  <span id="pginfo"></span>
+  <button id="bnext" onclick="go(1)">Next ▶</button>
+</div>
 
-        # Exit marker
-        exit_col = _WIN_COL if row["pnl"] > 0 else _LOSS_COL
-        fig.add_trace(go.Scatter(
-            x=[exit_t], y=[exit_price], mode="markers",
-            marker=dict(symbol="x-thin", size=14, color=exit_col,
-                        line=dict(color=exit_col, width=3)),
-            showlegend=False,
-            hovertext=f"EXIT {exit_price:.5f}  P&L R{row['pnl']:+.2f}", hoverinfo="text",
-        ), row=r, col=1)
+<script>
+const ALL = __DATA__;
 
-    # Style subplot titles: green for win, red for loss
-    for i, (ann, (_, row)) in enumerate(
-            zip(fig.layout.annotations, trades_df.iterrows())):
-        ann.font = dict(size=11,
-                        color=_WIN_COL if row["pnl"] > 0 else _LOSS_COL)
-        ann.x = 0
-        ann.xanchor = "left"
+// Build scenario dropdown from data
+const scens = [...new Set(ALL.map(t=>t.scenario).filter(Boolean))].sort();
+const fsel  = document.getElementById('fs');
+fsel.innerHTML = '<option value="">All Scenarios</option>' +
+  scens.map(s=>`<option value="${s}">${s}</option>`).join('');
 
-    fig.update_layout(
-        height=total_h,
-        margin=dict(l=60, r=20, t=30, b=20),
-        paper_bgcolor=_BG,
-        plot_bgcolor=_PLOT_BG,
-        font=dict(color=_TEXT, size=11),
-        showlegend=False,
-    )
-    fig.update_xaxes(
-        rangeslider_visible=False,
-        gridcolor=_GRID, gridwidth=1,
-        zeroline=False,
-        tickfont=dict(size=9, color=_TEXT),
-        showline=True, linecolor=_GRID,
-    )
-    fig.update_yaxes(
-        gridcolor=_GRID, gridwidth=1,
-        zeroline=False,
-        tickfont=dict(size=9, color=_TEXT),
-        showline=True, linecolor=_GRID,
-        tickformat=".5f",
-    )
+let page = 1;
+let vis  = ALL;
 
-    return fig
+function filt(){
+  const p = document.getElementById('fp').value;
+  const m = document.getElementById('fm').value;
+  const s = document.getElementById('fs').value;
+  const r = document.getElementById('fr').value;
+  vis = ALL.filter(t=>{
+    if(p && t.pair!==p) return false;
+    if(m && t.model!==m) return false;
+    if(s && t.scenario!==s) return false;
+    if(r==='win'  && t.pnl<=0) return false;
+    if(r==='loss' && t.pnl>0)  return false;
+    return true;
+  });
+  page=1; render();
+}
+
+['fp','fm','fs','fr','fpp'].forEach(id=>
+  document.getElementById(id).addEventListener('change', filt));
+
+function pp(){ return +document.getElementById('fpp').value }
+function tp(){ return Math.max(1,Math.ceil(vis.length/pp())) }
+function go(d){ page=Math.max(1,Math.min(tp(),page+d)); render(); }
+
+function render(){
+  const start=(page-1)*pp();
+  const slice=vis.slice(start,start+pp());
+
+  const wins=vis.filter(t=>t.pnl>0).length;
+  const totpnl=vis.reduce((s,t)=>s+t.pnl,0);
+  document.getElementById('stats').textContent=
+    `${vis.length} of ${ALL.length} trades  ·  `+
+    `${wins} wins / ${vis.length-wins} losses  ·  `+
+    `Total P&L: R${totpnl>=0?'+':''}${totpnl.toFixed(0)}`;
+
+  const box=document.getElementById('charts');
+  box.innerHTML='';
+
+  slice.forEach((t,i)=>{
+    const win=t.pnl>0, lng=t.direction>0;
+    const pnlHtml=win
+      ?`<span class="ppos">R+${t.pnl.toFixed(0)}</span>`
+      :`<span class="pneg">R${t.pnl.toFixed(0)}</span>`;
+
+    const card=document.createElement('div');
+    card.className='card '+(win?'win':'loss');
+    const cid='c'+i;
+
+    card.innerHTML=`
+      <div class="card-hdr">
+        <span class="badge ${win?'bwin':'bloss'}">${win?'✓ WIN':'✗ LOSS'}</span>
+        <span class="badge ${lng?'blong':'bshrt'}">${lng?'▲ LONG':'▼ SHORT'}</span>
+        <strong>${t.pair}</strong>
+        ${pnlHtml}
+        <span class="tag">[${t.tf}]</span>
+        <span class="tag">${t.scenario}</span>
+        <span class="tag">${t.model}</span>
+        <span class="tag">draw&nbsp;${t.draw}/3</span>
+        <span class="tag">conf&nbsp;${t.conf}</span>
+        ${t.crt?`<span class="tag">CRT&nbsp;${t.crt}</span>`:''}
+        <span class="dt">${t.opened_at} → ${t.closed_at}</span>
+      </div>
+      <div id="${cid}" class="chart-box"></div>`;
+    box.appendChild(card);
+
+    /* ── Plotly chart ── */
+    const x0=t.ohlc.x[0], x1=t.ohlc.x[t.ohlc.x.length-1];
+    const shapes=[];
+    if(t.entry!=null) shapes.push({type:'line',x0,x1,y0:t.entry,y1:t.entry,
+      line:{color:'#e3b341',width:1,dash:'dot'}});
+    if(t.stop!=null)  shapes.push({type:'line',x0,x1,y0:t.stop,y1:t.stop,
+      line:{color:'#f85149',width:1.5,dash:'dash'}});
+    if(t.target!=null) shapes.push({type:'line',x0,x1,y0:t.target,y1:t.target,
+      line:{color:'#58a6ff',width:1.5,dash:'dot'}});
+
+    // entry→exit shaded zone
+    if(t.entry!=null && t.exit!=null){
+      shapes.push({type:'rect',x0:t.entry_t,x1:t.exit_t,
+        y0:Math.min(t.entry,t.exit)*0.99995,
+        y1:Math.max(t.entry,t.exit)*1.00005,
+        fillcolor:win?'rgba(63,185,80,0.08)':'rgba(248,81,73,0.08)',
+        line:{width:0}});
+    }
+
+    const entryPx = lng ? -16 : 16;
+    const anns=[
+      {x:t.entry_t, y:t.entry, text:lng?'▲':'▼', showarrow:false,
+       font:{size:16,color:lng?'#3fb950':'#f85149'}, yshift:entryPx},
+      {x:t.exit_t,  y:t.exit,  text:'✕', showarrow:false,
+       font:{size:13,color:win?'#3fb950':'#f85149'}},
+    ];
+
+    Plotly.newPlot(cid,[{
+      type:'candlestick',
+      x:t.ohlc.x, open:t.ohlc.o, high:t.ohlc.h, low:t.ohlc.l, close:t.ohlc.c,
+      increasing:{line:{color:'#3fb950',width:1},fillcolor:'#3fb950'},
+      decreasing:{line:{color:'#4d5360',width:1},fillcolor:'#1c2030'},
+      showlegend:false, hoverinfo:'x+y',
+    }],{
+      margin:{l:58,r:6,t:4,b:28},
+      paper_bgcolor:'#161b22', plot_bgcolor:'#161b22',
+      font:{color:'#6e7681',size:9},
+      xaxis:{rangeslider:{visible:false},gridcolor:'#21262d',
+             tickfont:{size:9},zeroline:false,showline:false},
+      yaxis:{gridcolor:'#21262d',tickfont:{size:9},
+             zeroline:false,showline:false,tickformat:'.5f'},
+      shapes, annotations:anns, showlegend:false,
+    },{displayModeBar:false,responsive:true});
+  });
+
+  document.getElementById('bprev').disabled=(page<=1);
+  document.getElementById('bnext').disabled=(page>=tp());
+  document.getElementById('pginfo').textContent=
+    `Page ${page} of ${tp()}  (${vis.length} trades)`;
+  window.scrollTo(0,0);
+}
+
+render();
+</script>
+</body>
+</html>
+"""
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+# ── CLI ──────────────────────────────────────────────────────────────────────
 
 def main():
-    ap = argparse.ArgumentParser(description="Plot backtest trades on candlestick charts")
-    ap.add_argument("--pair",     help="Filter pair (EURUSD/GBPUSD/NZDUSD)")
-    ap.add_argument("--years",    nargs="+", type=int, default=[2022, 2023, 2024, 2025])
-    ap.add_argument("--result",   choices=["win", "loss"], help="Filter win or loss only")
-    ap.add_argument("--scenario", help="Filter im_scenario (e.g. 1a, 2b, N-long)")
-    ap.add_argument("--model",    help="Filter entry_model (judas/breakout)")
-    ap.add_argument("--max",      type=int, default=30,  help="Max trades to chart (default 30)")
-    ap.add_argument("--tf",       default=TF_DEFAULT, help="Candle timeframe (default 15T)")
-    ap.add_argument("--out",      default=os.path.join(DATA_DIR, "trades_chart.html"))
+    ap = argparse.ArgumentParser(description="ICT interactive trade chart viewer")
+    ap.add_argument("--years", nargs="+", type=int, default=[2022, 2023, 2024, 2025])
+    ap.add_argument("--tf",    default="15min", help="Candle timeframe (default 15min)")
+    ap.add_argument("--max",   type=int, default=400,
+                    help="Max trades to embed (default 400; use 800 for all)")
+    ap.add_argument("--out",   default=os.path.join(DATA_DIR, "trades_chart.html"))
     args = ap.parse_args()
 
     if not os.path.exists(TRADES_CSV):
@@ -309,52 +402,45 @@ def main():
     df["opened_at"] = pd.to_datetime(df["opened_at"], utc=True, errors="coerce")
     df["closed_at"] = pd.to_datetime(df["closed_at"], utc=True, errors="coerce")
     df = df.dropna(subset=["opened_at", "closed_at"])
-
-    # Filters
-    if args.pair:
-        df = df[df["pair"] == args.pair.upper()]
-    if args.result == "win":
-        df = df[df["pnl"] > 0]
-    elif args.result == "loss":
-        df = df[df["pnl"] <= 0]
-    if args.scenario:
-        df = df[df["im_scenario"] == args.scenario]
-    if args.model:
-        df = df[df["entry_model"] == args.model]
     if args.years:
         df = df[df["opened_at"].dt.year.isin(args.years)]
-
     df = df.head(args.max)
-    print(f"Charting {len(df)} trades on {args.tf} candles...")
 
-    # Load OHLC data
     pairs_needed = df["pair"].unique().tolist()
     ohlc_cache: dict[str, pd.DataFrame] = {}
     for pair in pairs_needed:
-        print(f"  Loading {pair} M1 data for years {args.years}...")
-        ohlc_cache[pair] = _load_m1(pair, args.years)
-        if ohlc_cache[pair].empty:
-            print(f"  WARNING: no data found for {pair} — trades will be skipped")
+        print(f"Loading {pair} M1 data...")
+        raw = _load_m1(pair, args.years)
+        if raw.empty:
+            print(f"  WARNING: no CSV found for {pair} — those trades will be skipped")
         else:
-            print(f"  {pair}: {len(ohlc_cache[pair]):,} M1 bars loaded")
+            norm = _norm_tf(args.tf)
+            ohlc_cache[pair] = _resample(raw, norm) if norm != "1min" else raw
+            print(f"  {pair}: {len(ohlc_cache[pair]):,} {args.tf} bars")
 
-    fig = build_chart(df, ohlc_cache, args.tf)
+    print(f"Building chart data for {len(df)} trades...")
+    trades, skipped = [], 0
+    for _, row in df.iterrows():
+        t = _build_trade(row, ohlc_cache, args.tf)
+        if t:
+            trades.append(t)
+        else:
+            skipped += 1
+    if skipped:
+        print(f"  Skipped {skipped} trades (OHLC data missing for that date)")
+    print(f"  {len(trades)} trades ready")
+
+    data_js = json.dumps(trades).replace("</script>", r"<\/script>")
+    html    = _HTML.replace("__DATA__", data_js)
 
     out = os.path.abspath(args.out)
-    html = fig.to_html(include_plotlyjs="cdn", full_html=True)
-    # Inject mobile viewport so chart is readable on phone
-    html = html.replace(
-        "<head>",
-        '<head>\n<meta name="viewport" content="width=device-width, initial-scale=1">',
-        1,
-    )
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"\nChart saved → {out}")
-    print("Open in browser. Scroll down for each trade.")
-    print("Legend: green candle=bullish | dark candle=bearish")
-    print("        ▲▼ = entry  ✕ = exit  gold dot = entry level")
-    print("        red dash = stop  blue dot = target")
+
+    size_mb = os.path.getsize(out) / 1_000_000
+    print(f"\nSaved → {out}  ({size_mb:.1f} MB)")
+    print("Open in browser. Use the dropdowns to filter by pair / model / scenario / result.")
+    print("Pagination buttons at the bottom. 20 trades per page by default.")
 
 
 if __name__ == "__main__":
