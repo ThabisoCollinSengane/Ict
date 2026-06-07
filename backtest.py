@@ -259,8 +259,9 @@ class Backtester:
             # Then (if enabled) trail behind the most recent confirmed M5 swing once
             # the trade clears STRUCTURE_TRAIL_ACTIVATE pips — the "trail off structure"
             # exit that lets winners run until an MSS breaks structure against them.
+            # Load M5 bars for structure trail AND trail-at-TP ratchet.
             bars5_trail = (self.bars_up_to(pair, config.STRUCTURE_TRAIL_TF, t)
-                           if config.STRUCTURE_TRAIL else None)
+                           if (config.STRUCTURE_TRAIL or config.TRAIL_AT_TP) else None)
             for leg in st["legs"]:
                 pips_profit = (bar.Close - leg["entry"]) * direction / pip
                 if pips_profit >= config.TRAIL_LOCK_PIPS:
@@ -276,7 +277,12 @@ class Backtester:
                         leg["stop"] = min(leg["stop"], leg["entry"])
 
                 # Structure trail: ratchet the stop to the latest M5 swing point.
-                if config.STRUCTURE_TRAIL and pips_profit >= config.STRUCTURE_TRAIL_ACTIVATE:
+                # Also runs when trail was engaged by TRAIL_AT_TP (leg["trail_engaged"]).
+                _do_ratchet = (
+                    (config.STRUCTURE_TRAIL and pips_profit >= config.STRUCTURE_TRAIL_ACTIVATE)
+                    or (config.TRAIL_AT_TP and leg.get("trail_engaged"))
+                )
+                if _do_ratchet and bars5_trail:
                     s_stop = self._structure_trail_stop(bars5_trail, direction, pip)
                     if s_stop is not None:
                         if direction > 0 and s_stop > leg["stop"] and s_stop < bar.Close:
@@ -288,10 +294,10 @@ class Backtester:
 
             for leg in list(st["legs"]):
                 sl = leg["stop"]
-                # When structure trail has engaged and LET_RUN is set, the trade
-                # rides on the structural stop — skip the fixed-target hard close so
-                # winners can extend past the first objective.
-                let_run = config.STRUCTURE_TRAIL_LET_RUN and leg.get("trail_engaged")
+                # Skip fixed TP when trail is engaged (either via STRUCTURE_TRAIL or TRAIL_AT_TP).
+                let_run = leg.get("trail_engaged") and (
+                    config.STRUCTURE_TRAIL_LET_RUN or config.TRAIL_AT_TP
+                )
                 if direction > 0:
                     sl_hit  = bar.Low <= sl
                     tp1_hit = (not leg.get("tp1_hit") and leg.get("tp1") is not None
@@ -313,7 +319,29 @@ class Backtester:
                         elif direction < 0 and (not let_run) and bar.Low <= target:
                             self._exit_leg(pair, leg, target, t, "target")
                 elif tp_hit:
-                    self._exit_leg(pair, leg, target, t, "target")
+                    if config.TRAIL_AT_TP:
+                        # TP touched — find last M5 swing and engage trail instead of exiting.
+                        trail_stop = (self._structure_trail_stop(bars5_trail, direction, pip)
+                                      if bars5_trail else None)
+                        min_dist = config.TRAIL_AT_TP_MIN_PIPS * pip
+                        can_trail = (
+                            trail_stop is not None and (
+                                (direction > 0 and (target - trail_stop) >= min_dist) or
+                                (direction < 0 and (trail_stop - target) >= min_dist)
+                            )
+                        )
+                        if can_trail:
+                            if direction > 0:
+                                leg["stop"] = max(leg["stop"], trail_stop)
+                            else:
+                                leg["stop"] = min(leg["stop"], trail_stop)
+                            leg["trail_engaged"] = True
+                            # Do NOT exit — trail takes over from here
+                        else:
+                            # No qualifying swing (too close or absent) — exit normally
+                            self._exit_leg(pair, leg, target, t, "target")
+                    else:
+                        self._exit_leg(pair, leg, target, t, "target")
             if not self.active.get(pair, {}).get("legs"):
                 self.active.pop(pair, None)
 

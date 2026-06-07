@@ -393,6 +393,14 @@ DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 EURGBP_SYNTHETIC_LOOKBACK         = 6    # H1 bars to look back
 EURGBP_SYNTHETIC_THRESHOLD_PIPS   = 10   # minimum divergence (pips) to fire
 
+# --- Trail at TP (structural runner) ---
+# When price wicks to the TP level, instead of exiting move the stop to the
+# last confirmed M5 swing low/high (≥ TRAIL_AT_TP_MIN_PIPS away) and let the
+# trade run until that trailing stop is hit.  Falls back to normal TP exit when
+# no qualifying swing exists (swing too close or not found).
+TRAIL_AT_TP          = bool(int(_os.environ.get("TRAIL_AT_TP",          0)))
+TRAIL_AT_TP_MIN_PIPS = float(_os.environ.get("TRAIL_AT_TP_MIN_PIPS",    5.0))
+
 # --- Scale-out (partial TP1 close) ---
 # Close SCALE_OUT_RATIO of the position at SCALE_OUT_PIPS profit, then let the
 # remainder run to the structural target.  Only fires when the target is at
