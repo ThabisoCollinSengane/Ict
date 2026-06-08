@@ -407,6 +407,7 @@ class Backtester:
             "target_escalated": st.get("target_escalated", False),
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
+            "soj_sweep": st.get("soj_sweep", False),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -461,6 +462,7 @@ class Backtester:
             "target_escalated": st.get("target_escalated", False),
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
+            "soj_sweep": st.get("soj_sweep", False),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
