@@ -434,6 +434,18 @@ TRAIL_AT_TP            = bool(int(_os.environ.get("TRAIL_AT_TP",            0)))
 TRAIL_AT_TP_MIN_PIPS   = float(_os.environ.get("TRAIL_AT_TP_MIN_PIPS",    5.0))
 TRAIL_AT_TP_MIN_TARGET = float(_os.environ.get("TRAIL_AT_TP_MIN_TARGET", 28.0))
 
+# --- 5-pip HWM trail from +20 pips ---
+# Replaces the fixed TRAIL_LOCK (+10 pip lock at +20 pips) for trades whose
+# target is >= TRAIL_5PIP_MIN_TARGET pips away.  Once price reaches
+# TRAIL_LOCK_PIPS (20 pips) profit:
+#   stop = max_close_reached - TRAIL_5PIP_GAP pips
+# Stop ratchets every bar as new highs are made.  The fixed TP is bypassed
+# (let_run=True) — the trade runs until the trail stop is hit.
+# Trades with target < TRAIL_5PIP_MIN_TARGET still exit at fixed TP.
+TRAIL_5PIP_ENABLED     = bool(int(_os.environ.get("TRAIL_5PIP_ENABLED",     0)))
+TRAIL_5PIP_GAP         = float(_os.environ.get("TRAIL_5PIP_GAP",          5.0))
+TRAIL_5PIP_MIN_TARGET  = float(_os.environ.get("TRAIL_5PIP_MIN_TARGET",  20.0))
+
 # --- TP Runner (partial exit AT TP1, runner to TP2) ---
 # At the original institutional draw (TP1): close TP_RUNNER_RATIO of the position
 # and move the stop to break-even.  The remaining units run to TP2 — the next

@@ -264,7 +264,28 @@ class Backtester:
                            if (config.STRUCTURE_TRAIL or config.TRAIL_AT_TP) else None)
             for leg in st["legs"]:
                 pips_profit = (bar.Close - leg["entry"]) * direction / pip
-                if pips_profit >= config.TRAIL_LOCK_PIPS:
+                _tgt_pips   = abs(target - leg["entry"]) / pip
+                _use_hwm    = (config.TRAIL_5PIP_ENABLED
+                               and _tgt_pips >= config.TRAIL_5PIP_MIN_TARGET
+                               and pips_profit >= config.TRAIL_LOCK_PIPS)
+
+                if _use_hwm:
+                    # 5-pip HWM trail: tracks max close reached from +20 pips onwards.
+                    # Replaces the fixed TRAIL_LOCK lock-at-+10 for far targets.
+                    _gap = config.TRAIL_5PIP_GAP * pip
+                    if direction > 0:
+                        leg["trail_hwm"] = max(leg.get("trail_hwm", bar.Close), bar.Close)
+                        _ts = leg["trail_hwm"] - _gap
+                        if _ts > leg["entry"]:
+                            leg["stop"] = max(leg["stop"], _ts)
+                            leg["trail_engaged"] = True
+                    else:
+                        leg["trail_hwm"] = min(leg.get("trail_hwm", bar.Close), bar.Close)
+                        _ts = leg["trail_hwm"] + _gap
+                        if _ts < leg["entry"]:
+                            leg["stop"] = min(leg["stop"], _ts)
+                            leg["trail_engaged"] = True
+                elif pips_profit >= config.TRAIL_LOCK_PIPS:
                     locked = leg["entry"] + 10 * pip * direction
                     if direction > 0:
                         leg["stop"] = max(leg["stop"], locked)
@@ -276,12 +297,12 @@ class Backtester:
                     else:
                         leg["stop"] = min(leg["stop"], leg["entry"])
 
-                # Milestone trailing: extends the TRAIL_LOCK step every
-                # MILESTONE_TRAIL_STEP pips for long HTF-targeted trades.
-                # At +40 pips → stop at entry+30; +60 → entry+50; +80 → entry+70…
-                # Short trades (20-30 pip target) exit before any new milestone fires.
+                # Milestone trailing: extends the lock step every MILESTONE_TRAIL_STEP pips.
+                # Skipped when the 5-pip HWM trail is engaged (HWM is tighter between
+                # milestones and identical at milestone points — no need to apply both).
                 if (config.MILESTONE_TRAIL_ENABLED
-                        and pips_profit >= config.TRAIL_LOCK_PIPS + config.MILESTONE_TRAIL_STEP):
+                        and pips_profit >= config.TRAIL_LOCK_PIPS + config.MILESTONE_TRAIL_STEP
+                        and not leg.get("trail_engaged")):
                     _step = config.MILESTONE_TRAIL_STEP
                     _buf  = config.MILESTONE_TRAIL_BUFFER
                     _milestone = int(pips_profit / _step) * _step
@@ -309,9 +330,10 @@ class Backtester:
 
             for leg in list(st["legs"]):
                 sl = leg["stop"]
-                # Skip fixed TP when trail is engaged (either via STRUCTURE_TRAIL or TRAIL_AT_TP).
+                # Skip fixed TP when trail is engaged (STRUCTURE_TRAIL, TRAIL_AT_TP, or 5-pip HWM).
                 let_run = leg.get("trail_engaged") and (
                     config.STRUCTURE_TRAIL_LET_RUN or config.TRAIL_AT_TP
+                    or config.TRAIL_5PIP_ENABLED
                 )
                 if direction > 0:
                     sl_hit  = bar.Low <= sl
