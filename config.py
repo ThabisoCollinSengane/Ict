@@ -424,13 +424,17 @@ DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 EURGBP_SYNTHETIC_LOOKBACK         = 6    # H1 bars to look back
 EURGBP_SYNTHETIC_THRESHOLD_PIPS   = 10   # minimum divergence (pips) to fire
 
-# --- Trail at TP (structural runner) ---
-# When price wicks to the TP level, instead of exiting move the stop to the
-# last confirmed M5 swing low/high (≥ TRAIL_AT_TP_MIN_PIPS away) and let the
-# trade run until that trailing stop is hit.  Falls back to normal TP exit when
-# no qualifying swing exists (swing too close or not found).
-TRAIL_AT_TP          = bool(int(_os.environ.get("TRAIL_AT_TP",          0)))
-TRAIL_AT_TP_MIN_PIPS = float(_os.environ.get("TRAIL_AT_TP_MIN_PIPS",    5.0))
+# --- Trail at TP (HWM runner) ---
+# When price touches the TP level on a FAR-target trade (target pips >=
+# TRAIL_AT_TP_MIN_TARGET), switch from fixed-TP exit to a 5-pip high-water-mark
+# trailing stop.  The trail tracks max Close reached past TP and exits when
+# price retreats TRAIL_AT_TP_MIN_PIPS pips from that HWM.
+# SHORT-target trades (target < MIN_TARGET pips) always exit at fixed TP —
+# the fib extension IS the AMD delivery draw; no need to trail.
+# Falls back to fixed TP on near-target trades.
+TRAIL_AT_TP            = bool(int(_os.environ.get("TRAIL_AT_TP",            0)))
+TRAIL_AT_TP_MIN_PIPS   = float(_os.environ.get("TRAIL_AT_TP_MIN_PIPS",    5.0))
+TRAIL_AT_TP_MIN_TARGET = float(_os.environ.get("TRAIL_AT_TP_MIN_TARGET", 28.0))
 
 # --- TP Runner (partial exit AT TP1, runner to TP2) ---
 # At the original institutional draw (TP1): close TP_RUNNER_RATIO of the position
