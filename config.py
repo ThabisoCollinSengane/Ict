@@ -373,6 +373,25 @@ BREAKOUT_MODEL_ENABLED = True
 BREAKOUT_HOLD_PIPS     = 3.0       # min close beyond the range extreme to call it a hold
 BREAKOUT_CONVICTION    = 2         # conviction credit when the intermarket breakout confirms
 
+# Multi-TF breakout calibration (v4 — per-TF parameters for detect_breakout).
+# Each instrument (EU, GU) independently confirms on its highest available TF
+# (D1 → H4 → H1 → M15 cascade); directions must still all agree.  Parameters
+# are scaled to keep the same clock-time coverage as the M15 defaults while
+# widening pip tolerances appropriately for each TF's typical range magnitude.
+# M15 uses the global AMD_* defaults above.
+BREAKOUT_H1_PARAMS = dict(
+    min_bars=3, max_bars=20, max_range_pips=40, min_touches=2,
+    range_end_lookback=20, sweep_lookback=10, hold_pips=5.0,
+)
+BREAKOUT_H4_PARAMS = dict(
+    min_bars=2, max_bars=8,  max_range_pips=70, min_touches=2,
+    range_end_lookback=8,  sweep_lookback=4,  hold_pips=8.0,
+)
+BREAKOUT_D1_PARAMS = dict(
+    min_bars=2, max_bars=5,  max_range_pips=100, min_touches=2,
+    range_end_lookback=5,  sweep_lookback=3,  hold_pips=15.0,
+)
+
 # --- Market Profile ---
 # Weekly AMD: when the weekly Judas swing is confirmed (Monday range swept on
 # Tue/Wed/Thu and close back inside), pyramid legs use FULL lots regardless of

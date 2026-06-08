@@ -503,7 +503,7 @@ class Backtester:
         return 0
 
     def _intermarket_breakout(self, t) -> int:
-        """Triple-confirmed intermarket breakout on M15.
+        """Triple-confirmed intermarket breakout — multi-TF cascade (v4).
 
         A single-pair breakout from consolidation is usually a Judas fakeout. A
         genuine USD-driven expansion shows up in ALL THREE legs at once:
@@ -513,28 +513,52 @@ class Backtester:
             EURUSD clears range LOW  + GBPUSD clears range LOW  + DXY clears HIGH
               → USD strength expansion → -1 (look short EURUSD/GBPUSD)
 
-        Returns +1, -1, or 0 (no confirmed triple breakout).
+        v4 cascade (2026-06-08): each instrument independently confirms on its
+        highest available TF (D1 → H4 → H1 → M15); all directions must still agree.
+        This captures the real-world scenario where the leading pair (EU) and DXY
+        break H1 structure while the lagging pair (GU) only confirms on M15.
+        Per-TF parameters (BREAKOUT_H1/H4/D1_PARAMS in config) scale bar counts
+        and pip tolerances appropriately — the root cause of v1–v3 failures was
+        passing larger-TF bars to M15-calibrated detect_breakout.
 
-        Multi-TF tested (2026-06-08):
-        - v1/v2 (H1→M15 cascade): MaxDD -15.74%, equity R302M vs R400.7M baseline. ❌
-        - v3 (D1→H4→H1→M15 cascade): MaxDD -18.89%, equity R390.6M vs R400.7M. ❌
-          Breakout count ballooned to 534 (vs ~130 baseline) — D1/H4 bars fed to the
-          M15-calibrated detect_breakout are too permissive; range params designed for
-          M15 accept nearly everything on bigger TFs. M15-only is optimal.
+        Multi-TF test history:
+        - v1/v2 (H1→M15 cascade, M15 params):  MaxDD -15.74%, R302M. ❌
+        - v3 (D1→H4→H1→M15, M15 params):       MaxDD -18.89%, R390M. ❌
+        - v4 (D1→H4→H1→M15, per-TF params):    pending test.
         """
         if not config.BREAKOUT_MODEL_ENABLED:
             return 0
 
-        eu = self.bars_up_to("EURUSD", "15T", t)
-        gu = self.bars_up_to("GBPUSD", "15T", t)
-        if not eu or not gu:
+        _tf_params = {
+            "D":    config.BREAKOUT_D1_PARAMS,
+            "240T": config.BREAKOUT_H4_PARAMS,
+            "60T":  config.BREAKOUT_H1_PARAMS,
+            "15T":  {},   # AMD defaults (M15-calibrated)
+        }
+
+        def _best_breakout(sym):
+            for tf, params in _tf_params.items():
+                bars = self.bars_up_to(sym, tf, t)
+                if not bars:
+                    continue
+                brk = detect_breakout(bars, sym, **params)
+                if brk:
+                    return brk[1]
             return 0
-        eu_brk = detect_breakout(eu, "EURUSD")
-        gu_brk = detect_breakout(gu, "GBPUSD")
-        if not (eu_brk and gu_brk):
+
+        eu_dir = _best_breakout("EURUSD")
+        gu_dir = _best_breakout("GBPUSD")
+        if not eu_dir or not gu_dir or eu_dir != gu_dir:
             return 0
-        eu_dir, gu_dir = eu_brk[1], gu_brk[1]
-        dxy_dir = self._dxy_bias("15T", t, lookback=config.SWING_LOOKBACK_STH)
+
+        # DXY uses _dxy_bias (BOS detector) — same cascade, no range params needed.
+        dxy_dir = 0
+        for tf in ("D", "240T", "60T", "15T"):
+            d = self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH)
+            if d != 0:
+                dxy_dir = d
+                break
+
         if eu_dir == +1 and gu_dir == +1 and dxy_dir == -1:
             return +1
         if eu_dir == -1 and gu_dir == -1 and dxy_dir == +1:
