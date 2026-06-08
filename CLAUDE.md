@@ -12,12 +12,12 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 811 trades, WR 46.0%, PF 4.47, MaxDD -12.95%, R500 → R294.8M.
+**Backtest result (4 years, 2022–2025):** 812 trades, WR 46.1%, PF 4.47, MaxDD -13.01%, R500 → R400.7M.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
 HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
 targets, P18 score≥4 confluence sizing (1.25×), P19 H4-CRT Turtle Soup sizing (1.25×),
-P20 high-conviction target escalation, P21 pyramid gate fix, P22 pyramid gate relaxation.
-MaxDD unchanged at -12.95% across all additions. See P18 for the cache-bug post-mortem.)
+P20 high-conviction target escalation, P21 pyramid gate fix, P22 pyramid gate relaxation,
+P23 milestone trailing stop. See P18 for the cache-bug post-mortem.)
 
 ---
 
@@ -932,6 +932,68 @@ Pyramids now fire ~16 times in IS (was ~2) / ~4 times in OOS (was ~32) → ~20 t
 Overall WR on pyramid legs ~45%; 50% WR on im1.0 legs, 40% on im0.8 legs.
 
 **Config:** `PYRAMID_DRAW_UNLOCK_MIN=1`, `PYRAMID_MIN_FAVOUR_PIPS=15`.
+
+### P23 — Milestone trailing stop (SHIPPED 2026-06-08)
+**What:** Extends the existing `TRAIL_BE_PIPS` / `TRAIL_LOCK_PIPS` step system continuously for
+long-running trades headed to a distant HTF target. Every `MILESTONE_TRAIL_STEP` pips (20) of
+additional progress, the stop is locked at `(milestone - MILESTONE_TRAIL_BUFFER)` pips from entry.
+
+**Stop progression:**
+- +10 pips → stop to breakeven (existing `TRAIL_BE_PIPS`)
+- +20 pips → stop to entry + 10 pips (existing `TRAIL_LOCK_PIPS`)
+- +40 pips → stop to entry + 30 pips (new — milestone trail takes over)
+- +60 pips → stop to entry + 50 pips
+- +80 pips → stop to entry + 70 pips (…etc.)
+
+**Why it matters:** Trades targeting PDH/PDL, PWH/PWL, or ITH/ITL frequently travel 50–100 pips.
+Without milestone trail, a trade that reached +35 pips and reversed was still a full loss (stop at
+original -10). With milestone trail, stop is now at +30 pips after +40 pips of progress — a
+35-pip reversal exits at +30 instead of -10. At R10k lots that difference is +R555 vs -R185, and
+that delta compounds at every high-equity milestone.
+
+Short-target trades (20–30 pip fib extensions) exit via TP before any new milestone fires —
+no behaviour change on the majority of trades.
+
+**Result (full 4yr):**
+
+| Metric | P22 baseline | **P23** |
+|---|---|---|
+| Full 4yr equity | R294.8M | **R400.7M (+36%)** |
+| Full 4yr PF | 4.47 | **4.47** (unchanged ✓) |
+| Full 4yr MaxDD | -12.95% | **-13.01%** (+0.06pp) |
+| IS PF / equity | 3.07 / R242k | 3.09 / **R300k** (+24%) |
+| IS MaxDD | -12.95% | -13.01% (+0.06pp) |
+| OOS PF / equity | 4.47 / R1.502M | 4.47 / **R1.569M** (+4.5%) |
+| OOS MaxDD | -13.93% | -13.94% (flat) |
+
+The +36% equity gain with PF unchanged and MaxDD up only 0.06pp is the largest compounding
+improvement since P18. IS/OOS both positive and same ballpark. Ships ON.
+
+**Config:** `MILESTONE_TRAIL_ENABLED=1`, `MILESTONE_TRAIL_STEP=20`, `MILESTONE_TRAIL_BUFFER=10`.
+
+### HTF target preference — TESTED + REVERTED (2026-06-08)
+**Hypothesis:** When an unswept ITH/ITL/PDH/PDL/PWH/PWL is within 120 pips, prefer it as the
+primary target over a closer fib extension — these are resting liquidity, not projected levels.
+
+**Result — reverted:**
+
+| Metric | P23 baseline | HTF preference on |
+|---|---|---|
+| IS MaxDD | -13.01% | **-22.57%** |
+| OOS MaxDD | -13.94% | **-22.60%** |
+| IS WR | 46.0% | 41.8% |
+| OOS WR | 45.9% | 42.5% |
+
+Forcing far targets (ITH/ITL at 65–120 pips over nearer fib at 28 pips) means staying through
+the intermediate consolidation zone where price typically pauses or reverses. The 28-pip fib IS
+the draw for the current AMD delivery cycle; the 65-pip ITH is the draw for the NEXT cycle
+(continuation trade or pyramid). The nearest qualifying target principle is correct.
+
+The ITH/ITL add value correctly: as confluence score contributors (P18 sizing bump) and as
+fallback when they genuinely ARE the nearest qualifying target (8 wins, avg R403k each — the
+highest per-win average). Not by forced selection over nearer targets.
+
+**Config:** `HTF_TARGET_PREF_PIPS=0` (off by default, code retained).
 
 ---
 

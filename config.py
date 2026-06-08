@@ -67,6 +67,23 @@ MIN_RR = 1.2                       # minimum reward:risk
 FIXED_STOP_PIPS = 10               # max/fallback stop distance — 10 pips from entry
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit
 TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profit
+
+# Milestone trailing stop: extends the TRAIL_LOCK step continuously for long HTF-
+# target trades.  Every MILESTONE_TRAIL_STEP pips of progress, the stop is locked
+# at (milestone - MILESTONE_TRAIL_BUFFER) pips from entry.  Kicks in after +20 pips
+# (TRAIL_LOCK already handles the first step); from +40 pips onward this governs.
+#   +40 pips → stop at entry + 30   +60 → entry + 50   +80 → entry + 70  etc.
+# When the main target is a short fib-extension (20-30 pips) the trade exits before
+# any new milestone fires — no behaviour change on short-target trades.
+MILESTONE_TRAIL_ENABLED = bool(int(_os.environ.get("MILESTONE_TRAIL_ENABLED", 1)))
+MILESTONE_TRAIL_STEP    = int(_os.environ.get("MILESTONE_TRAIL_STEP",   20))
+MILESTONE_TRAIL_BUFFER  = int(_os.environ.get("MILESTONE_TRAIL_BUFFER", 10))
+
+# HTF draw preference: when an unswept ITH/ITL, PDH/PDL, or PWH/PWL is within
+# this many pips, prefer it over a closer fib extension as the primary target.
+# These are RESTING LIQUIDITY pools (actual institutional destination); fib
+# extensions are projected levels.  Set 0 to disable.
+HTF_TARGET_PREF_PIPS = int(_os.environ.get("HTF_TARGET_PREF_PIPS", 0))  # off by default — tested, reverted (WR drop + MaxDD -22%)
 # Structure trailing: once a trade is in profit, trail the stop behind the most
 # recent confirmed M5 swing point (the "manual trail off structure"). The trade
 # stays open until price breaks that structural point (an MSS against the

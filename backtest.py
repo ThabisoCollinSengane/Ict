@@ -276,6 +276,21 @@ class Backtester:
                     else:
                         leg["stop"] = min(leg["stop"], leg["entry"])
 
+                # Milestone trailing: extends the TRAIL_LOCK step every
+                # MILESTONE_TRAIL_STEP pips for long HTF-targeted trades.
+                # At +40 pips → stop at entry+30; +60 → entry+50; +80 → entry+70…
+                # Short trades (20-30 pip target) exit before any new milestone fires.
+                if (config.MILESTONE_TRAIL_ENABLED
+                        and pips_profit >= config.TRAIL_LOCK_PIPS + config.MILESTONE_TRAIL_STEP):
+                    _step = config.MILESTONE_TRAIL_STEP
+                    _buf  = config.MILESTONE_TRAIL_BUFFER
+                    _milestone = int(pips_profit / _step) * _step
+                    _lock_ms   = leg["entry"] + (_milestone - _buf) * pip * direction
+                    if direction > 0:
+                        leg["stop"] = max(leg["stop"], _lock_ms)
+                    else:
+                        leg["stop"] = min(leg["stop"], _lock_ms)
+
                 # Structure trail: ratchet the stop to the latest M5 swing point.
                 # Also runs when trail was engaged by TRAIL_AT_TP (leg["trail_engaged"]).
                 _do_ratchet = (
@@ -1151,6 +1166,19 @@ class Backtester:
             if _premium_ok:
                 rr_ok = _premium_ok
                 _used_escalation = True
+        # P23: prefer HTF institutional draws over fib/FVG projections when one is
+        # available within HTF_TARGET_PREF_PIPS.  ITH/ITL/PDH/PDL/PWH/PWL are resting
+        # liquidity pools — the actual institutional destination.  Fib extensions are
+        # projected levels; they lose the selection when a real liquidity pool exists.
+        _htf_draw_types = {"ith_liquidity", "itl_liquidity", "pdh_pdl", "pwh_pwl"}
+        if config.HTF_TARGET_PREF_PIPS > 0 and rr_ok:
+            _htf_pref_dist = config.HTF_TARGET_PREF_PIPS * pip_v
+            _htf_ok = [c for c in rr_ok
+                       if c[1] in _htf_draw_types
+                       and abs(c[0] - price) <= _htf_pref_dist]
+            if _htf_ok:
+                rr_ok = _htf_ok   # narrow to HTF draws; fib/FVG become fallback
+
         # Keep the original selection: nearest target that clears MIN_RR (fewest
         # path changes). Confluence is an analytics signal, not a selection criterion.
         if rr_ok:
