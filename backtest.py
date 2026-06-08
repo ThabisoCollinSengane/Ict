@@ -292,8 +292,10 @@ class Backtester:
                         leg["stop"] = min(leg["stop"], _lock_ms)
 
                 # Structure trail: ratchet the stop to the latest M5 swing point.
+                # Also runs when trail was engaged by TRAIL_AT_TP (leg["trail_engaged"]).
                 _do_ratchet = (
-                    config.STRUCTURE_TRAIL and pips_profit >= config.STRUCTURE_TRAIL_ACTIVATE
+                    (config.STRUCTURE_TRAIL and pips_profit >= config.STRUCTURE_TRAIL_ACTIVATE)
+                    or (config.TRAIL_AT_TP and leg.get("trail_engaged"))
                 )
                 if _do_ratchet and bars5_trail:
                     s_stop = self._structure_trail_stop(bars5_trail, direction, pip)
@@ -304,22 +306,6 @@ class Backtester:
                         elif direction < 0 and s_stop < leg["stop"] and s_stop > bar.Close:
                             leg["stop"] = s_stop
                             leg["trail_engaged"] = True
-
-                # TRAIL_AT_TP HWM ratchet: once trail engaged at TP, track the
-                # high-water-mark (max Close past TP) and trail 5 pips behind it.
-                if config.TRAIL_AT_TP and leg.get("trail_engaged") and not config.STRUCTURE_TRAIL:
-                    _hwm_key = "trail_hwm"
-                    _gap = config.TRAIL_AT_TP_MIN_PIPS * pip
-                    if direction > 0:
-                        leg[_hwm_key] = max(leg.get(_hwm_key, target), bar.Close)
-                        _hwm_stop = leg[_hwm_key] - _gap
-                        if _hwm_stop > leg["entry"]:
-                            leg["stop"] = max(leg["stop"], _hwm_stop)
-                    else:
-                        leg[_hwm_key] = min(leg.get(_hwm_key, target), bar.Close)
-                        _hwm_stop = leg[_hwm_key] + _gap
-                        if _hwm_stop < leg["entry"]:
-                            leg["stop"] = min(leg["stop"], _hwm_stop)
 
             for leg in list(st["legs"]):
                 sl = leg["stop"]
@@ -349,31 +335,22 @@ class Backtester:
                             self._exit_leg(pair, leg, target, t, "target")
                 elif tp_hit:
                     if config.TRAIL_AT_TP:
-                        # Only engage trail on far targets (>= TRAIL_AT_TP_MIN_TARGET pips).
-                        # Short fib-extension targets (~20-25 pip) always exit at fixed TP —
-                        # those ARE the AMD delivery draw; trailing them just gives back pips.
-                        _tgt_pips = abs(target - leg["entry"]) / pip
-                        if _tgt_pips >= config.TRAIL_AT_TP_MIN_TARGET:
-                            # Far target — engage 5-pip HWM trail from TP level.
-                            _gap = config.TRAIL_AT_TP_MIN_PIPS * pip
+                        # TP touched — find the M5 swing closest to TP (not nearest in
+                        # time) that is above entry. Only engages when meaningful
+                        # structure formed near the TP during the delivery phase.
+                        trail_stop = (self._trail_stop_near_target(
+                                          bars5_trail, direction, pip,
+                                          leg["entry"], target)
+                                      if bars5_trail else None)
+                        if trail_stop is not None:
                             if direction > 0:
-                                leg["trail_hwm"] = target
-                                _hwm_stop = target - _gap
-                                if _hwm_stop > leg["entry"]:
-                                    leg["stop"] = max(leg["stop"], _hwm_stop)
-                                    leg["trail_engaged"] = True
-                                else:
-                                    self._exit_leg(pair, leg, target, t, "target")
+                                leg["stop"] = max(leg["stop"], trail_stop)
                             else:
-                                leg["trail_hwm"] = target
-                                _hwm_stop = target + _gap
-                                if _hwm_stop < leg["entry"]:
-                                    leg["stop"] = min(leg["stop"], _hwm_stop)
-                                    leg["trail_engaged"] = True
-                                else:
-                                    self._exit_leg(pair, leg, target, t, "target")
+                                leg["stop"] = min(leg["stop"], trail_stop)
+                            leg["trail_engaged"] = True
+                            # Do NOT exit — trail takes over from here
                         else:
-                            # Short target — fixed exit at TP
+                            # No qualifying swing (fast spike, no structure near TP)
                             self._exit_leg(pair, leg, target, t, "target")
                     else:
                         self._exit_leg(pair, leg, target, t, "target")

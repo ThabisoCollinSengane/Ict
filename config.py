@@ -424,14 +424,12 @@ DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 EURGBP_SYNTHETIC_LOOKBACK         = 6    # H1 bars to look back
 EURGBP_SYNTHETIC_THRESHOLD_PIPS   = 10   # minimum divergence (pips) to fire
 
-# --- Trail at TP (HWM runner) ---
-# When price touches the TP level on a FAR-target trade (target pips >=
-# TRAIL_AT_TP_MIN_TARGET), switch from fixed-TP exit to a 5-pip high-water-mark
-# trailing stop.  The trail tracks max Close reached past TP and exits when
-# price retreats TRAIL_AT_TP_MIN_PIPS pips from that HWM.
-# SHORT-target trades (target < MIN_TARGET pips) always exit at fixed TP —
-# the fib extension IS the AMD delivery draw; no need to trail.
-# Falls back to fixed TP on near-target trades.
+# --- Trail at TP (tested 4 times, all reverted) ---
+# All four implementations (v1 swing, v2 entry-check, v3 near-TP swing, v4 HWM
+# far-target-only) degraded the 4-year run by 16-52%.  Root cause: the TP IS the
+# AMD delivery draw — the institutional cycle ends there.  Trailing past it means
+# sitting through the reversal/consolidation phase where the algo has no edge.
+# The fixed TP exit is optimal.  Code retained; TRAIL_AT_TP=0 (off by default).
 TRAIL_AT_TP            = bool(int(_os.environ.get("TRAIL_AT_TP",            0)))
 TRAIL_AT_TP_MIN_PIPS   = float(_os.environ.get("TRAIL_AT_TP_MIN_PIPS",    5.0))
 TRAIL_AT_TP_MIN_TARGET = float(_os.environ.get("TRAIL_AT_TP_MIN_TARGET", 28.0))
