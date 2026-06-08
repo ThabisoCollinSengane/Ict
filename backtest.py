@@ -503,39 +503,46 @@ class Backtester:
         return 0
 
     def _intermarket_breakout(self, t) -> int:
-        """Triple-confirmed intermarket breakout on M15.
+        """Multi-TF triple-confirmed intermarket breakout.
 
-        A single-pair breakout from consolidation is usually a Judas fakeout. A
-        genuine USD-driven expansion shows up in ALL THREE legs at once:
+        Each instrument confirms on its own highest available timeframe
+        (H1 → M15 → M5).  A USD-driven expansion shows the same directional
+        move across all three legs even when the lagging pair only clears M15/M5
+        structure while the leading pair + DXY clear H1:
 
-            EURUSD clears range HIGH + GBPUSD clears range HIGH + DXY clears LOW
-              → USD weakness expansion → +1 (look long EURUSD/GBPUSD)
-            EURUSD clears range LOW  + GBPUSD clears range LOW  + DXY clears HIGH
-              → USD strength expansion → -1 (look short EURUSD/GBPUSD)
+            EURUSD breaks H1 high  + GBPUSD breaks M15 high  + DXY breaks H1 low
+              → USD weakness, GBPUSD lagging but still confirming → +1
 
-        Returns +1, -1, or 0 (no confirmed triple breakout). Fractal: M15 ranges,
-        but the same structure recurses on any timeframe.
+        Returns +1, -1, or 0 (no confirmed triple breakout).
         """
         if not config.BREAKOUT_MODEL_ENABLED:
             return 0
-        eu = self.bars_up_to("EURUSD", "15T", t)
-        gu = self.bars_up_to("GBPUSD", "15T", t)
-        if not eu or not gu:
+
+        def _first_breakout(sym):
+            for tf in ("60T", "15T", "5T"):
+                bars = self.bars_up_to(sym, tf, t)
+                if not bars:
+                    continue
+                brk = detect_breakout(bars, sym)
+                if brk:
+                    return brk[1]
             return 0
-        eu_brk = detect_breakout(eu, "EURUSD")
-        gu_brk = detect_breakout(gu, "GBPUSD")
-        if not (eu_brk and gu_brk):
+
+        eu_dir = _first_breakout("EURUSD")
+        gu_dir = _first_breakout("GBPUSD")
+        if not eu_dir or not gu_dir or eu_dir != gu_dir:
             return 0
-        eu_dir, gu_dir = eu_brk[1], gu_brk[1]
-        # DXY confirmation = its M15 BOS direction. The synthetic DXY is on a ~100-point
-        # scale, so the forex-pip range detection in detect_breakout can't be applied to
-        # it directly; the M15 structural bias ("the dollar takes out a low" = DXY making
-        # lower lows → bias -1) is the correct, scale-independent confirmation.
-        dxy_dir = self._dxy_bias("15T", t, lookback=config.SWING_LOOKBACK_STH)
-        # Bullish USD pairs: both pairs broke high (+1), DXY breaking lows (-1).
+
+        # DXY: highest available TF showing BOS in the opposite direction.
+        dxy_dir = 0
+        for tf in ("60T", "15T"):
+            d = self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH)
+            if d != 0:
+                dxy_dir = d
+                break
+
         if eu_dir == +1 and gu_dir == +1 and dxy_dir == -1:
             return +1
-        # Bearish USD pairs: both pairs broke low (-1), DXY breaking highs (+1).
         if eu_dir == -1 and gu_dir == -1 and dxy_dir == +1:
             return -1
         return 0
