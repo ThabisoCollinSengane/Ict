@@ -113,11 +113,18 @@ STRUCTURE_STOP_TF      = "1T"      # timeframe whose fractal ITL/ITH anchors the
 STRUCTURE_STOP_LOOKBACK = 90       # bars to scan for the intermediate swing
 
 # --- Account protection (wipeout prevention) ---
-# 1. Peak drawdown halt: if equity falls >20% from its highest point, stop trading
-#    for DRAWDOWN_PAUSE_DAYS calendar days before retrying. Prevents cascading losses
-#    in trending-against conditions.
-MAX_DRAWDOWN_HALT_PCT   = 15.0    # halt earlier — 20% was allowing too much cascade loss
+# 1. Peak drawdown halt: if equity falls >MAX_DRAWDOWN_HALT_PCT% from its highest
+#    point, stop trading for DRAWDOWN_PAUSE_DAYS calendar days before retrying.
+#
+#    Growth-phase override (equity < GROWTH_PHASE_EQUITY):
+#    The % breaker is too tight at small equity — a normal 2-trade losing run from
+#    R500 peak can exceed -15% (R75 down). During growth, use a hard ZAR floor
+#    instead: halt only when equity drops to GROWTH_PHASE_FLOOR_ZAR (half of
+#    starting capital). Normal % breaker resumes once equity >= GROWTH_PHASE_EQUITY.
+MAX_DRAWDOWN_HALT_PCT   = 15.0    # normal phase: -15% from peak → 10-day pause
 DRAWDOWN_PAUSE_DAYS     = 10      # 2-week break outlasts most short-term adverse regimes
+GROWTH_PHASE_EQUITY     = 3_000   # ZAR — below this the growth-phase floor applies
+GROWTH_PHASE_FLOOR_ZAR  = 250     # halt only when equity drops to this during growth
 # 2. Daily loss cap: stop opening new trades for the rest of the calendar day once
 #    daily losses exceed this % of the account equity at day open.
 MAX_DAILY_LOSS_PCT      = 6.0     # ~2 full stop-losses at 0.03 lots

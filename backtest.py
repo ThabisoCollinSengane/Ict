@@ -1590,8 +1590,17 @@ class Backtester:
             self._peak_equity = self.equity
             self._drawdown_halt_until = None
         if self._peak_equity > 0:
-            dd_pct = (self._peak_equity - self.equity) / self._peak_equity * 100
-            if dd_pct >= config.MAX_DRAWDOWN_HALT_PCT:
+            if self.equity < config.GROWTH_PHASE_EQUITY:
+                # Growth phase: use hard ZAR floor instead of %-from-peak.
+                # The % breaker is too tight at R500 — a 2-trade losing run
+                # already exceeds -15%. Floor fires only at half starting capital.
+                breached = self.equity <= config.GROWTH_PHASE_FLOOR_ZAR
+            else:
+                breached = (
+                    (self._peak_equity - self.equity) / self._peak_equity * 100
+                    >= config.MAX_DRAWDOWN_HALT_PCT
+                )
+            if breached:
                 from datetime import timedelta
                 self._drawdown_halt_until = day_key + timedelta(days=config.DRAWDOWN_PAUSE_DAYS)
                 g["drawdown_halt"] += 1
