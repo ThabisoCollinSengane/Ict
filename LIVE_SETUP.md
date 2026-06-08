@@ -67,14 +67,46 @@ instrument isn't offered on your account type — tell me and I'll adjust.
 | 1 | Broker layer (`live/mt5_connector.py`) — connect, bars, orders | ✅ built |
 | 1 | Connectivity smoke test (`live/smoke_test.py`) | ✅ built |
 | 1 | VPS setup script + this guide | ✅ built |
-| 2 | Live strategy loop (`live/run_live.py`) — drive backtest logic on live bars | ⬜ next |
-| 2 | Port sizing levers to live (P9 HTF-FVG, P18 score mult, draw 2×/3×) | ⬜ next |
-| 3 | Demo paper-trade ≥2 weeks; reconcile fills vs backtest expectations | ⬜ |
+| 2 | Live strategy loop (`live/run_live.py`) — drive backtest logic on live bars | ✅ built |
+| 2 | Telegram notifications (trade open/close/circuit breaker/daily equity) | ✅ built |
+| 2 | P23 milestone trailing stop in live engine | ✅ built |
+| 3 | Demo paper-trade ≥2 weeks; reconcile fills vs backtest expectations | 🔄 active |
 | 4 | Switch to real account + funding | ⬜ |
 
 **Do not skip Phase 3.** The backtest assumes fills at bar prices with modelled
 spread/slippage; live fills will differ. Paper trading on demo is how we confirm
-the live engine matches the validated R178.7M behavior before risking the R500.
+the live engine matches the validated R400.7M behavior before risking the R500.
+
+---
+
+## Telegram notifications setup (one-time, ~5 min)
+
+Notifications fire on: trade opened, trade closed (with P&L), circuit breaker,
+daily equity snapshot at midnight UTC.
+
+1. Open Telegram → search `@BotFather` → send `/newbot` → follow prompts → copy the token
+   (looks like `7123456789:AABBccDD...`)
+2. Search `@userinfobot` → send `/start` → copy your numeric chat ID (e.g. `987654321`)
+3. Set as env vars on the VPS **before** running the bot:
+
+```powershell
+$env:TELEGRAM_BOT_TOKEN="7123456789:AABBccDD..."
+$env:TELEGRAM_CHAT_ID="987654321"
+```
+
+Or add them to a `.env` file in the repo root (already in `.gitignore`):
+
+```
+TELEGRAM_BOT_TOKEN=7123456789:AABBccDD...
+TELEGRAM_CHAT_ID=987654321
+```
+
+Test it without starting the bot:
+```powershell
+.\.venv\Scripts\python.exe -m scripts.notify
+```
+
+A message saying "ICT Bot — test OK" should arrive on your phone within seconds.
 
 ---
 

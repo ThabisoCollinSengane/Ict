@@ -44,6 +44,11 @@ from risk import pip_size
 from trade_log import TradeLog
 import live.mt5_connector as mt
 
+try:
+    from scripts.notify import send_message as _notify
+except Exception:
+    def _notify(msg): return False  # noqa: E731
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -232,11 +237,23 @@ class LiveTrader(Backtester):
         )
         if res and res["ok"]:
             leg["ticket"] = res["ticket"]
+            _dir_str   = "LONG" if st["direction"] > 0 else "SHORT"
+            _stop_pips = abs(leg["entry"] - leg["stop"]) / pip_size(pair)
+            _rwd_pips  = abs(st["target"] - leg["entry"]) / pip_size(pair)
             log.info(
                 "OPEN %s %s %.2f lots  entry≈%.5f  SL=%.5f  TP=%.5f  [%s %s]",
                 "BUY" if st["direction"] > 0 else "SELL", pair, lots,
                 leg["entry"], leg["stop"], st["target"],
                 st.get("im_scenario", "?"), st.get("entry_model", "?"),
+            )
+            _notify(
+                f"TRADE OPENED\n"
+                f"{pair} {_dir_str} | {st.get('entry_model','?').upper()}\n"
+                f"Entry:  {leg['entry']:.5f}\n"
+                f"Stop:   {leg['stop']:.5f} ({_stop_pips:.1f} pips)\n"
+                f"Target: {st['target']:.5f} ({_rwd_pips:.1f} pips)\n"
+                f"Scenario: {st.get('im_scenario','?')} | Draw: {st.get('draw_score','?')}/3\n"
+                f"Equity: R{self.equity:,.2f}"
             )
             self.log.upsert_position(pair, st)
         else:
@@ -318,6 +335,14 @@ class LiveTrader(Backtester):
                             self._consec_losses = 0
                         else:
                             self._consec_losses += 1
+                    _dir_str = "LONG" if st["direction"] > 0 else "SHORT"
+                    _pnl_str = f"{sign}R{abs(pnl_zar or 0):,.2f}"
+                    _notify(
+                        f"TRADE CLOSED\n"
+                        f"{pair} {_dir_str} | ticket {ticket}\n"
+                        f"P&L: {_pnl_str}\n"
+                        f"Equity: R{self.equity:,.2f}"
+                    )
                     self.trades.append({
                         "pair": pair, "direction": st["direction"],
                         "ticket": ticket, "closed_at": now,
@@ -345,7 +370,12 @@ class LiveTrader(Backtester):
             return None
 
     def _trail_stops(self, pair, cur_price, now):
-        """Apply BE/lock trailing to each leg and push updated SL to MT5."""
+        """Apply BE / lock / P23 milestone trailing and push updated SL to MT5.
+
+        +10 pips → stop to break-even.
+        +20 pips → stop locked at entry + 10 pips.
+        +40/60/80… pips → milestone trail: stop at entry + (milestone − 10) pips.
+        """
         st = self.active.get(pair)
         if st is None:
             return
@@ -354,26 +384,46 @@ class LiveTrader(Backtester):
         pip       = pip_size(pair)
 
         for leg in st["legs"]:
-            old_stop     = leg["stop"]
-            pips_profit  = (cur_price - leg["entry"]) * direction / pip
+            old_stop    = leg["stop"]
+            entry       = leg["entry"]
+            pips_profit = (cur_price - entry) * direction / pip
+            new_stop    = old_stop
 
+            # TRAIL_BE: move stop to entry at +TRAIL_BE_PIPS
+            if pips_profit >= config.TRAIL_BE_PIPS:
+                if direction > 0:
+                    new_stop = max(new_stop, entry)
+                else:
+                    new_stop = min(new_stop, entry)
+
+            # TRAIL_LOCK: lock +10 pips at +TRAIL_LOCK_PIPS
             if pips_profit >= config.TRAIL_LOCK_PIPS:
-                locked = leg["entry"] + config.TRAIL_BE_PIPS * pip * direction
+                locked = entry + 10 * pip * direction
                 if direction > 0:
-                    leg["stop"] = max(old_stop, locked)
+                    new_stop = max(new_stop, locked)
                 else:
-                    leg["stop"] = min(old_stop, locked)
-            elif pips_profit >= config.TRAIL_BE_PIPS:
-                if direction > 0:
-                    leg["stop"] = max(old_stop, leg["entry"])
-                else:
-                    leg["stop"] = min(old_stop, leg["entry"])
+                    new_stop = min(new_stop, locked)
 
-            if leg["stop"] != old_stop and leg.get("ticket"):
-                mt.modify_sl_tp(leg["ticket"], sl=leg["stop"], tp=target)
-                log.info("Trail %s %s  stop %.5f → %.5f",
-                         "long" if direction > 0 else "short", pair,
-                         old_stop, leg["stop"])
+            # P23 milestone trail: every MILESTONE_TRAIL_STEP pips of additional
+            # progress, ratchet stop to (milestone - MILESTONE_TRAIL_BUFFER) pips.
+            if (config.MILESTONE_TRAIL_ENABLED
+                    and pips_profit >= config.TRAIL_LOCK_PIPS + config.MILESTONE_TRAIL_STEP):
+                _step      = config.MILESTONE_TRAIL_STEP
+                _buf       = config.MILESTONE_TRAIL_BUFFER
+                _milestone = int(pips_profit / _step) * _step
+                _lock_ms   = entry + (_milestone - _buf) * pip * direction
+                if direction > 0:
+                    new_stop = max(new_stop, _lock_ms)
+                else:
+                    new_stop = min(new_stop, _lock_ms)
+
+            if new_stop != old_stop:
+                leg["stop"] = new_stop
+                if leg.get("ticket"):
+                    mt.modify_sl_tp(leg["ticket"], sl=new_stop, tp=target)
+                    log.info("Trail %s %s  stop %.5f → %.5f  (+%.1f pips profit)",
+                             "long" if direction > 0 else "short", pair,
+                             old_stop, new_stop, pips_profit)
 
     def _update_live_positions(self, now):
         """Trail stops and attempt pyramid adds for all open positions."""
@@ -408,6 +458,12 @@ class LiveTrader(Backtester):
         dd = (session_eq - live_eq) / session_eq * 100
         if dd >= config.SESSION_DRAWDOWN_PCT:
             log.warning("Session kill switch: %.1f%% floating DD — closing all", dd)
+            _notify(
+                f"CIRCUIT BREAKER: SESSION KILL SWITCH\n"
+                f"Session loss: {dd:.1f}%\n"
+                f"Equity: R{self._zar(acc.equity):,.2f}\n"
+                f"All positions closing — halted for the day"
+            )
             for pair in list(self.active.keys()):
                 self._force_close(pair, 0, now, "session_kill")
 
@@ -452,6 +508,11 @@ class LiveTrader(Backtester):
             self._day_open_eq[day_key] = self.equity
             self._consec_losses = 0
             log.info("New day %s — equity %.2f ZAR", day_key, self.equity)
+            _notify(
+                f"NEW DAY — {day_key}\n"
+                f"Equity: R{self.equity:,.2f}\n"
+                f"Open positions: {len(self.active)}"
+            )
 
         # Detect positions closed by broker (SL/TP hit).
         self._sync_closed_positions(now)
