@@ -77,7 +77,7 @@ TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profi
 # any new milestone fires — no behaviour change on short-target trades.
 MILESTONE_TRAIL_ENABLED = bool(int(_os.environ.get("MILESTONE_TRAIL_ENABLED", 1)))
 MILESTONE_TRAIL_STEP    = int(_os.environ.get("MILESTONE_TRAIL_STEP",   20))
-MILESTONE_TRAIL_BUFFER  = int(_os.environ.get("MILESTONE_TRAIL_BUFFER", 10))
+MILESTONE_TRAIL_BUFFER  = int(_os.environ.get("MILESTONE_TRAIL_BUFFER", 5))
 
 # HTF draw preference: when an unswept ITH/ITL, PDH/PDL, or PWH/PWL is within
 # this many pips, prefer it over a closer fib extension as the primary target.
