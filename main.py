@@ -5,7 +5,7 @@ Confirmation : real UDXUSD (DXY) + EURGBP / AUDNZD relative strength.
 Entry        : market order at 5m bar close, patterned stop (FVG/OB/Breaker).
 News         : High-impact = distribution catalyst (fixed 10-pip SL, full pyramid).
                Medium-impact = hard block (spread risk without catalyst).
-Pyramiding   : up to 3 legs; new leg requires pattern + 20-pip favour + IM score.
+Pyramiding   : up to 3 legs; new leg requires pattern + 15-pip favour + IM score.
 Circuit breakers:
   - Peak drawdown > MAX_DRAWDOWN_HALT_PCT  → pause DRAWDOWN_PAUSE_DAYS days.
   - Session equity drop > SESSION_DRAWDOWN_PCT → halt rest of day.
@@ -277,6 +277,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             self._check_session_handover(pair)
 
         if pair in self.active:
+            self._update_open_stops(pair)
             self._maybe_pyramid(pair)
         else:
             self._maybe_open(pair)
@@ -686,7 +687,8 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         elif dir_check != st["direction"]:
             return
 
-        # Weekly AMD upgrade
+        # Weekly AMD upgrade — runs FIRST so the draw-unlock gate below sees the
+        # promoted score (P21 fix: the upgrade must precede the im_score < 1.0 check).
         if config.WEEKLY_AMD_FULL_PYRAMID and st.get("weekly_amd_dir") == st["direction"]:
             im_score = 1.0
 
@@ -697,6 +699,12 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         # Weekly AMD hard gate
         if config.PYRAMID_REQUIRE_WEEKLY_AMD and st.get("weekly_amd_dir") != st["direction"]:
             return
+
+        # P22: im_score < 1.0 is allowed when draw_score >= PYRAMID_DRAW_UNLOCK_MIN.
+        # Any HTF draw alignment (≥1) is sufficient when DXY agrees with the trade.
+        if im_score < 1.0:
+            if st.get("draw_score", 0) < config.PYRAMID_DRAW_UNLOCK_MIN:
+                return
 
         bars5  = self._asc(self.bars_5m[pair])
         if not bars5:
@@ -927,6 +935,75 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 self._order_index.pop(lg.get("sl_id"), None)
                 self._order_index.pop(lg.get("tp_id"), None)
             self.active.pop(pair, None)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Stop management — TRAIL_BE / TRAIL_LOCK / P23 milestone trail
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _update_open_stops(self, pair: str):
+        """Ratchet stops for all open legs on every 5m bar close.
+
+        +10 pips → move stop to break-even (TRAIL_BE_PIPS).
+        +20 pips → lock stop at entry + 10 pips (TRAIL_LOCK_PIPS).
+        +40/60/80… pips → milestone trail: stop at entry + (milestone − 10) pips.
+
+        Every update calls UpdateStopPrice on the live SL order so the broker
+        reflects the new level immediately.
+        """
+        st = self.active.get(pair)
+        if st is None:
+            return
+        bars5 = self._asc(self.bars_5m[pair])
+        if not bars5:
+            return
+        cur_price = bars5[-1].Close
+        pip       = pip_size(pair)
+        direction = st["direction"]
+
+        for leg in st["legs"]:
+            entry       = leg["entry"]
+            pips_profit = (cur_price - entry) * direction / pip
+
+            new_stop = leg["stop"]
+
+            # Step 1: TRAIL_BE — move stop to entry at +TRAIL_BE_PIPS
+            if pips_profit >= config.TRAIL_BE_PIPS:
+                if direction > 0:
+                    new_stop = max(new_stop, entry)
+                else:
+                    new_stop = min(new_stop, entry)
+
+            # Step 2: TRAIL_LOCK — lock +10 pips at +TRAIL_LOCK_PIPS
+            if pips_profit >= config.TRAIL_LOCK_PIPS:
+                locked = entry + 10 * pip * direction
+                if direction > 0:
+                    new_stop = max(new_stop, locked)
+                else:
+                    new_stop = min(new_stop, locked)
+
+            # Step 3: P23 milestone trail — every MILESTONE_TRAIL_STEP pips beyond
+            # TRAIL_LOCK_PIPS, ratchet the stop to (milestone − MILESTONE_TRAIL_BUFFER).
+            if (config.MILESTONE_TRAIL_ENABLED
+                    and pips_profit >= config.TRAIL_LOCK_PIPS + config.MILESTONE_TRAIL_STEP):
+                _step      = config.MILESTONE_TRAIL_STEP
+                _buf       = config.MILESTONE_TRAIL_BUFFER
+                _milestone = int(pips_profit / _step) * _step
+                _lock_ms   = entry + (_milestone - _buf) * pip * direction
+                if direction > 0:
+                    new_stop = max(new_stop, _lock_ms)
+                else:
+                    new_stop = min(new_stop, _lock_ms)
+
+            # Only update the broker order when the stop has moved in our favour.
+            if new_stop != leg["stop"]:
+                sl_id  = leg.get("sl_id")
+                if sl_id is not None:
+                    ticket = self.Transactions.GetOrderTicket(sl_id)
+                    if ticket is not None and ticket.Status not in (
+                        OrderStatus.Filled, OrderStatus.Canceled
+                    ):
+                        ticket.UpdateStopPrice(new_stop)
+                leg["stop"] = new_stop
 
     # ──────────────────────────────────────────────────────────────────────────
     # Session handover
