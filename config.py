@@ -373,6 +373,16 @@ BREAKOUT_MODEL_ENABLED = True
 BREAKOUT_HOLD_PIPS     = 3.0       # min close beyond the range extreme to call it a hold
 BREAKOUT_CONVICTION    = 2         # conviction credit when the intermarket breakout confirms
 
+# --- Session-open Judas sweep (P26) ---
+# The session open price is the AMD equilibrium reference for the current cycle.
+# When price sweeps below it (for longs) / above it (for shorts) by at least
+# SWEEP_SOJ_MIN_PIPS AND closes back through, the manipulation phase has fired
+# anchored to that reference — no pre-existing consolidation range required.
+# Adds +1 conviction alongside (not replacing) the AMD range+sweep detection.
+SOJ_SWEEP_ENABLED  = bool(int(_os.environ.get("SOJ_SWEEP_ENABLED",  1)))
+SWEEP_SOJ_MIN_PIPS = float(_os.environ.get("SWEEP_SOJ_MIN_PIPS", 3.0))
+SOJ_LOOKBACK_BARS  = int(_os.environ.get("SOJ_LOOKBACK_BARS",     48))   # covers full session
+
 # Multi-TF breakout calibration (v4 — per-TF parameters for detect_breakout).
 # Each instrument (EU, GU) independently confirms on its highest available TF
 # (D1 → H4 → H1 → M15 cascade); directions must still all agree.  Parameters

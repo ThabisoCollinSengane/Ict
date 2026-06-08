@@ -621,6 +621,36 @@ class Backtester:
             return None
         return mp_session_open(bars, ts, sess_name, t)
 
+    def _session_open_judas_sweep(self, pair: str, direction: int,
+                                   session_open_price: float, t) -> bool:
+        """P26: Session-open Judas sweep.
+
+        True when, within the current session, price swept the session open in the
+        manipulation direction and has since closed back on the distribution side.
+
+          Long  (+1): any bar's Low went ≥ SWEEP_SOJ_MIN_PIPS below session_open_price
+                      AND the current close is back above session_open_price.
+          Short (-1): any bar's High went ≥ SWEEP_SOJ_MIN_PIPS above session_open_price
+                      AND the current close is back below session_open_price.
+
+        SOJ_LOOKBACK_BARS (default 48 M5 bars = 4 h) covers the full London or NY
+        killzone without reaching back into yesterday's session.
+        """
+        bars = self.bars_up_to(pair, "5T", t)
+        if not bars or len(bars) < 3:
+            return False
+        pip = 0.0001
+        min_sweep = config.SWEEP_SOJ_MIN_PIPS * pip
+        last = bars[-1]
+        lookback = min(config.SOJ_LOOKBACK_BARS, len(bars) - 1)
+        sess_bars = bars[-lookback:]
+        if direction > 0:
+            return (any(b.Low < session_open_price - min_sweep for b in sess_bars)
+                    and last.Close > session_open_price)
+        else:
+            return (any(b.High > session_open_price + min_sweep for b in sess_bars)
+                    and last.Close < session_open_price)
+
     def _get_weekly_amd(self, pair: str, t) -> object | None:
         """Cached weekly AMD for this bar (recomputed at most once per bar per pair)."""
         bars = self.tf_bars.get((pair, "D"), [])
@@ -1938,6 +1968,18 @@ class Backtester:
             _judas_key = (pair, _session_label, _ny_dt.date())
             self._judas_seen[_judas_key] = True
 
+        # P26 — Session-open Judas sweep: the session open price IS the AMD
+        # equilibrium reference. A sweep of it + close back through = manipulation
+        # phase firing on the institutional reference, even without a formal range.
+        _soj_sweep = False
+        if config.SOJ_SWEEP_ENABLED and _session_open is not None:
+            _soj_sweep = self._session_open_judas_sweep(pair, direction, _session_open, t)
+            if _soj_sweep:
+                conviction += 1
+                g["soj_sweep"] = g.get("soj_sweep", 0) + 1
+                _judas_key = (pair, _session_label, _ny_dt.date())
+                self._judas_seen[_judas_key] = True
+
         # HTF FVG 50% draw (P9): price consolidating at the equilibrium of an
         # unmitigated H4/D1/W1 FVG aligned with the trade. These gaps are the
         # bigger-timeframe draw on liquidity continuation moves deliver into —
@@ -2421,6 +2463,7 @@ class Backtester:
             "dxy_mstruct_sweep": _ms["dxy_minor_sweep"],
             "crt_tf": _crt_tf,
             "target_escalated": _tgt_escalated,
+            "soj_sweep": _soj_sweep,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
