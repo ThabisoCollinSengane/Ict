@@ -515,39 +515,26 @@ class Backtester:
 
         Returns +1, -1, or 0 (no confirmed triple breakout).
 
-        Multi-TF tested (2026-06-08): allowing H1→M15 (and H1→M15→M5) for each
-        instrument added ~300 extra H1-driven signals, MaxDD -15.74% (breaches
-        -15% limit), equity R302M vs R400.7M baseline. H1 detect_breakout with
-        M15-calibrated parameters is too permissive. M15-only remains optimal.
+        Multi-TF tested (2026-06-08):
+        - v1/v2 (H1→M15 cascade): MaxDD -15.74%, equity R302M vs R400.7M baseline. ❌
+        - v3 (D1→H4→H1→M15 cascade): MaxDD -18.89%, equity R390.6M vs R400.7M. ❌
+          Breakout count ballooned to 534 (vs ~130 baseline) — D1/H4 bars fed to the
+          M15-calibrated detect_breakout are too permissive; range params designed for
+          M15 accept nearly everything on bigger TFs. M15-only is optimal.
         """
         if not config.BREAKOUT_MODEL_ENABLED:
             return 0
 
-        def _first_breakout(sym):
-            # D1 → H4 → H1 → M15: each pair confirms on its highest available TF.
-            # No M5 — too noisy.  Directions must still all agree.
-            for tf in ("D", "240T", "60T", "15T"):
-                bars = self.bars_up_to(sym, tf, t)
-                if not bars:
-                    continue
-                brk = detect_breakout(bars, sym)
-                if brk:
-                    return brk[1]
+        eu = self.bars_up_to("EURUSD", "15T", t)
+        gu = self.bars_up_to("GBPUSD", "15T", t)
+        if not eu or not gu:
             return 0
-
-        eu_dir = _first_breakout("EURUSD")
-        gu_dir = _first_breakout("GBPUSD")
-        if not eu_dir or not gu_dir or eu_dir != gu_dir:
+        eu_brk = detect_breakout(eu, "EURUSD")
+        gu_brk = detect_breakout(gu, "GBPUSD")
+        if not (eu_brk and gu_brk):
             return 0
-
-        # DXY: D1 → H4 → H1 → M15 BOS
-        dxy_dir = 0
-        for tf in ("D", "240T", "60T", "15T"):
-            d = self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH)
-            if d != 0:
-                dxy_dir = d
-                break
-
+        eu_dir, gu_dir = eu_brk[1], gu_brk[1]
+        dxy_dir = self._dxy_bias("15T", t, lookback=config.SWING_LOOKBACK_STH)
         if eu_dir == +1 and gu_dir == +1 and dxy_dir == -1:
             return +1
         if eu_dir == -1 and gu_dir == -1 and dxy_dir == +1:
