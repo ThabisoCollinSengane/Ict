@@ -522,16 +522,32 @@ class Backtester:
         """
         if not config.BREAKOUT_MODEL_ENABLED:
             return 0
-        eu = self.bars_up_to("EURUSD", "15T", t)
-        gu = self.bars_up_to("GBPUSD", "15T", t)
-        if not eu or not gu:
+
+        def _first_breakout(sym):
+            # D1 → H4 → H1 → M15: each pair confirms on its highest available TF.
+            # No M5 — too noisy.  Directions must still all agree.
+            for tf in ("D", "240T", "60T", "15T"):
+                bars = self.bars_up_to(sym, tf, t)
+                if not bars:
+                    continue
+                brk = detect_breakout(bars, sym)
+                if brk:
+                    return brk[1]
             return 0
-        eu_brk = detect_breakout(eu, "EURUSD")
-        gu_brk = detect_breakout(gu, "GBPUSD")
-        if not (eu_brk and gu_brk):
+
+        eu_dir = _first_breakout("EURUSD")
+        gu_dir = _first_breakout("GBPUSD")
+        if not eu_dir or not gu_dir or eu_dir != gu_dir:
             return 0
-        eu_dir, gu_dir = eu_brk[1], gu_brk[1]
-        dxy_dir = self._dxy_bias("15T", t, lookback=config.SWING_LOOKBACK_STH)
+
+        # DXY: D1 → H4 → H1 → M15 BOS
+        dxy_dir = 0
+        for tf in ("D", "240T", "60T", "15T"):
+            d = self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH)
+            if d != 0:
+                dxy_dir = d
+                break
+
         if eu_dir == +1 and gu_dir == +1 and dxy_dir == -1:
             return +1
         if eu_dir == -1 and gu_dir == -1 and dxy_dir == +1:
