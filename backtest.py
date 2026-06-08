@@ -503,23 +503,25 @@ class Backtester:
         return 0
 
     def _intermarket_breakout(self, t) -> int:
-        """Multi-TF triple-confirmed intermarket breakout.
+        """Triple-confirmed intermarket breakout — leading pair on H1, lagging on H1/M15.
 
-        Each instrument confirms on its own highest available timeframe
-        (H1 → M15 → M5).  A USD-driven expansion shows the same directional
-        move across all three legs even when the lagging pair only clears M15/M5
-        structure while the leading pair + DXY clear H1:
+        The original M15-only check missed the real-world scenario where USD-driven
+        expansion shows on H1 for the leading pair (EURUSD + DXY) while the lagging
+        GBPUSD only clears M15 structure in the same move.
 
-            EURUSD breaks H1 high  + GBPUSD breaks M15 high  + DXY breaks H1 low
-              → USD weakness, GBPUSD lagging but still confirming → +1
+        Logic:
+          1. EURUSD must confirm on its HIGHEST available TF (H1 first, then M15).
+          2. GBPUSD confirms on H1 or M15 (no M5 — too noisy for genuine expansion).
+          3. DXY confirms on H1 first, then M15.
+          4. All three must agree on direction.
 
-        Returns +1, -1, or 0 (no confirmed triple breakout).
+        Returns +1, -1, or 0.
         """
         if not config.BREAKOUT_MODEL_ENABLED:
             return 0
 
-        def _first_breakout(sym):
-            for tf in ("60T", "15T", "5T"):
+        def _first_breakout(sym, tfs):
+            for tf in tfs:
                 bars = self.bars_up_to(sym, tf, t)
                 if not bars:
                     continue
@@ -528,12 +530,14 @@ class Backtester:
                     return brk[1]
             return 0
 
-        eu_dir = _first_breakout("EURUSD")
-        gu_dir = _first_breakout("GBPUSD")
+        # EURUSD: leading pair — H1 first, M15 fallback
+        eu_dir = _first_breakout("EURUSD", ("60T", "15T"))
+        # GBPUSD: lagging pair — H1 or M15 only (no M5)
+        gu_dir = _first_breakout("GBPUSD", ("60T", "15T"))
         if not eu_dir or not gu_dir or eu_dir != gu_dir:
             return 0
 
-        # DXY: highest available TF showing BOS in the opposite direction.
+        # DXY: H1 first, then M15
         dxy_dir = 0
         for tf in ("60T", "15T"):
             d = self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH)
