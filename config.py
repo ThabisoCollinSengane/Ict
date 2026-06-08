@@ -188,7 +188,7 @@ MAX_FORWARD_DAYS = 5
 NEWS_BLOCK_MINUTES_BEFORE = 15
 NEWS_BLOCK_MINUTES_AFTER  = 15
 NEWS_IMPACTS = ("High", "Medium")
-NEWS_CURRENCIES = ("USD", "EUR", "GBP")
+NEWS_CURRENCIES = ("USD", "EUR", "GBP", "NZD")
 FOREXFACTORY_XML_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
 # CPI/NFP/FOMC create 20-40+ pip Judas spikes that always blow through a 10-pip stop.
 # These are blocked entirely (like Medium). All other High-impact events are allowed
