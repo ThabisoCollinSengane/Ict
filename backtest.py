@@ -503,48 +503,35 @@ class Backtester:
         return 0
 
     def _intermarket_breakout(self, t) -> int:
-        """Triple-confirmed intermarket breakout — leading pair on H1, lagging on H1/M15.
+        """Triple-confirmed intermarket breakout on M15.
 
-        The original M15-only check missed the real-world scenario where USD-driven
-        expansion shows on H1 for the leading pair (EURUSD + DXY) while the lagging
-        GBPUSD only clears M15 structure in the same move.
+        A single-pair breakout from consolidation is usually a Judas fakeout. A
+        genuine USD-driven expansion shows up in ALL THREE legs at once:
 
-        Logic:
-          1. EURUSD must confirm on its HIGHEST available TF (H1 first, then M15).
-          2. GBPUSD confirms on H1 or M15 (no M5 — too noisy for genuine expansion).
-          3. DXY confirms on H1 first, then M15.
-          4. All three must agree on direction.
+            EURUSD clears range HIGH + GBPUSD clears range HIGH + DXY clears LOW
+              → USD weakness expansion → +1 (look long EURUSD/GBPUSD)
+            EURUSD clears range LOW  + GBPUSD clears range LOW  + DXY clears HIGH
+              → USD strength expansion → -1 (look short EURUSD/GBPUSD)
 
-        Returns +1, -1, or 0.
+        Returns +1, -1, or 0 (no confirmed triple breakout).
+
+        Multi-TF tested (2026-06-08): allowing H1→M15 (and H1→M15→M5) for each
+        instrument added ~300 extra H1-driven signals, MaxDD -15.74% (breaches
+        -15% limit), equity R302M vs R400.7M baseline. H1 detect_breakout with
+        M15-calibrated parameters is too permissive. M15-only remains optimal.
         """
         if not config.BREAKOUT_MODEL_ENABLED:
             return 0
-
-        def _first_breakout(sym, tfs):
-            for tf in tfs:
-                bars = self.bars_up_to(sym, tf, t)
-                if not bars:
-                    continue
-                brk = detect_breakout(bars, sym)
-                if brk:
-                    return brk[1]
+        eu = self.bars_up_to("EURUSD", "15T", t)
+        gu = self.bars_up_to("GBPUSD", "15T", t)
+        if not eu or not gu:
             return 0
-
-        # EURUSD: leading pair — H1 first, M15 fallback
-        eu_dir = _first_breakout("EURUSD", ("60T", "15T"))
-        # GBPUSD: lagging pair — H1 or M15 only (no M5)
-        gu_dir = _first_breakout("GBPUSD", ("60T", "15T"))
-        if not eu_dir or not gu_dir or eu_dir != gu_dir:
+        eu_brk = detect_breakout(eu, "EURUSD")
+        gu_brk = detect_breakout(gu, "GBPUSD")
+        if not (eu_brk and gu_brk):
             return 0
-
-        # DXY: H1 first, then M15
-        dxy_dir = 0
-        for tf in ("60T", "15T"):
-            d = self._dxy_bias(tf, t, lookback=config.SWING_LOOKBACK_STH)
-            if d != 0:
-                dxy_dir = d
-                break
-
+        eu_dir, gu_dir = eu_brk[1], gu_brk[1]
+        dxy_dir = self._dxy_bias("15T", t, lookback=config.SWING_LOOKBACK_STH)
         if eu_dir == +1 and gu_dir == +1 and dxy_dir == -1:
             return +1
         if eu_dir == -1 and gu_dir == -1 and dxy_dir == +1:
