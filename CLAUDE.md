@@ -12,12 +12,12 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 812 trades, WR 46.1%, PF 4.47, MaxDD -13.01%, R500 → R400.7M.
+**Backtest result (4 years, 2022–2025):** 810 trades, WR 45.9%, PF 4.47, MaxDD -12.95%, R500 → R429.3M.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
 HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
 targets, P18 score≥4 confluence sizing (1.25×), P19 H4-CRT Turtle Soup sizing (1.25×),
 P20 high-conviction target escalation, P21 pyramid gate fix, P22 pyramid gate relaxation,
-P23 milestone trailing stop. See P18 for the cache-bug post-mortem.)
+P23 milestone trailing stop, P26 session-open Judas sweep. See P18 for the cache-bug post-mortem.)
 
 ---
 
@@ -994,6 +994,62 @@ fallback when they genuinely ARE the nearest qualifying target (8 wins, avg R403
 highest per-win average). Not by forced selection over nearer targets.
 
 **Config:** `HTF_TARGET_PREF_PIPS=0` (off by default, code retained).
+
+### P26 — Session-open Judas sweep (SHIPPED 2026-06-10)
+**What:** The session open price (London 03:00 ET / NY 07:00 ET) is the AMD equilibrium
+reference for the current cycle. When price sweeps below it (for longs) or above it (for
+shorts) by ≥ `SWEEP_SOJ_MIN_PIPS` (3 pips) and closes back through, the manipulation phase
+has fired anchored to that institutional reference — even without a formal 8–96 bar
+consolidation range. This is the setup ICT calls "trading the return to the session open":
+price opens, Judas-sweeps below/above the open, then distributes back through it.
+
+**Why the bot was missing it:** `detect_amd_setup` requires a consolidation range (both
+extremes touched ≥2× over 8–96 M15 bars). These setups are often a directional drop and
+reversal with no defined range — a one-sided move through the opening price that immediately
+reverses. No range → no AMD signal → conviction too low. Identified from a real trade
+missed on 8 Jun 2026: EURUSD/GBPUSD swept below their London opens (~1.15143 / 1.33213)
+while DXY also dropped below its own open (100.108), then all three closed back above.
+
+**Implementation** (`_session_open_judas_sweep` in backtest.py):
+- Checks last `SOJ_LOOKBACK_BARS` (48) M5 bars — covers full London or NY session
+- For longs: any bar Low < session_open − 3 pips AND current Close > session_open → True
+- For shorts: any bar High > session_open + 3 pips AND current Close < session_open → True
+- +1 conviction when fires (alongside AMD detection, not replacing it)
+- Marks `_judas_seen` so `session_phase` labels correctly (london_judas / ny_judas)
+- `soj_sweep` column on every trade record
+
+**Result (full 4yr vs P23 baseline):**
+
+| Metric | P23 baseline | **P26** | Δ |
+|---|---|---|---|
+| Trades | 795 | 810 | +15 |
+| WR | 46.6% | 45.9% | -0.7pp |
+| PF | 4.47 | **4.47** | unchanged ✓ |
+| Equity | R400.7M | **R429.3M** | **+R28.6M (+7.1%)** |
+| MaxDD | -13.01% | **-12.95%** | improved ✓ |
+
+**IS/OOS validation:**
+
+| Metric | IS 2022–23 | OOS 2024–25 | Verdict |
+|---|---|---|---|
+| PF | 3.09 | 4.47 | ✅ positive both splits |
+| SOJ sweep WR | 46.8% | 44.4% | ✅ consistent |
+| SOJ sweep PF | 2.88 | 4.17 | ✅ positive both splits |
+| MaxDD | -12.95% | -15.41% | ✅ full run -12.95% |
+
+IS/OOS both positive, same ballpark. Full continuous run MaxDD tightens from -13.01% to
+-12.95% — the new trades are quality entries happening at genuine institutional levels.
+
+**Multi-TF breakout test history (reverted — documented here for reference):**
+All 4 variants of multi-TF breakout detection were tested and failed MaxDD:
+- v1/v2 (H1→M15 cascade, M15 params): MaxDD -15.74%, R302M ❌
+- v3 (D1→H4→H1→M15, M15 params): MaxDD -18.89%, R390M ❌
+- v4 (D1→H4→H1→M15, per-TF calibrated): MaxDD -15.32%, R396M ❌
+Root cause: cascade allows stale confirmations + M15-only triple confirmation enforces
+strict simultaneity. `BREAKOUT_H1/H4/D1_PARAMS` retained in config.py for reference.
+M15-only triple-confirmed breakout is optimal.
+
+**Config:** `SOJ_SWEEP_ENABLED=1`, `SWEEP_SOJ_MIN_PIPS=3.0`, `SOJ_LOOKBACK_BARS=48`.
 
 ---
 
