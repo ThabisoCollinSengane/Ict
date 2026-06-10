@@ -408,6 +408,7 @@ class Backtester:
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
             "soj_sweep": st.get("soj_sweep", False),
+            "soj_type": st.get("soj_type", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -463,6 +464,7 @@ class Backtester:
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
             "soj_sweep": st.get("soj_sweep", False),
+            "soj_type": st.get("soj_type", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -624,34 +626,65 @@ class Backtester:
         return mp_session_open(bars, ts, sess_name, t)
 
     def _session_open_judas_sweep(self, pair: str, direction: int,
-                                   session_open_price: float, t) -> bool:
-        """P26: Session-open Judas sweep.
+                                   session_open_price: float, t,
+                                   daily_open_price: float | None = None) -> int:
+        """P26: Session-open + daily-open pattern detection. Returns conviction points (0–2).
 
-        True when, within the current session, price swept the session open in the
-        manipulation direction and has since closed back on the distribution side.
+        Checks BOTH the session open (London 03:00 / NY 07:00 ET) and the daily open
+        (00:00 UTC) as institutional AMD equilibrium references.
 
-          Long  (+1): any bar's Low went ≥ SWEEP_SOJ_MIN_PIPS below session_open_price
-                      AND the current close is back above session_open_price.
-          Short (-1): any bar's High went ≥ SWEEP_SOJ_MIN_PIPS above session_open_price
-                      AND the current close is back below session_open_price.
+        For each reference price, two patterns are checked:
 
-        SOJ_LOOKBACK_BARS (default 48 M5 bars = 4 h) covers the full London or NY
-        killzone without reaching back into yesterday's session.
+        Judas sweep (+1 per reference): price swept ≥ SWEEP_SOJ_MIN_PIPS through the
+          reference in the manipulation direction then closed back on the distribution side.
+          Long : any Low  < ref − 3 pips  AND  close > ref.
+          Short: any High > ref + 3 pips  AND  close < ref.
+
+        Pullback retest (+1 per reference): price first extended ≥ SOJ_EXTEND_MIN_PIPS
+          in the trade direction from the reference, then pulled back to within
+          SOJ_RETEST_TOL_PIPS of it.
+          Long : any High > ref + 8 pips  AND  ref − 5 pips ≤ close ≤ ref + 5 pips.
+          Short: any Low  < ref − 8 pips  AND  ref − 5 pips ≤ close ≤ ref + 5 pips.
+
+        Points are capped at 1 per reference (either Judas or retest fires — both
+        detecting on the same reference only counts once). Max total = 2 points
+        (session open + daily open each contributing 1). The type stored in soj_type
+        reflects the strongest signal across both references.
         """
         bars = self.bars_up_to(pair, "5T", t)
         if not bars or len(bars) < 3:
-            return False
+            return 0
         pip = 0.0001
-        min_sweep = config.SWEEP_SOJ_MIN_PIPS * pip
+        min_sweep  = config.SWEEP_SOJ_MIN_PIPS  * pip
+        min_extend = config.SOJ_EXTEND_MIN_PIPS * pip
+        retest_tol = config.SOJ_RETEST_TOL_PIPS * pip
         last = bars[-1]
         lookback = min(config.SOJ_LOOKBACK_BARS, len(bars) - 1)
         sess_bars = bars[-lookback:]
-        if direction > 0:
-            return (any(b.Low < session_open_price - min_sweep for b in sess_bars)
-                    and last.Close > session_open_price)
-        else:
-            return (any(b.High > session_open_price + min_sweep for b in sess_bars)
-                    and last.Close < session_open_price)
+        points = 0
+
+        def _check_ref(ref_price: float) -> bool:
+            """Return True if Judas or pullback retest fires for this reference price."""
+            if direction > 0:
+                judas = (any(b.Low < ref_price - min_sweep for b in sess_bars)
+                         and last.Close > ref_price)
+                retest = (any(b.High > ref_price + min_extend for b in sess_bars)
+                          and ref_price - retest_tol <= last.Close <= ref_price + retest_tol
+                          and last.Close >= ref_price - pip)
+            else:
+                judas = (any(b.High > ref_price + min_sweep for b in sess_bars)
+                         and last.Close < ref_price)
+                retest = (any(b.Low < ref_price - min_extend for b in sess_bars)
+                          and ref_price - retest_tol <= last.Close <= ref_price + retest_tol
+                          and last.Close <= ref_price + pip)
+            return judas or retest
+
+        if _check_ref(session_open_price):
+            points += 1
+        if daily_open_price is not None and abs(daily_open_price - session_open_price) > 2 * pip:
+            if _check_ref(daily_open_price):
+                points += 1
+        return points
 
     def _get_weekly_amd(self, pair: str, t) -> object | None:
         """Cached weekly AMD for this bar (recomputed at most once per bar per pair)."""
@@ -1912,6 +1945,20 @@ class Backtester:
             _cached_draw = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
             self._draw_cache[_draw_key] = (_cached_draw, direction)
         _draw_score = _cached_draw
+
+        # SOJ early check: compute session open before the conviction block so
+        # _soj_pts_early is available for the full conviction block below.
+        # The session open and direction match what _profile_score would compute.
+        # Also compute daily open early for the P26 dual-reference check.
+        _sess_name_early = "London Open" if _is_london else ("New York AM" if _is_ny else None)
+        _session_open_early = self._session_open(pair, _sess_name_early, t) if _sess_name_early else None
+        _daily_open_early = self._daily_open(pair, t)
+        _soj_pts_early = 0
+        if config.SOJ_SWEEP_ENABLED and _session_open_early is not None:
+            _soj_pts_early = self._session_open_judas_sweep(
+                pair, direction, _session_open_early, t,
+                daily_open_price=_daily_open_early)
+
         if _draw_score == 0 and not _is_breakout:
             if _is_ny_cont and config.NY_CONTINUATION_GATE_EXEMPT:
                 # Exempt: this runs WITH the daily draw (continuation of London's
@@ -1970,17 +2017,27 @@ class Backtester:
             _judas_key = (pair, _session_label, _ny_dt.date())
             self._judas_seen[_judas_key] = True
 
-        # P26 — Session-open Judas sweep: the session open price IS the AMD
-        # equilibrium reference. A sweep of it + close back through = manipulation
-        # phase firing on the institutional reference, even without a formal range.
-        _soj_sweep = False
-        if config.SOJ_SWEEP_ENABLED and _session_open is not None:
-            _soj_sweep = self._session_open_judas_sweep(pair, direction, _session_open, t)
-            if _soj_sweep:
-                conviction += 1
-                g["soj_sweep"] = g.get("soj_sweep", 0) + 1
-                _judas_key = (pair, _session_label, _ny_dt.date())
-                self._judas_seen[_judas_key] = True
+        # P26 — Session-open + daily-open pattern (Judas sweep / pullback retest):
+        # Session open (03:00 London / 07:00 NY ET) and daily open (00:00 UTC) are
+        # both AMD equilibrium references. +1 per reference that confirms a Judas
+        # or pullback. Max +2 (both references active), min +1 (one reference).
+        # Reuse early-computed values (before the draw gate, same logic).
+        _soj_pts = _soj_pts_early
+        _soj_type = ""
+        if _soj_pts:
+            conviction += _soj_pts
+            if _soj_pts >= 2:
+                # Both session open and daily open confirmed the pattern.
+                g["soj_judas"] = g.get("soj_judas", 0) + 1
+                _soj_type = "dual"
+            else:
+                # Single reference (session open or daily open) confirmed.
+                g["soj_retest"] = g.get("soj_retest", 0) + 1
+                _soj_type = "single"
+            g["soj_sweep"] = g.get("soj_sweep", 0) + 1
+            _judas_key = (pair, _session_label, _ny_dt.date())
+            self._judas_seen[_judas_key] = True
+        _soj_sweep = _soj_pts > 0
 
         # HTF FVG 50% draw (P9): price consolidating at the equilibrium of an
         # unmitigated H4/D1/W1 FVG aligned with the trade. These gaps are the
@@ -2466,6 +2523,7 @@ class Backtester:
             "crt_tf": _crt_tf,
             "target_escalated": _tgt_escalated,
             "soj_sweep": _soj_sweep,
+            "soj_type": _soj_type,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.

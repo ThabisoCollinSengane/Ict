@@ -660,22 +660,29 @@ def main():
                   f"{pnl:>11.2f} {avg:>10.2f}")
 
         if "soj_sweep" in df.columns:
-            print("\n=== P26 — Session-open Judas sweep ===")
-            print("  Price swept the session open in the manipulation direction then")
-            print("  closed back through it — AMD cycle anchored to the institutional reference.")
-            print(f"  {'Bucket':<22} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'P&L ZAR':>14} {'PF':>6}")
-            print("  " + "-" * 62)
-            for flag, label in [(True, "SOJ sweep fired"), (False, "no SOJ sweep")]:
-                g2 = df[df.soj_sweep == flag]
+            print("\n=== P26 — Session-open + daily-open pattern ===")
+            print("  +1 per reference (session open / daily open) showing Judas sweep or")
+            print("  pullback retest. Dual (+2) = both references fired.")
+            print(f"  {'Bucket':<30} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'P&L ZAR':>14} {'PF':>6}")
+            print("  " + "-" * 70)
+            buckets = [
+                (df["soj_type"] == "dual",    "SOJ dual (sess+daily, +2)"),
+                (df["soj_type"] == "single",  "SOJ single reference (+1)"),
+                (~df["soj_sweep"],             "no SOJ pattern"),
+            ] if "soj_type" in df.columns else [
+                (df.soj_sweep,   "SOJ fired"),
+                (~df.soj_sweep,  "no SOJ"),
+            ]
+            for mask, label in buckets:
+                g2 = df[mask]
                 if len(g2) == 0:
                     continue
                 wins2 = (g2.pnl > 0).sum()
-                losses2 = len(g2) - wins2
                 wr2 = 100 * wins2 / len(g2)
                 gross_w = g2[g2.pnl > 0].pnl.sum()
                 gross_l = abs(g2[g2.pnl < 0].pnl.sum())
                 pf2 = (gross_w / gross_l) if gross_l else float("inf")
-                print(f"  {label:<22} {len(g2):>7} {wins2:>5} {wr2:>5.1f}% "
+                print(f"  {label:<30} {len(g2):>7} {wins2:>5} {wr2:>5.1f}% "
                       f"{g2.pnl.sum():>13.2f} {pf2:>6.2f}")
     else:
         print("\nNo trades generated.")

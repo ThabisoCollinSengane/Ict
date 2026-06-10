@@ -373,15 +373,21 @@ BREAKOUT_MODEL_ENABLED = True
 BREAKOUT_HOLD_PIPS     = 3.0       # min close beyond the range extreme to call it a hold
 BREAKOUT_CONVICTION    = 2         # conviction credit when the intermarket breakout confirms
 
-# --- Session-open Judas sweep (P26) ---
+# --- Session-open patterns (P26) ---
 # The session open price is the AMD equilibrium reference for the current cycle.
-# When price sweeps below it (for longs) / above it (for shorts) by at least
-# SWEEP_SOJ_MIN_PIPS AND closes back through, the manipulation phase has fired
-# anchored to that reference — no pre-existing consolidation range required.
-# Adds +1 conviction alongside (not replacing) the AMD range+sweep detection.
-SOJ_SWEEP_ENABLED  = bool(int(_os.environ.get("SOJ_SWEEP_ENABLED",  1)))
-SWEEP_SOJ_MIN_PIPS = float(_os.environ.get("SWEEP_SOJ_MIN_PIPS", 3.0))
-SOJ_LOOKBACK_BARS  = int(_os.environ.get("SOJ_LOOKBACK_BARS",     48))   # covers full session
+# Two patterns, both anchored to the open and firing every session:
+#
+# Judas sweep (+2): price swept SWEEP_SOJ_MIN_PIPS through the open in the
+#   manipulation direction then closed back — classic stop-hunt at the open.
+#
+# Pullback retest (+1): price first extended SOJ_EXTEND_MIN_PIPS in the trade
+#   direction, then pulled back to within SOJ_RETEST_TOL_PIPS of the open.
+#   This is the "return to the open after the initial move" — happens every session.
+SOJ_SWEEP_ENABLED  = bool(int(_os.environ.get("SOJ_SWEEP_ENABLED",   1)))
+SWEEP_SOJ_MIN_PIPS = float(_os.environ.get("SWEEP_SOJ_MIN_PIPS",  3.0))  # Judas wick depth
+SOJ_EXTEND_MIN_PIPS = float(_os.environ.get("SOJ_EXTEND_MIN_PIPS", 8.0)) # min move before retest
+SOJ_RETEST_TOL_PIPS = float(_os.environ.get("SOJ_RETEST_TOL_PIPS", 5.0)) # tolerance at open
+SOJ_LOOKBACK_BARS  = int(_os.environ.get("SOJ_LOOKBACK_BARS",      48))   # covers full session
 
 # Multi-TF breakout calibration (v4 — per-TF parameters for detect_breakout).
 # Each instrument (EU, GU) independently confirms on its highest available TF
