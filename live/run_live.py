@@ -101,6 +101,10 @@ class LiveTrader(Backtester):
         self._day_open_eq       = {}   # date → equity at day open
         self._drawdown_halt_until = None
 
+        # Stale-feed guard state: True while the MT5 feed is detected frozen, so
+        # the STALE / RECOVERED alerts fire once per transition (not every loop).
+        self._feed_stale = False
+
         # Weekly / daily trade budgets
         self._week_total   = {}
         self._week_pair    = {}
@@ -467,6 +471,67 @@ class LiveTrader(Backtester):
             for pair in list(self.active.keys()):
                 self._force_close(pair, 0, now, "session_kill")
 
+    # ── Stale-feed guard ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _forex_market_open(now: datetime) -> bool:
+        """Rough forex market hours in UTC. Closed over the weekend gap.
+
+        Week opens Sunday ~21:00 UTC and closes Friday ~21:00 UTC. During that
+        gap bars legitimately don't advance, so the stale-feed alert is suppressed.
+        """
+        wd = now.weekday()          # Mon=0 … Sat=5, Sun=6
+        h  = now.hour
+        if wd == 5:                 # Saturday: closed all day
+            return False
+        if wd == 6 and h < 21:      # Sunday before 21:00 UTC: still closed
+            return False
+        if wd == 4 and h >= 21:     # Friday after 21:00 UTC: closed
+            return False
+        return True
+
+    def _feed_fresh(self, now: datetime) -> bool:
+        """Return True if the MT5 feed is live; alert + return False if stale.
+
+        Compares the age of the latest completed EURUSD M5 bar against
+        STALE_FEED_MAX_MINUTES. Alerts on Telegram once when the feed goes stale
+        and once when it recovers. Suppressed entirely over the weekend gap.
+        """
+        if not config.STALE_FEED_GUARD_ENABLED:
+            return True
+        if not self._forex_market_open(now):
+            self._feed_stale = False    # weekend gap — reset, no alert
+            return True
+
+        bars = mt.get_bars("EURUSD", "5T", 1)
+        if not bars:
+            age_min = None              # no bars at all → treat as stale
+        else:
+            # bar.time is the bar OPEN epoch (UTC); +300s = its close.
+            last_close = bars[-1].time + 300
+            age_min = (now.timestamp() - last_close) / 60.0
+
+        stale = (age_min is None) or (age_min > config.STALE_FEED_MAX_MINUTES)
+
+        if stale and not self._feed_stale:
+            self._feed_stale = True
+            detail = "no bars returned" if age_min is None else f"last bar {age_min:.0f} min old"
+            log.warning("FEED STALE — %s — holding, no trades until recovery", detail)
+            _notify(
+                f"⚠️ FEED STALE\n"
+                f"MT5 data has stopped updating ({detail}).\n"
+                f"Bot is HOLDING — no new trades until the feed recovers.\n"
+                f"Check the VPS terminal + broker connection."
+            )
+        elif not stale and self._feed_stale:
+            self._feed_stale = False
+            log.info("Feed recovered (last bar %.0f min old) — resuming", age_min or 0)
+            _notify(
+                "✅ FEED RECOVERED\n"
+                "MT5 data is flowing again. Bot resuming normal operation."
+            )
+        return not stale
+
     # ── Main loop ─────────────────────────────────────────────────────────────
 
     def run(self):
@@ -478,10 +543,16 @@ class LiveTrader(Backtester):
         log.info("DEMO mode until smoke test confirmed — see LIVE_SETUP.md")
         log.info("=" * 60)
 
+        _feed_timeout = (config.STALE_FEED_MAX_MINUTES * 60
+                         if config.STALE_FEED_GUARD_ENABLED else None)
         while True:
             try:
-                mt.wait_for_bar("5T")
+                # Timeout so a frozen feed wakes us to run the stale check instead
+                # of blocking forever inside wait_for_bar.
+                mt.wait_for_bar("5T", timeout_seconds=_feed_timeout)
                 now = datetime.now(timezone.utc)
+                if not self._feed_fresh(now):
+                    continue   # feed stale — alerted, skip this cycle (no trading)
                 self._run_once(now)
             except KeyboardInterrupt:
                 log.info("KeyboardInterrupt — shutting down gracefully")

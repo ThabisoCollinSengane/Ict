@@ -445,6 +445,17 @@ SLIPPAGE_PIPS = 0.5          # one-way slippage on market order entries
 # for the remainder of the day — no automatic resume.  Set to 0 to disable.
 SESSION_DRAWDOWN_PCT = 10.0  # halt day if session equity falls >10% from session open
 
+# --- Stale-feed guard (live safety) ---
+# The MT5 terminal can silently drop the broker connection while its Python API
+# keeps answering with CACHED bars. The strategy then re-evaluates identical data
+# forever: equity frozen, open positions never resolve, no new entries — a silent
+# freeze. This guard checks the age of the latest completed EURUSD M5 bar on every
+# wake; when it exceeds STALE_FEED_MAX_MINUTES during forex market hours it alerts
+# on Telegram once and holds (no trading) until the feed recovers. Weekend gaps are
+# expected and suppressed. Set STALE_FEED_GUARD_ENABLED=0 to disable.
+STALE_FEED_GUARD_ENABLED = bool(int(_os.environ.get("STALE_FEED_GUARD_ENABLED", 1)))
+STALE_FEED_MAX_MINUTES   = float(_os.environ.get("STALE_FEED_MAX_MINUTES", 15))
+
 # --- Symbols ---
 PAIRS = ("GBPUSD", "EURUSD", "NZDUSD")   # tradeable (AUDUSD excluded: poor Asian WR)
 REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength

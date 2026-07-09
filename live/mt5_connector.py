@@ -374,17 +374,23 @@ def close_position(ticket: int, deviation: int = 20) -> bool:
 
 
 def wait_for_bar(tf: str = "5T", poll_seconds: float = 2.0,
-                 base: str = "EURUSD"):
+                 base: str = "EURUSD", timeout_seconds: float | None = None):
     """Block until a NEW completed bar of `tf` appears, then return it.
 
-    Used by the live loop to wake once per closed candle. Returns the new Bar.
+    Used by the live loop to wake once per closed candle. Returns the new Bar,
+    or None if `timeout_seconds` elapses with no new bar — the caller uses that
+    to run a stale-feed check instead of blocking forever on a frozen feed.
     """
     last_time = None
     bars = get_bars(base, tf, 2)
     if bars:
         last_time = bars[-1].time
+    waited = 0.0
     while True:
         time.sleep(poll_seconds)
+        waited += poll_seconds
         bars = get_bars(base, tf, 2)
         if bars and (last_time is None or bars[-1].time != last_time):
             return bars[-1]
+        if timeout_seconds is not None and waited >= timeout_seconds:
+            return None
