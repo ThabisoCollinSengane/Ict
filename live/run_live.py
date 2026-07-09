@@ -240,7 +240,22 @@ class LiveTrader(Backtester):
             comment=f"ict_{st.get('im_scenario', '')}",
         )
         if res and res["ok"]:
-            leg["ticket"] = res["ticket"]
+            ticket = res.get("ticket") or self._recover_ticket(pair)
+            if not ticket:
+                # Broker accepted the order but returned no id and we can't match
+                # an open position — we cannot manage what we can't reference.
+                # Drop our tracking (so the pair isn't frozen) and warn: there may
+                # be an untracked position with a broker-side SL/TP still on it.
+                log.error("Order for %s reported OK but no ticket — possible untracked position", pair)
+                _notify(
+                    f"⚠️ ORDER UNCERTAIN\n"
+                    f"{pair} order was accepted but MT5 returned no ticket.\n"
+                    f"There may be an UNTRACKED position (its SL/TP are still set) —\n"
+                    f"check the terminal manually. Bot dropped it from tracking."
+                )
+                del self.active[pair]
+                return
+            leg["ticket"] = ticket
             _dir_str   = "LONG" if st["direction"] > 0 else "SHORT"
             _stop_pips = abs(leg["entry"] - leg["stop"]) / pip_size(pair)
             _rwd_pips  = abs(st["target"] - leg["entry"]) / pip_size(pair)
@@ -295,7 +310,15 @@ class LiveTrader(Backtester):
             comment=f"ict_pyr{new_leg['leg_idx']}",
         )
         if res and res["ok"]:
-            new_leg["ticket"] = res["ticket"]
+            ticket = res.get("ticket") or self._recover_ticket(pair)
+            if not ticket:
+                # No ticket to manage the add by — revert the leg rather than
+                # keep a phantom. Any real broker fill keeps its own SL/TP.
+                log.error("Pyramid %s leg %d reported OK but no ticket — reverting leg",
+                          pair, new_leg["leg_idx"])
+                st["legs"].pop()
+                return
+            new_leg["ticket"] = ticket
             log.info("PYRAMID %s leg %d  %.2f lots  entry≈%.5f",
                      pair, new_leg["leg_idx"], lots, new_leg["entry"])
             self.log.upsert_position(pair, st)
@@ -318,6 +341,33 @@ class LiveTrader(Backtester):
 
     # ── Live position management ──────────────────────────────────────────────
 
+    def _tracked_tickets(self) -> set:
+        """Every broker ticket currently tracked across all active legs."""
+        return {leg.get("ticket")
+                for st in self.active.values()
+                for leg in st["legs"]
+                if leg.get("ticket")}
+
+    def _recover_ticket(self, pair: str):
+        """Best-effort recovery of a just-opened position's ticket.
+
+        MT5's order_send can return TRADE_RETCODE_DONE while `res.order` comes
+        back 0/None. Without a ticket the leg is unmanageable (can't trail,
+        close, or detect broker-close) and would otherwise be kept forever as a
+        phantom. Here we look for an open position on this symbol stamped with
+        our magic number that we're not already tracking — very likely the fill
+        we just placed. Returns its ticket, or None if none can be matched.
+        """
+        tracked = self._tracked_tickets()
+        candidates = [p for p in (mt.positions(pair) or [])
+                      if getattr(p, "magic", 0) == mt.MT5_MAGIC
+                      and p.ticket not in tracked]
+        if not candidates:
+            return None
+        # Most recently opened wins (fallback: highest ticket id).
+        best = max(candidates, key=lambda p: (getattr(p, "time", 0), p.ticket))
+        return best.ticket
+
     def _sync_closed_positions(self, now):
         """Remove legs that MT5 has already closed (SL or TP hit by broker)."""
         for pair in list(self.active.keys()):
@@ -327,7 +377,21 @@ class LiveTrader(Backtester):
             live_legs = []
             for leg in st["legs"]:
                 ticket = leg.get("ticket")
-                if ticket is None or ticket in open_tickets:
+                if ticket is None:
+                    # Phantom leg with no broker ticket — try one last recovery,
+                    # else drop it. Keeping it (the old behaviour) froze the pair
+                    # forever: it never matched an open ticket AND was never
+                    # counted as closed. Prevented at source in _maybe_open /
+                    # _maybe_pyramid; this is the defensive backstop.
+                    recovered = self._recover_ticket(pair)
+                    if recovered:
+                        leg["ticket"] = recovered
+                        live_legs.append(leg)
+                        log.info("Recovered phantom %s leg → ticket %s", pair, recovered)
+                    else:
+                        log.warning("Dropping phantom %s leg (no ticket, unrecoverable)", pair)
+                    continue
+                if ticket in open_tickets:
                     live_legs.append(leg)
                 else:
                     pnl_zar = self._deal_pnl_zar(ticket)

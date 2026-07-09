@@ -30,6 +30,11 @@ from dataclasses import dataclass
 
 log = logging.getLogger("ict.mt5")
 
+# Magic number stamped on every order this bot places. Used to recover a
+# position's ticket if order_send() returns success without an order id, and
+# to tell our positions apart from any placed manually in the same terminal.
+MT5_MAGIC = 770022
+
 # ── Lazy MetaTrader5 import ───────────────────────────────────────────────────
 _MT5 = None
 
@@ -271,7 +276,7 @@ def _filling_mode(name: str):
 def market_order(base: str, volume_lots: float, direction: int,
                  sl: float | None = None, tp: float | None = None,
                  deviation: int = 20, comment: str = "ict",
-                 magic: int = 770022) -> dict | None:
+                 magic: int = MT5_MAGIC) -> dict | None:
     """Send a market order. direction +1 buy / -1 sell. Returns a result dict.
 
     Returns {"ok": bool, "ticket": int|None, "retcode": int, "comment": str}.
