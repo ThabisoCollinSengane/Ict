@@ -15,7 +15,7 @@ pip install -q -r requirements.txt || { echo "pip install failed"; exit 1; }
 pip install -q --upgrade "gdown>=5.2" || { echo "gdown upgrade failed"; exit 1; }
 
 echo "=== [2/6] downloading M1 data (public link) ==="
-rm -rf /tmp/m1dl && gdown --folder --remaining-ok -O /tmp/m1dl "$M1_URL"
+rm -rf /tmp/m1dl && gdown --folder -O /tmp/m1dl "$M1_URL"
 M1_ZIP=$(find /tmp/m1dl -name 'HISTDATA_*_M1????.zip' 2>/dev/null | head -1)
 if [ -z "$M1_ZIP" ]; then
   echo "ERROR: no M1 zips downloaded — is the M1 folder set to 'Anyone with the link'?"
@@ -31,7 +31,7 @@ echo "--- backtest summary (tail) ---"
 tail -50 /tmp/backtest_out.txt
 
 echo "=== [4/6] downloading tick data (slow, a few GB) ==="
-rm -rf /tmp/tickdl && gdown --folder --remaining-ok -O /tmp/tickdl "$TICK_URL"
+rm -rf /tmp/tickdl && gdown --folder -O /tmp/tickdl "$TICK_URL"
 TICK_ZIP=$(find /tmp/tickdl -name 'HISTDATA_*_T*.zip' 2>/dev/null | head -1)
 if [ -z "$TICK_ZIP" ]; then
   echo "ERROR: no tick zips downloaded — is the tick folder set to 'Anyone with the link'?"
