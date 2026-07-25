@@ -46,9 +46,12 @@ import re
 import sys
 import zipfile
 
-# HISTDATA_COM_<ASCII|MT>_<SYMBOL>_M1<YYYY><MM>[ (n)].zip
+# HISTDATA M1 zips come two ways:
+#   monthly: HISTDATA_COM_<ASCII|MT>_<SYMBOL>_M1<YYYY><MM>[ (n)].zip
+#   annual:  HISTDATA_COM_<ASCII|MT>_<SYMBOL>_M1<YYYY>[ (n)].zip
+# The month group is optional; absent → a full-year file (SYMBOL_YYYY.csv).
 _NAME_RE = re.compile(
-    r"HISTDATA_COM_(?:ASCII|MT)_([A-Z]{6})_M1(\d{4})(\d{2})", re.IGNORECASE
+    r"HISTDATA_COM_(?:ASCII|MT)_([A-Z]{6})_M1(\d{4})(\d{2})?", re.IGNORECASE
 )
 
 # Core pairs the backtester needs; used only for the coverage report at the end.
@@ -151,19 +154,20 @@ def main() -> int:
         if not m:
             print(f"  ? skip (unrecognised name): {name}")
             continue
-        sym, yyyy, mm = m.group(1).upper(), m.group(2), m.group(3)
+        sym, yyyy, mm = m.group(1).upper(), m.group(2), (m.group(3) or "")
         key = (sym, yyyy, mm)
+        label = f"{yyyy}-{mm}" if mm else yyyy          # "2026-01" or "2022"
 
         if key in seen:
             skipped_dupe += 1
-            print(f"  = dupe  {sym} {yyyy}-{mm}  ({name}) — already have {seen[key]}")
+            print(f"  = dupe  {sym} {label}  ({name}) — already have {seen[key]}")
             continue
 
-        out_name = f"{sym}_{yyyy}_{mm}.csv"
+        out_name = f"{sym}_{yyyy}_{mm}.csv" if mm else f"{sym}_{yyyy}.csv"
         out_path = os.path.join(args.dest, out_name)
         if os.path.exists(out_path) and not args.force:
             seen[key] = name
-            coverage.setdefault(sym, set()).add(f"{yyyy}-{mm}")
+            coverage.setdefault(sym, set()).add(label)
             print(f"  · exists {out_name} (use --force to overwrite)")
             continue
 
@@ -189,7 +193,7 @@ def main() -> int:
             f.write("\n".join(out_lines) + "\n")
 
         seen[key] = name
-        coverage.setdefault(sym, set()).add(f"{yyyy}-{mm}")
+        coverage.setdefault(sym, set()).add(label)
         written += 1
         warn = f"  ({bad} rows unparseable)" if bad else ""
         print(f"  + {out_name}  {len(out_lines):>6} rows{warn}")
