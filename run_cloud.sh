@@ -11,7 +11,8 @@ M1_URL="https://drive.google.com/drive/folders/1uN2c7QvNJg15CmVmNXUYR1CTiSsaB-d4
 TICK_URL="https://drive.google.com/drive/folders/1cXPxh_PqcNYIhHOnvZoV6JRI526tQIz-"
 
 echo "=== [1/6] installing dependencies ==="
-pip install -q -r requirements.txt gdown || { echo "pip install failed"; exit 1; }
+pip install -q -r requirements.txt || { echo "pip install failed"; exit 1; }
+pip install -q --upgrade "gdown>=5.2" || { echo "gdown upgrade failed"; exit 1; }
 
 echo "=== [2/6] downloading M1 data (public link) ==="
 rm -rf /tmp/m1dl && gdown --folder --remaining-ok -O /tmp/m1dl "$M1_URL"
