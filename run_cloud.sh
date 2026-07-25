@@ -54,4 +54,12 @@ echo "#  BACKTEST SUMMARY                                          #"
 echo "############################################################"
 tail -50 /tmp/backtest_out.txt
 echo ""
-echo "=== [6/6] DONE. Report also saved at data/p39_volume_report.md ==="
+echo "=== [6/6] pushing results to the repo so Claude can read them automatically ==="
+tail -80 /tmp/backtest_out.txt > data/backtest_summary.txt 2>/dev/null
+git add -f data/p39_volume_report.md data/backtest_summary.txt data/histdata/trades_dump.csv 2>/dev/null
+if git commit -q -m "P39 results (auto-pushed from Codespace)" 2>/dev/null && git push -q 2>/dev/null; then
+  echo "RESULTS PUSHED to the repo — Claude will pick them up. You can also say 'results are ready'."
+else
+  echo "(auto-push skipped — just copy the P39 REPORT block above and paste it to Claude)"
+fi
+echo "=== DONE. Report also at data/p39_volume_report.md ==="
