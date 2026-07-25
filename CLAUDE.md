@@ -1062,6 +1062,58 @@ M15-only triple-confirmed breakout is optimal.
 **Config:** `SOJ_SWEEP_ENABLED=1`, `SWEEP_SOJ_MIN_PIPS=3.0`, `SOJ_EXTEND_MIN_PIPS=8.0`,
 `SOJ_RETEST_TOL_PIPS=5.0`, `SOJ_LOOKBACK_BARS=48`.
 
+### P39 — Volume-as-confidence analysis (PIPELINE BUILT 2026-07-25, measurement-only, NOT run on real data yet)
+**What:** Measures whether tick volume — a data dimension the algo never consults — adds
+orthogonal edge as a per-trade **confidence** signal on sweeps (not a gate, not a size-up above
+baseline; at most a size *reducer* on noise-driven sweeps). Two hypotheses, per the P39 handover:
+- **H1 friction ratio**: ticks on the sweep/entry M5 bar ÷ mean ticks of the previous 20 M5 bars.
+  Bucketed low <0.65× / normal 0.65–1.2× / high 1.2–1.8× / spike >1.8×.
+- **H2 directional delta**: Lee-Ready bid-move classification (up=buy, down=sell, flat=neutral);
+  does net delta on the sweep bar align with the trade direction?
+
+**Data:** HistData **Tick** product (not the M1 Bar product — that strips volume to zeros). Real
+tick volume = tick COUNT per M5 bin. Timestamps are ET (UTC-5), converted the same way as
+`run_backtest_histdata.py`. Tubs's Drive folder "Tick data, fx eurusd and gbpusd 2022 and 2024"
+holds EURUSD+GBPUSD tick zips for 2022 (IS) and 2024 (OOS); some months are 0-byte failed
+downloads (e.g. EURUSD 202204/202209) and GBPUSD 202210 is a .txt placeholder — the pipeline
+flags these in the coverage table rather than silently skipping.
+
+**Pipeline:** `scripts/p39_volume_analysis.py` (stdlib-only — no pandas — so it runs on a bare
+Python and is unit-testable). Two phases: `aggregate` (stream tick zips → compact per-month M5
+tick/delta counts in `data/p39_agg/`, memory-safe line-by-line) then `analyse` (join to the
+backtest trade dump, measure, write `data/p39_volume_report.md`). True R is computed from
+`entry`/`stop`/`exit` in the trade dump (this branch's records carry them). Reports every table
+split IS vs OOS, plus by entry_model (judas vs breakout — the two opposite volume priors), per
+pair, and all three handover controls (control-1 non-signal bars, control-2 entry-type
+robustness, control-3 hour-of-day confound). Verdict GREEN/YELLOW/RED per the handover rules.
+
+**Status: built + validated on synthetic fixtures, NOT yet run on real data.** Verified
+end-to-end: ET→UTC tick alignment (the handover's #1 failure mode), friction bucketing, true-R,
+IS/OOS + model splits, pyramid-leg exclusion, delta alignment, and control-1 sampling
+(sweep-friction distinguishable from control bars). Cannot run in the cloud session — the tick
+set is 3–5 GB across dozens of Drive zips and can't transfer through the connector; the run
+happens locally where the data lives.
+
+**Run locally:**
+```
+python scripts/p39_volume_analysis.py aggregate <tick_zip_folder>   # slow, once
+python run_backtest_histdata.py --years 2022 2024                   # produces the trade dump
+python scripts/p39_volume_analysis.py analyse                       # writes the report
+```
+Then read `data/p39_volume_report.md` and act on its verdict. **Measurement only — nothing ships
+to the engine from this branch.** Sweep-bar identification is a documented tick-density *proxy*
+(the engine doesn't log the sweep bar); exact attribution needs a sweep-timestamp column in the
+engine, the clean fix if P39 goes GREEN.
+
+**⚠️ Repo-lineage note (2026-07-25):** the P39 handover assumes P1–P38 shipped
+(`live/trade_score_log.py`, PF 3.34 / 842 trades / MaxDD -11.5%). This branch
+(`claude/algorithm-ict-2022-alignment-9kkLi`, from which `p39-volume-analysis` was cut) is at
+**P26** (810 trades, PF 4.47, MaxDD -12.95%); `main` has no CLAUDE.md P-history, and **no branch
+in this remote contains P27–P38 or `trade_score_log`**. The P39 pipeline is written to consume
+whichever trade log exists (`trades_dump.csv`, else `trade_score_log.csv`, else `trade_log.db`),
+so it runs regardless — but the "current state" numbers in the handover describe a lineage not
+present in this repo. Flagged to Tubs.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
