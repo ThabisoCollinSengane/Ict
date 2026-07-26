@@ -470,7 +470,10 @@ STALE_FEED_GUARD_ENABLED = bool(int(_os.environ.get("STALE_FEED_GUARD_ENABLED", 
 STALE_FEED_MAX_MINUTES   = float(_os.environ.get("STALE_FEED_MAX_MINUTES", 15))
 
 # --- Symbols ---
-PAIRS = ("GBPUSD", "EURUSD", "NZDUSD")   # tradeable (AUDUSD excluded: poor Asian WR)
+# Env-overridable so a focused test can restrict the traded set, e.g.
+# TRADE_PAIRS="GBPUSD EURUSD" for the tick-volume study (only EU/GU have ticks).
+_tp = _os.environ.get("TRADE_PAIRS")
+PAIRS = tuple(_tp.split()) if _tp else ("GBPUSD", "EURUSD", "NZDUSD")   # AUDUSD excluded: poor Asian WR
 REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength
 REF_AUDNZD = "AUDNZD"              # AUDNZD data (loaded for AUDUSD MSS bars; not used as bias signal)
 # DXY synthetic uses these (all available on OANDA):
