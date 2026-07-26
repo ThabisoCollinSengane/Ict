@@ -416,6 +416,9 @@ class Backtester:
             "amd_sweep_side": st.get("amd_sweep_side", ""),
             "amd_sweep_depth": st.get("amd_sweep_depth"),
             "amd_sweep_aligned": st.get("amd_sweep_aligned"),
+            "amd_accum_start": st.get("amd_accum_start"),
+            "amd_accum_end": st.get("amd_accum_end"),
+            "amd_sweep_time": st.get("amd_sweep_time"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -479,6 +482,9 @@ class Backtester:
             "amd_sweep_side": st.get("amd_sweep_side", ""),
             "amd_sweep_depth": st.get("amd_sweep_depth"),
             "amd_sweep_aligned": st.get("amd_sweep_aligned"),
+            "amd_accum_start": st.get("amd_accum_start"),
+            "amd_accum_end": st.get("amd_accum_end"),
+            "amd_sweep_time": st.get("amd_sweep_time"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -2025,6 +2031,7 @@ class Backtester:
         _amd_sweep_side = ""
         _amd_sweep_depth = None
         _amd_sweep_aligned = None
+        _amd_accum_start = _amd_accum_end = _amd_sweep_time = None
         if amd is not None:
             rng, sweep_dir = amd
             g["consolidation_found"] += 1
@@ -2043,6 +2050,20 @@ class Backtester:
                 _amd_sweep_side = "high"
                 _amd_sweep_depth = (round((max(c.High for c in _post) - rng.high) / _amd_pip, 1)
                                     if _post else 0.0)
+            # Phase timestamps (backtest only) for the tick-volume study: map the
+            # M15 bar indices to UTC via tf_index. Guarded — live has no tf_index.
+            _m15_idx = getattr(self, "tf_index", {}).get((pair, "15T"))
+            if _m15_idx is not None and rng.end_idx <= len(bars15):
+                try:
+                    _amd_accum_start = str(_m15_idx[rng.start_idx])
+                    _amd_accum_end   = str(_m15_idx[rng.end_idx - 1])
+                    if _post:
+                        _sw_off = (min(range(len(_post)), key=lambda i: _post[i].Low)
+                                   if sweep_dir > 0 else
+                                   max(range(len(_post)), key=lambda i: _post[i].High))
+                        _amd_sweep_time = str(_m15_idx[rng.end_idx + _sw_off])
+                except (IndexError, KeyError):
+                    pass
             if sweep_dir == direction:
                 amd_score = 1
                 conviction += 1
@@ -2566,6 +2587,9 @@ class Backtester:
             "amd_sweep_side": _amd_sweep_side,
             "amd_sweep_depth": _amd_sweep_depth,
             "amd_sweep_aligned": _amd_sweep_aligned,
+            "amd_accum_start": _amd_accum_start,
+            "amd_accum_end": _amd_accum_end,
+            "amd_sweep_time": _amd_sweep_time,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
