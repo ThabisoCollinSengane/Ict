@@ -222,27 +222,37 @@ def _win_lose_phase(rows):
     return _tbl(["phase", "WIN", "LOSE", "Δ win−lose"], body)
 
 
+def _entry_wl(rows):
+    """Winners' minus losers' mean entry-bar (PD-array) volume ratio."""
+    w = _mean([r for r in rows if r["win"]], "entry")
+    l = _mean([r for r in rows if not r["win"]], "entry")
+    return (w - l) if (w is not None and l is not None) else None
+
+
 def _wr_by(rows, keyfn, values, labelfn=str):
-    """WR + n by a category, split IS/OOS, plus win−lose Δ at sweep & PD array."""
+    """WR + n by a category, split IS/OOS, with the entry-volume winner−loser Δ
+    reported SEPARATELY for IS and OOS. A context whose Δ has the same sign in
+    BOTH years is a real conditional-volume signal; if IS and OOS disagree, it's
+    a year-flip artifact (the P39 failure mode). n split shown so small cells are
+    visible."""
     body = []
     for v in values:
         sub = [r for r in rows if keyfn(r) == v]
         s_is = [r for r in sub if r["split"] == "IS"]
         s_oos = [r for r in sub if r["split"] == "OOS"]
-        wl_sweep = None
-        w, l = _mean([r for r in sub if r["win"]], "sweep"), _mean([r for r in sub if not r["win"]], "sweep")
-        if w is not None and l is not None:
-            wl_sweep = w - l
-        w2, l2 = _mean([r for r in sub if r["win"]], "entry"), _mean([r for r in sub if not r["win"]], "entry")
-        wl_entry = (w2 - l2) if (w2 is not None and l2 is not None) else None
+        wl_is, wl_oos = _entry_wl(s_is), _entry_wl(s_oos)
+        consistent = (wl_is is not None and wl_oos is not None
+                      and (wl_is > 0) == (wl_oos > 0))
         body.append([
-            labelfn(v), str(len(sub)),
+            labelfn(v), f"{len(s_is)}/{len(s_oos)}",
             f"{_wr(s_is):.0f}%" if s_is else "—",
             f"{_wr(s_oos):.0f}%" if s_oos else "—",
-            f"{wl_sweep:+.2f}×" if wl_sweep is not None else "—",
-            f"{wl_entry:+.2f}×" if wl_entry is not None else "—",
+            f"{wl_is:+.2f}×" if wl_is is not None else "—",
+            f"{wl_oos:+.2f}×" if wl_oos is not None else "—",
+            "✅" if consistent else "✗",
         ])
-    return _tbl(["segment", "n", "IS WR", "OOS WR", "sweep W−L", "PD-array W−L"], body)
+    return _tbl(["segment", "n IS/OOS", "IS WR", "OOS WR",
+                 "IS entryΔ", "OOS entryΔ", "same sign?"], body)
 
 
 def main():
@@ -287,30 +297,38 @@ def main():
         a(_win_lose_phase(sub))
         a("")
 
-    a("## 3. By PD-array type (OB vs FVG)")
-    a("`sweep W−L` / `PD-array W−L` = winners' minus losers' volume ratio there.")
+    a("## 3–7. Conditional volume — does high volume mean different things by context?")
+    a("")
+    a("**This is the P40 test.** `IS entryΔ` / `OOS entryΔ` = winners minus losers "
+      "mean entry-bar volume, computed **separately per year**. If a context's Δ "
+      "has the **same sign in both years** (`✅`), high entry volume genuinely "
+      "means something there (P40 has a basis). If IS and OOS disagree (`✗`), it's "
+      "a year-flip artifact — the P39 failure mode — and a fixed modifier would be "
+      "curve-fit. Read the `same sign?` column and the n split first.")
+    a("")
+    a("### By PD-array type (OB vs FVG)")
     a("")
     a(_wr_by(m, lambda r: r["array"], ["FVG", "OB", "breaker"]))
     a("")
 
-    a("## 4. By side (buying vs selling)")
+    a("### By side (buying vs selling)")
     a("")
     a(_wr_by(m, lambda r: r["side"], ["buy", "sell"]))
     a("")
 
-    a("## 5. By session")
+    a("### By session")
     a("")
     sessions = sorted({r["session"] for r in m if r["session"] not in ("", "?")})
     a(_wr_by(m, lambda r: r["session"], sessions) if sessions else "_no session labels_")
     a("")
 
-    a("## 6. Did the sweep run PDH/PDL (previous-day liquidity)?")
+    a("### Did the sweep run PDH/PDL (previous-day liquidity)?")
     a("")
     a(_wr_by(m, lambda r: r["pdliq"], [True, False],
              labelfn=lambda v: "swept PDH/PDL" if v else "no prev-day liq"))
     a("")
 
-    a("## 7. Entry in premium vs discount (vs prior-day mid)")
+    a("### Entry in premium vs discount (vs prior-day mid)")
     a("")
     a(_wr_by(m, lambda r: r["zone"], ["premium", "discount"]))
     a("")
