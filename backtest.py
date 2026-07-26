@@ -409,6 +409,13 @@ class Backtester:
             "tp1_price": st.get("tp1_price"),
             "soj_sweep": st.get("soj_sweep", False),
             "soj_type": st.get("soj_type", ""),
+            "amd_range_pips": st.get("amd_range_pips"),
+            "amd_range_bars": st.get("amd_range_bars"),
+            "amd_touches_hi": st.get("amd_touches_hi"),
+            "amd_touches_lo": st.get("amd_touches_lo"),
+            "amd_sweep_side": st.get("amd_sweep_side", ""),
+            "amd_sweep_depth": st.get("amd_sweep_depth"),
+            "amd_sweep_aligned": st.get("amd_sweep_aligned"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -465,6 +472,13 @@ class Backtester:
             "tp1_price": st.get("tp1_price"),
             "soj_sweep": st.get("soj_sweep", False),
             "soj_type": st.get("soj_type", ""),
+            "amd_range_pips": st.get("amd_range_pips"),
+            "amd_range_bars": st.get("amd_range_bars"),
+            "amd_touches_hi": st.get("amd_touches_hi"),
+            "amd_touches_lo": st.get("amd_touches_lo"),
+            "amd_sweep_side": st.get("amd_sweep_side", ""),
+            "amd_sweep_depth": st.get("amd_sweep_depth"),
+            "amd_sweep_aligned": st.get("amd_sweep_aligned"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -2005,9 +2019,30 @@ class Backtester:
         bars15 = self.bars_up_to(pair, "15T", t)
         amd = detect_amd_setup(bars15, pair)
         amd_score = 0
+        # AMD analytics: accumulation shape + stop-run (manipulation) depth per trade.
+        _amd_range_pips = _amd_range_bars = None
+        _amd_touches_hi = _amd_touches_lo = None
+        _amd_sweep_side = ""
+        _amd_sweep_depth = None
+        _amd_sweep_aligned = None
         if amd is not None:
             rng, sweep_dir = amd
             g["consolidation_found"] += 1
+            _amd_pip = pip_size(pair)
+            _amd_range_pips = round(rng.width / _amd_pip, 1)
+            _amd_range_bars = rng.length_bars
+            _amd_touches_hi = rng.touches_high
+            _amd_touches_lo = rng.touches_low
+            _amd_sweep_aligned = (sweep_dir == direction)
+            _post = bars15[rng.end_idx:]
+            if sweep_dir > 0:          # low extreme swept (bullish manipulation)
+                _amd_sweep_side = "low"
+                _amd_sweep_depth = (round((rng.low - min(c.Low for c in _post)) / _amd_pip, 1)
+                                    if _post else 0.0)
+            else:                      # high extreme swept (bearish manipulation)
+                _amd_sweep_side = "high"
+                _amd_sweep_depth = (round((max(c.High for c in _post) - rng.high) / _amd_pip, 1)
+                                    if _post else 0.0)
             if sweep_dir == direction:
                 amd_score = 1
                 conviction += 1
@@ -2524,6 +2559,13 @@ class Backtester:
             "target_escalated": _tgt_escalated,
             "soj_sweep": _soj_sweep,
             "soj_type": _soj_type,
+            "amd_range_pips": _amd_range_pips,
+            "amd_range_bars": _amd_range_bars,
+            "amd_touches_hi": _amd_touches_hi,
+            "amd_touches_lo": _amd_touches_lo,
+            "amd_sweep_side": _amd_sweep_side,
+            "amd_sweep_depth": _amd_sweep_depth,
+            "amd_sweep_aligned": _amd_sweep_aligned,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
