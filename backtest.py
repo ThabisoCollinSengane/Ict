@@ -419,6 +419,9 @@ class Backtester:
             "amd_accum_start": st.get("amd_accum_start"),
             "amd_accum_end": st.get("amd_accum_end"),
             "amd_sweep_time": st.get("amd_sweep_time"),
+            "amd_sweep_time_m5": st.get("amd_sweep_time_m5"),
+            "amd_swept_pdliq": st.get("amd_swept_pdliq"),
+            "amd_entry_zone": st.get("amd_entry_zone", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -485,6 +488,9 @@ class Backtester:
             "amd_accum_start": st.get("amd_accum_start"),
             "amd_accum_end": st.get("amd_accum_end"),
             "amd_sweep_time": st.get("amd_sweep_time"),
+            "amd_sweep_time_m5": st.get("amd_sweep_time_m5"),
+            "amd_swept_pdliq": st.get("amd_swept_pdliq"),
+            "amd_entry_zone": st.get("amd_entry_zone", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -2032,6 +2038,9 @@ class Backtester:
         _amd_sweep_depth = None
         _amd_sweep_aligned = None
         _amd_accum_start = _amd_accum_end = _amd_sweep_time = None
+        _amd_sweep_time_m5 = None
+        _amd_swept_pdliq = None
+        _amd_entry_zone = ""
         if amd is not None:
             rng, sweep_dir = amd
             g["consolidation_found"] += 1
@@ -2062,6 +2071,21 @@ class Backtester:
                                    if sweep_dir > 0 else
                                    max(range(len(_post)), key=lambda i: _post[i].High))
                         _amd_sweep_time = str(_m15_idx[rng.end_idx + _sw_off])
+                        # Option B: pin the sweep to M5 resolution — the M5 bar
+                        # inside the M15 sweep bar that actually made the extreme.
+                        _m5_idx = getattr(self, "tf_index", {}).get((pair, "5T"))
+                        _m5_bars = getattr(self, "tf_bars", {}).get((pair, "5T"))
+                        if _m5_idx is not None and _m5_bars is not None:
+                            _sw_ts = pd.Timestamp(_amd_sweep_time)
+                            _lo = _m5_idx.searchsorted(_sw_ts, side="left")
+                            _hi = _m5_idx.searchsorted(
+                                _sw_ts + pd.Timedelta(minutes=15), side="left")
+                            if _hi > _lo:
+                                _seg = _m5_bars[_lo:_hi]
+                                _k = (min(range(len(_seg)), key=lambda i: _seg[i].Low)
+                                      if sweep_dir > 0 else
+                                      max(range(len(_seg)), key=lambda i: _seg[i].High))
+                                _amd_sweep_time_m5 = str(_m5_idx[_lo + _k])
                 except (IndexError, KeyError):
                     pass
             if sweep_dir == direction:
@@ -2072,6 +2096,17 @@ class Backtester:
             # Key is session-specific so London's Judas doesn't bleed into NY.
             _judas_key = (pair, _session_label, _ny_dt.date())
             self._judas_seen[_judas_key] = True
+
+        # PDH/PDL context (option B): did the manipulation run previous-day
+        # liquidity, and is the entry in premium or discount vs the prior-day mid?
+        _mp = self._market_profile(pair, t)
+        if _mp:
+            _amd_entry_zone = "premium" if cur_price > _mp["pdm"] else "discount"
+            if amd is not None:
+                _tol = 5 * _amd_pip
+                _swept_lvl = rng.low if sweep_dir > 0 else rng.high
+                _amd_swept_pdliq = (abs(_swept_lvl - _mp["pdh"]) <= _tol or
+                                    abs(_swept_lvl - _mp["pdl"]) <= _tol)
 
         # P26 — Session-open + daily-open pattern (Judas sweep / pullback retest):
         # Session open (03:00 London / 07:00 NY ET) and daily open (00:00 UTC) are
@@ -2590,6 +2625,9 @@ class Backtester:
             "amd_accum_start": _amd_accum_start,
             "amd_accum_end": _amd_accum_end,
             "amd_sweep_time": _amd_sweep_time,
+            "amd_sweep_time_m5": _amd_sweep_time_m5,
+            "amd_swept_pdliq": _amd_swept_pdliq,
+            "amd_entry_zone": _amd_entry_zone,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.

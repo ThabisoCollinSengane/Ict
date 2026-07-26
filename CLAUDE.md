@@ -1114,6 +1114,49 @@ whichever trade log exists (`trades_dump.csv`, else `trade_score_log.csv`, else 
 so it runs regardless — but the "current state" numbers in the handover describe a lineage not
 present in this repo. Flagged to Tubs.
 
+**P39 RESULT (RAN 2026-07-26, on real EURUSD+GBPUSD 2022/2024 ticks):** verdict **RED — no
+shippable edge.** The friction-ratio H1 could not even be tested: the strategy's sweeps have
+**zero low-friction bucket** (all sweeps fire on elevated volume — control-1: sweep bars median
+1.55× vs random bars 0.97×), so there is no "low-volume noise" subgroup to shrink. Among the
+populated buckets, WR clusters ~44–58% with no consistent ordering across IS/OOS. H2 directional
+delta hinted at a counter-flow (absorption) effect — "against" flow WR 66.7% IS / 50.0% OOS vs
+"aligned" 46.2% / 44.4% — same sign both splits, but small-n and secondary. **Nothing shipped.**
+The measurement's real value: the strategy already selects for high-participation bars, so volume
+adds no orthogonal filter. Full-4yr backtest reproduced in the Codespace (2022–2024 only, 2025
+tick/M1 not fetched): 602 trades / WR 45.3% / PF 3.45 / **MaxDD -12.95% (exact match)** / R8.74M —
+MaxDD-exact confirms the algo behaves as documented.
+
+### AMD × tick-volume signature (RAN 2026-07-26, measurement-only)
+**What:** joins the P39 tick aggregation to per-trade AMD phase timestamps (backtest now logs the
+accumulation window + Judas sweep-bar UTC via `tf_index`, plus range width/duration/touches and
+sweep depth). Profiles tick volume as a ratio to each trade's own pre-accumulation baseline across
+accumulation / manipulation / distribution / PD-array(entry). Code: `scripts/amd_analysis.py`
+(price-only setup quality), `scripts/amd_tickvol_analysis.py` (tick-volume by phase),
+`run_amd.sh` / `run_amd_tickvol.sh`.
+
+**Finding 1 — the fingerprint is REAL and matches ICT (275 trades EU+GU 2022/2024):**
+
+| Phase | median | mean | ICT |
+|---|---|---|---|
+| Accumulation (coil) | 0.66× | 0.82× | quiet ✅ |
+| Manipulation (Judas sweep) | 1.26× | 1.74× | spike ✅ |
+| Distribution (entry→exit) | 1.22× | 1.81× | elevated ✅ |
+| PD array (OB/FVG fill) | 1.28× | 1.90× | reaction ✅ |
+
+Volume dries up in the coil (~⅔ normal), ~doubles on the stop-run, holds elevated in distribution,
+and reacts hardest at PD-array mitigation. Holds on both pairs (GBPUSD spikes harder, 1.93× vs
+1.63× sweep). Empirically validates the strategy is trading genuine AMD structure.
+
+**Finding 2 — volume does NOT predict winners (NULL):** winners vs losers carry essentially the
+same fingerprint. 2022 tiny edge to winners (+0.10× PD array); 2024 **flips** (losers higher, −0.20×
+PD/dist) — IS/OOS disagree on sign every phase. Absorption at the sweep is **50% win / 50% lose**
+(IS) and 48%/48% (OOS) — no discrimination. Same discipline as P39: **nothing shipped.**
+
+**Caveats:** sweep bar = deepest-excursion M15 bar (structural, not volume-selected — better than
+P39's density proxy, but still M15-resolution); EU+GU 2022/2024 only. **Next (option B, in
+progress):** log the exact M5 sweep bar + MSS(M5/M15) timing + PD-array type/side + session +
+PDH/PDL, all winners-vs-losers, to see precisely what losers do that winners don't.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
