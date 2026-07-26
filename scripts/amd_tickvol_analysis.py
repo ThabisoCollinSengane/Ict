@@ -172,6 +172,19 @@ def measure(trades, series):
             rec["dist"] = dm / base if dm is not None else None
         else:
             rec["dist"] = None
+        # Distribution trajectory: does the entry→target move run on DECLINING
+        # (express/quiet) or BUILDING volume? slope = 2nd-half − 1st-half mean.
+        rec["dist_slope"] = None
+        if t["closed"] and t["closed"] > t["opened"]:
+            dbins = [s[b][0] for b in range(eb, t["closed"] + M5, M5) if b in s]
+            if len(dbins) >= 4:
+                h = len(dbins) // 2
+                rec["dist_slope"] = (statistics.fmean(dbins[h:])
+                                     - statistics.fmean(dbins[:h])) / base
+        # Approach-to-entry MINIMUM: the quietest of the entry bar + 3 bars before
+        # it. The entry-hypothesis metric — did volume "die" going into the array?
+        appr = [s[eb - i * M5][0] for i in range(0, 4) if (eb - i * M5) in s]
+        rec["approach_min"] = (min(appr) / base) if appr else None
         out.append(rec)
     return out
 
@@ -202,6 +215,21 @@ def _vol_bucket(r):
     if v is None:
         return None
     return "low <0.9" if v < 0.9 else ("normal 0.9-1.3" if v < 1.3 else "high >1.3")
+
+
+def _approach_bucket(r):
+    v = r.get("approach_min")
+    if v is None:
+        return None
+    return ("died <0.5×" if v < 0.5 else "0.5-0.8×" if v < 0.8
+            else "0.8-1.2×" if v < 1.2 else ">1.2×")
+
+
+def _slope_sign(r):
+    v = r.get("dist_slope")
+    if v is None:
+        return None
+    return "declining (express)" if v < 0 else "building"
 
 
 def _wr_simple(rows, keyfn, values, labelfn=str):
@@ -423,7 +451,35 @@ def main():
     a(_wr_simple(maj, lambda r: r["array"], ["FVG", "OB", "breaker"]))
     a("")
 
-    a("## 12. Read")
+    a("## 12. ENTRY hypothesis — did tick volume DIE (<0.5×) approaching the PD array?")
+    a("")
+    a("Your idea: the best entry is when volume **collapses** in the PD array "
+      "(coil ending → move imminent), not when it's still busy (still coiling). "
+      "`approach` = the quietest volume ratio in the entry bar + 3 bars before it. "
+      "If the **died <0.5×** bucket wins more in **both** years, entering on "
+      "volume-death is worth building — and note it's a *new* trigger, since the "
+      "current entries mostly fire on elevated volume (the tension in §1's 1.28×).")
+    a("")
+    a(_wr_simple(m, _approach_bucket, ["died <0.5×", "0.5-0.8×", "0.8-1.2×", ">1.2×"]))
+    a("")
+
+    a("## 13. DISTRIBUTION shape — express (quiet) move or building volume?")
+    a("")
+    a("Entry→target: does the move run on **declining** volume (express route — "
+      "retail already chased the sweep) or **building** volume? `dist-slope` = "
+      "2nd-half minus 1st-half mean volume of the hold; negative = quieter into "
+      "the target.")
+    a("")
+    a(_wr_simple(m, _slope_sign, ["declining (express)", "building"]))
+    a("")
+    _w = _mean([r for r in m if r["win"]], "dist_slope")
+    _l = _mean([r for r in m if not r["win"]], "dist_slope")
+    if _w is not None and _l is not None:
+        a(f"Mean dist-slope — **winners {_w:+.2f}× vs losers {_l:+.2f}×** "
+          "(more negative = the move ran quieter into target).")
+        a("")
+
+    a("## 14. Read")
     a("")
     a("**Two questions in this report:**")
     a("")
@@ -440,6 +496,14 @@ def main():
       "§10 answers your 'high volume isn't always bad' point directly — if "
       "high-volume major-liq runs win more both years, that's a size-UP case. §11 "
       "shows where the edge concentrates (session/zone/array) for the recipe.")
+    a("")
+    a("3. **Entry timing & distribution — §12–§13 (your volume-death idea).** §12: "
+      "if the `died <0.5×` approach bucket wins clearly more in both years, "
+      "entering on volume collapse in the PD array is worth building as a new "
+      "trigger (and pyramid gate). §13: if winners' `dist-slope` is consistently "
+      "more negative than losers', the real move runs on quiet/express volume — "
+      "which also argues for holding through low-volume drift rather than exiting "
+      "on it.")
     a("")
     a("Discipline throughout: consistent across both years, n≥~20 per cell, or "
       "it's noise — same bar as P39.")
