@@ -314,6 +314,19 @@ CRT_SWEEP_MIN_PIPS = 2.0   # minimum wick beyond CRT H/L to qualify as a genuine
 CRT_SWEEP_MULT     = float(_os.environ.get("CRT_SWEEP_MULT", "1.25"))
 CRT_SWEEP_MULT_TF  = "240T"   # H4 CRT sweep is the lever; D1 bucket excluded
 
+# --- P40 conditional-volume modulator (FVG/OB, tick-volume; OFF by default) ---
+# Data-derived from data/amd_tickvol_report.md (both-year-consistent per §3-7):
+# high-volume FVG entries lose more -> size down; high-volume OB entries win more
+# -> size up. Only fires when tick volume is available (EU/GU 2022+2024 in the
+# backtest; MT5 tick_volume live) — otherwise neutral 1.0x. MUST clear the full
+# IS/OOS + MaxDD validation before it ships; OFF until then.
+USE_CONDITIONAL_VOLUME = bool(int(_os.environ.get("USE_CONDITIONAL_VOLUME", 0)))
+VOL_MOD_HIGH_RATIO = float(_os.environ.get("VOL_MOD_HIGH_RATIO", 1.2))  # "high volume" threshold
+VOL_MOD_FVG_DOWN   = float(_os.environ.get("VOL_MOD_FVG_DOWN", 0.80))   # high-vol FVG -> -20%
+VOL_MOD_OB_UP      = float(_os.environ.get("VOL_MOD_OB_UP", 1.15))      # high-vol OB  -> +15%
+VOL_MOD_MIN        = float(_os.environ.get("VOL_MOD_MIN", 0.70))
+VOL_MOD_MAX        = float(_os.environ.get("VOL_MOD_MAX", 1.25))
+
 # --- London-Judas priority (P10): size down the same-day NY-AM breakout echo ---
 # REVERTED — set to 1.0 (no-op). The counter below stays as analytics.
 # Hypothesis: when a London-Open Judas already fired on a pair that day, the

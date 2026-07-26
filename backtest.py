@@ -23,6 +23,7 @@ from ict.bias import htf_bias
 from ict import market_structure as mstruct
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup, detect_breakout
+from ict.volume_modulator import get_volume_modifier
 from ict.ote import in_ote, find_swing
 from ict.liquidity_divergence import judas_sweep_divergence
 from ict.fib_targets import nearest_fib_target
@@ -106,6 +107,9 @@ class Backtester:
                 self.tf_dfs[(sym, tf_name)] = d
                 self.tf_bars[(sym, tf_name)] = df_to_bars(d)
                 self.tf_index[(sym, tf_name)] = d.index
+
+        # P40: per-M5 tick counts for the conditional-volume modulator (optional).
+        self._tickvol = self._load_tickvol() if config.USE_CONDITIONAL_VOLUME else {}
 
         self.equity = config.STARTING_CASH
         self.start_equity = self.equity
@@ -797,6 +801,42 @@ class Backtester:
         if near(mp["val"]):
             return "val"
         return "none"
+
+    @staticmethod
+    def _load_tickvol():
+        """P40: load per-M5 tick counts from data/p39_agg/*_m5.csv, if present.
+        Returns {pair: {bin_utc: ticks}} — empty if the aggregation isn't there."""
+        import glob as _g
+        import csv as _csv
+        agg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "p39_agg")
+        out = {}
+        for p in _g.glob(os.path.join(agg, "*_m5.csv")):
+            pair = os.path.basename(p).split("_")[0]
+            d = out.setdefault(pair, {})
+            try:
+                with open(p) as f:
+                    for r in _csv.DictReader(f):
+                        d[int(r["bin_utc"])] = int(r["ticks"])
+            except (OSError, ValueError, KeyError):
+                continue
+        return out
+
+    def _entry_friction(self, pair, t):
+        """Entry-bar tick friction = ticks in the entry M5 bin / mean of the prior
+        20 bins. None when tick volume is unavailable for this pair/time."""
+        tv = getattr(self, "_tickvol", None)
+        s = tv.get(pair) if tv else None
+        if not s:
+            return None
+        ts = int(pd.Timestamp(t).timestamp())
+        eb = ts - ts % 300
+        if eb not in s:
+            return None
+        prior = [s[eb - i * 300] for i in range(1, 21) if (eb - i * 300) in s]
+        if len(prior) < 8:
+            return None
+        base = sum(prior) / len(prior)
+        return (s[eb] / base) if base > 0 else None
 
     def _profile_score(self, pair: str, direction: int, cur_price: float, t):
         """Return (score, session_open_price).
@@ -2541,6 +2581,15 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.CRT_SWEEP_MULT), min_units)
             g["crt_sweep_sized"] = g.get("crt_sweep_sized", 0) + 1
+        # P40 conditional-volume modulator: high-vol FVG entries lose more (size
+        # down) / high-vol OB entries win more (size up). Only fires where tick
+        # data exists (EU/GU 2022+2024); neutral (1.0) otherwise. No equity floor —
+        # it's a quality read, not a compounding-only lever. Validation-gated.
+        if config.USE_CONDITIONAL_VOLUME:
+            _vmod = get_volume_modifier(entry_type, self._entry_friction(pair, t))
+            if _vmod != 1.0:
+                units = max(int(units * _vmod), min_units)
+                g["vol_mod_applied"] = g.get("vol_mod_applied", 0) + 1
         # P10 London-Judas priority (REVERTED — downsize multiplier defaults to 1.0,
         # so this is a no-op + analytics counter). Hypothesis was that a NY-AM breakout
         # on a pair whose London Judas already fired today is the weaker echo and should

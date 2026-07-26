@@ -185,6 +185,15 @@ def measure(trades, series):
         # it. The entry-hypothesis metric — did volume "die" going into the array?
         appr = [s[eb - i * M5][0] for i in range(0, 4) if (eb - i * M5) in s]
         rec["approach_min"] = (min(appr) / base) if appr else None
+        # Approaching the target (higher-TF draw): volume in the last 3 bins into
+        # the exit, and the peak ('huge activity') as price delivers to the draw.
+        rec["tp_approach"] = rec["tp_spike"] = None
+        if t["closed"]:
+            xb = t["closed"] - t["closed"] % M5
+            tap = [s[xb - i * M5][0] for i in range(0, 3) if (xb - i * M5) in s]
+            if tap:
+                rec["tp_approach"] = statistics.fmean(tap) / base
+                rec["tp_spike"] = max(tap) / base
         out.append(rec)
     return out
 
@@ -479,7 +488,36 @@ def main():
           "(more negative = the move ran quieter into target).")
         a("")
 
-    a("## 14. Read")
+    a("## 14. Volume approaching the target (the higher-TF draw)")
+    a("")
+    a("How tick volume behaves as price delivers to the draw. `tp-approach` = mean "
+      "volume ratio in the last 3 bars into the exit; `tp-spike` = the peak of "
+      "those (the 'huge activity' at the draw). Winners (reached the draw) vs "
+      "losers (stopped) — does delivery to the draw come with a volume burst?")
+    a("")
+    _rows = []
+    for label, sub in (("winners", [r for r in m if r["win"]]),
+                       ("losers", [r for r in m if not r["win"]])):
+        _rows.append([label,
+                      f"{_mean(sub, 'tp_approach'):.2f}×" if _mean(sub, 'tp_approach') else "—",
+                      f"{_mean(sub, 'tp_spike'):.2f}×" if _mean(sub, 'tp_spike') else "—",
+                      str(sum(1 for r in sub if r.get('tp_spike') is not None))])
+    a(_tbl(["group", "mean tp-approach", "mean tp-spike", "n"], _rows))
+    a("")
+    a("Split by year:")
+    a("")
+    _rows = []
+    for split in ("IS", "OOS"):
+        for label, pred in (("win", lambda r: r["win"]), ("lose", lambda r: not r["win"])):
+            sub = [r for r in m if r["split"] == split and pred(r)]
+            _rows.append([f"{split} {label}",
+                          f"{_mean(sub, 'tp_approach'):.2f}×" if _mean(sub, 'tp_approach') else "—",
+                          f"{_mean(sub, 'tp_spike'):.2f}×" if _mean(sub, 'tp_spike') else "—",
+                          str(len(sub))])
+    a(_tbl(["group", "tp-approach", "tp-spike", "n"], _rows))
+    a("")
+
+    a("## 15. Read")
     a("")
     a("**Two questions in this report:**")
     a("")
