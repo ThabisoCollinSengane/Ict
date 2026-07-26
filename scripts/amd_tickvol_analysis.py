@@ -124,6 +124,7 @@ def load_trades(path):
             "session": (r.get("profile") or r.get("session_side") or "?").strip(),
             "pdliq": {"True": True, "False": False}.get((r.get("amd_swept_pdliq") or "").strip()),
             "zone": (r.get("amd_entry_zone") or "").strip(),
+            "liq_run": (r.get("amd_liq_run") or "").strip() or "none",
         })
     return out
 
@@ -148,7 +149,7 @@ def measure(trades, series):
         if base <= 0:
             continue
         rec = {k: t[k] for k in ("split", "win", "pair", "array", "side",
-                                 "session", "pdliq", "zone")}
+                                 "session", "pdliq", "zone", "liq_run")}
         am = _mean_ticks(s, t["accum_s"], t["accum_e"] + 900)
         rec["accum"] = am / base if am is not None else None
         eb = t["opened"] - t["opened"] % M5
@@ -187,6 +188,33 @@ def _med(rows, key):
 
 def _wr(rows):
     return (100.0 * sum(1 for r in rows if r["win"]) / len(rows)) if rows else None
+
+
+MAJOR = {"pwh", "pwl", "pdh", "pdl", "eqh", "eql"}
+
+
+def _is_major(r):
+    return r["liq_run"] in MAJOR
+
+
+def _vol_bucket(r):
+    v = r.get("entry")
+    if v is None:
+        return None
+    return "low <0.9" if v < 0.9 else ("normal 0.9-1.3" if v < 1.3 else "high >1.3")
+
+
+def _wr_simple(rows, keyfn, values, labelfn=str):
+    """WR + n split IS/OOS for a category (the liquidity/quality thread)."""
+    body = []
+    for v in values:
+        sub = [r for r in rows if keyfn(r) == v]
+        s_is = [r for r in sub if r["split"] == "IS"]
+        s_oos = [r for r in sub if r["split"] == "OOS"]
+        body.append([labelfn(v), f"{len(s_is)}/{len(s_oos)}",
+                     f"{_wr(s_is):.0f}%" if s_is else "—",
+                     f"{_wr(s_oos):.0f}%" if s_oos else "—"])
+    return _tbl(["segment", "n IS/OOS", "IS WR", "OOS WR"], body)
 
 
 def _tbl(header, rows):
@@ -349,14 +377,72 @@ def main():
     a(_tbl(hdr, body))
     a("")
 
-    a("## 9. Read")
+    a("## 9. Major-liquidity runs — which pay? (the validated PDH/PDL thread)")
     a("")
-    a("§2 is the headline — scan for a phase where winners' volume beats losers' "
-      "in the **same direction in both IS and OOS**. §3–§7 answer *where* it "
-      "lives (which array / side / session / whether it ran PDH-PDL / premium vs "
-      "discount): look for a `W−L` that is clearly positive in a high-n segment, "
-      "consistent across years. Anything that only shows in one year, or only in "
-      "a small-n (<20) cell, is noise — same discipline as P39.")
+    a("What the manipulation swept, ranked. `pwh/pwl` = prior-week high/low, "
+      "`pdh/pdl` = prior-day, `eqh/eql` = equal highs/lows (engineered), "
+      "`vah/val` = value area, `none` = a local range edge. **WR above baseline "
+      "in BOTH years = a real setup-quality signal we can build on.**")
+    a("")
+    a(_wr_simple(m, lambda r: r["liq_run"],
+                 ["pwh", "pwl", "pdh", "pdl", "eqh", "eql", "vah", "val", "none"]))
+    a("")
+    a("### Major liquidity (weekly / daily / equal H-L) vs none")
+    a("")
+    a(_wr_simple(m, _is_major, [True, False],
+                 labelfn=lambda v: "ran MAJOR liq" if v else "no major liq"))
+    a("")
+
+    a("## 10. Does HIGH volume help WHEN we run major liquidity?")
+    a("")
+    a("Your point — high volume isn't always a reason to run. Tested only where "
+      "it should matter: on trades that swept major liquidity. Entry-bar volume "
+      "bucketed. If high-volume major-liq runs win MORE in both years, volume is "
+      "conviction here, not a warning — a size-UP case, not a size-down.")
+    a("")
+    maj = [r for r in m if _is_major(r)]
+    a(_wr_simple(maj, _vol_bucket, ["low <0.9", "normal 0.9-1.3", "high >1.3"])
+      if maj else "_no major-liq trades in the tick window_")
+    a("")
+
+    a("## 11. Beneficial-entry recipe — major liquidity × context")
+    a("")
+    a("Where the major-liquidity edge concentrates (major-liq trades only).")
+    a("")
+    a("**× session**")
+    a("")
+    _sess = sorted({r["session"] for r in maj if r["session"] not in ("", "?")})
+    a(_wr_simple(maj, lambda r: r["session"], _sess) if _sess else "_n/a_")
+    a("")
+    a("**× premium/discount**")
+    a("")
+    a(_wr_simple(maj, lambda r: r["zone"], ["premium", "discount"]))
+    a("")
+    a("**× PD-array type**")
+    a("")
+    a(_wr_simple(maj, lambda r: r["array"], ["FVG", "OB", "breaker"]))
+    a("")
+
+    a("## 12. Read")
+    a("")
+    a("**Two questions in this report:**")
+    a("")
+    a("1. **P40 (conditional volume) — §3–§7.** Read the `same sign?` column. A "
+      "context (OB/FVG/session/zone) with `✅` in a high-n row means high entry "
+      "volume genuinely means something different there in both years → P40 has a "
+      "basis. Mostly `✗` → the 'conditional edge' was a 2022/2024 flip and a fixed "
+      "modifier would be curve-fit (drop it).")
+    a("")
+    a("2. **The liquidity edge — §9–§11 (the real thread).** §9: which liquidity "
+      "the sweep ran, WR per type. A type (esp. PWH/PWL, PDH/PDL) with WR above "
+      "the ~45% baseline in BOTH years is a genuine setup-quality signal → build a "
+      "conviction/size lever, validate on the full backtest (IS/OOS, MaxDD-neutral). "
+      "§10 answers your 'high volume isn't always bad' point directly — if "
+      "high-volume major-liq runs win more both years, that's a size-UP case. §11 "
+      "shows where the edge concentrates (session/zone/array) for the recipe.")
+    a("")
+    a("Discipline throughout: consistent across both years, n≥~20 per cell, or "
+      "it's noise — same bar as P39.")
     a("")
 
     os.makedirs(DATA_DIR, exist_ok=True)

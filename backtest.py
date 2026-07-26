@@ -422,6 +422,7 @@ class Backtester:
             "amd_sweep_time_m5": st.get("amd_sweep_time_m5"),
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
+            "amd_liq_run": st.get("amd_liq_run", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -491,6 +492,7 @@ class Backtester:
             "amd_sweep_time_m5": st.get("amd_sweep_time_m5"),
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
+            "amd_liq_run": st.get("amd_liq_run", ""),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -764,6 +766,37 @@ class Backtester:
         result = {"pdh": pdh, "pdl": pdl, "pdm": pdm, "vah": vah, "val": val}
         self._mp_cache[cache_key] = result
         return result
+
+    def _classify_liq_run(self, swept_lvl, side, mp, pair, t, bars15, pip):
+        """Which major liquidity pool the manipulation swept — the swept extreme is
+        within 5 pips of it. Priority (most significant first): weekly PWH/PWL >
+        daily PDH/PDL > engineered equal highs/lows > value-area VAH/VAL > none.
+        Widens the PDH/PDL-only flag so we can rank which liquidity runs pay."""
+        tol = 5 * pip
+
+        def near(lvl):
+            return abs(swept_lvl - lvl) <= tol
+
+        w = self.bars_up_to(pair, "W", t)
+        if len(w) >= 2:
+            if side == "high" and near(w[-2].High):
+                return "pwh"
+            if side == "low" and near(w[-2].Low):
+                return "pwl"
+        if side == "high" and near(mp["pdh"]):
+            return "pdh"
+        if side == "low" and near(mp["pdl"]):
+            return "pdl"
+        if side == "high":
+            if any(near(h) for h in find_equal_highs(bars15, pair)):
+                return "eqh"
+        elif any(near(l) for l in find_equal_lows(bars15, pair)):
+            return "eql"
+        if near(mp["vah"]):
+            return "vah"
+        if near(mp["val"]):
+            return "val"
+        return "none"
 
     def _profile_score(self, pair: str, direction: int, cur_price: float, t):
         """Return (score, session_open_price).
@@ -2041,6 +2074,7 @@ class Backtester:
         _amd_sweep_time_m5 = None
         _amd_swept_pdliq = None
         _amd_entry_zone = ""
+        _amd_liq_run = ""
         if amd is not None:
             rng, sweep_dir = amd
             g["consolidation_found"] += 1
@@ -2107,6 +2141,8 @@ class Backtester:
                 _swept_lvl = rng.low if sweep_dir > 0 else rng.high
                 _amd_swept_pdliq = (abs(_swept_lvl - _mp["pdh"]) <= _tol or
                                     abs(_swept_lvl - _mp["pdl"]) <= _tol)
+                _amd_liq_run = self._classify_liq_run(
+                    _swept_lvl, _amd_sweep_side, _mp, pair, t, bars15, _amd_pip)
 
         # P26 — Session-open + daily-open pattern (Judas sweep / pullback retest):
         # Session open (03:00 London / 07:00 NY ET) and daily open (00:00 UTC) are
@@ -2628,6 +2664,7 @@ class Backtester:
             "amd_sweep_time_m5": _amd_sweep_time_m5,
             "amd_swept_pdliq": _amd_swept_pdliq,
             "amd_entry_zone": _amd_entry_zone,
+            "amd_liq_run": _amd_liq_run,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
