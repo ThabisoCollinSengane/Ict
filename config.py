@@ -324,6 +324,21 @@ CRT_SWEEP_MULT_TF  = "240T"   # H4 CRT sweep is the lever; D1 bucket excluded
 # full + IS/OOS gate (equity up in all three, PF flat, MaxDD held to the decimal).
 PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.25"))
 
+# --- Draw-to-liquidity continuation entry (unswept PDH/PDL; OFF by default) ---
+# The strategy is a Judas REVERSAL: wait for the sweep, fade it. This is the
+# opposite thesis — open a CONTINUATION toward an UNSWEPT PDH/PDL (price is drawn
+# to the resting pool) and exit AT the pool. Mechanically it's a targeted gate
+# exemption: a draw_score==0 trade (which the inverted-draw 0/3 reversal gate
+# normally kills) is let through ONLY when there is an unswept PDH/PDL in the trade
+# direction within [MIN_PIPS_TARGET, DRAW_CONT_MAX_PIPS] — a NEAR pool (this cycle's
+# draw), not a far one (the HTF_TARGET_PREF revert showed forcing far pools = -22%
+# MaxDD). MSS 2-of-3 structure confirmation is still required. Tag entry_model=
+# "draw_cont". OFF until run_drawcont_validation.sh clears the full + IS/OOS gate —
+# strong negative prior (P11 NY_CONTINUATION_GATE_EXEMPT + SOJ-draw-bypass both
+# reverted), so this must earn its way in.
+DRAW_CONT_ENABLED  = bool(int(_os.environ.get("DRAW_CONT_ENABLED", 0)))
+DRAW_CONT_MAX_PIPS = float(_os.environ.get("DRAW_CONT_MAX_PIPS", 60))
+
 # --- P40 conditional-volume modulator (FVG/OB, tick-volume; OFF by default) ---
 # Data-derived from data/amd_tickvol_report.md (both-year-consistent per §3-7):
 # high-volume FVG entries lose more -> size down; high-volume OB entries win more

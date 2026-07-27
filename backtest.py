@@ -1226,6 +1226,32 @@ class Backtester:
                             best = candidate   # keep the lowest (closest to TP)
         return best
 
+    def _unswept_pdliq_target(self, pair, direction, price, t):
+        """Draw-to-liquidity continuation (config.DRAW_CONT_ENABLED).
+
+        Return the nearest UNSWEPT PDH/PDL in the trade direction that sits a NEAR
+        distance ahead — within [MIN_PIPS_TARGET, DRAW_CONT_MAX_PIPS] — else None.
+        For a long: an unswept prior-day HIGH above price (buy-side pool not yet
+        taken). For a short: an unswept prior-day LOW below price. "Unswept" is read
+        as 'the pool is still beyond current price in the draw direction' — price
+        hasn't delivered to it yet. Near-only by design: a far pool is the NEXT
+        cycle's draw and forcing trades to it wrecked MaxDD (HTF_TARGET_PREF revert).
+        """
+        d_bars = self.bars_up_to(pair, "D", t)
+        if len(d_bars) < 2:
+            return None
+        pip_v = pip_size(pair)
+        lo = config.MIN_PIPS_TARGET * pip_v
+        hi = config.DRAW_CONT_MAX_PIPS * pip_v
+        best = None
+        for db in d_bars[-4:-1]:            # last 3 completed daily candles
+            lvl = db.High if direction > 0 else db.Low
+            dist = (lvl - price) if direction > 0 else (price - lvl)
+            if lo <= dist <= hi:            # unswept (ahead) AND near (this cycle)
+                if best is None or dist < best[1]:
+                    best = (lvl, dist)
+        return best[0] if best else None
+
     # P20: source families considered "premium" institutional draws.
     # When escalation is active, raw swing / round-number candidates are bypassed
     # in favour of these if any qualify above the RR floor.
@@ -2059,11 +2085,25 @@ class Backtester:
                 pair, direction, _session_open_early, t,
                 daily_open_price=_daily_open_early)
 
+        # Draw-to-liquidity continuation (config.DRAW_CONT_ENABLED): is there an
+        # unswept PDH/PDL a near distance ahead in the trade direction? If so this
+        # trade can run WITH the draw toward that pool — a continuation, not a
+        # reversal — and is a candidate for the 0/3 gate exemption below.
+        _is_draw_cont = False
+        if (config.DRAW_CONT_ENABLED and _draw_score == 0 and not _is_breakout
+                and self._unswept_pdliq_target(pair, direction, cur_price, t) is not None):
+            _is_draw_cont = True
+
         if _draw_score == 0 and not _is_breakout:
             if _is_ny_cont and config.NY_CONTINUATION_GATE_EXEMPT:
                 # Exempt: this runs WITH the daily draw (continuation of London's
                 # move), not a fresh reversal — the 0/3 rule is reversal logic.
                 g["ny_continuation_exempt"] = g.get("ny_continuation_exempt", 0) + 1
+            elif _is_draw_cont:
+                # Exempt: continuation toward an unswept near PDH/PDL pool. Runs WITH
+                # the draw (scores 0 on the inverted reversal cascade by design), MSS
+                # 2-of-3 already confirmed the structure. Earns breakout-style credit.
+                g["draw_cont_confirmed"] = g.get("draw_cont_confirmed", 0) + 1
             else:
                 if _is_ny_cont:
                     # Measure how many NY-AM continuations the reversal gate kills.
@@ -2094,6 +2134,10 @@ class Backtester:
         # Breakout continuations earn conviction from the triple-confirmation instead
         # of the (low/zero) inverted-draw score — the intermarket agreement IS the edge.
         if _is_breakout:
+            conviction += config.BREAKOUT_CONVICTION
+        # Draw-continuation earns the same continuation credit — the unswept near
+        # pool is the draw the move is delivering into (replaces the 0 draw score).
+        if _is_draw_cont:
             conviction += config.BREAKOUT_CONVICTION
 
         # Open-level profile score: daily/weekly/session opens agreeing (0-1).
@@ -2697,7 +2741,8 @@ class Backtester:
             "max_legs": max_legs,
             "draw_score": _draw_score,
             "im_scenario": _im_scenario,
-            "entry_model": "breakout" if _is_breakout else "judas",
+            "entry_model": ("breakout" if _is_breakout else
+                            "draw_cont" if _is_draw_cont else "judas"),
             "session_phase": _session_phase,
             "profile": _session_label,
             "htf_fvg": _htf_fvg_tf,
