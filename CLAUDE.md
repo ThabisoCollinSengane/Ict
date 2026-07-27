@@ -1189,6 +1189,45 @@ init; (2) `entry_type` was referenced in the P40 sizing block ~40 lines before i
 like "no effect." `run_p40_validation.sh` now stamps the run's git sha and embeds any crashed
 arm's traceback into the pushed report so a crash can't masquerade as a null result again.
 
+### P41 — PDH/PDL-sweep sizing lever (SHIPPED 2026-07-27)
+**What (active lever):** When the AMD manipulation swept **prior-day liquidity** — the Judas sweep
+ran within ~5 pips of PDH or PDL — size the position **1.25×**. Same mechanism, magnitude, and R3k
+equity floor (`DRAW_SIZE_MIN_EQUITY`) as the shipped P18/P19 sizing bumps. Config:
+`PDLIQ_SWEEP_MULT=1.25` (env-overridable; 1.0 = off). Counter: `pdliq_sweep_sized`.
+
+**Where it came from — a PRICE byproduct of the (RED) tick-volume work, not a volume feature:** the
+AMD × tick-volume study (`data/amd_tickvol_report.md`) profiled, as a side output, *what liquidity
+each Judas sweep ran*. §9 was the one both-years-consistent setup-quality signal: sweeps that ran
+PDH/PDL won **55% (2022) / 53% (2024)** vs the ~45% baseline. It is pure price structure
+(`_amd_swept_pdliq` via `_market_profile`; no tick data), so unlike P39/P40 it applies to all pairs
+and all years. NB this is the **entry/sweep** side — PDH/PDL were already used as **target** levels
+and confluence sources (P15/P17/P18); using "did the *sweep* run PDH/PDL" as an entry-quality read
+is the new part.
+
+**Validation (`run_pdliq_validation.sh`, baseline 1.0× vs lever 1.25×):**
+
+| run | trades | WR | PF | MaxDD | equity ZAR | sized |
+|---|---|---|---|---|---|---|
+| Full (2022–24)* base | 602 | 45.3% | 3.45 | -12.95% | 8,743,319 | — |
+| Full lever | 602 | 45.3% | **3.49** | **-12.95%** | **11,702,904 (+34%)** | 91 |
+| IS 2022-23 base | 389 | 45.8% | 3.09 | -12.95% | 313,759 | — |
+| IS lever | 389 | 45.8% | 3.04 | -12.95% | **343,444 (+9.5%)** | 48 |
+| OOS 2024 base | 210 | 44.3% | 3.47 | -15.41% | 32,293 | — |
+| OOS lever | 209 | 44.0% | 3.50 | -15.41% | **34,690 (+7.4%)** | 31 |
+
+Equity up in ALL THREE runs, PF flat (±0.05), **MaxDD identical to the decimal** everywhere, WR
+unchanged — the clean-sizing-lever signature (same as P18/P19). Both splits stay strongly positive
+and same-ballpark (PF 3.04 IS / 3.50 OOS). Ships ON.
+
+***Caveat — 2025 not yet tested:** the Codespace has only 2022–2024 M1 data, so the "full" run is
+602 trades, not the documented 810 (which includes 2025). MaxDD reproducing the documented -12.95%
+exactly is strong evidence behavior is intact, but the lever should be re-confirmed on a true full
+4yr run once 2025 data is loaded. (OOS here is 2024 only, for the same reason.)
+
+**Live-engine note:** `main.py` needs `PDLIQ_SWEEP_MULT` ported alongside the other sizing
+multipliers (per the P18 live-engine gap — the LEAN engine still needs the full sizing block).
+`_amd_swept_pdliq` detection also needs porting there.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

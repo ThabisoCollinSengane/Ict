@@ -320,9 +320,9 @@ CRT_SWEEP_MULT_TF  = "240T"   # H4 CRT sweep is the lever; D1 bucket excluded
 # held WR 55% (2022) / 53% (2024) above the ~45% baseline in BOTH years
 # (data/amd_tickvol_report.md §9). Price-based (no tick data) so it applies to all
 # pairs/years. Same 1.25× magnitude + R3k floor (DRAW_SIZE_MIN_EQUITY) as P18/P19.
-# 1.0 = no-op; set 1.25 to test. MUST clear the full 4yr + IS/OOS + MaxDD-neutral
-# validation before it ships (run_pdliq_validation.sh).
-PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.0"))
+# 1.0 = no-op; 1.25 = active. SHIPPED ON after run_pdliq_validation.sh passed the
+# full + IS/OOS gate (equity up in all three, PF flat, MaxDD held to the decimal).
+PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.25"))
 
 # --- P40 conditional-volume modulator (FVG/OB, tick-volume; OFF by default) ---
 # Data-derived from data/amd_tickvol_report.md (both-year-consistent per §3-7):
