@@ -2,7 +2,8 @@
 
 Baseline (`PDLIQ_SWEEP_MULT=1.0`) vs lever (`1.25`) on the full 4yr and the IS/OOS splits. `sized` = trades the lever bumped. **Ships only if full-4yr equity is up and MaxDD is not worse, and both splits stay positive with MaxDD not materially worse.**
 
-_run commit: `a453405`_
+_run commit: `cf2b96f`_
+_**TRUE 4yr run** — 2025 M1 data present._
 
 ## Full 4yr
 
