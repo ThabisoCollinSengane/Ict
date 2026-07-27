@@ -39,35 +39,40 @@ run_one 0 y2024_base 2024
 run_one 1 y2024_mod  2024
 
 echo "=== building comparison ==="
-python - <<'PY'
+HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+HEAD_SHA="$HEAD_SHA" python - <<'PY'
 import re, os
+HEAD = os.environ.get("HEAD_SHA", "unknown")
 def grab(label):
     p = f"/tmp/p40_{label}.txt"
     if not os.path.exists(p):
-        return {}
+        return {}, "(no run output)"
     txt = open(p).read()
     def g(k, cast=float):
         m = re.search(rf"{k}\s+(-?[\d.]+)", txt)
         return cast(m.group(1)) if m else None
     vm = re.search(r"vol_mod_applied\s+(\d+)", txt)
-    return {"trades": g("trades", int), "wr": g("win_rate_pct"),
-            "pf": g("profit_factor"), "dd": g("max_drawdown_pct"),
-            "eq": g("ending_equity_ZAR"), "vmod": int(vm.group(1)) if vm else 0}
+    d = {"trades": g("trades", int), "wr": g("win_rate_pct"),
+         "pf": g("profit_factor"), "dd": g("max_drawdown_pct"),
+         "eq": g("ending_equity_ZAR"), "vmod": int(vm.group(1)) if vm else 0}
+    return d, txt
 
 L = ["# P40 conditional-volume modulator — tick-volume validation", "",
      "**EURUSD + GBPUSD only; 2022 and 2024 as two separate tests** (the tick-"
      "covered set). Baseline (modulator OFF) vs modulator ON. `vmod` = trades the "
      "modulator actually sized. **Ships only if PF + equity improve while MaxDD "
-     "holds in BOTH years.**", ""]
+     "holds in BOTH years.**", "",
+     f"_run commit: `{HEAD}`_", ""]
 
 def fmt(d, k, suf=""):
     v = d.get(k)
     if v is None: return "—"
     return (f"{v:,.0f}" if k == "eq" else f"{v:.2f}") + suf
 
+crash_logs = []
 for yr, base, mod in (("2022", "y2022_base", "y2022_mod"),
                       ("2024", "y2024_base", "y2024_mod")):
-    b, m = grab(base), grab(mod)
+    (b, bt), (m, mt) = grab(base), grab(mod)
     L += [f"## {yr}", "",
           "| metric | baseline | modulator | Δ |", "|---|---|---|---|"]
     for k, lbl, suf in (("trades", "trades", ""), ("wr", "win rate", "%"),
@@ -82,17 +87,27 @@ for yr, base, mod in (("2022", "y2022_base", "y2022_mod"),
             d = f"{mv-bv:+.2f}"
         L.append(f"| {lbl} | {fmt(b,k,suf)} | {fmt(m,k,suf)} | {d} |")
     L += ["", f"_trades sized by modulator: {m.get('vmod',0)}_", ""]
+    # Surface any run that produced NO summary (a crash) so it can't hide again.
+    for tag, dd, tt in (("baseline", b, bt), ("modulator", m, mt)):
+        if dd.get("pf") is None:
+            tail = "\n".join(tt.splitlines()[-30:])
+            crash_logs.append(f"### {yr} {tag} — NO SUMMARY (crash?)\n\n"
+                              f"```\n{tail}\n```\n")
 
 L += ["## Verdict", "",
       "GREEN (ship) = PF and equity up, MaxDD not worse, in **both** 2022 and "
       "2024. Otherwise it stays OFF (USE_CONDITIONAL_VOLUME=0)."]
+if crash_logs:
+    L += ["", "## Crash diagnostics (auto-captured)", ""] + crash_logs
 open("data/p40_validation.md", "w").write("\n".join(L) + "\n")
 print("\n".join(L))
 PY
 
 git add -f data/p40_validation.md 2>/dev/null
-if git commit -q -m "P40 tick-volume validation results (auto)" 2>/dev/null && git push -q 2>/dev/null; then
+git commit -q -m "P40 tick-volume validation results (auto, commit ${HEAD_SHA})" 2>/dev/null
+git pull -q --no-rebase --no-edit 2>/dev/null
+if git push -u origin HEAD 2>/dev/null; then
   echo "RESULTS PUSHED — Claude will read data/p40_validation.md"
 else
-  echo "(auto-push skipped — copy the comparison above to Claude)"
+  echo "(push failed — copy the comparison above to Claude)"
 fi

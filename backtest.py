@@ -2582,6 +2582,11 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.CRT_SWEEP_MULT), min_units)
             g["crt_sweep_sized"] = g.get("crt_sweep_sized", 0) + 1
+        # Entry-type tag (computed here so the P40 modulator below can read it;
+        # also reused at fill time). news upgrade may already have set max_legs.
+        base_type  = "amd" if amd_score else "mss"
+        entry_tag  = "news" if news_impact == "High" else base_type
+        entry_type = f"{entry_tag}_{pattern_tag}"
         # P40 conditional-volume modulator: high-vol FVG entries lose more (size
         # down) / high-vol OB entries win more (size up). Only fires where tick
         # data exists (EU/GU 2022+2024); neutral (1.0) otherwise. No equity floor —
@@ -2622,10 +2627,8 @@ class Backtester:
         if news_impact == "High":
             max_legs = config.MAX_LEGS
 
-        # Market order: fill immediately at current bar close.
-        base_type  = "amd" if amd_score else "mss"
-        entry_tag  = "news" if news_impact == "High" else base_type
-        entry_type = f"{entry_tag}_{pattern_tag}"
+        # Market order: fill immediately at current bar close. (entry_type computed
+        # above, before the P40 sizing block.)
         # Session-open side analytics tag (reuse _session_open computed above).
         if _session_open is None:
             _so_side = "no_open"
