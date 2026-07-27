@@ -70,6 +70,7 @@ def fmt(d, k, suf=""):
     return (f"{v:,.0f}" if k == "eq" else f"{v:.2f}") + suf
 
 crash_logs = []
+per_year = {}   # yr -> (pass_bool_or_None, reason)
 for yr, base, mod in (("2022", "y2022_base", "y2022_mod"),
                       ("2024", "y2024_base", "y2024_mod")):
     (b, bt), (m, mt) = grab(base), grab(mod)
@@ -93,10 +94,33 @@ for yr, base, mod in (("2022", "y2022_base", "y2022_mod"),
             tail = "\n".join(tt.splitlines()[-30:])
             crash_logs.append(f"### {yr} {tag} — NO SUMMARY (crash?)\n\n"
                               f"```\n{tail}\n```\n")
+    # Per-year pass = PF up AND equity up AND MaxDD not worse. dd is negative
+    # (e.g. -11.6) so "not worse" means modulator dd >= baseline dd.
+    if any(b.get(k) is None or m.get(k) is None for k in ("pf", "eq", "dd")):
+        per_year[yr] = (None, "run crashed — no summary")
+    else:
+        fails = []
+        if m["pf"] <= b["pf"]:  fails.append(f"PF {m['pf']:.2f}≤{b['pf']:.2f}")
+        if m["eq"] <= b["eq"]:  fails.append(f"equity {m['eq']:,.0f}≤{b['eq']:,.0f}")
+        if m["dd"] <  b["dd"]:  fails.append(f"MaxDD {m['dd']:.2f}<{b['dd']:.2f} (worse)")
+        per_year[yr] = (not fails, "; ".join(fails) if fails else "PF+equity up, MaxDD held")
 
-L += ["## Verdict", "",
-      "GREEN (ship) = PF and equity up, MaxDD not worse, in **both** 2022 and "
-      "2024. Otherwise it stays OFF (USE_CONDITIONAL_VOLUME=0)."]
+# Computed verdict — an explicit RED/GREEN, not just the definition.
+crashed = any(v is None for v, _ in per_year.values())
+green = (not crashed) and all(v for v, _ in per_year.values())
+if crashed:
+    head = "⚠️ INCONCLUSIVE — a run crashed (see diagnostics below)."
+elif green:
+    head = "🟢 GREEN — ship. PF+equity up and MaxDD held in BOTH years."
+else:
+    head = "🔴 RED — do NOT ship. Stays OFF (USE_CONDITIONAL_VOLUME=0)."
+L += ["## Verdict", "", f"**{head}**", ""]
+for yr, (v, why) in per_year.items():
+    mark = "🟢 pass" if v else ("⚠️ crash" if v is None else "🔴 fail")
+    L.append(f"- **{yr}: {mark}** — {why}")
+L += ["", "_Rule: GREEN only if PF **and** ending equity improve while MaxDD is "
+      "not worse, in **both** 2022 and 2024. This line is the computed result, "
+      "not a legend._"]
 if crash_logs:
     L += ["", "## Crash diagnostics (auto-captured)", ""] + crash_logs
 open("data/p40_validation.md", "w").write("\n".join(L) + "\n")

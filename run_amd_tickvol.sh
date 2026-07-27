@@ -37,10 +37,23 @@ fi
 echo "=== [3/4] running the instrumented backtest (logs AMD phase timestamps) ==="
 python run_backtest_histdata.py --years 2022 2023 2024 2025 > /tmp/amdtv_bt.txt 2>&1
 echo "--- backtest tail ---"; tail -15 /tmp/amdtv_bt.txt
-ls data/histdata/trades_dump.csv >/dev/null 2>&1 || { echo "ERROR: no trade dump — see /tmp/amdtv_bt.txt"; exit 1; }
+if ! ls data/histdata/trades_dump.csv >/dev/null 2>&1; then
+  # Surface the crash into the report so it lands in the repo, not just /tmp.
+  { echo "# AMD × tick-volume — RUN FAILED"; echo;
+    echo "The instrumented backtest produced no trade dump. Tail of the run:"; echo;
+    echo '```'; tail -40 /tmp/amdtv_bt.txt; echo '```'; } > data/amd_tickvol_report.md
+  git add -f data/amd_tickvol_report.md 2>/dev/null
+  git commit -q -m "AMD x tick-volume: backtest crash (auto)" 2>/dev/null
+  git pull -q --no-rebase --no-edit 2>/dev/null; git push -u origin HEAD 2>/dev/null
+  echo "ERROR: no trade dump — crash tail pushed to data/amd_tickvol_report.md"; exit 1
+fi
 
 echo "=== [4/4] AMD × tick-volume analysis ==="
 python scripts/amd_tickvol_analysis.py || exit 1
+
+# Stamp the run's commit sha so we can confirm which code produced the report.
+SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+printf '\n_report generated on commit `%s`_\n' "$SHA" >> data/amd_tickvol_report.md
 
 echo ""
 echo "############################################################"
@@ -49,8 +62,10 @@ echo "############################################################"
 cat data/amd_tickvol_report.md
 
 git add -f data/amd_tickvol_report.md 2>/dev/null
-if git commit -q -m "AMD x tick-volume results (auto)" 2>/dev/null && git push -q 2>/dev/null; then
+git commit -q -m "AMD x tick-volume results (auto, commit ${SHA})" 2>/dev/null
+git pull -q --no-rebase --no-edit 2>/dev/null
+if git push -u origin HEAD 2>/dev/null; then
   echo ""; echo "RESULTS PUSHED — Claude will read the report."
 else
-  echo ""; echo "(auto-push skipped — copy the report above to Claude)"
+  echo ""; echo "(push failed — copy the report above to Claude)"
 fi
