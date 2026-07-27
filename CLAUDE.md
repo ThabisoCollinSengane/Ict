@@ -1232,6 +1232,36 @@ EVERY subset tested, and MaxDD reproduces the documented -12.95% exactly. Re-con
 multipliers (per the P18 live-engine gap — the LEAN engine still needs the full sizing block).
 `_amd_swept_pdliq` detection also needs porting there.
 
+### Draw-to-liquidity continuation entry (TESTED + REVERTED 2026-07-27)
+**What:** the "trade TOWARD the unhit pool" idea — open a CONTINUATION toward an unswept PDH/PDL
+(price is drawn to the resting pool) and exit AT it, instead of only fading the sweep. Built as a
+targeted gate exemption: a `draw_score==0` trade (normally killed by the inverted-draw 0/3 reversal
+gate) is let through ONLY when `_unswept_pdliq_target` finds an unswept PDH/PDL in the trade
+direction within `[MIN_PIPS_TARGET, DRAW_CONT_MAX_PIPS]` (a NEAR pool = this cycle's draw, never a
+far one — the `HTF_TARGET_PREF` revert already showed far pools = -22% MaxDD). MSS 2-of-3 kept;
+earns breakout-style conviction; tagged `entry_model="draw_cont"`.
+
+**Result — REVERTED (4th continuation-bypass to fail):**
+
+| metric | baseline | draw-cont ON |
+|---|---|---|
+| Full 4yr MaxDD | -12.95% | **-16.73%** (breaches -15% breaker) ❌ |
+| Full 4yr PF | 3.49 | 3.30 ❌ |
+| Full 4yr WR | 45.3% | 44.6% ❌ |
+| Full 4yr equity | 11.70M | 12.27M (illusory — bought with -16.73% DD) |
+| IS MaxDD / PF | -12.95% / 3.04 | -16.73% / 2.90 ❌ |
+| OOS MaxDD / equity | -15.41% / 34,690 | -11.86% / **33,958 (down)** ❌ |
+
+72 continuation entries added; they win LESS often (WR + PF down in all three splits) and cluster
+their losses (full+IS MaxDD blows past the -15% breaker). IS/OOS also disagree on MaxDD sign
+(IS -3.78pp, OOS +3.55pp) → fails the not-curve-fit test independently. **Root cause (same as
+TRAIL_AT_TP / TP-runner from the exit side):** the pool is where the AMD cycle ENDS — riding
+continuation INTO it means buying exactly where smart money sells into the resting liquidity.
+PDH/PDL are correct as TARGETS/exits (already used, P15/P17/P18/P41), wrong as continuation ENTRIES.
+`DRAW_CONT_ENABLED=0` (default off; byte-identical to shipped when off). Code + `_unswept_pdliq_target`
++ `run_drawcont_validation.sh` retained for reference. Fourth confirmation that the strategy's
+reversal DNA beats every continuation-bypass (P11 NY-exempt, SOJ-draw bypass, now this).
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
