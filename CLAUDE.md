@@ -1157,6 +1157,38 @@ P39's density proxy, but still M15-resolution); EU+GU 2022/2024 only. **Next (op
 progress):** log the exact M5 sweep bar + MSS(M5/M15) timing + PD-array type/side + session +
 PDH/PDL, all winners-vs-losers, to see precisely what losers do that winners don't.
 
+### P40 — Conditional-volume position-size modulator (TESTED + REVERTED 2026-07-27)
+**What:** Turn the AMD tick-volume winner/loser gap into a live sizing lever. From the descriptive
+study, high-volume FVG entries were more often losers (size DOWN) and high-volume OB entries more
+often winners (size UP). `ict/volume_modulator.get_volume_modifier(entry_type, friction_ratio)`
+applies `VOL_MOD_FVG_DOWN=0.80` / `VOL_MOD_OB_UP=1.15` when the entry-bar friction ratio (ticks ÷
+mean of prior 20 M5 bins) ≥ `VOL_MOD_HIGH_RATIO=1.2`; neutral (1.0×) when tick data is absent.
+Wired into the `_maybe_open` sizing block, gated by `USE_CONDITIONAL_VOLUME`.
+
+**Validation (EU+GU only, 2022 & 2024 as two separate tick-volume tests):** the modulator sized
+~half of all trades each year (vmod 90/190 and 108/195 — broad, not a small sample).
+
+| | 2022 | 2024 |
+|---|---|---|
+| PF | 5.26 → 5.35 (+0.09) | 3.32 → 3.11 (−0.21) ❌ |
+| Equity ZAR | 30,016 → 29,473 (−543) ❌ | 26,778 → 24,388 (−2,390) ❌ |
+| MaxDD | −11.55% → −11.89% ❌ | −11.60% → −11.95% ❌ |
+| WR | 48.9% → 48.9% | 44.9% → 44.6% ❌ |
+
+**Verdict RED — reverted.** Fails the ship gate (PF+equity up, MaxDD held) in BOTH years. 2024 is
+worse on every metric; 2022's PF bump is illusory (equity down + MaxDD worse in the same year →
+the modifier shrank winners more than it saved on losers). Same lesson as P39 and the P8/P10/P11
+reverts: **a measurable winner/loser difference is not a tradeable edge** — the high-volume FVG
+"losers" it shrinks are still net-positive to the compounding path. `USE_CONDITIONAL_VOLUME=0`
+(default off). Code + config retained for reference; nothing ships to the engine.
+
+**Two bugs found + fixed during the run (both would silently zero the modulator):** (1) `os` was
+never imported at module level in `backtest.py` though `_load_tickvol()` uses it → `NameError` at
+init; (2) `entry_type` was referenced in the P40 sizing block ~40 lines before its definition →
+`UnboundLocalError` on the first trade. Both produced empty (`—`) modulator columns that looked
+like "no effect." `run_p40_validation.sh` now stamps the run's git sha and embeds any crashed
+arm's traceback into the pushed report so a crash can't masquerade as a null result again.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
