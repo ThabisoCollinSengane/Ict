@@ -9,14 +9,29 @@
 cd "$(dirname "$0")" || exit 1
 M1_URL="https://drive.google.com/drive/folders/1uN2c7QvNJg15CmVmNXUYR1CTiSsaB-d4"
 
-echo "=== ensuring M1 data is prepared ==="
-if ! ls data/histdata/EURUSD_2022.csv >/dev/null 2>&1; then
+echo "=== ensuring M1 data is prepared (all 4 years: 2022-2025) ==="
+# We want a TRUE 4yr run. Re-prepare if ANY year's CSV is missing (prepare_histdata
+# dedups/appends, so re-running is safe). 2025 is the one usually absent.
+missing=0
+for y in 2022 2023 2024 2025; do
+  ls data/histdata/EURUSD_$y.csv >/dev/null 2>&1 || { echo "  EURUSD_$y.csv MISSING"; missing=1; }
+done
+if [ "$missing" = 1 ]; then
+  echo "  fetching M1 from Drive + preparing…"
   pip install -q --upgrade "gdown>=5.2"
   rm -rf /tmp/m1dl && gdown --folder -O /tmp/m1dl "$M1_URL"
   Z=$(find /tmp/m1dl -name 'HISTDATA_*_M1????.zip' 2>/dev/null | head -1)
   [ -z "$Z" ] && { echo "ERROR: M1 download failed"; exit 1; }
   python scripts/prepare_histdata.py "$(dirname "$Z")" || exit 1
 fi
+echo "=== per-year M1 coverage (a year with no CSV cannot be tested) ==="
+for y in 2022 2023 2024 2025; do
+  for p in EURUSD GBPUSD NZDUSD; do
+    if ls data/histdata/${p}_$y.csv >/dev/null 2>&1; then s="ok"; else s="MISSING"; fi
+    printf "  %s %s: %s\n" "$p" "$y" "$s"
+  done
+done
+COVER2025="$(ls data/histdata/EURUSD_2025.csv >/dev/null 2>&1 && echo yes || echo NO)"
 
 run_one() {  # $1 = mult  $2 = label  $3.. = years
   local mult="$1" label="$2"; shift 2
@@ -35,9 +50,10 @@ run_one 1.25 oos_lev   2024 2025
 
 echo "=== building comparison ==="
 HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-HEAD_SHA="$HEAD_SHA" python - <<'PY'
+HEAD_SHA="$HEAD_SHA" COVER2025="$COVER2025" python - <<'PY'
 import re, os
 HEAD = os.environ.get("HEAD_SHA", "unknown")
+C2025 = os.environ.get("COVER2025", "NO")
 def grab(label):
     p = f"/tmp/pdl_{label}.txt"
     if not os.path.exists(p):
@@ -56,7 +72,11 @@ L = ["# PDH/PDL-sweep sizing lever — full-backtest validation", "",
      "Baseline (`PDLIQ_SWEEP_MULT=1.0`) vs lever (`1.25`) on the full 4yr and the "
      "IS/OOS splits. `sized` = trades the lever bumped. **Ships only if full-4yr "
      "equity is up and MaxDD is not worse, and both splits stay positive with "
-     "MaxDD not materially worse.**", "", f"_run commit: `{HEAD}`_", ""]
+     "MaxDD not materially worse.**", "", f"_run commit: `{HEAD}`_",
+     ("_**TRUE 4yr run** — 2025 M1 data present._" if C2025 == "yes" else
+      "_⚠️ **2025 M1 data ABSENT** — 'Full' below is 2022-2024 only (not the "
+      "documented 810-trade 4yr path). Load 2025 into the Drive folder for a true "
+      "4yr confirm._"), ""]
 
 def fmt(d, k, suf=""):
     v = d.get(k)
