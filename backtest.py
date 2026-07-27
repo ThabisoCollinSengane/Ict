@@ -8,6 +8,7 @@ Usage:  python backtest.py
 """
 
 import itertools
+import os
 import sys
 from collections import namedtuple
 from datetime import timedelta
