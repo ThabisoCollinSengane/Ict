@@ -314,6 +314,16 @@ CRT_SWEEP_MIN_PIPS = 2.0   # minimum wick beyond CRT H/L to qualify as a genuine
 CRT_SWEEP_MULT     = float(_os.environ.get("CRT_SWEEP_MULT", "1.25"))
 CRT_SWEEP_MULT_TF  = "240T"   # H4 CRT sweep is the lever; D1 bucket excluded
 
+# --- PDH/PDL-sweep sizing lever (price-based; OFF by default) ---
+# When the AMD manipulation swept prior-day liquidity (within ~5 pips of PDH/PDL)
+# the raid hit a genuine resting-liquidity pool — the setup-quality bucket that
+# held WR 55% (2022) / 53% (2024) above the ~45% baseline in BOTH years
+# (data/amd_tickvol_report.md §9). Price-based (no tick data) so it applies to all
+# pairs/years. Same 1.25× magnitude + R3k floor (DRAW_SIZE_MIN_EQUITY) as P18/P19.
+# 1.0 = no-op; set 1.25 to test. MUST clear the full 4yr + IS/OOS + MaxDD-neutral
+# validation before it ships (run_pdliq_validation.sh).
+PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.0"))
+
 # --- P40 conditional-volume modulator (FVG/OB, tick-volume; OFF by default) ---
 # Data-derived from data/amd_tickvol_report.md (both-year-consistent per §3-7):
 # high-volume FVG entries lose more -> size down; high-volume OB entries win more

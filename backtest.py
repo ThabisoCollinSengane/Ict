@@ -2582,6 +2582,17 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.CRT_SWEEP_MULT), min_units)
             g["crt_sweep_sized"] = g.get("crt_sweep_sized", 0) + 1
+        # PDH/PDL-sweep sizing lever: when the manipulation ran previous-day
+        # liquidity (sweep within ~5 pips of PDH/PDL), the AMD raid hit a genuine
+        # resting-liquidity pool — the setup-quality bucket that held WR 55%/53%
+        # above the ~45% baseline in BOTH years (AMD tick-vol study §9). Price-
+        # based (no tick data) so it applies across all pairs/years. Same 1.25×
+        # magnitude and R3k floor as P18/P19. Default off (mult=1.0) until the
+        # full-backtest IS/OOS + MaxDD validation passes.
+        if (config.PDLIQ_SWEEP_MULT != 1.0 and _amd_swept_pdliq
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            units = max(int(units * config.PDLIQ_SWEEP_MULT), min_units)
+            g["pdliq_sweep_sized"] = g.get("pdliq_sweep_sized", 0) + 1
         # Entry-type tag (computed here so the P40 modulator below can read it;
         # also reused at fill time). news upgrade may already have set max_legs.
         base_type  = "amd" if amd_score else "mss"
