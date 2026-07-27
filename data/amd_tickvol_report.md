@@ -143,7 +143,47 @@ Where the major-liquidity edge concentrates (major-liq trades only).
 | OB | 16/45 | 50% | 42% |
 | breaker | 4/3 | 100% | 33% |
 
-## 12. Read
+## 12. ENTRY hypothesis — did tick volume DIE (<0.5×) approaching the PD array?
+
+Your idea: the best entry is when volume **collapses** in the PD array (coil ending → move imminent), not when it's still busy (still coiling). `approach` = the quietest volume ratio in the entry bar + 3 bars before it. If the **died <0.5×** bucket wins more in **both** years, entering on volume-death is worth building — and note it's a *new* trigger, since the current entries mostly fire on elevated volume (the tension in §1's 1.28×).
+
+| segment | n IS/OOS | IS WR | OOS WR |
+|---|---|---|---|
+| died <0.5× | 14/58 | 43% | 41% |
+| 0.5-0.8× | 19/38 | 53% | 55% |
+| 0.8-1.2× | 22/28 | 50% | 46% |
+| >1.2× | 61/34 | 51% | 38% |
+
+## 13. DISTRIBUTION shape — express (quiet) move or building volume?
+
+Entry→target: does the move run on **declining** volume (express route — retail already chased the sweep) or **building** volume? `dist-slope` = 2nd-half minus 1st-half mean volume of the hold; negative = quieter into the target.
+
+| segment | n IS/OOS | IS WR | OOS WR |
+|---|---|---|---|
+| declining (express) | 40/59 | 58% | 41% |
+| building | 48/90 | 60% | 52% |
+
+Mean dist-slope — **winners +0.18× vs losers +0.20×** (more negative = the move ran quieter into target).
+
+## 14. Volume approaching the target (the higher-TF draw)
+
+How tick volume behaves as price delivers to the draw. `tp-approach` = mean volume ratio in the last 3 bars into the exit; `tp-spike` = the peak of those (the 'huge activity' at the draw). Winners (reached the draw) vs losers (stopped) — does delivery to the draw come with a volume burst?
+
+| group | mean tp-approach | mean tp-spike | n |
+|---|---|---|---|
+| winners | 2.05× | 2.72× | 129 |
+| losers | 2.06× | 2.91× | 145 |
+
+Split by year:
+
+| group | tp-approach | tp-spike | n |
+|---|---|---|---|
+| IS win | 2.34× | 2.94× | 58 |
+| IS lose | 2.22× | 2.91× | 58 |
+| OOS win | 1.82× | 2.54× | 71 |
+| OOS lose | 1.95× | 2.91× | 88 |
+
+## 15. Read
 
 **Two questions in this report:**
 
@@ -151,5 +191,9 @@ Where the major-liquidity edge concentrates (major-liq trades only).
 
 2. **The liquidity edge — §9–§11 (the real thread).** §9: which liquidity the sweep ran, WR per type. A type (esp. PWH/PWL, PDH/PDL) with WR above the ~45% baseline in BOTH years is a genuine setup-quality signal → build a conviction/size lever, validate on the full backtest (IS/OOS, MaxDD-neutral). §10 answers your 'high volume isn't always bad' point directly — if high-volume major-liq runs win more both years, that's a size-UP case. §11 shows where the edge concentrates (session/zone/array) for the recipe.
 
+3. **Entry timing & distribution — §12–§13 (your volume-death idea).** §12: if the `died <0.5×` approach bucket wins clearly more in both years, entering on volume collapse in the PD array is worth building as a new trigger (and pyramid gate). §13: if winners' `dist-slope` is consistently more negative than losers', the real move runs on quiet/express volume — which also argues for holding through low-volume drift rather than exiting on it.
+
 Discipline throughout: consistent across both years, n≥~20 per cell, or it's noise — same bar as P39.
 
+
+_report generated on commit `6168719`_
