@@ -1219,10 +1219,14 @@ Equity up in ALL THREE runs, PF flat (±0.05), **MaxDD identical to the decimal*
 unchanged — the clean-sizing-lever signature (same as P18/P19). Both splits stay strongly positive
 and same-ballpark (PF 3.04 IS / 3.50 OOS). Ships ON.
 
-***Caveat — 2025 not yet tested:** the Codespace has only 2022–2024 M1 data, so the "full" run is
-602 trades, not the documented 810 (which includes 2025). MaxDD reproducing the documented -12.95%
-exactly is strong evidence behavior is intact, but the lever should be re-confirmed on a true full
-4yr run once 2025 data is loaded. (OOS here is 2024 only, for the same reason.)
+***Caveat — full 810-trade path not yet reproduced (data-completeness, not lever):** the Codespace
+"full" run is 602 trades, not the documented 810. Coverage check (2026-07-27) showed 2025 is only
+PARTIALLY present — `NZDUSD_2025` is a full year (371k M1 rows) but `UDXUSD_2025` (the DXY feed) is
+MISSING, and the EUR/GBP 2025 months have gaps from the tick-era downloads. Since the hard gate is
+DXY H1 BOS, a missing 2025 DXY feed suppresses 2025 entries → the OOS split barely moves. The lever
+verdict does NOT depend on this: it is GREEN (equity up, PF flat, MaxDD held to the decimal) on
+EVERY subset tested, and MaxDD reproduces the documented -12.95% exactly. Re-confirm on the true
+810-trade path once `UDXUSD_2025` + the EUR/GBP 2025 gaps are loaded.
 
 **Live-engine note:** `main.py` needs `PDLIQ_SWEEP_MULT` ported alongside the other sizing
 multipliers (per the P18 live-engine gap — the LEAN engine still needs the full sizing block).
