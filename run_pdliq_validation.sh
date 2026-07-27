@@ -10,28 +10,35 @@ cd "$(dirname "$0")" || exit 1
 M1_URL="https://drive.google.com/drive/folders/1uN2c7QvNJg15CmVmNXUYR1CTiSsaB-d4"
 
 echo "=== ensuring M1 data is prepared (all 4 years: 2022-2025) ==="
-# We want a TRUE 4yr run. Re-prepare if ANY year's CSV is missing (prepare_histdata
-# dedups/appends, so re-running is safe). 2025 is the one usually absent.
+# We want a TRUE 4yr run. UDXUSD (real DXY) is a CORE symbol for the histdata
+# runner — a missing UDXUSD_YYYY = zero trades that year (DXY H1 BOS is the hard
+# gate). Re-prepare if any CORE symbol/year is missing, OR if REFRESH_M1=1 is set
+# (use that after you add new files to the Drive folder — prepare dedups/appends).
 missing=0
 for y in 2022 2023 2024 2025; do
-  ls data/histdata/EURUSD_$y.csv >/dev/null 2>&1 || { echo "  EURUSD_$y.csv MISSING"; missing=1; }
+  for p in EURUSD GBPUSD UDXUSD; do
+    ls data/histdata/${p}_$y.csv >/dev/null 2>&1 || { echo "  ${p}_$y.csv MISSING"; missing=1; }
+  done
 done
-if [ "$missing" = 1 ]; then
-  echo "  fetching M1 from Drive + preparing…"
+if [ "$missing" = 1 ] || [ "${REFRESH_M1:-0}" = 1 ]; then
+  echo "  fetching M1 from Drive + preparing (REFRESH_M1=${REFRESH_M1:-0})…"
   pip install -q --upgrade "gdown>=5.2"
   rm -rf /tmp/m1dl && gdown --folder -O /tmp/m1dl "$M1_URL"
   Z=$(find /tmp/m1dl -name 'HISTDATA_*_M1????.zip' 2>/dev/null | head -1)
   [ -z "$Z" ] && { echo "ERROR: M1 download failed"; exit 1; }
   python scripts/prepare_histdata.py "$(dirname "$Z")" || exit 1
 fi
-echo "=== per-year M1 coverage (a year with no CSV cannot be tested) ==="
+echo "=== per-year M1 coverage + row counts (empty/missing = year can't be tested) ==="
 for y in 2022 2023 2024 2025; do
-  for p in EURUSD GBPUSD NZDUSD; do
-    if ls data/histdata/${p}_$y.csv >/dev/null 2>&1; then s="ok"; else s="MISSING"; fi
-    printf "  %s %s: %s\n" "$p" "$y" "$s"
+  for p in EURUSD GBPUSD NZDUSD UDXUSD; do
+    f="data/histdata/${p}_$y.csv"
+    if [ -f "$f" ]; then rows=$(wc -l < "$f"); printf "  %s %s: %s rows\n" "$p" "$y" "$rows";
+    else printf "  %s %s: MISSING\n" "$p" "$y"; fi
   done
 done
-COVER2025="$(ls data/histdata/EURUSD_2025.csv >/dev/null 2>&1 && echo yes || echo NO)"
+# TRUE 4yr requires the real DXY feed for 2025 (else 2025 gates to ~0 trades).
+COVER2025="$(ls data/histdata/UDXUSD_2025.csv >/dev/null 2>&1 && echo yes || echo NO)"
+echo "  -> UDXUSD_2025 present (true-4yr gate): $COVER2025"
 
 run_one() {  # $1 = mult  $2 = label  $3.. = years
   local mult="$1" label="$2"; shift 2
