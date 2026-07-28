@@ -2,20 +2,20 @@
 
 Baseline (`PDLIQ_SWEEP_MULT=1.0`) vs lever (`1.25`) on the full 4yr and the IS/OOS splits. `sized` = trades the lever bumped. **Ships only if full-4yr equity is up and MaxDD is not worse, and both splits stay positive with MaxDD not materially worse.**
 
-_run commit: `cf2b96f`_
+_run commit: `2abe5be`_
 _**TRUE 4yr run** — 2025 M1 data present._
 
 ## Full 4yr
 
 | metric | baseline | lever 1.25× | Δ |
 |---|---|---|---|
-| trades | 602.00 | 602.00 | +0.00 |
-| win rate | 45.30% | 45.30% | +0.00 |
-| profit factor | 3.45 | 3.49 | +0.04 |
+| trades | 810.00 | 810.00 | +0.00 |
+| win rate | 45.90% | 45.90% | +0.00 |
+| profit factor | 4.47 | 4.46 | -0.01 |
 | max drawdown | -12.95% | -12.95% | +0.00 |
-| ending equity ZAR | 8,743,319 | 11,702,904 | +2,959,585 |
+| ending equity ZAR | 429,300,486 | 675,623,325 | +246,322,839 |
 
-_trades sized by lever: 91_
+_trades sized by lever: 122_
 
 ## IS 2022-23
 
@@ -33,13 +33,13 @@ _trades sized by lever: 48_
 
 | metric | baseline | lever 1.25× | Δ |
 |---|---|---|---|
-| trades | 210.00 | 209.00 | -1.00 |
-| win rate | 44.30% | 44.00% | -0.30 |
-| profit factor | 3.47 | 3.50 | +0.03 |
+| trades | 418.00 | 417.00 | -1.00 |
+| win rate | 45.90% | 45.80% | -0.10 |
+| profit factor | 4.47 | 4.46 | -0.01 |
 | max drawdown | -15.41% | -15.41% | +0.00 |
-| ending equity ZAR | 32,293 | 34,690 | +2,398 |
+| ending equity ZAR | 1,593,594 | 2,012,439 | +418,844 |
 
-_trades sized by lever: 31_
+_trades sized by lever: 62_
 
 ## Verdict
 
