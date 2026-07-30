@@ -1271,6 +1271,31 @@ NEXT cycle's draw (why HTF_TARGET_PREF forcing far targets = -22% MaxDD). It doe
 price CONTINUES to the far pools after our exit — that cascade plays out across trades/days and
 needs a PURE PRICE-PATH study (raw M1, independent of entries), the clean next test.
 
+### Pure-price draw cascade study (MEASURED 2026-07-28, validates design)
+**What:** the clean test of the ICT draw hierarchy on RAW M1 price, independent of the strategy's
+entries/exits (fixes the exit-cap limitation of the draw-ladder study). `scripts/price_cascade.py`
++ `run_price_cascade.sh`: detect every prior-day-liquidity sweep, follow price forward 2 trading
+days, record which pools it reaches (3d≤30d≤60d ascending + weekly). 3,637 sweep events (1844 IS /
+1793 OOS), vectorized ffill-reindex level alignment (no lookahead), O(n).
+
+**Result — cascade CONFIRMED, rock-solid IS/OOS + per-pair:**
+
+| next pool | reach IS | reach OOS |
+|---|---|---|
+| 3-day | 58% | 61% |
+| 30-day | 21% | 20% |
+| 60-day | 15% | 13% |
+| weekly | 25% | 27% |
+
+All 3 pairs match (~60/20/14). Conditional: daily→3d 60%, 3d→30d 49%, 30d→60d 70% (deep moves
+cascade, but are rare). **Interpretation — validates the design, not a new lever:** the 3-day pool
+is the dependable next draw and the strategy ALREADY targets it (PDH/PDL = last 3 daily candles).
+The 30/60-day pools are reached only ~20%/13% in 2 days — extension-only, which is the empirical
+proof of why `HTF_TARGET_PREF` (forcing far targets) = -22% MaxDD: ~80% of the time price doesn't
+get there. Far-pool momentum (30d→60d 70%) is real but sits in rare deep moves an intraday
+exit-at-nearest strategy isn't positioned to hold (TRAIL_AT_TP / TP-runner already reverted). No
+lever — the algo is already built around the reliable rung.
+
 ### Draw-to-liquidity continuation entry (TESTED + REVERTED 2026-07-27)
 **What:** the "trade TOWARD the unhit pool" idea — open a CONTINUATION toward an unswept PDH/PDL
 (price is drawn to the resting pool) and exit AT it, instead of only fading the sweep. Built as a
