@@ -593,6 +593,18 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         # Account is ZAR-denominated, so TotalPortfolioValue is already in ZAR and
         # compares directly to DRAW_SIZE_MIN_EQUITY (the R3,000 multiplier floor).
         # _draw_score and _is_breakout were computed during conviction scoring above.
+        # P41: did the AMD manipulation sweep run prior-day liquidity (PDH/PDL)?
+        # Prior-day H/L = the last completed daily candle (bars1d_full[-1], ascending).
+        # rng/sweep_dir exist only when amd fired; guard on it. Computed here so the
+        # analytics flag is set even when equity is below the multiplier floor.
+        _amd_swept_pdliq = False
+        if amd is not None and len(bars1d_full) >= 1:
+            _swept_lvl = rng.low if sweep_dir > 0 else rng.high
+            _tol = 5 * pip_v
+            _pdh, _pdl = bars1d_full[-1].High, bars1d_full[-1].Low
+            _amd_swept_pdliq = (abs(_swept_lvl - _pdh) <= _tol
+                                or abs(_swept_lvl - _pdl) <= _tol)
+
         equity_zar = self.Portfolio.TotalPortfolioValue
         if equity_zar >= config.DRAW_SIZE_MIN_EQUITY:
             # Draw-cascade 2×/3×: HTF W→D→H4 draw agreeing with the trade.
@@ -614,6 +626,10 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             _crt_pts, _crt_tf = self._htf_crt_sweep(pair, direction, cur_price)
             if _crt_tf == config.CRT_SWEEP_MULT_TF and config.CRT_SWEEP_MULT != 1.0:
                 units = max(int(units * config.CRT_SWEEP_MULT), min_units)
+
+            # P41 PDH/PDL-sweep 1.25× — the raid ran prior-day liquidity (55/53% WR).
+            if _amd_swept_pdliq and config.PDLIQ_SWEEP_MULT != 1.0:
+                units = max(int(units * config.PDLIQ_SWEEP_MULT), min_units)
 
         # ── Place market order ────────────────────────────────────────────────
         qc_sym       = self.symbols[pair]
@@ -641,6 +657,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             "news_impact": news_impact,
             "entry_model": "breakout" if _is_breakout else "judas",
             "draw_score": _draw_score,
+            "amd_swept_pdliq": _amd_swept_pdliq,
         }
         self._pending_entry[entry_ticket.OrderId] = {
             "pair": pair, "stop": stop, "units": units,

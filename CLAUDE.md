@@ -1232,9 +1232,12 @@ reproduced the documented **810 trades** (OOS now the real 2024-25 = 418 trades,
 Equity up in all three, PF flat (±0.05), **MaxDD held to the decimal everywhere** — the clean-
 sizing-lever signature, now on the full documented path. P41 fully confirmed.
 
-**Live-engine note:** `main.py` needs `PDLIQ_SWEEP_MULT` ported alongside the other sizing
-multipliers (per the P18 live-engine gap — the LEAN engine still needs the full sizing block).
-`_amd_swept_pdliq` detection also needs porting there.
+**Live-engine note (PORTED 2026-07-28):** `main.py` now carries P41 — `_amd_swept_pdliq` is
+computed in `_maybe_open` from the AMD `rng`/`sweep_dir` vs the prior completed daily candle
+(`bars1d_full[-1].High/.Low`, ±5 pips), and `PDLIQ_SWEEP_MULT` is applied in the sizing block
+alongside draw-cascade/P9/P18/P19, gated by the same R3k `DRAW_SIZE_MIN_EQUITY` floor. Recorded as
+`amd_swept_pdliq` on the trade record. The LEAN engine's sizing block is now complete (all four
+1.25× levers + draw-cascade 2×/3×). `py_compile` clean; smoke-test on DEMO before funding.
 
 ### PWH/PWL reaction study — the P41 question one TF up (MEASURED 2026-07-28, INCONCLUSIVE)
 **What:** does sweeping a WEEKLY pool (PWH/PWL) predict a better reversal, the way sweeping a

@@ -61,8 +61,8 @@ DRAW_SIZE_MULT = {0: 1.0, 1: 1.0, 2: 2.0, 3: 3.0}
 # Below this the account trades flat lots (preservation): the early small-account
 # phase is where 2x sizing produced the deepest drawdowns.
 DRAW_SIZE_MIN_EQUITY = 3000        # ZAR equity floor before draw multipliers apply
-MIN_PIPS_TARGET = 20               # minimum pips to target (entry and pyramid checks)
-MIN_ENTRY_PIPS_TARGET = 20         # same as MIN_PIPS_TARGET — keep them in sync here
+MIN_PIPS_TARGET = int(_os.environ.get("MIN_PIPS_TARGET", 20))  # min pips to target (env-overridable to test 30)
+MIN_ENTRY_PIPS_TARGET = MIN_PIPS_TARGET   # kept in sync with MIN_PIPS_TARGET
 MIN_RR = 1.2                       # minimum reward:risk
 FIXED_STOP_PIPS = 10               # max/fallback stop distance — 10 pips from entry
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit
