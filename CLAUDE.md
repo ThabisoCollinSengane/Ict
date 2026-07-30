@@ -1250,6 +1250,27 @@ n=8 is noise — no lever. **Weekly levels matter here as TARGETS/draws (P17/P18
 — price is drawn *to* the weekly pool, it doesn't *sweep* it intraday. Bonus: the run re-confirmed
 P41 on the full set (daily-pool sweeps WR 50/45 vs no-pool baseline 45.3/45.8, both years).
 
+### Draw-on-liquidity ladder study (MEASURED 2026-07-28, analytics-only)
+**What:** how price reacts to each liquidity rung — previous session H/L, 3-day, weekly, 30-day,
+60-day — as TARGETS and as DRAWS price delivers to. Instrumentation (logging only, 810/PF 4.47/
+MaxDD -12.95% unchanged): `_prev_session_hl` (previous ET session block extreme), `_draw_ladder`
+(pip-distance to nearest UNSWEPT pool ahead at each rung), MFE tracking in `_update_orders`.
+Confirmed the "past 3 days H/L" is ALREADY the PDH/PDL target basis (`d_bars[-4:-1]`); added the
+30/60-day rungs that weren't built. Code: `scripts/draw_ladder_analysis.py` + `run_draw_ladder.sh`.
+
+**Finding A (targets):** fib extensions are the workhorse (217/218 trades). Weekly/ITH targets are
+rare big-R lottery tickets — PWH/PWL 4/8 trades, PF 26.78/7.55; huge payoff when hit, low hit-rate.
+Hit-rates low everywhere (21-41%) — most trades exit via trail/BE/scale, not the nominal target.
+
+**Finding B (ladder) — the key result + its limit:** within-trade delivery: previous session
+78%/87% (at 6-7 pips), 3-day 0%/0% (42-62 pips), weekly 7%/8% (105-167 pips), 30-day/60-day 0%.
+The 0%s are an EXIT-CAP artifact, not "price never goes there": the strategy exits at the nearest
+fib (~25 pips), and MFE is only tracked while the trade is open, so it can't reach a 42-pip 3-day
+pool. This CONFIRMS the strategy delivers to the nearest draw and exits — the far pools are the
+NEXT cycle's draw (why HTF_TARGET_PREF forcing far targets = -22% MaxDD). It does NOT test whether
+price CONTINUES to the far pools after our exit — that cascade plays out across trades/days and
+needs a PURE PRICE-PATH study (raw M1, independent of entries), the clean next test.
+
 ### Draw-to-liquidity continuation entry (TESTED + REVERTED 2026-07-27)
 **What:** the "trade TOWARD the unhit pool" idea — open a CONTINUATION toward an unswept PDH/PDL
 (price is drawn to the resting pool) and exit AT it, instead of only fading the sweep. Built as a
