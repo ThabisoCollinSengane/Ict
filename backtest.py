@@ -260,6 +260,13 @@ class Backtester:
             target = st["target"]
             pip = pip_size(pair)
 
+            # MFE (max favorable excursion) — analytics only, so the draw-ladder
+            # study can ask "did price reach the 3-day / 30-day / 60-day pool?".
+            _fav = bar.High if direction > 0 else bar.Low
+            _mp = st.get("mfe_price")
+            st["mfe_price"] = (_fav if _mp is None else
+                               (max(_mp, _fav) if direction > 0 else min(_mp, _fav)))
+
             # Trail stop: move to BE at +TRAIL_BE_PIPS, lock +10 pips at +TRAIL_LOCK_PIPS.
             # Then (if enabled) trail behind the most recent confirmed M5 swing once
             # the trade clears STRUCTURE_TRAIL_ACTIVATE pips — the "trail off structure"
@@ -428,6 +435,11 @@ class Backtester:
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
+            "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
+                              * direction / pip_size(pair), 1),
+            "lad_sess": st.get("lad_sess"), "lad_d3": st.get("lad_d3"),
+            "lad_wk": st.get("lad_wk"), "lad_d30": st.get("lad_d30"),
+            "lad_d60": st.get("lad_d60"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -498,6 +510,11 @@ class Backtester:
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
+            "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
+                              * direction / pip_size(pair), 1),
+            "lad_sess": st.get("lad_sess"), "lad_d3": st.get("lad_d3"),
+            "lad_wk": st.get("lad_wk"), "lad_d30": st.get("lad_d30"),
+            "lad_d60": st.get("lad_d60"),
         }
         self.trades.append(record)
         self.log.write_trade(record, equity_after=self.equity)
@@ -802,6 +819,63 @@ class Backtester:
         if near(mp["val"]):
             return "val"
         return "none"
+
+    def _prev_session_hl(self, pair, t, direction):
+        """High (long) / low (short) of the PREVIOUS completed ET session block.
+        Blocks are 8h: Asian 17:00-01:00, London 01:00-09:00, NY 09:00-17:00 ET.
+        Analytics-only, no lookahead — only bars strictly before t are used."""
+        df = self.tf_dfs.get((pair, "5T"))
+        if df is None or len(df) == 0:
+            return None
+        ts = pd.Timestamp(t)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        cur = ts.tz_convert("America/New_York")
+        day = cur.normalize()
+        h = cur.hour
+        if h >= 17:
+            bs = day + pd.Timedelta(hours=17)
+        elif h >= 9:
+            bs = day + pd.Timedelta(hours=9)
+        elif h >= 1:
+            bs = day + pd.Timedelta(hours=1)
+        else:
+            bs = day - pd.Timedelta(hours=7)          # yesterday 17:00 ET
+        ps, pe = bs - pd.Timedelta(hours=8), bs        # previous block window
+        et_idx = df.index.tz_convert("America/New_York")
+        mask = (et_idx >= ps) & (et_idx < pe) & (df.index < ts)
+        seg = df[mask]
+        if len(seg) == 0:
+            return None
+        return float(seg["High"].max()) if direction > 0 else float(seg["Low"].min())
+
+    def _draw_ladder(self, pair, direction, price, t):
+        """Distance (pips) to the nearest UNSWEPT draw ahead at each liquidity rung,
+        in the trade direction — the ICT draw-on-liquidity ladder. None when the
+        rung's level is behind price (already taken) or unavailable. Analytics-only."""
+        pip = pip_size(pair)
+
+        def ahead(level):
+            if level is None:
+                return None
+            d = (level - price) * direction
+            return round(d / pip, 1) if d > 0 else None
+
+        def ext(bars):
+            if not bars:
+                return None
+            return max(b.High for b in bars) if direction > 0 else min(b.Low for b in bars)
+
+        d = self.bars_up_to(pair, "D", t)
+        w = self.bars_up_to(pair, "W", t)
+        wk_lvl = (w[-2].High if direction > 0 else w[-2].Low) if len(w) >= 2 else None
+        return {
+            "lad_sess": ahead(self._prev_session_hl(pair, t, direction)),
+            "lad_d3":   ahead(ext(d[-3:]))  if len(d) >= 3  else None,
+            "lad_wk":   ahead(wk_lvl),
+            "lad_d30":  ahead(ext(d[-30:])) if len(d) >= 30 else None,
+            "lad_d60":  ahead(ext(d[-60:])) if len(d) >= 60 else None,
+        }
 
     @staticmethod
     def _load_tickvol():
@@ -2729,8 +2803,15 @@ class Backtester:
             "_units_tp2": (_r_units_2 if _runner_applies else _units_tp2),
             "runner_be_after_tp1": _runner_applies,
         }
+        _ladder = self._draw_ladder(pair, direction, cur_price, t)
         self.active[pair] = {
             "direction": direction,
+            "mfe_price": entry,
+            "lad_sess": _ladder["lad_sess"],
+            "lad_d3":   _ladder["lad_d3"],
+            "lad_wk":   _ladder["lad_wk"],
+            "lad_d30":  _ladder["lad_d30"],
+            "lad_d60":  _ladder["lad_d60"],
             "target": _active_target,
             "tp1_price": target if _runner_applies else None,
             "tp_runner": _runner_applies,
