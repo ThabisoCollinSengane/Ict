@@ -1236,6 +1236,20 @@ sizing-lever signature, now on the full documented path. P41 fully confirmed.
 multipliers (per the P18 live-engine gap — the LEAN engine still needs the full sizing block).
 `_amd_swept_pdliq` detection also needs porting there.
 
+### PWH/PWL reaction study — the P41 question one TF up (MEASURED 2026-07-28, INCONCLUSIVE)
+**What:** does sweeping a WEEKLY pool (PWH/PWL) predict a better reversal, the way sweeping a
+DAILY pool (PDH/PDL, P41) did? `scripts/pwliq_analysis.py` + `run_pwliq_analysis.sh` bucket all
+810 trades by `amd_liq_run` (the pool the AMD sweep ran) and report WR/PF/mean-R split IS/OOS.
+
+**Result — INCONCLUSIVE (structural, not a null):** only **8 of 810 trades** (2 IS / 6 OOS) had a
+sweep that ran a weekly pool. Intraday Judas sweeps run the session range (tens of pips); PWH/PWL
+sit a week's range away (100-300 pips), so an intraday sweep essentially never originates at a
+weekly level. Sweep-reach on the full set: equal-H/L **397**, daily PDH/PDL **115** (why P41 works),
+weekly PWH/PWL **8**, value-area 9. The 8 weekly trades lean positive (WR 50/50, +0.68/+1.27R) but
+n=8 is noise — no lever. **Weekly levels matter here as TARGETS/draws (P17/P18), not sweep origins**
+— price is drawn *to* the weekly pool, it doesn't *sweep* it intraday. Bonus: the run re-confirmed
+P41 on the full set (daily-pool sweeps WR 50/45 vs no-pool baseline 45.3/45.8, both years).
+
 ### Draw-to-liquidity continuation entry (TESTED + REVERTED 2026-07-27)
 **What:** the "trade TOWARD the unhit pool" idea — open a CONTINUATION toward an unswept PDH/PDL
 (price is drawn to the resting pool) and exit AT it, instead of only fading the sweep. Built as a
