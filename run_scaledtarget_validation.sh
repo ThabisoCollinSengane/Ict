@@ -51,7 +51,8 @@ def grab(label):
     def g(k, c=float):
         m = re.search(rf"{k}\s+(-?[\d.]+)", t); return c(m.group(1)) if m else None
     return {"trades": g("trades", int), "wr": g("win_rate_pct"), "pf": g("profit_factor"),
-            "dd": g("max_drawdown_pct"), "eq": g("ending_equity_ZAR")}
+            "dd": g("max_drawdown_pct"), "eq": g("ending_equity_ZAR"),
+            "pyr": g("pyramid_added", int), "pyrblk": g("pyramid_blocked_min_target", int)}
 def cell(d, k):
     v = d.get(k)
     return "—" if v is None else (f"{v:,.0f}" if k == "eq" else f"{v:.2f}")
@@ -64,6 +65,14 @@ def rowset(split, title):
         L.append(f"| {name} | {cell(d,'trades')} | {cell(d,'wr')}% | {cell(d,'pf')} | "
                  f"{cell(d,'dd')}% | {cell(d,'eq')} |")
     return L + [""]
+def pyrset(split, title):
+    L = [f"### {title} — pyramiding", "",
+         "| floor | pyramids added | blocked by target-room gate |", "|---|---|---|"]
+    for cfg, name in (("flat20", "flat 20"), ("flat30", "flat 30 (shipped)"),
+                      ("scaled", "SCALED 20/30")):
+        d = grab(f"{cfg}_{split}")
+        L.append(f"| {name} | {d.get('pyr','—')} | {d.get('pyrblk','—')} |")
+    return L + [""]
 
 L = ["# Equity-scaled target floor — flat-20 vs flat-30 vs scaled(20/30)", "",
      "Scaled = 20-pip floor below R3k (small-account compounding), 30-pip above "
@@ -71,6 +80,13 @@ L = ["# Equity-scaled target floor — flat-20 vs flat-30 vs scaled(20/30)", "",
      "equity with MaxDD not worse, both splits holding.**", "", f"_run commit: `{SHA}`_", ""]
 for split, title in (("full", "Full 4yr"), ("is", "IS 2022-23"), ("oos", "OOS 2024-25")):
     L += rowset(split, title)
+
+L += ["## Pyramiding — did the 30-pip floor starve adds?", "",
+      "`pyramids added` = legs that fired; `blocked by target-room gate` = adds "
+      "rejected because <floor pips remained to TP. If flat-30 adds ≪ flat-20, the "
+      "floor is starving pyramids and a separate PYRAMID_MIN_TARGET is worth it.", ""]
+for split, title in (("full", "Full 4yr"), ("is", "IS 2022-23"), ("oos", "OOS 2024-25")):
+    L += pyrset(split, title)
 
 f30, sc = grab("flat30_full"), grab("scaled_full")
 f20 = grab("flat20_full")

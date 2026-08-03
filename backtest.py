@@ -126,6 +126,8 @@ class Backtester:
             "manipulation_correct_dir": 0,
             "m5_fvg_correct_dir": 0, "target_found": 0,
             "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
+            # pyramid counters (adds that fired vs blocked by the target-room gate)
+            "pyramid_added": 0, "pyramid_blocked_min_target": 0,
             # protection counters
             "drawdown_halt": 0, "daily_loss_halt": 0, "consec_loss_pause": 0,
             # weekly/daily budget counters
@@ -3056,6 +3058,7 @@ class Backtester:
             "runner_be_after_tp1": False,
         }
         st["legs"].append(leg)
+        self.gate["pyramid_added"] = self.gate.get("pyramid_added", 0) + 1
 
 
 def summarize(bt):
