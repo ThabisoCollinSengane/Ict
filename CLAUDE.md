@@ -1274,6 +1274,24 @@ NEXT cycle's draw (why HTF_TARGET_PREF forcing far targets = -22% MaxDD). It doe
 price CONTINUES to the far pools after our exit — that cascade plays out across trades/days and
 needs a PURE PRICE-PATH study (raw M1, independent of entries), the clean next test.
 
+### Minimum-target floor 20 → 30 pips (SHIPPED 2026-07-28, user preference)
+**What:** `MIN_PIPS_TARGET` raised 20 → 30 (env-overridable). Higher floor forces further, higher-RR
+targets. Validated 20 vs 25 vs 30 on full + IS/OOS (`run_mintarget_validation.sh`):
+
+| floor | full PF | full MaxDD | full equity | IS PF/eq | OOS PF/MaxDD/eq |
+|---|---|---|---|---|---|
+| 20 | 4.46 | -12.95% | R675.6M | 3.04 / R343k | 4.46 / -15.41% / R2.01M |
+| 30 | **4.95** | **-12.76%** | R567.6M | 2.88 / R273k | **4.95 / -12.55% / R2.24M** |
+
+**Strict gate = RED** (full-4yr equity down -16%, IS weaker) — the compounding-path effect: the
+smaller 20-pip winners hit more often and compound forward, so raw geometric growth is higher at 20
+even as PF rises at 30. **Shipped anyway at the user's explicit preference (2026-07-28):** 30 buys
+higher PF (4.95), better MaxDD everywhere (notably OOS -12.55% vs -15.41%), and higher OOS equity —
+the equity "loss" is only on the idealized R500→4yr compounding fantasy, not the live R1k path. The
+trade-off is a genuine risk/quality-vs-raw-growth preference, not a defect. Weaker IS (small-account)
+phase is the known cost. `MIN_PIPS_TARGET=20` env-restores the old behavior. Considered but not built:
+an equity-scaled floor (20 below R3k, 30 above) — the theoretically-best hybrid, deferred.
+
 ### Pure-price draw cascade study (MEASURED 2026-07-28, validates design)
 **What:** the clean test of the ICT draw hierarchy on RAW M1 price, independent of the strategy's
 entries/exits (fixes the exit-cap limitation of the draw-ladder study). `scripts/price_cascade.py`
