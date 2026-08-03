@@ -877,6 +877,16 @@ class Backtester:
             "lad_d60":  ahead(ext(d[-60:])) if len(d) >= 60 else None,
         }
 
+    def _min_pips_target(self):
+        """Equity-scaled minimum target floor. Below the R3k multiplier threshold
+        a smaller floor hits more often (compounding fuel for the small account);
+        at/above it a larger floor gives higher PF + lower DD. When scaling is off
+        (default) returns the flat config.MIN_PIPS_TARGET — byte-identical to shipped."""
+        if not config.MIN_TARGET_SCALED:
+            return config.MIN_PIPS_TARGET
+        return (config.MIN_PIPS_TARGET_SMALL if self.equity < config.DRAW_SIZE_MIN_EQUITY
+                else config.MIN_PIPS_TARGET_LARGE)
+
     @staticmethod
     def _load_tickvol():
         """P40: load per-M5 tick counts from data/p39_agg/*_m5.csv, if present.
@@ -1361,7 +1371,7 @@ class Backtester:
         if swing is not None:
             fib_t = nearest_fib_target(
                 swing[0], swing[1], direction, price,
-                min_distance=config.MIN_PIPS_TARGET * pip_v,
+                min_distance=self._min_pips_target() * pip_v,
             )
             if fib_t is not None:
                 candidates.append((fib_t, "fib_extension"))
@@ -1418,11 +1428,12 @@ class Backtester:
             if filtered:
                 candidates = filtered
         # Prefer the nearest target satisfying both MIN_RR and MIN_PIPS_TARGET.
+        _min_tgt = self._min_pips_target()
         if stop is not None:
             min_reward = max(abs(price - stop) * config.MIN_RR,
-                             config.MIN_PIPS_TARGET * pip_v)
+                             _min_tgt * pip_v)
         else:
-            min_reward = config.MIN_PIPS_TARGET * pip_v
+            min_reward = _min_tgt * pip_v
         rr_ok = [c for c in candidates if abs(c[0] - price) >= min_reward]
         # P20: when high-conviction signals fire, prefer premium liquidity draws
         # (ITH/ITL, PDH/PDL, FVG, OB, fib) over raw swing / round-number targets.
@@ -2661,7 +2672,7 @@ class Backtester:
             max_legs = max(max_legs, 2)
 
         reward_pips = abs(target - entry) / pip
-        if reward_pips < config.MIN_ENTRY_PIPS_TARGET:
+        if reward_pips < self._min_pips_target():
             return
         g["rr_ok"] += 1
 
@@ -3004,7 +3015,7 @@ class Backtester:
             stop = entry - _max_stop if st["direction"] > 0 else entry + _max_stop
 
         reward_pips = abs(st["target"] - entry) / pip
-        if reward_pips < config.MIN_PIPS_TARGET:
+        if reward_pips < self._min_pips_target():
             self.gate["pyramid_blocked_min_target"] = self.gate.get("pyramid_blocked_min_target", 0) + 1
             return
 

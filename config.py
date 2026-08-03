@@ -63,6 +63,14 @@ DRAW_SIZE_MULT = {0: 1.0, 1: 1.0, 2: 2.0, 3: 3.0}
 DRAW_SIZE_MIN_EQUITY = 3000        # ZAR equity floor before draw multipliers apply
 MIN_PIPS_TARGET = int(_os.environ.get("MIN_PIPS_TARGET", 30))  # min pips to target (30: higher PF + lower DD, user pref)
 MIN_ENTRY_PIPS_TARGET = MIN_PIPS_TARGET   # kept in sync with MIN_PIPS_TARGET
+# Equity-scaled target floor (OFF by default). The 20-vs-30 validation showed 20
+# wins the small-account phase (more frequent hits = compounding fuel below R3k)
+# while 30 wins the large-account phase (higher PF, lower DD). This uses the small
+# floor below the R3k multiplier threshold (DRAW_SIZE_MIN_EQUITY) and the large
+# floor above it — best-of-both, if it validates. OFF → flat MIN_PIPS_TARGET (30).
+MIN_TARGET_SCALED     = bool(int(_os.environ.get("MIN_TARGET_SCALED", 0)))
+MIN_PIPS_TARGET_SMALL = int(_os.environ.get("MIN_PIPS_TARGET_SMALL", 20))
+MIN_PIPS_TARGET_LARGE = int(_os.environ.get("MIN_PIPS_TARGET_LARGE", 30))
 MIN_RR = 1.2                       # minimum reward:risk
 FIXED_STOP_PIPS = 10               # max/fallback stop distance — 10 pips from entry
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit

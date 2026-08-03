@@ -1289,8 +1289,17 @@ even as PF rises at 30. **Shipped anyway at the user's explicit preference (2026
 higher PF (4.95), better MaxDD everywhere (notably OOS -12.55% vs -15.41%), and higher OOS equity —
 the equity "loss" is only on the idealized R500→4yr compounding fantasy, not the live R1k path. The
 trade-off is a genuine risk/quality-vs-raw-growth preference, not a defect. Weaker IS (small-account)
-phase is the known cost. `MIN_PIPS_TARGET=20` env-restores the old behavior. Considered but not built:
-an equity-scaled floor (20 below R3k, 30 above) — the theoretically-best hybrid, deferred.
+phase is the known cost. `MIN_PIPS_TARGET=20` env-restores the old behavior.
+
+**Equity-scaled floor (BUILT 2026-07-28, default OFF, pending validation):** the theoretically-best
+hybrid — 20-pip floor below R3k (`DRAW_SIZE_MIN_EQUITY`; more frequent hits = small-account
+compounding fuel), 30-pip floor above it (higher PF + lower DD). `_min_pips_target()` in both
+backtest.py and main.py; wired into `_find_target` (fib min-distance + RR selection) and both the
+entry and pyramid gates. Config: `MIN_TARGET_SCALED=0` (off → byte-identical to flat
+`MIN_PIPS_TARGET`), `MIN_PIPS_TARGET_SMALL=20`, `MIN_PIPS_TARGET_LARGE=30`. Validate with
+`run_scaledtarget_validation.sh` (flat-20 vs flat-30 vs scaled, full+IS/OOS) — ship only if it beats
+flat-30 on full-4yr equity with MaxDD held; the IS (small-account) split is the one to watch since
+that's the live R1k starting phase.
 
 ### Pure-price draw cascade study (MEASURED 2026-07-28, validates design)
 **What:** the clean test of the ICT draw hierarchy on RAW M1 price, independent of the strategy's

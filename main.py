@@ -578,7 +578,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
             return
 
         reward_pips = abs(target - cur_price) / pip
-        if reward_pips < config.MIN_ENTRY_PIPS_TARGET:
+        if reward_pips < self._min_pips_target():
             return
 
         equity_usd = self.Portfolio.TotalPortfolioValue / config.USD_ZAR
@@ -766,7 +766,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                     else entry + _max_stop)
 
         reward_pips = abs(st["target"] - entry) / pip
-        if reward_pips < config.MIN_PIPS_TARGET:
+        if reward_pips < self._min_pips_target():
             return
 
         tier_lots = self._pyramid_lots()
@@ -1548,6 +1548,17 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
                 seen.add(src)
         return len(seen)
 
+    def _min_pips_target(self):
+        """Equity-scaled minimum target floor (mirrors backtest). OFF (default) →
+        flat config.MIN_PIPS_TARGET. ON → small floor below the R3k multiplier
+        threshold, large floor above. Account is ZAR so TotalPortfolioValue compares
+        directly to DRAW_SIZE_MIN_EQUITY."""
+        if not config.MIN_TARGET_SCALED:
+            return config.MIN_PIPS_TARGET
+        return (config.MIN_PIPS_TARGET_SMALL
+                if self.Portfolio.TotalPortfolioValue < config.DRAW_SIZE_MIN_EQUITY
+                else config.MIN_PIPS_TARGET_LARGE)
+
     def _find_target(self, pair, direction, cur_price):
         """Return (target_price, confluence_score) — mirrors backtest._find_target.
 
@@ -1565,7 +1576,7 @@ class ICTIntermarketAlgorithm(QCAlgorithm):
         if swing is not None:
             fib_t = nearest_fib_target(
                 swing[0], swing[1], direction, cur_price,
-                min_distance=config.MIN_PIPS_TARGET * pip_v,
+                min_distance=self._min_pips_target() * pip_v,
             )
             if fib_t is not None:
                 candidates.append((fib_t, "fib_extension"))
