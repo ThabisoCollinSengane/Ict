@@ -64,17 +64,29 @@ def main():
         start = end - pd.Timedelta(days=a.days)
     L += [f"_data window: {start} → {end} (UTC) · classifier + gates are the real code_", ""]
 
-    # Build + run the full strategy on the fetched data (entries + gate funnel).
-    trades, gate, run_err = [], {}, None
+    def _run(dslice):
+        bb = bt.Backtester(dslice)
+        bb.run()
+        return bb
+
+    # Build + run the full strategy. For --date, the funnel is scoped to THAT DAY
+    # by diffing the cumulative gate at day-end minus day-start (counters only grow).
+    trades, gate, run_err, b = [], {}, None, None
+    funnel_scope = "cumulative over the fetched period"
     try:
-        b = bt.Backtester(data)
-        b.run()
-        gate = dict(b.gate)
+        if a.date:
+            b = _run({s: df[df.index <= end] for s, df in data.items()})
+            g_end = dict(b.gate)
+            b0 = _run({s: df[df.index < start] for s, df in data.items()})
+            gate = {k: g_end.get(k, 0) - b0.gate.get(k, 0) for k in g_end}
+            funnel_scope = f"**this day only** ({a.date}) — day-end minus day-start"
+        else:
+            b = _run(data)
+            gate = dict(b.gate)
         trades = [t for t in b.trades
                   if start <= pd.Timestamp(t["opened_at"]).tz_convert("UTC") <= end]
     except Exception as e:  # noqa: BLE001
         run_err = f"{type(e).__name__}: {e}"
-        # fall back to a fresh Backtester purely for the resampled dfs (structure still works)
         b = bt.Backtester(data)
 
     # 1 · Structure labels (real classify) on 5m and 15m.
@@ -106,16 +118,25 @@ def main():
         L += ["No entries — every candidate was rejected by a gate (see the funnel "
               "below). That's the algo being selective, not a bug.", ""]
     else:
-        L += ["| opened (UTC) | dir | model | scenario | draw | target_type | swept PDH/PDL | result |",
-              "|---|---|---|---|---|---|---|---|"]
+        pipsz = 0.01 if a.pair.endswith("JPY") else 0.0001
+        L += ["| opened (UTC) | dir | model | scenario | draw | lot | **pips** | **ZAR** | exit reason |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        tot_pips = tot_zar = 0.0
         for t in trades:
             d = "long" if t["direction"] > 0 else "short"
+            pips = (t["exit"] - t["entry"]) * t["direction"] / pipsz
+            lot = t.get("units", 0) / 100000.0
+            tot_pips += pips
+            tot_zar += t.get("pnl", 0)
             L.append(f"| {pd.Timestamp(t['opened_at']):%m-%d %H:%M} | {d} | "
                      f"{t.get('entry_model','?')} | {t.get('im_scenario','?')} | "
-                     f"{t.get('draw_score','?')} | {t.get('target_type','?')} | "
-                     f"{t.get('amd_swept_pdliq','?')} | {t.get('reason','open')} "
-                     f"({t.get('pnl',0):+.0f}) |")
-        L += [""]
+                     f"{t.get('draw_score','?')} | {lot:.2f} | {pips:+.1f} | "
+                     f"{t.get('pnl',0):+.0f} | {t.get('reason','open')} |")
+        L += ["", f"_totals: {tot_pips:+.1f} pips · {tot_zar:+.0f} ZAR at the shown lot. "
+              f"Pips are lot-independent — at **0.03 lots** (R5.55/pip) the day would be "
+              f"**{tot_pips * 5.55:+.0f} ZAR**; at 0.01 lots (R1.85/pip) **{tot_pips * 1.85:+.0f} "
+              f"ZAR**. 'exit reason' = stop covers both the −10-pip stop AND a trailing-stop "
+              f"exit in profit._", ""]
 
     # 3 · Gate funnel — pipeline order, then EVERY reject counter so the exact gate
     # that killed the setups is visible (cumulative over the period).
@@ -124,11 +145,12 @@ def main():
              "h4_bias_ok", "dealing_range_ok", "htf_draw_partial", "htf_draw_full_cascade",
              "htf_draw_counter", "consolidation_found", "manipulation_correct_dir",
              "m5_fvg_correct_dir", "target_found", "entry_blocked_min_target", "rr_ok",
-             "risk_cap_ok", "risk_cap_skip", "units_nonzero", "limit_placed", "pyramid_added"]
-    L += ["## Gate funnel — where setups die (cumulative over the fetched period)", "",
-          "Pipeline order, then reject counters. `htf_draw_counter` = killed by the 0/3 "
-          "draw gate; `entry_blocked_min_target` = target < the 30-pip floor; "
-          "`risk_cap_skip` = stop too big for equity. The reject counter with the big "
+             "risk_cap_ok", "risk_cap_skip", "units_nonzero", "entry_opened", "pyramid_added"]
+    L += [f"## Gate funnel — where setups die ({funnel_scope})", "",
+          "Pipeline order, then reject counters. `entry_opened` = trades actually opened "
+          "(the real count — the old `limit_placed` was a dead counter). `htf_draw_counter` "
+          "= killed by the 0/3 draw gate; `entry_blocked_min_target` = target < the 30-pip "
+          "floor; `risk_cap_skip` = stop too big for equity. The reject counter with the big "
           "number is the real bottleneck.", "", "```"]
     for k in order:
         if k in gate:
