@@ -2675,6 +2675,7 @@ class Backtester:
 
         reward_pips = abs(target - entry) / pip
         if reward_pips < self._min_pips_target():
+            self.gate["entry_blocked_min_target"] = self.gate.get("entry_blocked_min_target", 0) + 1
             return
         g["rr_ok"] += 1
 
