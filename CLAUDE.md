@@ -1301,6 +1301,18 @@ entry and pyramid gates. Config: `MIN_TARGET_SCALED=0` (off → byte-identical t
 flat-30 on full-4yr equity with MaxDD held; the IS (small-account) split is the one to watch since
 that's the live R1k starting phase.
 
+**Result — 🔴 RED, kept OFF (validated 2026-08-04):** scaled full-4yr R563.6M vs flat-30 R567.6M
+(slightly worse), OOS R1.83M / MaxDD -16.12% vs flat-30 R2.24M / -12.55% (worse), and it did NOT
+recover flat-20's small-account IS edge (scaled IS R271k ≈ flat-30 R273k, not flat-20's R343k). The
+hybrid fails because the account crosses R3k too fast for the 20-pip regime to matter — scaled ≈
+flat-30 with OOS-path noise making it marginally worse. `MIN_TARGET_SCALED=0` stays.
+
+**Pyramiding × 30-pip floor (measured same run):** the 30-pip floor blocks ~2× more pyramid
+ATTEMPTS (full 4yr: 1124 blocked vs flat-20's 514) but actual adds were UNCHANGED (18 vs 17). The
+hypothesis that MIN_PIPS_TARGET=30 starves pyramiding was WRONG — successful adds sit on long-target
+moves that clear the floor easily. No separate PYRAMID_MIN_TARGET needed; measure-first avoided an
+unnecessary lever. (~17-19 pyramids/4yr is just how rare these high-conviction adds are by design.)
+
 ### Pure-price draw cascade study (MEASURED 2026-07-28, validates design)
 **What:** the clean test of the ICT draw hierarchy on RAW M1 price, independent of the strategy's
 entries/exits (fixes the exit-cap limitation of the draw-ladder study). `scripts/price_cascade.py`
