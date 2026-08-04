@@ -1,6 +1,6 @@
 # Live structure + entries — GBPUSD
 
-_data window: 2026-08-01 16:10:00+00:00 → 2026-08-04 16:10:00+00:00 (UTC) · classifier + gates are the real code_
+_data window: 2026-08-01 16:45:00+00:00 → 2026-08-04 16:45:00+00:00 (UTC) · classifier + gates are the real code_
 
 ## 15-minute structure
 
@@ -98,12 +98,14 @@ _data window: 2026-08-01 16:10:00+00:00 → 2026-08-04 16:10:00+00:00 (UTC) · c
 | 08-04 13:15 | **STL** | 1.34391 | intact |
 | 08-04 14:00 | **STH** | 1.34555 | ✓ taken |
 | 08-04 15:15 | **STL** | 1.34427 | intact |
-| 08-04 15:45 | **STH** | 1.34557 | intact |
+| 08-04 16:00 | **STH** | 1.34562 | intact |
+| 08-04 16:00 | **STL** | 1.34490 | ✓ taken |
+| 08-04 16:30 | **STL** | 1.34479 | intact |
 
 ## 5-minute structure
 
 **Intermediate trend read: bullish (higher ITHs/ITLs).**
-- last intact **ITH** 1.34718 (buy-side draw above)
+- last intact **ITH** 1.34562 (buy-side draw above)
 - last intact **ITL** 1.34427 (sell-side pool below)
 
 | time (UTC) | tier | price | swept? |
@@ -381,40 +383,75 @@ _data window: 2026-08-01 16:10:00+00:00 → 2026-08-04 16:10:00+00:00 (UTC) · c
 | 08-04 15:00 | **STH** | 1.34486 | ✓ taken |
 | 08-04 15:15 | **ITL** | 1.34427 | intact |
 | 08-04 15:15 | **STL** | 1.34427 | intact |
-| 08-04 15:55 | **STH** | 1.34557 | intact |
-| 08-04 16:05 | **STL** | 1.34490 | intact |
+| 08-04 15:55 | **STH** | 1.34557 | ✓ taken |
+| 08-04 16:05 | **STL** | 1.34490 | ✓ taken |
+| 08-04 16:10 | **ITH** | 1.34562 | intact |
+| 08-04 16:10 | **STH** | 1.34562 | intact |
+| 08-04 16:20 | **STH** | 1.34541 | intact |
+| 08-04 16:20 | **STL** | 1.34512 | ✓ taken |
+| 08-04 16:35 | **STL** | 1.34479 | intact |
 
 ## Entries the algorithm took (this window)
 
 No entries — every candidate was rejected by a gate (see the funnel below). That's the algo being selective, not a bug.
 
-## Gate funnel (cumulative over the fetched period)
+## Gate funnel — where setups die (cumulative over the fetched period)
 
-How many times each filter passed. Reading top→bottom shows where candidates get eliminated — the last non-zero rows are the real bottleneck.
+Pipeline order, then reject counters. `htf_draw_counter` = killed by the 0/3 draw gate; `entry_blocked_min_target` = target < the 30-pip floor; `risk_cap_skip` = stop too big for equity. The reject counter with the big number is the real bottleneck.
 
 ```
-  checks                     6759
-  in_killzone                6759
-  news_clear                 6723
-  nfp_fomc_ok                6348
-  intermarket_signal         278
-  pair_matches               278
-  mss_h1_m15_m5_ok           101
-  daily_bias_ok              101
-  h1_bias_ok                 101
-  h4_bias_ok                 101
-  dealing_range_ok           5
-  htf_draw_partial           29
-  htf_draw_full_cascade      0
-  consolidation_found        41
-  manipulation_correct_dir   41
-  m5_fvg_correct_dir         39
-  target_found               39
-  rr_ok                      39
-  units_nonzero              39
-  limit_placed               0
-  pyramid_added              1
+  checks                       6759
+  in_killzone                  6759
+  news_clear                   6723
+  nfp_fomc_ok                  6348
+  intermarket_signal           278
+  pair_matches                 278
+  mss_h1_m15_m5_ok             101
+  daily_bias_ok                101
+  h1_bias_ok                   101
+  h4_bias_ok                   101
+  dealing_range_ok             5
+  htf_draw_partial             29
+  htf_draw_full_cascade        0
+  htf_draw_counter             37
+  consolidation_found          41
+  manipulation_correct_dir     41
+  m5_fvg_correct_dir           39
+  target_found                 39
+  rr_ok                        39
+  risk_cap_ok                  39
+  units_nonzero                39
+  limit_placed                 0
+  pyramid_added                1
+  --- other non-zero counters ---
+  breakout_confirmed           41
+  choch_confirmed              2
+  crt_turtle_soup              18
+  daily_pair_cap               152
+  dxy_fvg_room                 8
+  gt_disp_wick                 32
+  gt_judas_reversal            10
+  gt_macro_window              5
+  gt_mp_discount               11
+  gt_mp_extreme                2
+  gt_pool_sweep                28
+  htf_fvg_5050_hit             4
+  london_judas_ny_echo         1
+  mstruct_align                33
+  mstruct_minor_sweep          7
+  ny_continuation              19
+  phase_london_judas           13
+  phase_ny_judas               29
+  pyramid_blocked_favour       272
+  pyramid_blocked_low_im       264
+  pyramid_blocked_min_target   56
+  session_handover_closed      3
+  soj_judas                    6
+  soj_retest                   32
+  soj_sweep                    38
+  stop_capped_10pip            30
+  weekly_amd_confirmed         17
 ```
 
 
-_report generated on commit `2d57f20`_
+_report generated on commit `de324bc`_
