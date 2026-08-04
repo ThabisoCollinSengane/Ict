@@ -41,12 +41,55 @@ def _classify_window(df, start, end):
     return rows, ms.structure_direction(res), ms.last_intact(res, "ITH"), ms.last_intact(res, "ITL")
 
 
+def _list_trades(a, data, L):
+    """Dump every trade over the fetched period + a per-day tally so the trending
+    days (2+ entries) stand out. Then run --date on the best one for full detail."""
+    pipsz = 0.01 if a.pair.endswith("JPY") else 0.0001
+    try:
+        b = bt.Backtester(data)
+        b.run()
+    except Exception as e:  # noqa: BLE001
+        L += [f"ERROR: run failed — `{type(e).__name__}: {e}`"]; _write(L); print("\n".join(L)); return 1
+    trades = [t for t in b.trades if t.get("leg_idx", 1) == 1]  # entries only, not pyramid legs
+    L += [f"_all {len(trades)} entries over {a.period} · pips lot-independent · "
+          f"ZAR shown at the run's lot; ×3 for 0.03 lots, ÷2 for 0.01_", "",
+          "## Every entry (chronological)", "",
+          "| opened (UTC) | dir | model | scenario | draw | lot | pips | ZAR | result |",
+          "|---|---|---|---|---|---|---|---|---|"]
+    per_day = {}
+    for t in sorted(trades, key=lambda x: pd.Timestamp(x["opened_at"])):
+        ts = pd.Timestamp(t["opened_at"]).tz_convert("UTC")
+        d = "long" if t["direction"] > 0 else "short"
+        pips = (t["exit"] - t["entry"]) * t["direction"] / pipsz
+        lot = t.get("units", 0) / 100000.0
+        day = ts.strftime("%Y-%m-%d")
+        agg = per_day.setdefault(day, [0, 0.0, 0.0])
+        agg[0] += 1; agg[1] += pips; agg[2] += t.get("pnl", 0)
+        L.append(f"| {ts:%m-%d %H:%M} | {d} | {t.get('entry_model','?')} | "
+                 f"{t.get('im_scenario','?')} | {t.get('draw_score','?')} | {lot:.2f} | "
+                 f"{pips:+.1f} | {t.get('pnl',0):+.0f} | {t.get('reason','open')} |")
+    L += ["", "## Per-day tally — the trending days (2+ entries) stand out", "",
+          "| day | entries | net pips | net ZAR | at 0.03 lots |", "|---|---|---|---|---|"]
+    for day in sorted(per_day):
+        n, pp, zz = per_day[day]
+        star = " ⭐" if n >= 2 else ""
+        L.append(f"| {day}{star} | {n} | {pp:+.1f} | {zz:+.0f} | {pp*5.55:+.0f} |")
+    L += ["", "_⭐ = multi-entry (trending) day. Run "
+          "`bash run_live_structure.sh --pair " + a.pair + " --date <YYYY-MM-DD>` on one "
+          "to see its structure + the gate funnel passing all the way to entry._"]
+    _write(L)
+    print("\n".join(L))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pair", default="GBPUSD")
     ap.add_argument("--days", type=float, default=3.0, help="window = last N days of data")
     ap.add_argument("--date", default=None, help="YYYY-MM-DD — window = just that UTC day")
     ap.add_argument("--period", default="60d")
+    ap.add_argument("--list", action="store_true",
+                    help="dump EVERY trade over the period + per-day tally (find trending days)")
     a = ap.parse_args()
 
     L = [f"# Live structure + entries — {a.pair}", ""]
@@ -55,6 +98,9 @@ def main():
     if a.pair not in data or data[a.pair].empty:
         L.append(f"ERROR: no data for {a.pair} from yfinance.")
         _write(L); return 1
+
+    if a.list:
+        return _list_trades(a, data, L)
 
     if a.date:
         start = pd.Timestamp(a.date, tz="UTC")
