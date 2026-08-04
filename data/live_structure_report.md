@@ -258,4 +258,4 @@ Pipeline order, then reject counters. `entry_opened` = trades actually opened (t
 ```
 
 
-_report generated on commit `8ce16ce`_
+_report generated on commit `e54b2c7`_
