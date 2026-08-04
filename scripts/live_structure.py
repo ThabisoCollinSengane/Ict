@@ -54,9 +54,20 @@ def _reject_section(rejects, title):
           "| reason | count |", "|---|---|"]
     for reason, n in by_reason.most_common():
         L.append(f"| {reason} | {n} |")
-    close = [r for r in rejects if not r["reason"].startswith("no MSS")]
-    L += ["", f"**Close calls — {len(close)} setups that passed the structure shift "
-          "but were blocked by a later gate:**", ""]
+    # Collapse consecutive re-evaluations of the SAME setup (same pair+dir+reason
+    # within 30 min) into one distinct missed setup — the raw log fires every bar.
+    raw = sorted((r for r in rejects if not r["reason"].startswith("no MSS")),
+                 key=lambda x: (x["pair"], pd.Timestamp(x["t"])))
+    close, prev = [], None
+    for r in raw:
+        cont = (prev and prev["pair"] == r["pair"] and prev["direction"] == r["direction"]
+                and prev["reason"] == r["reason"]
+                and (pd.Timestamp(r["t"]) - pd.Timestamp(prev["t"])).total_seconds() < 1800)
+        if not cont:                      # a new distinct setup (rolling gap check)
+            close.append(r)
+        prev = r
+    L += ["", f"**Close calls — {len(close)} distinct setups that passed the structure "
+          "shift but were blocked by a later gate** (consecutive per-bar repeats collapsed):", ""]
     if close:
         L += ["| time (UTC) | pair | dir | blocked by |", "|---|---|---|---|"]
         for r in sorted(close, key=lambda x: pd.Timestamp(x["t"]))[:60]:
