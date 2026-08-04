@@ -57,6 +57,11 @@ YF_TICKERS = {
     "USDCAD": "USDCAD=X",
     "USDSEK": "USDSEK=X",
     "USDCHF": "USDCHF=X",
+    # NZD family — needed for the NZDUSD leg (DXY × AUDNZD cascade). Extra pairs
+    # are harmless to the synthetic DXY (which uses only DXY_CONSTITUENTS).
+    "NZDUSD": "NZDUSD=X",
+    "AUDNZD": "AUDNZD=X",
+    "AUDUSD": "AUDUSD=X",
 }
 
 Bar = namedtuple("Bar", "Open High Low Close")

@@ -78,8 +78,10 @@ def _list_trades(a, data, L):
         b.run()
     except Exception as e:  # noqa: BLE001
         L += [f"ERROR: run failed — `{type(e).__name__}: {e}`"]; _write(L); print("\n".join(L)); return 1
-    trades = [t for t in b.trades if t.get("leg_idx", 1) == 1]  # entries only, not pyramid legs
-    L += [f"_all {len(trades)} entries over {a.period} · pips lot-independent · "
+    # entries on THIS pair only (not pyramid legs, not other pairs' trades)
+    trades = [t for t in b.trades
+              if t.get("pair") == a.pair and t.get("leg_idx", 1) == 1]
+    L += [f"_all {len(trades)} {a.pair} entries over {a.period} · pips lot-independent · "
           f"ZAR shown at the run's lot; ×3 for 0.03 lots, ÷2 for 0.01_", "",
           "## Every entry (chronological)", "",
           "| opened (UTC) | dir | model | scenario | draw | lot | pips | ZAR | result |",
@@ -105,7 +107,7 @@ def _list_trades(a, data, L):
     L += ["", "_⭐ = multi-entry (trending) day. Run "
           "`bash run_live_structure.sh --pair " + a.pair + " --date <YYYY-MM-DD>` on one "
           "to see its structure + the gate funnel passing all the way to entry._", ""]
-    L += _reject_section(getattr(b, "reject_log", []),
+    L += _reject_section([r for r in getattr(b, "reject_log", []) if r.get("pair") == a.pair],
                          "Setups that couldn't be taken (whole period)")
     _write(L)
     print("\n".join(L))
@@ -159,8 +161,8 @@ def main():
         else:
             b = _run(data)
             gate = dict(b.gate)
-        trades = [t for t in b.trades
-                  if start <= pd.Timestamp(t["opened_at"]).tz_convert("UTC") <= end]
+        trades = [t for t in b.trades if t.get("pair") == a.pair
+                  and start <= pd.Timestamp(t["opened_at"]).tz_convert("UTC") <= end]
     except Exception as e:  # noqa: BLE001
         run_err = f"{type(e).__name__}: {e}"
         b = bt.Backtester(data)
@@ -216,8 +218,8 @@ def main():
 
     # 2b · Missed setups — the trades that couldn't be taken (this window).
     if not run_err and b is not None:
-        rj = [r for r in getattr(b, "reject_log", [])
-              if start <= pd.Timestamp(r["t"]).tz_convert("UTC") <= end]
+        rj = [r for r in getattr(b, "reject_log", []) if r.get("pair") == a.pair
+              and start <= pd.Timestamp(r["t"]).tz_convert("UTC") <= end]
         L += _reject_section(rj, "Setups that couldn't be taken (this window)")
 
     # 3 · Gate funnel — pipeline order, then EVERY reject counter so the exact gate
