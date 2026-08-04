@@ -45,6 +45,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pair", default="GBPUSD")
     ap.add_argument("--days", type=float, default=3.0, help="window = last N days of data")
+    ap.add_argument("--date", default=None, help="YYYY-MM-DD — window = just that UTC day")
     ap.add_argument("--period", default="60d")
     a = ap.parse_args()
 
@@ -55,8 +56,12 @@ def main():
         L.append(f"ERROR: no data for {a.pair} from yfinance.")
         _write(L); return 1
 
-    end = data[a.pair].index.max()
-    start = end - pd.Timedelta(days=a.days)
+    if a.date:
+        start = pd.Timestamp(a.date, tz="UTC")
+        end = start + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    else:
+        end = data[a.pair].index.max()
+        start = end - pd.Timedelta(days=a.days)
     L += [f"_data window: {start} → {end} (UTC) · classifier + gates are the real code_", ""]
 
     # Build + run the full strategy on the fetched data (entries + gate funnel).
@@ -112,18 +117,27 @@ def main():
                      f"({t.get('pnl',0):+.0f}) |")
         L += [""]
 
-    # 3 · Gate funnel — how many candidates each filter let through (cumulative).
-    L += ["## Gate funnel (cumulative over the fetched period)", "",
-          "How many times each filter passed. Reading top→bottom shows where "
-          "candidates get eliminated — the last non-zero rows are the real bottleneck.", "",
-          "```"]
-    for k in ("checks", "in_killzone", "news_clear", "nfp_fomc_ok", "intermarket_signal",
-              "pair_matches", "mss_h1_m15_m5_ok", "daily_bias_ok", "h1_bias_ok",
-              "h4_bias_ok", "dealing_range_ok", "htf_draw_partial", "htf_draw_full_cascade",
-              "consolidation_found", "manipulation_correct_dir", "m5_fvg_correct_dir",
-              "target_found", "rr_ok", "units_nonzero", "limit_placed", "pyramid_added"):
+    # 3 · Gate funnel — pipeline order, then EVERY reject counter so the exact gate
+    # that killed the setups is visible (cumulative over the period).
+    order = ["checks", "in_killzone", "news_clear", "nfp_fomc_ok", "intermarket_signal",
+             "pair_matches", "mss_h1_m15_m5_ok", "daily_bias_ok", "h1_bias_ok",
+             "h4_bias_ok", "dealing_range_ok", "htf_draw_partial", "htf_draw_full_cascade",
+             "htf_draw_counter", "consolidation_found", "manipulation_correct_dir",
+             "m5_fvg_correct_dir", "target_found", "entry_blocked_min_target", "rr_ok",
+             "risk_cap_ok", "risk_cap_skip", "units_nonzero", "limit_placed", "pyramid_added"]
+    L += ["## Gate funnel — where setups die (cumulative over the fetched period)", "",
+          "Pipeline order, then reject counters. `htf_draw_counter` = killed by the 0/3 "
+          "draw gate; `entry_blocked_min_target` = target < the 30-pip floor; "
+          "`risk_cap_skip` = stop too big for equity. The reject counter with the big "
+          "number is the real bottleneck.", "", "```"]
+    for k in order:
         if k in gate:
-            L.append(f"  {k:26s} {gate[k]}")
+            L.append(f"  {k:28s} {gate[k]}")
+    extra = sorted(k for k, v in gate.items() if k not in order and v)
+    if extra:
+        L.append("  --- other non-zero counters ---")
+        for k in extra:
+            L.append(f"  {k:28s} {gate[k]}")
     L += ["```", ""]
 
     _write(L)

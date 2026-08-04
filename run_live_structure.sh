@@ -6,14 +6,17 @@
 # full strategy, and pushes the labelled swings + the entries the algo took + the
 # gate funnel — so we can see EXACTLY how it reads/traded the window in your chart.
 cd "$(dirname "$0")" || exit 1
-PAIR="${1:-GBPUSD}"
-DAYS="${2:-3}"
 
 echo "=== ensuring yfinance ==="
 python -c "import yfinance" 2>/dev/null || pip install -q yfinance
 
-echo "=== running real classifier + entries/gates ($PAIR, last $DAYS days) ==="
-python scripts/live_structure.py --pair "$PAIR" --days "$DAYS" || {
+# Forward all args. Examples:
+#   bash run_live_structure.sh --pair GBPUSD --days 3
+#   bash run_live_structure.sh --pair GBPUSD --date 2026-07-30
+ARGS=("$@")
+[ ${#ARGS[@]} -eq 0 ] && ARGS=(--pair GBPUSD --days 3)
+echo "=== running real classifier + entries/gates (${ARGS[*]}) ==="
+python scripts/live_structure.py "${ARGS[@]}" || {
   echo "run failed — copy the traceback above to Claude"; exit 1; }
 
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
