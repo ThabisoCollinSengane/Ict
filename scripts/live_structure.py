@@ -41,6 +41,34 @@ def _classify_window(df, start, end):
     return rows, ms.structure_direction(res), ms.last_intact(res, "ITH"), ms.last_intact(res, "ITL")
 
 
+def _reject_section(rejects, title):
+    """Markdown for the 'trades that couldn't be taken'. Splits the common
+    no-MSS (structure never confirmed) from the post-MSS 'close calls' — real
+    setups that formed and then hit a later gate."""
+    from collections import Counter
+    L = [f"## {title}", ""]
+    if not rejects:
+        return L + ["_None recorded._", ""]
+    by_reason = Counter(r["reason"] for r in rejects)
+    L += ["Why setups did **not** become trades (counts):", "",
+          "| reason | count |", "|---|---|"]
+    for reason, n in by_reason.most_common():
+        L.append(f"| {reason} | {n} |")
+    close = [r for r in rejects if not r["reason"].startswith("no MSS")]
+    L += ["", f"**Close calls — {len(close)} setups that passed the structure shift "
+          "but were blocked by a later gate:**", ""]
+    if close:
+        L += ["| time (UTC) | pair | dir | blocked by |", "|---|---|---|---|"]
+        for r in sorted(close, key=lambda x: pd.Timestamp(x["t"]))[:60]:
+            d = "long" if r["direction"] > 0 else "short"
+            L.append(f"| {pd.Timestamp(r['t']):%m-%d %H:%M} | {r['pair']} | {d} | {r['reason']} |")
+        if len(close) > 60:
+            L.append(f"| … | | | (+{len(close) - 60} more) |")
+    else:
+        L.append("_None — every structure-confirmed setup that formed became a trade._")
+    return L + [""]
+
+
 def _list_trades(a, data, L):
     """Dump every trade over the fetched period + a per-day tally so the trending
     days (2+ entries) stand out. Then run --date on the best one for full detail."""
@@ -76,7 +104,9 @@ def _list_trades(a, data, L):
         L.append(f"| {day}{star} | {n} | {pp:+.1f} | {zz:+.0f} | {pp*5.55:+.0f} |")
     L += ["", "_⭐ = multi-entry (trending) day. Run "
           "`bash run_live_structure.sh --pair " + a.pair + " --date <YYYY-MM-DD>` on one "
-          "to see its structure + the gate funnel passing all the way to entry._"]
+          "to see its structure + the gate funnel passing all the way to entry._", ""]
+    L += _reject_section(getattr(b, "reject_log", []),
+                         "Setups that couldn't be taken (whole period)")
     _write(L)
     print("\n".join(L))
     return 0
@@ -183,6 +213,12 @@ def main():
               f"**{tot_pips * 5.55:+.0f} ZAR**; at 0.01 lots (R1.85/pip) **{tot_pips * 1.85:+.0f} "
               f"ZAR**. 'exit reason' = stop covers both the −10-pip stop AND a trailing-stop "
               f"exit in profit._", ""]
+
+    # 2b · Missed setups — the trades that couldn't be taken (this window).
+    if not run_err and b is not None:
+        rj = [r for r in getattr(b, "reject_log", [])
+              if start <= pd.Timestamp(r["t"]).tz_convert("UTC") <= end]
+        L += _reject_section(rj, "Setups that couldn't be taken (this window)")
 
     # 3 · Gate funnel — pipeline order, then EVERY reject counter so the exact gate
     # that killed the setups is visible (cumulative over the period).

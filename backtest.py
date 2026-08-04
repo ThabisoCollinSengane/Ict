@@ -116,6 +116,7 @@ class Backtester:
         self.start_equity = self.equity
         self.active = {}
         self.trades = []
+        self.reject_log = []   # near-misses: setups that formed then hit a gate
         # Diagnostic counters: how many times each gate was reached / rejected.
         self.gate = {
             "checks": 0, "in_killzone": 0, "news_clear": 0,
@@ -888,6 +889,12 @@ class Backtester:
             return config.MIN_PIPS_TARGET
         return (config.MIN_PIPS_TARGET_SMALL if self.equity < config.DRAW_SIZE_MIN_EQUITY
                 else config.MIN_PIPS_TARGET_LARGE)
+
+    def _log_reject(self, t, pair, direction, reason):
+        """Record a would-be setup that formed (passed the earlier gates) but was
+        blocked by a later gate — the 'trades that couldn't be taken'."""
+        self.reject_log.append({"t": t, "pair": pair, "direction": direction,
+                                "reason": reason})
 
     @staticmethod
     def _load_tickvol():
@@ -2096,6 +2103,7 @@ class Backtester:
         dxy_mss   = self._dxy_has_mss(t, -direction)
         mss_count = sym1_mss + sym2_mss + dxy_mss
         if mss_count < 2:
+            self._log_reject(t, pair, direction, f"no MSS ({mss_count}/3 structure shift, need 2)")
             return   # Need at least 2-of-3 MSS
         g["mss_h1_m15_m5_ok"] += 1
 
@@ -2196,6 +2204,7 @@ class Backtester:
                     # Measure how many NY-AM continuations the reversal gate kills.
                     g["ny_continuation_gated"] = g.get("ny_continuation_gated", 0) + 1
                 g["htf_draw_counter"] += 1
+                self._log_reject(t, pair, direction, "no HTF draw (0/3 cascade, not a breakout)")
                 return   # hard gate: no HTF draw alignment → skip (reversal logic).
             # Breakout continuations are exempt: a strong continuation move runs
             # WITH the HTF, which scores low on the inverted draw cascade by design.
@@ -2203,11 +2212,14 @@ class Backtester:
         # 2a_h4: H1 flat but H4 EURGBP confirms EUR>GBP (PF 0.01, WR 25%). Gate.
         # 2a_ip: H1+H4 both flat, synthetic momentum fires — even more extended. Gate.
         if _im_scenario in ("2a_h4", "2a_ip"):
+            self._log_reject(t, pair, direction, f"{_im_scenario} scenario gated (PF≤0.01)")
             return
         if _im_scenario in ("2a", "2a_h4", "2a_ip") and _draw_score == 3:
+            self._log_reject(t, pair, direction, "2a at 3/3 draw (over-extended)")
             return
         # 2a London = price entering London already deep into a EURUSD rally (PF 0.84).
         if _im_scenario in ("2a", "2a_h4", "2a_ip") and _is_london:
+            self._log_reject(t, pair, direction, "2a in London (chasing the spike)")
             return
         # N-long_h4: H1 AUDNZD flat, H4 confirms NZD strong → NZDUSD long.
         # WR 0% in both IS (2022-23) and OOS (2024-25). Clear loser — gate entirely.
@@ -2676,6 +2688,8 @@ class Backtester:
         reward_pips = abs(target - entry) / pip
         if reward_pips < self._min_pips_target():
             self.gate["entry_blocked_min_target"] = self.gate.get("entry_blocked_min_target", 0) + 1
+            self._log_reject(t, pair, direction,
+                             f"target only {reward_pips:.0f} pips (< {self._min_pips_target()} floor)")
             return
         g["rr_ok"] += 1
 
@@ -2761,6 +2775,7 @@ class Backtester:
         trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
         if trade_risk_zar > self.equity * (config.MAX_RISK_PER_TRADE_PCT / 100.0):
             g["risk_cap_skip"] = g.get("risk_cap_skip", 0) + 1
+            self._log_reject(t, pair, direction, "risk > max-per-trade cap (stop too wide for equity)")
             return
         g["risk_cap_ok"] = g.get("risk_cap_ok", 0) + 1
 
