@@ -1,4 +1,4 @@
-# Live structure + entries — GBPUSD
+# Live structure + entries — EURUSD
 
 _all 39 entries over 60d · pips lot-independent · ZAR shown at the run's lot; ×3 for 0.03 lots, ÷2 for 0.01_
 
@@ -81,6 +81,6 @@ _all 39 entries over 60d · pips lot-independent · ZAR shown at the run's lot; 
 | 2026-07-30 ⭐ | 2 | +24.4 | +90 | +136 |
 | 2026-07-31 | 1 | -3.9 | -15 | -22 |
 
-_⭐ = multi-entry (trending) day. Run `bash run_live_structure.sh --pair GBPUSD --date <YYYY-MM-DD>` on one to see its structure + the gate funnel passing all the way to entry._
+_⭐ = multi-entry (trending) day. Run `bash run_live_structure.sh --pair EURUSD --date <YYYY-MM-DD>` on one to see its structure + the gate funnel passing all the way to entry._
 
-_report generated on commit `3ed3121`_
+_report generated on commit `24edc99`_
