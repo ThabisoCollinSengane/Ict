@@ -125,7 +125,7 @@ class Backtester:
             "dealing_range_ok": 0, "consolidation_found": 0,
             "manipulation_correct_dir": 0,
             "m5_fvg_correct_dir": 0, "target_found": 0,
-            "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
+            "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0, "entry_opened": 0,
             # pyramid counters (adds that fired vs blocked by the target-room gate)
             "pyramid_added": 0, "pyramid_blocked_min_target": 0,
             # protection counters
@@ -2818,6 +2818,7 @@ class Backtester:
             "runner_be_after_tp1": _runner_applies,
         }
         _ladder = self._draw_ladder(pair, direction, cur_price, t)
+        self.gate["entry_opened"] = self.gate.get("entry_opened", 0) + 1
         self.active[pair] = {
             "direction": direction,
             "mfe_price": entry,
