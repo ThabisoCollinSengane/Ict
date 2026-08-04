@@ -88,7 +88,11 @@ def _list_trades(a, data, L):
         b = bt.Backtester(data)
         b.run()
     except Exception as e:  # noqa: BLE001
-        L += [f"ERROR: run failed — `{type(e).__name__}: {e}`"]; _write(L); print("\n".join(L)); return 1
+        import traceback
+        L += ["## RUN FAILED", "", f"`{type(e).__name__}: {e}`", "",
+              "```", traceback.format_exc().strip(), "```"]
+        _write(L); print("\n".join(L))
+        return 0   # return 0 so the runner still pushes the traceback for diagnosis
     # entries on THIS pair only (not pyramid legs, not other pairs' trades)
     trades = [t for t in b.trades
               if t.get("pair") == a.pair and t.get("leg_idx", 1) == 1]
@@ -175,7 +179,8 @@ def main():
         trades = [t for t in b.trades if t.get("pair") == a.pair
                   and start <= pd.Timestamp(t["opened_at"]).tz_convert("UTC") <= end]
     except Exception as e:  # noqa: BLE001
-        run_err = f"{type(e).__name__}: {e}"
+        import traceback
+        run_err = f"{type(e).__name__}: {e}\n\n```\n{traceback.format_exc().strip()}\n```"
         b = bt.Backtester(data)
 
     # 1 · Structure labels (real classify) on 5m and 15m.
@@ -201,8 +206,8 @@ def main():
     # 2 · Entries the algo actually took in the window.
     L += ["## Entries the algorithm took (this window)", ""]
     if run_err:
-        L += [f"⚠️ the full run raised `{run_err}` — structure above is still valid; "
-              "entries/gates need the run to complete. Paste this and I'll fix.", ""]
+        L += ["⚠️ the full run raised an error — structure above is still valid; "
+              "entries/gates need the run to complete:", "", run_err, ""]
     elif not trades:
         L += ["No entries — every candidate was rejected by a gate (see the funnel "
               "below). That's the algo being selective, not a bug.", ""]
