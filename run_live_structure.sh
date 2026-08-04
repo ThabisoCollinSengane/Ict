@@ -10,7 +10,7 @@ cd "$(dirname "$0")" || exit 1
 echo "=== ensuring yfinance ==="
 python -c "import yfinance" 2>/dev/null || pip install -q yfinance
 
-# Forward all args to the script. Examples:
+# Forward all args. Examples:
 #   bash run_live_structure.sh --pair GBPUSD --days 3
 #   bash run_live_structure.sh --pair GBPUSD --date 2026-07-30
 ARGS=("$@")

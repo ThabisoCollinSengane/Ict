@@ -117,8 +117,8 @@ def main():
                      f"({t.get('pnl',0):+.0f}) |")
         L += [""]
 
-    # 3 · Gate funnel — pipeline order first, then EVERY reject counter so the
-    # exact gate that killed the setups is visible (cumulative over the period).
+    # 3 · Gate funnel — pipeline order, then EVERY reject counter so the exact gate
+    # that killed the setups is visible (cumulative over the period).
     order = ["checks", "in_killzone", "news_clear", "nfp_fomc_ok", "intermarket_signal",
              "pair_matches", "mss_h1_m15_m5_ok", "daily_bias_ok", "h1_bias_ok",
              "h4_bias_ok", "dealing_range_ok", "htf_draw_partial", "htf_draw_full_cascade",
@@ -126,14 +126,13 @@ def main():
              "m5_fvg_correct_dir", "target_found", "entry_blocked_min_target", "rr_ok",
              "risk_cap_ok", "risk_cap_skip", "units_nonzero", "limit_placed", "pyramid_added"]
     L += ["## Gate funnel — where setups die (cumulative over the fetched period)", "",
-          "Pipeline order, then every reject counter. `htf_draw_counter` = killed by the "
-          "0/3 draw gate; `entry_blocked_min_target` = target < the 30-pip floor; "
+          "Pipeline order, then reject counters. `htf_draw_counter` = killed by the 0/3 "
+          "draw gate; `entry_blocked_min_target` = target < the 30-pip floor; "
           "`risk_cap_skip` = stop too big for equity. The reject counter with the big "
           "number is the real bottleneck.", "", "```"]
     for k in order:
         if k in gate:
             L.append(f"  {k:28s} {gate[k]}")
-    # anything else non-zero we didn't list explicitly
     extra = sorted(k for k, v in gate.items() if k not in order and v)
     if extra:
         L.append("  --- other non-zero counters ---")
