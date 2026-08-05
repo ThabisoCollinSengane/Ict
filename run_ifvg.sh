@@ -26,7 +26,7 @@ RUN_IFVG_BACKTEST=1 python scripts/backtest_ifvg.py --years 2022 2023 2024 2025 
 
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 printf '\n_report generated on commit `%s`_\n' "$SHA" >> data/ifvg_report.md
-git add -f data/ifvg_report.md 2>/dev/null
+git add -f data/ifvg_report.md data/ifvg_trades.csv 2>/dev/null
 git commit -q -m "IFVG backtest results (auto, commit ${SHA})" 2>/dev/null
 git pull -q --no-rebase --no-edit 2>/dev/null
 if git push -u origin HEAD 2>/dev/null; then
