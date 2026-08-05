@@ -212,7 +212,9 @@ def run_tf(det_cs, ltf, ltf_times, pip, spread=1.5, target="2r",
                 continue   # this variant needs a liquidity draw to aim at
         r = simulate(ltf, k, idir, entry, stop, friction, tp_price)
         if r is not None:
-            rs.append(r)
+            tp = tp_price if tp_price is not None else entry + idir * RR * abs(entry - stop)
+            rs.append({"t": ltf[k].t, "dir": idir, "entry": entry, "stop": stop,
+                       "target": tp, "r": r, "stop_pips": abs(entry - stop) / pip})
             used_until = k
     return rs
 
@@ -268,9 +270,10 @@ def _candles(m1, tf):
 
 
 def analyse(pairs, years, target="2r"):
-    # results[tf_label][year] = list of R
+    # results[tf_label][year] = list of R ; trades = full per-entry log
     results = {lab: {y: [] for y in years} for _, lab, _, _ in TF_MAP}
     covered = []
+    trades = []
     for pair in pairs:
         pip = 0.01 if pair.endswith("JPY") else 0.0001
         spread = _SPREAD.get(pair, _SPREAD.get("default", 1.5))
@@ -286,9 +289,11 @@ def analyse(pairs, years, target="2r"):
                 det = cache.setdefault(det_tf, _candles(m1, det_tf))
                 ltf = cache.setdefault(ent_tf, _candles(m1, ent_tf))
                 ltf_times = [c.t for c in ltf]
-                results[lab][y] += run_tf(det, ltf, ltf_times, pip, spread, target,
-                                          d_cs, d_times, w_cs, w_times)
-    return results, covered
+                for d in run_tf(det, ltf, ltf_times, pip, spread, target,
+                                d_cs, d_times, w_cs, w_times):
+                    results[lab][y].append(d["r"])
+                    trades.append({**d, "pair": pair, "tf": lab})
+    return results, covered, trades
 
 
 def report(results, years, covered, pairs, target="2r"):
@@ -337,6 +342,24 @@ def report(results, years, covered, pairs, target="2r"):
                  "a proper (spread/slippage-aware) follow-up." if good else
                  "Not positive in both splits — the raw inversion edge doesn't hold; nothing to ship.")]
     return L
+
+
+def entries_section(trades):
+    """A readable sample of the ACTUAL entries taken (full log → data/ifvg_trades.csv).
+    Shows the first 30 chronologically; every column is a real backtest entry."""
+    import pandas as pd
+    L = ["## Actual entries taken (sample of the first 30 — full log in data/ifvg_trades.csv)", ""]
+    if not trades:
+        return L + ["_No entries._", ""]
+    L += [f"_{len(trades)} entries total._", "",
+          "| time (UTC) | pair | TF | dir | entry | stop | target | stop pips | R |",
+          "|---|---|---|---|---|---|---|---|---|"]
+    for t in sorted(trades, key=lambda x: pd.Timestamp(x["t"]))[:30]:
+        d = "buy" if t["dir"] > 0 else "sell"
+        L.append(f"| {pd.Timestamp(t['t']):%Y-%m-%d %H:%M} | {t['pair']} | {t['tf']} | {d} | "
+                 f"{t['entry']:.5f} | {t['stop']:.5f} | {t['target']:.5f} | "
+                 f"{t['stop_pips']:.1f} | {t['r']:+.2f} |")
+    return L + [""]
 
 
 # ── self-test (no data) ────────────────────────────────────────────────────────
@@ -397,15 +420,25 @@ def main():
     if os.getenv("RUN_IFVG_BACKTEST", "0") != "1":
         print("Guarded: set RUN_IFVG_BACKTEST=1 to run the IFVG backtest.")
         return 0
-    print(f"IFVG backtest — pairs {a.pairs}, years {a.years}…")
-    results, covered = analyse(a.pairs, a.years, a.target)
-    lines = report(results, a.years, covered, a.pairs, a.target)
+    print(f"IFVG backtest — pairs {a.pairs}, years {a.years}, target {a.target}…")
+    results, covered, trades = analyse(a.pairs, a.years, a.target)
+    lines = report(results, a.years, covered, a.pairs, a.target) + entries_section(trades)
     text = "\n".join(lines) + "\n"
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, "w") as f:
         f.write(text)
+    # full per-entry log to CSV
+    import csv
+    csv_path = os.path.join(os.path.dirname(REPORT), "ifvg_trades.csv")
+    with open(csv_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["time", "pair", "tf", "dir", "entry", "stop", "target", "stop_pips", "R"])
+        for t in sorted(trades, key=lambda x: (x["pair"], x["tf"], str(x["t"]))):
+            w.writerow([t["t"], t["pair"], t["tf"], "buy" if t["dir"] > 0 else "sell",
+                        f"{t['entry']:.5f}", f"{t['stop']:.5f}", f"{t['target']:.5f}",
+                        f"{t['stop_pips']:.1f}", f"{t['r']:.3f}"])
     print(text)
-    print(f"[report → {REPORT}]")
+    print(f"[report → {REPORT}] [{len(trades)} entries → {csv_path}]")
     return 0
 
 
