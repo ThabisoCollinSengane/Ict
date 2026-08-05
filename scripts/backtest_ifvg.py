@@ -138,14 +138,32 @@ def structure_stop(ltf, k, idir, entry, pip):
     return stop
 
 
-def simulate(ltf, k0, idir, entry, stop, friction):
-    """Walk to 1R stop or 2R target with spread+slippage on BOTH fills. Returns the
-    realised R. Stop checked before target within a bar (conservative)."""
+def htf_target(entry, idir, d_cs, w_cs, min_dist):
+    """Nearest unswept HTF liquidity beyond entry in the trade direction — the
+    closest prior-day (last 3 completed daily) or prior-week high/low, at least
+    min_dist away. None if no draw exists that far out. Uses only COMPLETED HTF
+    bars (drops the current forming day/week) → no lookahead."""
+    levels = []
+    for b in d_cs[-4:-1]:                # prior 3 completed daily candles (PDH/PDL)
+        levels += [b.h, b.l]
+    if len(w_cs) >= 2:
+        levels += [w_cs[-2].h, w_cs[-2].l]   # prior completed week (PWH/PWL)
+    if idir > 0:
+        cand = [lv for lv in levels if lv > entry + min_dist]
+        return min(cand) if cand else None
+    cand = [lv for lv in levels if lv < entry - min_dist]
+    return max(cand) if cand else None
+
+
+def simulate(ltf, k0, idir, entry, stop, friction, tp_price=None):
+    """Walk to the stop or the target with spread+slippage on BOTH fills. Returns
+    realised R (off the structural stop). tp_price given → use it (HTF-liquidity
+    target); else fixed 2R. Stop checked before target within a bar (conservative)."""
     eff_entry = entry + idir * friction          # worse entry fill
     risk = abs(eff_entry - stop)
     if risk <= 0:
         return None
-    tp = eff_entry + idir * RR * risk
+    tp = tp_price if tp_price is not None else eff_entry + idir * RR * risk
     for k in range(k0 + 1, min(len(ltf), k0 + 1 + SIM_BARS)):
         c = ltf[k]
         if idir > 0:
@@ -163,10 +181,11 @@ def simulate(ltf, k0, idir, entry, stop, friction):
     return (exit_fill - eff_entry) * idir / risk
 
 
-def run_tf(det_cs, ltf, ltf_times, pip, mode="wick", spread=1.5):
+def run_tf(det_cs, ltf, ltf_times, pip, spread=1.5, target="2r",
+           d_cs=None, d_times=None, w_cs=None, w_times=None):
     """All IFVG trades for one detection-TF / entry-TF pair. Returns list of R.
-    Entry = confirmation close (all TFs, incl. D1); stop = market-structure 10-pip
-    capped; friction = half-spread + slippage per side."""
+    Entry = confirmation close (all TFs); stop = market-structure 10-pip capped;
+    target = '2r' (fixed) or 'htf' (nearest HTF liquidity). friction on both fills."""
     friction = (spread / 2 + _SLIP) * pip
     rs = []
     used_until = -1   # avoid overlapping trades from clustered gaps
@@ -183,7 +202,15 @@ def run_tf(det_cs, ltf, ltf_times, pip, mode="wick", spread=1.5):
             continue
         k, entry = ent
         stop = structure_stop(ltf, k, idir, entry, pip)
-        r = simulate(ltf, k, idir, entry, stop, friction)
+        tp_price = None
+        if target == "htf":
+            et = ltf[k].t
+            di = bisect.bisect_right(d_times, et)
+            wi = bisect.bisect_right(w_times, et)
+            tp_price = htf_target(entry, idir, d_cs[:di], w_cs[:wi], abs(entry - stop))
+            if tp_price is None:
+                continue   # this variant needs a liquidity draw to aim at
+        r = simulate(ltf, k, idir, entry, stop, friction, tp_price)
         if r is not None:
             rs.append(r)
             used_until = k
@@ -240,7 +267,7 @@ def _candles(m1, tf):
     return [C(t, r.o, r.h, r.l, r.c) for t, r in zip(d.index, d.itertuples(index=False))]
 
 
-def analyse(pairs, years):
+def analyse(pairs, years, target="2r"):
     # results[tf_label][year] = list of R
     results = {lab: {y: [] for y in years} for _, lab, _, _ in TF_MAP}
     covered = []
@@ -253,25 +280,30 @@ def analyse(pairs, years):
                 continue
             covered.append(f"{pair} {y}")
             cache = {}
+            d_cs = _candles(m1, "D"); d_times = [c.t for c in d_cs]
+            w_cs = _candles(m1, "1W"); w_times = [c.t for c in w_cs]
             for det_tf, lab, ent_tf, mode in TF_MAP:
                 det = cache.setdefault(det_tf, _candles(m1, det_tf))
                 ltf = cache.setdefault(ent_tf, _candles(m1, ent_tf))
                 ltf_times = [c.t for c in ltf]
-                results[lab][y] += run_tf(det, ltf, ltf_times, pip, mode, spread)
+                results[lab][y] += run_tf(det, ltf, ltf_times, pip, spread, target,
+                                          d_cs, d_times, w_cs, w_times)
     return results, covered
 
 
-def report(results, years, covered, pairs):
+def report(results, years, covered, pairs, target="2r"):
     is_y = [y for y in years if y <= 2023]
     oos_y = [y for y in years if y >= 2024]
+    tgt_txt = ("nearest HTF liquidity (prior-day / prior-week high-low, ≥1R away)"
+               if target == "htf" else f"fixed {RR:.0f}R")
     L = ["# Inversion FVG (IFVG) backtest — market-structure stop + costs", "",
          "Core condition: a FVG violated by a **full-body close outside it** inverts "
          "to a supply/demand zone. Entry one TF lower (D1→H4, H4→H1, H1→M15, M15→M5) "
          "on a **confirmation close** — a candle that wicks into the zone AND closes "
          "back OUT in the trade direction (rejection proven, price moving away). "
          f"**Stop = market structure, capped at {STOP_CAP_PIPS} pips on every entry** "
-         f"(R defined off that stop); target {RR:.0f}R. **Spread + slippage applied on "
-         "both fills.**", "",
+         f"(R defined off that stop); **target = {tgt_txt}**. Spread + slippage on "
+         "both fills.", "",
          f"_pairs: {', '.join(pairs)} · coverage: {', '.join(covered) or 'NONE'}_", "",
          "MaxDD is peak-to-trough of the cumulative-R curve. `total` = summed R.", ""]
 
@@ -340,8 +372,15 @@ def _selftest():
     # demand confirmation: candle dips into zone [10,12], closes back ABOVE hi, bullish
     dem = find_entry([c(8, 12.5, 12.7, 11.5, 12.55)], 0, +1, 10, 12)
     assert dem and dem[1] == 12.55, dem
+    # HTF target: buy at 100.00, daily highs 100.20 & 100.50 above → nearest = 100.20
+    d = [c(0, 99, 99.3, 98.8, 99.1), c(1, 100, 100.2, 99.5, 100.1),
+         c(2, 100.1, 100.5, 99.9, 100.3), c(3, 100.3, 100.4, 100.0, 100.35)]
+    tp = htf_target(100.00, +1, d, [], 0.001)   # last 3 completed = d[-4:-1]=d[0:3]
+    assert tp == 100.20, tp                       # nearest daily high above entry+min_dist
+    tp2 = htf_target(100.00, -1, d, [], 0.001)    # sell: nearest low below
+    assert tp2 is not None and tp2 < 100.00, tp2
     print("selftest OK — FVG detect, inversion, confirmation-close entry (+no-trigger "
-          "on shallow poke), 10-pip structure stop, friction-aware 2R sim")
+          "on shallow poke), 10-pip structure stop, friction sim, HTF-liquidity target")
     return 0
 
 
@@ -349,6 +388,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pairs", nargs="+", default=["EURUSD", "GBPUSD", "NZDUSD"])
     ap.add_argument("--years", type=int, nargs="+", default=[2022, 2024])
+    ap.add_argument("--target", choices=["2r", "htf"], default="2r",
+                    help="'2r' fixed, or 'htf' = nearest prior-day/week liquidity")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -357,8 +398,8 @@ def main():
         print("Guarded: set RUN_IFVG_BACKTEST=1 to run the IFVG backtest.")
         return 0
     print(f"IFVG backtest — pairs {a.pairs}, years {a.years}…")
-    results, covered = analyse(a.pairs, a.years)
-    lines = report(results, a.years, covered, a.pairs)
+    results, covered = analyse(a.pairs, a.years, a.target)
+    lines = report(results, a.years, covered, a.pairs, a.target)
     text = "\n".join(lines) + "\n"
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, "w") as f:
