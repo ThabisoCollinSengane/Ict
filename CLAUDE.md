@@ -1228,8 +1228,17 @@ but the edge still isn't there: a **2R target off a 10-pip stop needs >33% WR**,
 ~33% (breakeven pre-cost), and spread/slippage sink it — `median R = -1.11` everywhere (most trades
 stop out). Root cause: the inversion *rejects* but doesn't reliably *run* a fixed 2R after a
 (correctly) later confirmation entry. **Verdict: IFVG-as-standalone with a structural stop + fixed
-2R has no tradeable edge. Nothing ships.** Untested variant (per original spec): target nearest HTF
-liquidity instead of fixed 2R — the one lever that could convert the ~35% rejections; long shot.
+2R has no tradeable edge. Nothing ships.**
+
+**HTF-liquidity target variant (tested 2026-08-05 — also RED, book closed):** targeting the nearest
+prior-day/prior-week high-low (≥1R, no lookahead) instead of fixed 2R made it slightly WORSE — WR
+fell to ~28-32% (far draws hit less often than a fixed 2R before the 10-pip stop is swept), overall
+PF 0.81 IS / 0.75 OOS, negative every TF both splits; D1 dropped to 0.81/0.48 (a distant draw + a
+10-pip stop is the worst combo). `median R=-1.11` everywhere. **Two target variants (2R + HTF), both
+negative in both splits, all TFs → IFVG has no tradeable edge with a realistic structural stop +
+costs. Closed.** The full-body-close inversion is a real market-STRUCTURE phenomenon but a ~30%-WR
+standalone entry can't clear the >33% breakeven a 10-pip/2R needs. `scripts/backtest_ifvg.py`
+retained (`--target 2r|htf`, flag `RUN_IFVG_BACKTEST=1`) for reference; nothing in the engine.
 
 ### P41 — PDH/PDL-sweep sizing lever (SHIPPED 2026-07-27)
 **What (active lever):** When the AMD manipulation swept **prior-day liquidity** — the Judas sweep
