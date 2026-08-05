@@ -219,9 +219,13 @@ def _load_m1(pair, year):
     return df.drop_duplicates("dt").sort_values("dt").set_index("dt")[["o", "h", "l", "c"]]
 
 
-def _candles(m1, rule):
-    import pandas as pd  # noqa: F401
-    d = m1.resample(rule).agg({"o": "first", "h": "max", "l": "min", "c": "last"}).dropna()
+# pandas 2.2+ removed the "T" frequency aliases (15T/60T/…) → use min/h/D.
+_RULE = {"5T": "5min", "15T": "15min", "60T": "60min", "240T": "240min", "D": "1D"}
+
+
+def _candles(m1, tf):
+    d = m1.resample(_RULE.get(tf, tf)).agg(
+        {"o": "first", "h": "max", "l": "min", "c": "last"}).dropna()
     return [C(t, r.o, r.h, r.l, r.c) for t, r in zip(d.index, d.itertuples(index=False))]
 
 
