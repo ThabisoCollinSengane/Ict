@@ -12,12 +12,13 @@ Pipeline per detection timeframe (D1 / H4 / H1 / M15):
         close+open above the FVG high  -> bullish IFVG (demand, buy on retest)
         close+open below the FVG low   -> bearish IFVG (supply, sell on retest)
   3. Drop ONE timeframe (D1->H4, H4->H1, H1->M15, M15->M5) and hunt the entry:
-     - M15/H1/H4: first LTF candle that retests the zone with a rejection wick
-       > 40% of its range in the zone direction; enter on its close, stop beyond
-       the wick.
-     - D1: limit at the zone's near edge on first retest, stop at the far edge —
-       price does the same consolidation and the IFVG high/low is the entry.
-  4. Target = 2R (fixed). The zone dies if price closes full-body back through it.
+     a CONFIRMATION CLOSE — a candle that wicks into the IFVG zone AND closes back
+     OUT in the trade direction (demand: dips in, closes above the high; supply:
+     pokes in, closes below the low). The rejection is proven and price is already
+     moving away, so entry is at that close.
+  4. Stop = market structure, capped at 10 pips (beyond the confirmation candle's
+     wick / nearest swing). Target = 2R. Spread + slippage on both fills. The zone
+     dies if a full body closes through it against the IFVG direction first.
 
 Output: WR% / PF / MaxDD(R) / count / mean-R / median-R, split IS (2022) vs
 OOS (2024), broken down by detection timeframe (incl. D1).
@@ -99,46 +100,24 @@ def mark_inversion(cs, form_idx, lo, hi):
 
 
 def find_entry(ltf, start_k, idir, lo, hi):
-    """First LTF retest with a rejection wick > WICK_FRAC in the zone direction.
-    Returns (k, entry) or None (entry = candle close). Zone invalidated if a full
-    body closes back through it against the IFVG direction before a valid retest."""
+    """Confirmation-close entry (all TFs). The candle must WICK into the IFVG zone
+    AND CLOSE back OUT in the trade direction — the rejection is proven and price is
+    already moving away, so the tight 10-pip stop sits behind a confirmed move, not
+    inside the retest noise. Returns (k, entry=close) or None.
+      demand (idir>0): low ≤ hi (dipped in) AND close > hi (closed back above) AND bullish
+      supply (idir<0): high ≥ lo (poked in) AND close < lo (closed back below) AND bearish
+    Zone dies if a full body closes through it against the IFVG direction first."""
     for k in range(start_k, min(len(ltf), start_k + RETEST_BARS)):
         c = ltf[k]
-        rng = c.h - c.l
-        if rng <= 0:
-            continue
-        in_zone = (c.l <= hi and c.h >= lo)
-        if not in_zone:
-            if idir > 0 and c.o < lo and c.c < lo:      # demand broken
+        if idir > 0:                                        # demand
+            if c.l <= hi and c.c > hi and c.c > c.o:
+                return (k, c.c)
+            if c.o < lo and c.c < lo:                       # closed below zone → dead
                 return None
-            if idir < 0 and c.o > hi and c.c > hi:      # supply broken
-                return None
-            continue
-        lower_wick = min(c.o, c.c) - c.l
-        upper_wick = c.h - max(c.o, c.c)
-        if idir > 0 and lower_wick / rng > WICK_FRAC:   # bullish rejection
-            return (k, c.c)
-        if idir < 0 and upper_wick / rng > WICK_FRAC:   # bearish rejection
-            return (k, c.c)
-    return None
-
-
-def find_entry_edge(ltf, start_k, idir, lo, hi):
-    """D1-style: limit at the IFVG's near edge on first retest. Returns (k, entry).
-    Demand broke UP → price retests DOWN to the high edge (buy at hi); supply broke
-    DOWN → retests UP to the low edge (sell at lo). Stop is the market-structure
-    stop (below), NOT the zone far edge. Zone dies on a full body back through it."""
-    for k in range(start_k, min(len(ltf), start_k + RETEST_BARS)):
-        c = ltf[k]
-        if idir > 0:                              # demand — buy at the high edge
-            if c.l <= hi:
-                return (k, hi)
-            if c.o < lo and c.c < lo:
-                return None
-        else:                                     # supply — sell at the low edge
-            if c.h >= lo:
-                return (k, lo)
-            if c.o > hi and c.c > hi:
+        else:                                               # supply
+            if c.h >= lo and c.c < lo and c.c < c.o:
+                return (k, c.c)
+            if c.o > hi and c.c > hi:                        # closed above zone → dead
                 return None
     return None
 
@@ -186,9 +165,8 @@ def simulate(ltf, k0, idir, entry, stop, friction):
 
 def run_tf(det_cs, ltf, ltf_times, pip, mode="wick", spread=1.5):
     """All IFVG trades for one detection-TF / entry-TF pair. Returns list of R.
-    mode: 'wick' (LTF rejection candle) or 'edge' (limit at the zone edge, D1).
-    Stop = market-structure 10-pip-capped; friction = half-spread + slippage/side."""
-    entry_fn = find_entry_edge if mode == "edge" else find_entry
+    Entry = confirmation close (all TFs, incl. D1); stop = market-structure 10-pip
+    capped; friction = half-spread + slippage per side."""
     friction = (spread / 2 + _SLIP) * pip
     rs = []
     used_until = -1   # avoid overlapping trades from clustered gaps
@@ -200,7 +178,7 @@ def run_tf(det_cs, ltf, ltf_times, pip, mode="wick", spread=1.5):
         start_k = bisect.bisect_right(ltf_times, det_cs[inv_idx].t)
         if start_k <= used_until:
             continue
-        ent = entry_fn(ltf, start_k, idir, zlo, zhi)
+        ent = find_entry(ltf, start_k, idir, zlo, zhi)
         if ent is None:
             continue
         k, entry = ent
@@ -288,8 +266,9 @@ def report(results, years, covered, pairs):
     oos_y = [y for y in years if y >= 2024]
     L = ["# Inversion FVG (IFVG) backtest — market-structure stop + costs", "",
          "Core condition: a FVG violated by a **full-body close outside it** inverts "
-         "to a supply/demand zone. Entry one TF lower (D1→H4, H4→H1, H1→M15, M15→M5): "
-         f"M15/H1/H4 on a >{WICK_FRAC:.0%}-wick rejection candle, D1 at the zone edge. "
+         "to a supply/demand zone. Entry one TF lower (D1→H4, H4→H1, H1→M15, M15→M5) "
+         "on a **confirmation close** — a candle that wicks into the zone AND closes "
+         "back OUT in the trade direction (rejection proven, price moving away). "
          f"**Stop = market structure, capped at {STOP_CAP_PIPS} pips on every entry** "
          f"(R defined off that stop); target {RR:.0f}R. **Spread + slippage applied on "
          "both fills.**", "",
@@ -342,27 +321,27 @@ def _selftest():
            c(4, 9.8, 9.9, 9.0, 9.2)]        # full body below 10 -> supply
     inv = mark_inversion(cs, fv[0][0], 10, 12)
     assert inv and inv[1] == -1, inv        # bearish IFVG
-    # LTF retest: candle pushes up into zone with big upper wick (rejection)
+    # supply confirmation-close entry: candle pokes UP into zone [10,12], closes
+    # back BELOW lo=10, bearish → confirmed rejection, enter at close.
     ltf = [c(5, 9.5, 9.6, 9.4, 9.55),
-           c(6, 10.2, 11.9, 10.1, 10.4)]    # high 11.9 in zone, upper wick huge
+           c(6, 9.7, 10.8, 9.6, 9.65)]          # high 10.8 into zone, close 9.65<10, bearish
     e = find_entry(ltf, 0, -1, 10, 12)
-    assert e is not None and e[1] == 10.4, e   # (k, entry=close)
-    # market-structure stop, 10-pip capped: entry 10.4, recent high 11.9 is 1.5 away
+    assert e is not None and e[1] == 9.65, e     # entry = close, back below the zone
+    # a mere poke that does NOT close back out must NOT trigger
+    notrig = find_entry([c(6, 9.7, 10.8, 9.6, 10.5)], 0, -1, 10, 12)  # closes inside zone
+    assert notrig is None, "shallow poke closing inside the zone must not enter"
     pip = 0.0001
-    st = structure_stop(ltf, 1, -1, 10.4, pip)
-    assert abs(10.4 - st) <= STOP_CAP_PIPS * pip + 1e-9, st   # never wider than 10 pips
-    assert st > 10.4, st                        # sell: stop above entry
-    # 2R sim with friction: candle drops to target, high stays under the stop
+    st = structure_stop(ltf, 1, -1, 9.65, pip)
+    assert abs(9.65 - st) <= STOP_CAP_PIPS * pip + 1e-9 and st > 9.65, st   # ≤10 pips, above
+    # 2R sim with friction: price drops to target, high stays under the stop
     friction = (1.5 / 2 + _SLIP) * pip
-    r = simulate([ltf[1], c(7, 10.40, 10.3999, 10.3950, 10.3960)], 0, -1, 10.4, st, friction)
+    r = simulate([ltf[1], c(7, 9.65, 9.6499, 9.6450, 9.6460)], 0, -1, 9.65, st, friction)
     assert 1.3 < r <= RR, r                      # ~2R, minus round-trip friction
-    # D1 edge entries return (k, entry) only; stop comes from structure_stop
-    edge = find_entry_edge([c(8, 9.0, 9.5, 8.8, 9.2), c(9, 9.6, 10.3, 9.5, 9.9)], 0, -1, 10, 12)
-    assert edge and edge[1] == 10, edge          # sell at the low edge
-    edge2 = find_entry_edge([c(8, 13, 13.2, 11.9, 12.8)], 0, +1, 10, 12)
-    assert edge2 and edge2[1] == 12, edge2        # buy at the high edge
-    print("selftest OK — FVG detect, inversion, wick entry, D1 edge entry, "
-          "10-pip structure stop, friction-aware 2R sim")
+    # demand confirmation: candle dips into zone [10,12], closes back ABOVE hi, bullish
+    dem = find_entry([c(8, 12.5, 12.7, 11.5, 12.55)], 0, +1, 10, 12)
+    assert dem and dem[1] == 12.55, dem
+    print("selftest OK — FVG detect, inversion, confirmation-close entry (+no-trigger "
+          "on shallow poke), 10-pip structure stop, friction-aware 2R sim")
     return 0
 
 
