@@ -1189,6 +1189,31 @@ init; (2) `entry_type` was referenced in the P40 sizing block ~40 lines before i
 like "no effect." `run_p40_validation.sh` now stamps the run's git sha and embeds any crashed
 arm's traceback into the pushed report so a crash can't masquerade as a null result again.
 
+### IFVG (Inversion FVG) backtest — D1-only edge (MEASURED 2026-08-05)
+**What:** `scripts/backtest_ifvg.py` (flag `RUN_IFVG_BACKTEST=1`, `run_ifvg.sh`) tests the theory
+that a FVG violated by a **full-body close outside it** inverts into a S/D zone. Detect on
+D1/H4/H1/M15, hunt the entry one TF lower (D1→H4, H4→H1, H1→M15, M15→M5): M15/H1/H4 on a >40%-wick
+rejection candle, D1 at the zone edge. **Stop = market structure capped at 10 pips on EVERY entry**
+(R off that stop, 2R target), spread+slippage on both fills. IS 2022 / OOS 2024, EU+GU+NZD.
+
+**Result — blanket RED, D1 the lone survivor:**
+
+| TF | IS PF | OOS PF | WR IS/OOS | n |
+|---|---|---|---|---|
+| M15 | 0.79 | 0.63 | 34/30% | ~2000 | 🔴 |
+| H1 | 0.77 | 0.71 | 32/31% | ~590 | 🔴 |
+| H4 | 1.03 | 0.81 | 38/33% | ~165 | 🔴 loses OOS |
+| **D1** | **1.98** | **1.38** | 54/46% | ~50 | 🟢 both splits + |
+
+Overall PF 0.81 IS / 0.66 OOS → nothing ships broadly. The **raw** (no-cost, zone-height-stop)
+version looked tradeable on every TF (edge scaled up with TF: D1 PF 3.0/1.9 raw); adding the
+**structural 10-pip stop + costs** killed M15/H1/H4 — a 10-pip stop gets hunted on the lower TFs and
+a ~2-pip spread is 20% of a 10-pip risk. **Only D1 survives** (zone is a real institutional level;
+price respects it). Confirms the tight structural stop is itself the filter separating genuine HTF
+liquidity from LTF noise. **Caveat:** D1 n≈50 — real but modest, and the edge-entry assumes the
+limit fills at the zone edge. **Next:** re-run D1 across 2022–2025 all pairs to push n→few-hundred;
+ship only if it holds PF>1.3 both halves. Measurement only — nothing in the engine.
+
 ### P41 — PDH/PDL-sweep sizing lever (SHIPPED 2026-07-27)
 **What (active lever):** When the AMD manipulation swept **prior-day liquidity** — the Judas sweep
 ran within ~5 pips of PDH or PDL — size the position **1.25×**. Same mechanism, magnitude, and R3k
