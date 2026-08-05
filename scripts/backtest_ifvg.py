@@ -51,6 +51,18 @@ RR = 2.0
 INV_SCAN = 300        # bars after FVG to find the inversion
 RETEST_BARS = 600     # LTF bars after inversion to find the entry
 SIM_BARS = 1500       # LTF bars to resolve the trade
+# Stop = market structure, capped at 10 pips — on EVERY entry, every TF (per the
+# live strategy: beyond the nearest LTF swing, never wider than 10 pips). R is
+# defined off THIS stop, so the 2R target is ~20 pips regardless of detection TF.
+STOP_CAP_PIPS = 10
+STOP_LOOKBACK = 12    # LTF bars back to locate the structural swing
+try:
+    import config as _cfg
+    _SPREAD = dict(_cfg.PAIR_SPREAD_PIPS)
+    _SLIP = float(getattr(_cfg, "SLIPPAGE_PIPS", 0.5))
+except Exception:      # noqa: BLE001 - standalone use without config
+    _SPREAD = {"default": 1.5}
+    _SLIP = 0.5
 
 
 # ── FVG / IFVG / entry logic (pure, unit-tested) ──────────────────────────────
@@ -86,10 +98,10 @@ def mark_inversion(cs, form_idx, lo, hi):
     return None
 
 
-def find_entry(ltf, start_k, idir, lo, hi, pip):
+def find_entry(ltf, start_k, idir, lo, hi):
     """First LTF retest with a rejection wick > WICK_FRAC in the zone direction.
-    Returns (k, entry, stop) or None. Zone invalidated if a full body closes
-    back through it against the IFVG direction before a valid retest."""
+    Returns (k, entry) or None (entry = candle close). Zone invalidated if a full
+    body closes back through it against the IFVG direction before a valid retest."""
     for k in range(start_k, min(len(ltf), start_k + RETEST_BARS)):
         c = ltf[k]
         rng = c.h - c.l
@@ -105,59 +117,79 @@ def find_entry(ltf, start_k, idir, lo, hi, pip):
         lower_wick = min(c.o, c.c) - c.l
         upper_wick = c.h - max(c.o, c.c)
         if idir > 0 and lower_wick / rng > WICK_FRAC:   # bullish rejection
-            return (k, c.c, c.l - pip)
+            return (k, c.c)
         if idir < 0 and upper_wick / rng > WICK_FRAC:   # bearish rejection
-            return (k, c.c, c.h + pip)
+            return (k, c.c)
     return None
 
 
-def find_entry_edge(ltf, start_k, idir, lo, hi, pip):
-    """D1-style entry: a limit at the IFVG's NEAR edge on first retest, stop at the
-    FAR edge (± 1 pip) → risk = zone height. Bullish IFVG (demand) broke UP so price
-    sits above the zone and retests DOWN to the high edge (buy at hi, stop below lo);
-    bearish IFVG (supply) sits below and retests UP to the low edge (sell at lo, stop
-    above hi). Zone dies if a full body closes through it against the IFVG direction."""
+def find_entry_edge(ltf, start_k, idir, lo, hi):
+    """D1-style: limit at the IFVG's near edge on first retest. Returns (k, entry).
+    Demand broke UP → price retests DOWN to the high edge (buy at hi); supply broke
+    DOWN → retests UP to the low edge (sell at lo). Stop is the market-structure
+    stop (below), NOT the zone far edge. Zone dies on a full body back through it."""
     for k in range(start_k, min(len(ltf), start_k + RETEST_BARS)):
         c = ltf[k]
         if idir > 0:                              # demand — buy at the high edge
             if c.l <= hi:
-                return (k, hi, lo - pip)
-            if c.o < lo and c.c < lo:             # closed below the zone → dead
+                return (k, hi)
+            if c.o < lo and c.c < lo:
                 return None
         else:                                     # supply — sell at the low edge
             if c.h >= lo:
-                return (k, lo, hi + pip)
+                return (k, lo)
             if c.o > hi and c.c > hi:
                 return None
     return None
 
 
-def simulate(ltf, k0, idir, entry, stop):
-    """Walk forward to 1R stop or 2R target; stop checked first (conservative)."""
-    risk = abs(entry - stop)
+def structure_stop(ltf, k, idir, entry, pip):
+    """Market-structure stop, capped at 10 pips — beyond the nearest LTF swing in
+    the last STOP_LOOKBACK bars, but never wider than STOP_CAP_PIPS. Mirrors the
+    live strategy: the stop always sits on structure, tight, regardless of the
+    detection timeframe."""
+    seg = ltf[max(0, k - STOP_LOOKBACK):k + 1]
+    if idir > 0:
+        stop = min(c.l for c in seg) - pip
+    else:
+        stop = max(c.h for c in seg) + pip
+    cap = STOP_CAP_PIPS * pip
+    if abs(entry - stop) > cap or (idir > 0 and stop >= entry) or (idir < 0 and stop <= entry):
+        stop = entry - idir * cap        # fall back to the flat 10-pip cap
+    return stop
+
+
+def simulate(ltf, k0, idir, entry, stop, friction):
+    """Walk to 1R stop or 2R target with spread+slippage on BOTH fills. Returns the
+    realised R. Stop checked before target within a bar (conservative)."""
+    eff_entry = entry + idir * friction          # worse entry fill
+    risk = abs(eff_entry - stop)
     if risk <= 0:
         return None
-    tp = entry + idir * RR * risk
+    tp = eff_entry + idir * RR * risk
     for k in range(k0 + 1, min(len(ltf), k0 + 1 + SIM_BARS)):
         c = ltf[k]
         if idir > 0:
             if c.l <= stop:
-                return -1.0
+                return (stop - friction - eff_entry) / risk
             if c.h >= tp:
-                return RR
+                return (tp - friction - eff_entry) / risk
         else:
             if c.h >= stop:
-                return -1.0
+                return (eff_entry - (stop + friction)) / risk
             if c.l <= tp:
-                return RR
+                return (eff_entry - (tp + friction)) / risk
     last = ltf[min(len(ltf) - 1, k0 + SIM_BARS)].c
-    return (last - entry) * idir / risk
+    exit_fill = last - idir * friction
+    return (exit_fill - eff_entry) * idir / risk
 
 
-def run_tf(det_cs, ltf, ltf_times, pip, mode="wick"):
+def run_tf(det_cs, ltf, ltf_times, pip, mode="wick", spread=1.5):
     """All IFVG trades for one detection-TF / entry-TF pair. Returns list of R.
-    mode: 'wick' (LTF rejection candle) or 'edge' (limit at the zone edge, D1)."""
+    mode: 'wick' (LTF rejection candle) or 'edge' (limit at the zone edge, D1).
+    Stop = market-structure 10-pip-capped; friction = half-spread + slippage/side."""
     entry_fn = find_entry_edge if mode == "edge" else find_entry
+    friction = (spread / 2 + _SLIP) * pip
     rs = []
     used_until = -1   # avoid overlapping trades from clustered gaps
     for form_idx, lo, hi in detect_fvgs(det_cs):
@@ -168,11 +200,12 @@ def run_tf(det_cs, ltf, ltf_times, pip, mode="wick"):
         start_k = bisect.bisect_right(ltf_times, det_cs[inv_idx].t)
         if start_k <= used_until:
             continue
-        ent = entry_fn(ltf, start_k, idir, zlo, zhi, pip)
+        ent = entry_fn(ltf, start_k, idir, zlo, zhi)
         if ent is None:
             continue
-        k, entry, stop = ent
-        r = simulate(ltf, k, idir, entry, stop)
+        k, entry = ent
+        stop = structure_stop(ltf, k, idir, entry, pip)
+        r = simulate(ltf, k, idir, entry, stop, friction)
         if r is not None:
             rs.append(r)
             used_until = k
@@ -235,6 +268,7 @@ def analyse(pairs, years):
     covered = []
     for pair in pairs:
         pip = 0.01 if pair.endswith("JPY") else 0.0001
+        spread = _SPREAD.get(pair, _SPREAD.get("default", 1.5))
         for y in years:
             m1 = _load_m1(pair, y)
             if m1 is None or len(m1) < 5000:
@@ -245,18 +279,20 @@ def analyse(pairs, years):
                 det = cache.setdefault(det_tf, _candles(m1, det_tf))
                 ltf = cache.setdefault(ent_tf, _candles(m1, ent_tf))
                 ltf_times = [c.t for c in ltf]
-                results[lab][y] += run_tf(det, ltf, ltf_times, pip, mode)
+                results[lab][y] += run_tf(det, ltf, ltf_times, pip, mode, spread)
     return results, covered
 
 
 def report(results, years, covered, pairs):
     is_y = [y for y in years if y <= 2023]
     oos_y = [y for y in years if y >= 2024]
-    L = ["# Inversion FVG (IFVG) backtest", "",
-         "Core condition tested: a FVG violated by a **full-body close outside it** "
-         "inverts to a supply/demand zone; entry on the LTF retest rejection (wick "
-         f">{WICK_FRAC:.0%} of range), stop beyond the wick, target {RR:.0f}R. "
-         "Detection TF → entry TF: H4→H1, H1→M15, M15→M5.", "",
+    L = ["# Inversion FVG (IFVG) backtest — market-structure stop + costs", "",
+         "Core condition: a FVG violated by a **full-body close outside it** inverts "
+         "to a supply/demand zone. Entry one TF lower (D1→H4, H4→H1, H1→M15, M15→M5): "
+         f"M15/H1/H4 on a >{WICK_FRAC:.0%}-wick rejection candle, D1 at the zone edge. "
+         f"**Stop = market structure, capped at {STOP_CAP_PIPS} pips on every entry** "
+         f"(R defined off that stop); target {RR:.0f}R. **Spread + slippage applied on "
+         "both fills.**", "",
          f"_pairs: {', '.join(pairs)} · coverage: {', '.join(covered) or 'NONE'}_", "",
          "MaxDD is peak-to-trough of the cumulative-R curve. `total` = summed R.", ""]
 
@@ -309,26 +345,24 @@ def _selftest():
     # LTF retest: candle pushes up into zone with big upper wick (rejection)
     ltf = [c(5, 9.5, 9.6, 9.4, 9.55),
            c(6, 10.2, 11.9, 10.1, 10.4)]    # high 11.9 in zone, upper wick huge
-    e = find_entry(ltf, 0, -1, 10, 12, 0.0001)
-    assert e is not None, "should find a bearish rejection entry"
-    k, entry, stop = e
-    assert stop > entry, (entry, stop)      # sell: stop above entry
-    # simulate a drop to 2R target
-    risk = stop - entry
-    tp = entry - RR * risk
-    sim = [c(7, entry, entry + 0.01, tp - 0.5, tp - 0.4)]  # low pierces tp
-    r = simulate(ltf[:1] + [ltf[1]] + sim, 1, -1, entry, stop)
-    assert r == RR, r
-    # D1 edge entry: bearish IFVG (supply) zone [10,12]; price retests UP to lo=10
-    edge = find_entry_edge([c(8, 9.0, 9.5, 8.8, 9.2), c(9, 9.6, 10.3, 9.5, 9.9)],
-                           0, -1, 10, 12, 0.0001)
-    assert edge is not None, "edge entry should trigger when high reaches the low edge"
-    _, e_entry, e_stop = edge
-    assert e_entry == 10 and e_stop > 12, edge   # sell at low edge, stop above high edge
-    # demand edge: zone [10,12], price retests DOWN to hi=12
-    edge2 = find_entry_edge([c(8, 13, 13.2, 11.9, 12.8)], 0, +1, 10, 12, 0.0001)
-    assert edge2 and edge2[1] == 12 and edge2[2] < 10, edge2  # buy at high edge, stop below low
-    print("selftest OK — FVG detect, full-body inversion, wick-rejection entry, D1 edge entry, 2R sim")
+    e = find_entry(ltf, 0, -1, 10, 12)
+    assert e is not None and e[1] == 10.4, e   # (k, entry=close)
+    # market-structure stop, 10-pip capped: entry 10.4, recent high 11.9 is 1.5 away
+    pip = 0.0001
+    st = structure_stop(ltf, 1, -1, 10.4, pip)
+    assert abs(10.4 - st) <= STOP_CAP_PIPS * pip + 1e-9, st   # never wider than 10 pips
+    assert st > 10.4, st                        # sell: stop above entry
+    # 2R sim with friction: candle drops to target, high stays under the stop
+    friction = (1.5 / 2 + _SLIP) * pip
+    r = simulate([ltf[1], c(7, 10.40, 10.3999, 10.3950, 10.3960)], 0, -1, 10.4, st, friction)
+    assert 1.3 < r <= RR, r                      # ~2R, minus round-trip friction
+    # D1 edge entries return (k, entry) only; stop comes from structure_stop
+    edge = find_entry_edge([c(8, 9.0, 9.5, 8.8, 9.2), c(9, 9.6, 10.3, 9.5, 9.9)], 0, -1, 10, 12)
+    assert edge and edge[1] == 10, edge          # sell at the low edge
+    edge2 = find_entry_edge([c(8, 13, 13.2, 11.9, 12.8)], 0, +1, 10, 12)
+    assert edge2 and edge2[1] == 12, edge2        # buy at the high edge
+    print("selftest OK — FVG detect, inversion, wick entry, D1 edge entry, "
+          "10-pip structure stop, friction-aware 2R sim")
     return 0
 
 
