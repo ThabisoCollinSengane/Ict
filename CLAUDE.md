@@ -1207,12 +1207,29 @@ rejection candle, D1 at the zone edge. **Stop = market structure capped at 10 pi
 
 Overall PF 0.81 IS / 0.66 OOS → nothing ships broadly. The **raw** (no-cost, zone-height-stop)
 version looked tradeable on every TF (edge scaled up with TF: D1 PF 3.0/1.9 raw); adding the
-**structural 10-pip stop + costs** killed M15/H1/H4 — a 10-pip stop gets hunted on the lower TFs and
-a ~2-pip spread is 20% of a 10-pip risk. **Only D1 survives** (zone is a real institutional level;
-price respects it). Confirms the tight structural stop is itself the filter separating genuine HTF
-liquidity from LTF noise. **Caveat:** D1 n≈50 — real but modest, and the edge-entry assumes the
-limit fills at the zone edge. **Next:** re-run D1 across 2022–2025 all pairs to push n→few-hundred;
-ship only if it holds PF>1.3 both halves. Measurement only — nothing in the engine.
+**structural 10-pip stop + costs** killed M15/H1/H4, leaving only a small-sample D1 positive.
+
+**FINAL — RED everywhere (re-run 2026-08-05, confirmation-close entry, full 4yr):** per user
+review, the LTF stop-outs were premature entries — replaced the 40%-wick/edge triggers with a
+unified **confirmation close** (candle wicks into the zone AND closes back OUT in the trade
+direction), keeping the 10-pip structural stop + costs, run on **all 3 pairs × 2022-2025**:
+
+| TF | IS PF | OOS PF | WR IS/OOS | n IS/OOS |
+|---|---|---|---|---|
+| M15 | 0.78 | 0.73 | 33/32% | 4022/4543 |
+| H1 | 0.83 | 0.85 | 33/34% | 1243/1122 |
+| H4 | 0.97 | 0.89 | 37/35% | 378/292 |
+| D1 | 0.86 | 0.67 | 34/28% | 89/78 |
+
+Overall 0.80 IS / 0.76 OOS — **negative on every timeframe.** The earlier D1 positive (PF 1.98/1.38)
+was **n≈50 noise + the looser zone-stop**; at n≈89/78 with the corrected rules it collapsed to
+0.86/0.67. The confirmation-close entry worked (cut the shallow-poke stop-outs, WR up to ~33-37%)
+but the edge still isn't there: a **2R target off a 10-pip stop needs >33% WR**, IFVG lands right at
+~33% (breakeven pre-cost), and spread/slippage sink it — `median R = -1.11` everywhere (most trades
+stop out). Root cause: the inversion *rejects* but doesn't reliably *run* a fixed 2R after a
+(correctly) later confirmation entry. **Verdict: IFVG-as-standalone with a structural stop + fixed
+2R has no tradeable edge. Nothing ships.** Untested variant (per original spec): target nearest HTF
+liquidity instead of fixed 2R — the one lever that could convert the ~35% rejections; long shot.
 
 ### P41 — PDH/PDL-sweep sizing lever (SHIPPED 2026-07-27)
 **What (active lever):** When the AMD manipulation swept **prior-day liquidity** — the Judas sweep
