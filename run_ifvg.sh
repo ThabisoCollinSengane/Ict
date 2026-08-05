@@ -20,8 +20,9 @@ if [ "$missing" = 1 ]; then
       echo "ERROR: could not obtain M1"; exit 1; }
 fi
 
-echo "=== running IFVG backtest — HTF-liquidity target (D1/H4/H1/M15, IS 22-23 vs OOS 24-25) ==="
-RUN_IFVG_BACKTEST=1 python scripts/backtest_ifvg.py --years 2022 2023 2024 2025 --target htf || {
+echo "=== running IFVG backtest — SWING-structure entry, H1/H4, IS 22-23 vs OOS 24-25 ==="
+RUN_IFVG_BACKTEST=1 python scripts/backtest_ifvg.py --years 2022 2023 2024 2025 \
+  --entry swing --target 2r || {
   echo "run failed — copy the traceback to Claude"; exit 1; }
 
 SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"

@@ -57,6 +57,8 @@ SIM_BARS = 1500       # LTF bars to resolve the trade
 # defined off THIS stop, so the 2R target is ~20 pips regardless of detection TF.
 STOP_CAP_PIPS = 10
 STOP_LOOKBACK = 12    # LTF bars back to locate the structural swing
+SWING_STRENGTH = 2    # fractal swing = this many bars each side (H1/H4 swing entry)
+SWING_TFS = {"H1", "H4"}   # swing-entry model runs same-TF on these only
 try:
     import config as _cfg
     _SPREAD = dict(_cfg.PAIR_SPREAD_PIPS)
@@ -136,6 +138,40 @@ def structure_stop(ltf, k, idir, entry, pip):
     if abs(entry - stop) > cap or (idir > 0 and stop >= entry) or (idir < 0 and stop <= entry):
         stop = entry - idir * cap        # fall back to the flat 10-pip cap
     return stop
+
+
+def _is_swing_low(cs, i, s):
+    return all(cs[i].l < cs[i - j].l for j in range(1, s + 1)) and \
+           all(cs[i].l < cs[i + j].l for j in range(1, s + 1))
+
+
+def _is_swing_high(cs, i, s):
+    return all(cs[i].h > cs[i - j].h for j in range(1, s + 1)) and \
+           all(cs[i].h > cs[i + j].h for j in range(1, s + 1))
+
+
+def find_entry_swing(cs, start_k, idir, zlo, zhi, s):
+    """Swing-structure entry (same TF as detection). After the IFVG inversion, wait
+    for the first CONFIRMED fractal swing (low for demand / high for supply) that
+    HOLDS at/near the zone, then enter on the confirmation bar's close. The swing
+    IS the structure — the stop sits just beyond it.
+    Returns (confirm_k, entry_close, swing_level) or None. A fractal at bar i needs
+    `s` bars each side, so it confirms at i+s (entry is taken there — no lookahead)."""
+    for i in range(max(start_k, s), len(cs) - s):
+        c = cs[i]
+        if idir > 0:                                  # demand — swing low
+            if c.o < zlo and c.c < zlo:               # full body back below zone → dead
+                return None
+            if _is_swing_low(cs, i, s) and c.l >= zlo:   # held at/above the zone floor
+                conf = i + s
+                return (conf, cs[conf].c, c.l)
+        else:                                         # supply — swing high
+            if c.o > zhi and c.c > zhi:
+                return None
+            if _is_swing_high(cs, i, s) and c.h <= zhi:  # held at/below the zone ceiling
+                conf = i + s
+                return (conf, cs[conf].c, c.h)
+    return None
 
 
 def htf_target(entry, idir, d_cs, w_cs, min_dist):
@@ -219,6 +255,45 @@ def run_tf(det_cs, ltf, ltf_times, pip, spread=1.5, target="2r",
     return rs
 
 
+def run_tf_swing(cs, pip, spread=1.5, target="2r",
+                 d_cs=None, d_times=None, w_cs=None, w_times=None):
+    """Swing-structure model (SAME TF): IFVG inversion, then enter on the first
+    confirmed fractal swing that holds at the zone. Stop = just beyond the swing
+    (the structure itself — NOT the 10-pip cap). Same TF for detection + entry."""
+    friction = (spread / 2 + _SLIP) * pip
+    cs_times = [c.t for c in cs]
+    rs = []
+    used_until = -1
+    for form_idx, lo, hi in detect_fvgs(cs):
+        inv = mark_inversion(cs, form_idx, lo, hi)
+        if inv is None:
+            continue
+        inv_idx, idir, zlo, zhi = inv
+        if inv_idx <= used_until:
+            continue
+        ent = find_entry_swing(cs, inv_idx + 1, idir, zlo, zhi, SWING_STRENGTH)
+        if ent is None:
+            continue
+        k, entry, swing = ent
+        stop = swing - pip if idir > 0 else swing + pip     # beyond the swing low/high
+        if (idir > 0 and stop >= entry) or (idir < 0 and stop <= entry):
+            continue                                        # degenerate — skip
+        tp_price = None
+        if target == "htf":
+            di = bisect.bisect_right(d_times, cs[k].t)
+            wi = bisect.bisect_right(w_times, cs[k].t)
+            tp_price = htf_target(entry, idir, d_cs[:di], w_cs[:wi], abs(entry - stop))
+            if tp_price is None:
+                continue
+        r = simulate(cs, k, idir, entry, stop, friction, tp_price)
+        if r is not None:
+            tp = tp_price if tp_price is not None else entry + idir * RR * abs(entry - stop)
+            rs.append({"t": cs[k].t, "dir": idir, "entry": entry, "stop": stop,
+                       "target": tp, "r": r, "stop_pips": abs(entry - stop) / pip})
+            used_until = k
+    return rs
+
+
 # ── metrics ───────────────────────────────────────────────────────────────────
 
 def metrics(rs):
@@ -269,7 +344,7 @@ def _candles(m1, tf):
     return [C(t, r.o, r.h, r.l, r.c) for t, r in zip(d.index, d.itertuples(index=False))]
 
 
-def analyse(pairs, years, target="2r"):
+def analyse(pairs, years, target="2r", entry="confirm"):
     # results[tf_label][year] = list of R ; trades = full per-entry log
     results = {lab: {y: [] for y in years} for _, lab, _, _ in TF_MAP}
     covered = []
@@ -286,29 +361,43 @@ def analyse(pairs, years, target="2r"):
             d_cs = _candles(m1, "D"); d_times = [c.t for c in d_cs]
             w_cs = _candles(m1, "1W"); w_times = [c.t for c in w_cs]
             for det_tf, lab, ent_tf, mode in TF_MAP:
-                det = cache.setdefault(det_tf, _candles(m1, det_tf))
-                ltf = cache.setdefault(ent_tf, _candles(m1, ent_tf))
-                ltf_times = [c.t for c in ltf]
-                for d in run_tf(det, ltf, ltf_times, pip, spread, target,
-                                d_cs, d_times, w_cs, w_times):
+                if entry == "swing":
+                    if lab not in SWING_TFS:      # swing model = same-TF, H1/H4 only
+                        continue
+                    cs = cache.setdefault(det_tf, _candles(m1, det_tf))
+                    rows = run_tf_swing(cs, pip, spread, target,
+                                        d_cs, d_times, w_cs, w_times)
+                else:
+                    det = cache.setdefault(det_tf, _candles(m1, det_tf))
+                    ltf = cache.setdefault(ent_tf, _candles(m1, ent_tf))
+                    ltf_times = [c.t for c in ltf]
+                    rows = run_tf(det, ltf, ltf_times, pip, spread, target,
+                                  d_cs, d_times, w_cs, w_times)
+                for d in rows:
                     results[lab][y].append(d["r"])
                     trades.append({**d, "pair": pair, "tf": lab})
     return results, covered, trades
 
 
-def report(results, years, covered, pairs, target="2r"):
+def report(results, years, covered, pairs, target="2r", entry="confirm"):
     is_y = [y for y in years if y <= 2023]
     oos_y = [y for y in years if y >= 2024]
     tgt_txt = ("nearest HTF liquidity (prior-day / prior-week high-low, ≥1R away)"
                if target == "htf" else f"fixed {RR:.0f}R")
+    if entry == "swing":
+        ent_txt = (f"**Swing-structure entry (SAME TF, {'/'.join(sorted(SWING_TFS))} only):** "
+                   "after the full-body-close inversion, wait for the first confirmed "
+                   f"fractal swing (low for demand / high for supply, {SWING_STRENGTH} bars "
+                   "each side) that HOLDS at the zone; enter on the confirmation bar's close, "
+                   "**stop just beyond the swing** (the structure itself — not a 10-pip cap).")
+    else:
+        ent_txt = ("Entry one TF lower (D1→H4, H4→H1, H1→M15, M15→M5) on a **confirmation "
+                   "close** — a candle that wicks into the zone AND closes back OUT in the "
+                   f"trade direction. **Stop = market structure, capped at {STOP_CAP_PIPS} pips.**")
     L = ["# Inversion FVG (IFVG) backtest — market-structure stop + costs", "",
          "Core condition: a FVG violated by a **full-body close outside it** inverts "
-         "to a supply/demand zone. Entry one TF lower (D1→H4, H4→H1, H1→M15, M15→M5) "
-         "on a **confirmation close** — a candle that wicks into the zone AND closes "
-         "back OUT in the trade direction (rejection proven, price moving away). "
-         f"**Stop = market structure, capped at {STOP_CAP_PIPS} pips on every entry** "
-         f"(R defined off that stop); **target = {tgt_txt}**. Spread + slippage on "
-         "both fills.", "",
+         "to a supply/demand zone. " + ent_txt + " "
+         f"**Target = {tgt_txt}**. Spread + slippage on both fills.", "",
          f"_pairs: {', '.join(pairs)} · coverage: {', '.join(covered) or 'NONE'}_", "",
          "MaxDD is peak-to-trough of the cumulative-R curve. `total` = summed R.", ""]
 
@@ -402,8 +491,17 @@ def _selftest():
     assert tp == 100.20, tp                       # nearest daily high above entry+min_dist
     tp2 = htf_target(100.00, -1, d, [], 0.001)    # sell: nearest low below
     assert tp2 is not None and tp2 < 100.00, tp2
-    print("selftest OK — FVG detect, inversion, confirmation-close entry (+no-trigger "
-          "on shallow poke), 10-pip structure stop, friction sim, HTF-liquidity target")
+    # swing-low detection + swing entry (demand): a V-shaped low at index 2 (s=1)
+    sw = [c(0, 12.6, 12.7, 12.4, 12.55), c(1, 12.5, 12.55, 12.2, 12.3),
+          c(2, 12.3, 12.35, 12.05, 12.1),  # swing low here (lower than neighbours)
+          c(3, 12.15, 12.4, 12.1, 12.35), c(4, 12.4, 12.6, 12.35, 12.55)]
+    assert _is_swing_low(sw, 2, 1) and not _is_swing_high(sw, 2, 1)
+    # demand IFVG zone [12.0,12.2]; swing low 12.05 holds ≥ zlo; confirm at 2+1=3
+    se = find_entry_swing(sw, 0, +1, 12.0, 12.2, 1)
+    assert se and se[0] == 3 and se[2] == 12.05, se        # (confirm_k, entry_close, swing_low)
+    assert se[1] == sw[3].c, se                            # entry = confirmation bar close
+    print("selftest OK — FVG detect, inversion, confirmation-close entry, HTF target, "
+          "swing-low detection + swing-structure entry, 10-pip stop, friction sim")
     return 0
 
 
@@ -413,6 +511,9 @@ def main():
     ap.add_argument("--years", type=int, nargs="+", default=[2022, 2024])
     ap.add_argument("--target", choices=["2r", "htf"], default="2r",
                     help="'2r' fixed, or 'htf' = nearest prior-day/week liquidity")
+    ap.add_argument("--entry", choices=["confirm", "swing"], default="confirm",
+                    help="'confirm' = confirmation close (one TF lower); "
+                         "'swing' = swing-structure entry, same TF, H1/H4")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -420,9 +521,9 @@ def main():
     if os.getenv("RUN_IFVG_BACKTEST", "0") != "1":
         print("Guarded: set RUN_IFVG_BACKTEST=1 to run the IFVG backtest.")
         return 0
-    print(f"IFVG backtest — pairs {a.pairs}, years {a.years}, target {a.target}…")
-    results, covered, trades = analyse(a.pairs, a.years, a.target)
-    lines = report(results, a.years, covered, a.pairs, a.target) + entries_section(trades)
+    print(f"IFVG backtest — pairs {a.pairs}, years {a.years}, target {a.target}, entry {a.entry}…")
+    results, covered, trades = analyse(a.pairs, a.years, a.target, a.entry)
+    lines = report(results, a.years, covered, a.pairs, a.target, a.entry) + entries_section(trades)
     text = "\n".join(lines) + "\n"
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, "w") as f:
