@@ -1,4 +1,4 @@
-# Renames DAT_ASCII_EURUSD_M1_2022.csv → EURUSD_2022.csv in data\histdata\
+# Renames DAT_ASCII_EURUSD_M1_2022.csv -> EURUSD_2022.csv in data\histdata\
 
 $dir = "C:\Ict\data\histdata"
 

@@ -1,7 +1,7 @@
-# ICT live-trading — one-shot Windows VM bootstrap (Azure / any Windows Server 2022).
+# ICT live-trading - one-shot Windows VM bootstrap (Azure / any Windows Server 2022).
 #
 # Installs Chocolatey, Python, and Git; downloads the MetaTrader 5 installer;
-# clones this repo; and builds the Python venv with the live dependencies — the
+# clones this repo; and builds the Python venv with the live dependencies - the
 # whole environment in one run. Run ONCE, in an *Administrator* PowerShell:
 #
 #     Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -59,7 +59,7 @@ if (-not (Test-Path $mt5exe)) {
     try {
         Invoke-WebRequest $Mt5Url -OutFile $mt5exe -UseBasicParsing
     } catch {
-        Write-Host "  MT5 download failed — download it from your Exness dashboard instead." -ForegroundColor Yellow
+        Write-Host "  MT5 download failed - download it from your Exness dashboard instead." -ForegroundColor Yellow
     }
 } else {
     Info "MT5 installer already on the Desktop"
