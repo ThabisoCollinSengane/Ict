@@ -45,6 +45,7 @@ HELP = (
     "/bias EURUSD long | short | both\n"
     "/levels EURUSD buy 1.0950 1.0975 sell 1.0900\n"
     "/hold EURUSD  (run across sessions)  ·  /release EURUSD\n"
+    "/close EURUSD | all   ·   /halt   ·   /resume\n"
     "/auto EURUSD  ·  /clear  ·  /status"
 )
 
@@ -62,10 +63,13 @@ def _match_pair(tok: str):
     return None
 
 
-def parse_command(text: str, inputs) -> str | None:
-    """Apply one command line to `inputs`; return an ack string (or None to ignore).
+def parse_command(text: str, inputs, trader=None) -> str | None:
+    """Apply one command line; return an ack string (or None to ignore).
 
-    Pure function — no network — so the whole command grammar is unit-testable.
+    `inputs` holds per-day state (lot/bias/levels/hold). `trader`, when supplied,
+    is the live engine — needed for the ACTION commands (/close /halt /resume)
+    that do something now rather than set state. Parsing is pure and works with
+    trader=None (offline-testable); the action just isn't executed.
     """
     text = (text or "").strip()
     if not text.startswith("/"):
@@ -78,6 +82,33 @@ def parse_command(text: str, inputs) -> str | None:
         return HELP
     if cmd == "status":
         return inputs.status_text()
+
+    # ── action commands (need the live engine) ───────────────────────────────
+    if cmd == "close":
+        if not args:
+            return "usage: /close EURUSD   (or /close all)"
+        if args[0].lower() == "all":
+            if trader is None:
+                return "close all — (no live engine attached)"
+            n = trader.manual_close_all()
+            return f"closing ALL open positions ({n})" if n else "nothing open to close"
+        p = _match_pair(args[0])
+        if not p:
+            return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
+        if trader is None:
+            return f"close {p} — (no live engine attached)"
+        return trader.manual_close(p)
+
+    if cmd in ("halt", "stop", "pause"):
+        if trader is not None:
+            trader.manual_halt()
+        return ("TRADING HALTED — no new entries or pyramid adds. Open trades keep "
+                "running on their stops. Send /resume to re-enable, /close all to flatten.")
+
+    if cmd in ("resume", "unhalt"):
+        if trader is not None:
+            trader.manual_resume()
+        return "Resumed — new entries re-enabled."
     if cmd == "clear":
         return inputs.clear()
     if cmd == "auto":
@@ -163,9 +194,10 @@ def _write_offset(o: int) -> None:
         f.write(str(o))
 
 
-def poll(inputs) -> int:
+def poll(inputs, trader=None) -> int:
     """Fetch new Telegram messages and apply any commands. Returns count applied.
 
+    `trader` (the live engine) enables the action commands /close /halt /resume.
     Never raises — a Telegram hiccup must never interrupt the trading loop.
     """
     token = getattr(config, "TELEGRAM_BOT_TOKEN", "") or os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -198,7 +230,7 @@ def poll(inputs) -> int:
         if str(msg.get("chat", {}).get("id")) != chat_id:
             continue                       # ignore anyone but the owner
         text = msg.get("text", "")
-        ack = parse_command(text, inputs)
+        ack = parse_command(text, inputs, trader=trader)
         if ack is not None:
             _notify(f"SEMI-AUTO\n{ack}")
             applied += 1

@@ -86,6 +86,42 @@ def test_parse_hold_and_release():
     print("ok  parse /hold + /release")
 
 
+def test_action_commands_parse_and_dispatch():
+    """/close /halt /resume parse, and dispatch to a stub trader when present."""
+    si = _fresh_inputs()
+    import config
+    p = config.PAIRS[0] if config.PAIRS else "EURUSD"
+
+    class StubTrader:
+        def __init__(self):
+            self.halted = False
+            self.closed = []
+        def manual_close(self, pair):
+            self.closed.append(pair); return f"{pair}: closing all legs at market"
+        def manual_close_all(self):
+            self.closed.append("ALL"); return 2
+        def manual_halt(self):
+            self.halted = True
+        def manual_resume(self):
+            self.halted = False
+
+    # Without a trader, action commands still parse to an ack (no crash).
+    assert tc.parse_command(f"/close {p}", si) is not None
+    assert tc.parse_command("/halt", si) is not None
+
+    # With a trader, they dispatch.
+    tr = StubTrader()
+    tc.parse_command(f"/close {p}", si, trader=tr)
+    assert tr.closed == [p]
+    tc.parse_command("/close all", si, trader=tr)
+    assert tr.closed[-1] == "ALL"
+    tc.parse_command("/halt", si, trader=tr)
+    assert tr.halted is True
+    tc.parse_command("/resume", si, trader=tr)
+    assert tr.halted is False
+    print("ok  /close /halt /resume parse + dispatch")
+
+
 def test_backtest_handover_hook_is_noop():
     """The backtest base must never exempt a pair — keeps numbers byte-identical."""
     from backtest import Backtester
@@ -144,6 +180,7 @@ def main():
     test_parse_levels()
     test_clear_and_auto()
     test_parse_hold_and_release()
+    test_action_commands_parse_and_dispatch()
     test_backtest_handover_hook_is_noop()
     test_amd_sweep_logic()
     print("\nALL SEMI-AUTO TESTS PASSED")

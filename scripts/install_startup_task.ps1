@@ -1,5 +1,5 @@
 # Register the ICT live bot to auto-start at logon (Windows Scheduled Task).
-# Runs in the INTERACTIVE session on purpose — MT5 is a GUI app and needs a real
+# Runs in the INTERACTIVE session on purpose - MT5 is a GUI app and needs a real
 # session, so this triggers at logon (not "session 0"). Combined with Windows
 # auto-logon (see GCP_WINDOWS_SETUP.md) the bot recovers after a reboot too.
 #     powershell -ExecutionPolicy Bypass -File scripts\install_startup_task.ps1
@@ -28,5 +28,5 @@ Write-Host "    Start-ScheduledTask -TaskName ICTLiveBot"
 Write-Host "Stop it:    Stop-ScheduledTask -TaskName ICTLiveBot"
 Write-Host "Remove it:  Unregister-ScheduledTask -TaskName ICTLiveBot -Confirm:`$false"
 Write-Host ""
-Write-Host "IMPORTANT: enable Windows auto-logon so a reboot re-triggers this task —"
+Write-Host "IMPORTANT: enable Windows auto-logon so a reboot re-triggers this task -"
 Write-Host "see the 'Survive reboots' section in GCP_WINDOWS_SETUP.md."

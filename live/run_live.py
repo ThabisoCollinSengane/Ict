@@ -103,6 +103,7 @@ class LiveTrader(Backtester):
         self.inputs = SessionInputs()
         self._current_pair = None       # set before super()._maybe_open so
         self._templated = set()         # _pyramid_lots knows which pair it sizes
+        self._manual_halt = False       # /halt: pause new entries + pyramid adds
 
         # Circuit-breaker state
         self._consec_losses     = 0
@@ -277,8 +278,36 @@ class LiveTrader(Backtester):
 
     def _handover_exempt(self, pair) -> bool:
         """Live override: the trader's /hold keeps a pair open across the session
-        handover (London→NY, NY AM→PM) — it then runs on stop/target/trail only."""
+        handover (London->NY, NY AM->PM) - it then runs on stop/target/trail only."""
         return bool(self.inputs.hold(pair))
+
+    # ── Manual actions (Telegram /close, /halt, /resume) ─────────────────────
+
+    def manual_close(self, pair) -> str:
+        """Close every open leg on `pair` at market now (Telegram /close PAIR)."""
+        if pair not in self.active:
+            return f"no open {pair} position"
+        self._force_close(pair, 0, datetime.now(timezone.utc), "manual_close")
+        log.warning("MANUAL CLOSE %s (Telegram)", pair)
+        return f"{pair}: closing all legs at market"
+
+    def manual_close_all(self) -> int:
+        """Close every open position across all pairs. Returns how many pairs."""
+        pairs = list(self.active.keys())
+        for p in pairs:
+            self._force_close(p, 0, datetime.now(timezone.utc), "manual_close")
+        if pairs:
+            log.warning("MANUAL CLOSE ALL %s (Telegram)", ", ".join(pairs))
+        return len(pairs)
+
+    def manual_halt(self) -> None:
+        """Pause all new risk (entries + pyramid adds). Open trades keep running."""
+        self._manual_halt = True
+        log.warning("MANUAL HALT (Telegram) — no new entries/adds until /resume")
+
+    def manual_resume(self) -> None:
+        self._manual_halt = False
+        log.info("Manual halt cleared (Telegram) — entries re-enabled")
 
     def _direction_allowed(self, pair, direction, t) -> bool:
         """Live override of the backtest hook: apply the Telegram filters."""
@@ -380,6 +409,8 @@ class LiveTrader(Backtester):
     def _maybe_pyramid(self, pair, t):
         if pair not in self.active:
             return
+        if self._manual_halt:
+            return                           # /halt pauses new risk (adds too)
         self._current_pair = pair            # so _pyramid_lots sizes THIS pair
         st = self.active[pair]
         n_before   = len(st["legs"])
@@ -776,9 +807,10 @@ class LiveTrader(Backtester):
         # Sync equity from MT5 (uses balance = realised P&L).
         self._update_equity()
 
-        # Semi-auto: pull any new Telegram commands (lot / bias / levels). Safe —
-        # poll() never raises, so a Telegram hiccup can't interrupt trading.
-        telegram_control.poll(self.inputs)
+        # Semi-auto: pull any new Telegram commands (lot / bias / levels / hold /
+        # close / halt). Passing self enables the action commands. poll() never
+        # raises, so a Telegram hiccup can't interrupt trading.
+        telegram_control.poll(self.inputs, trader=self)
 
         # Record day-open equity for daily-loss and session-kill checks.
         if day_key not in self._day_open_eq:
@@ -811,11 +843,12 @@ class LiveTrader(Backtester):
             self._templated.add((day_key, sess))
             _notify(self._session_template(day_key, sess))
 
-        # New entry checks for each tradeable pair.
-        for pair in config.PAIRS:
-            if pair not in self.active:
-                if can_open_new_trade(now, pair):
-                    self._maybe_open(pair, now)
+        # New entry checks for each tradeable pair (skipped entirely while halted).
+        if not self._manual_halt:
+            for pair in config.PAIRS:
+                if pair not in self.active:
+                    if can_open_new_trade(now, pair):
+                        self._maybe_open(pair, now)
 
         # Periodic gate summary every 100 bars.
         total_checks = self.gate.get("checks", 0)

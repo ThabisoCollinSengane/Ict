@@ -70,7 +70,18 @@ the afternoon** — managed purely by its **stop, target, and milestone trail**.
 (Winning trades already carry across by default; `/hold` also keeps the
 losing-but-you-believe-in-it ones alive.)
 
-### 5 · Review & reset
+### 5 · Manual control — close & halt (act now)
+```
+/close EURUSD          → close EURUSD's open position(s) at market, now
+/close all             → flatten everything
+/halt                  → stop all new entries AND pyramid adds; open trades
+                          keep running on their stops
+/resume                → re-enable new entries
+```
+To go fully flat and stay out: `/close all` then `/halt`. To stop taking new
+trades but let winners keep running: just `/halt`.
+
+### 6 · Review & reset
 ```
 /status                → echo this session's plan for every pair
 /auto EURUSD           → revert one pair to full auto
@@ -127,6 +138,8 @@ at the handover. You could add `/bias GBPUSD short` for the NY session, or
 | `/levels EURUSD buy … sell …` | manual-AMD liquidity (sweep→target) |
 | `/hold EURUSD` / `/hold all` | run across the session handover |
 | `/release EURUSD` | normal handover management |
+| `/close EURUSD` / `/close all` | close position(s) at market now |
+| `/halt` / `/resume` | pause / re-enable all new entries + adds |
 | `/status` | echo today's plan |
 | `/auto EURUSD` / `/clear` | revert one / all to auto |
 | `/help` | command list |

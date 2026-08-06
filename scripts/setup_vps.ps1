@@ -3,7 +3,7 @@
 #     powershell -ExecutionPolicy Bypass -File scripts\setup_vps.ps1
 #
 # It creates a virtual environment and installs the live dependencies. It does NOT
-# install Python or MT5 — see LIVE_SETUP.md for those (one-time manual downloads).
+# install Python or MT5 - see LIVE_SETUP.md for those (one-time manual downloads).
 
 $ErrorActionPreference = "Stop"
 Write-Host "=== ICT VPS setup ===" -ForegroundColor Cyan
@@ -24,7 +24,7 @@ if (-not (Test-Path ".venv")) {
     Write-Host "Creating virtual environment (.venv)..."
     python -m venv .venv
 } else {
-    Write-Host ".venv already exists — reusing."
+    Write-Host ".venv already exists - reusing."
 }
 
 # 3. Install deps
