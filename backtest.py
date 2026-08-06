@@ -1859,6 +1859,15 @@ class Backtester:
             "dxy_minor_sweep": dxy_minor_sweep,
         }
 
+    def _direction_allowed(self, pair, direction, t):
+        """Hook for the live semi-auto layer to veto a trade direction.
+
+        Default (backtest): always allow — a pure no-op so backtest numbers are
+        byte-identical. LiveTrader overrides it to apply the trader's Telegram
+        direction filter + full-manual-AMD levels gate.
+        """
+        return True
+
     def _maybe_open(self, pair, t):
         g = self.gate
         g["checks"] += 1
@@ -2092,6 +2101,14 @@ class Backtester:
         _is_breakout = (_brk_dir != 0 and _brk_dir == direction)
         if _is_breakout:
             g["breakout_confirmed"] = g.get("breakout_confirmed", 0) + 1
+
+        # Semi-auto manual override (live only; no-op in backtest). Vetoes the
+        # trade when it fights the trader's Telegram direction filter or the
+        # full-manual-AMD levels gate (sweep-one-side / target-the-other). Placed
+        # here — before MSS/budget — so a vetoed setup consumes no daily slot.
+        if not self._direction_allowed(pair, direction, t):
+            self._log_reject(t, pair, direction, "semi-auto: direction/levels gate")
+            return
 
         # P11: NY-AM continuation of the day's London/DXY direction. London sets the
         # day's USD direction (DXY-wide); into NY price consolidates over the handover
