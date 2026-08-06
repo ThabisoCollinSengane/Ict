@@ -44,6 +44,7 @@ HELP = (
     "/lot 0.02  ·  /lot GBPUSD 0.03\n"
     "/bias EURUSD long | short | both\n"
     "/levels EURUSD buy 1.0950 1.0975 sell 1.0900\n"
+    "/hold EURUSD  (run across sessions)  ·  /release EURUSD\n"
     "/auto EURUSD  ·  /clear  ·  /status"
 )
 
@@ -82,6 +83,25 @@ def parse_command(text: str, inputs) -> str | None:
     if cmd == "auto":
         p = _match_pair(args[0]) if args else None
         return inputs.clear(p) if p else "usage: /auto EURUSD"
+
+    if cmd == "hold":
+        if not args:
+            return "usage: /hold EURUSD   (also /hold all, /hold EURUSD off)"
+        if args[0].lower() == "all":
+            return "\n".join(inputs.set_hold(pp, True) for pp in _pairs())
+        p = _match_pair(args[0])
+        if not p:
+            return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
+        on = not (len(args) >= 2 and args[1].lower() in ("off", "0", "no", "release"))
+        return inputs.set_hold(p, on)
+
+    if cmd == "release":
+        if not args:
+            return "usage: /release EURUSD   (also /release all)"
+        if args[0].lower() == "all":
+            return "\n".join(inputs.set_hold(pp, False) for pp in _pairs())
+        p = _match_pair(args[0])
+        return inputs.set_hold(p, False) if p else f"unknown pair '{args[0]}'"
 
     if cmd == "lot":
         if not args:

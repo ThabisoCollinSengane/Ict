@@ -73,6 +73,27 @@ def test_clear_and_auto():
     print("ok  /auto reverts a pair")
 
 
+def test_parse_hold_and_release():
+    si = _fresh_inputs()
+    import config
+    p = config.PAIRS[0] if config.PAIRS else "EURUSD"
+    tc.parse_command(f"/hold {p}", si)
+    assert si.hold(p) is True
+    tc.parse_command(f"/release {p}", si)
+    assert si.hold(p) is False
+    tc.parse_command(f"/hold {p} off", si)      # explicit off form
+    assert si.hold(p) is False
+    print("ok  parse /hold + /release")
+
+
+def test_backtest_handover_hook_is_noop():
+    """The backtest base must never exempt a pair — keeps numbers byte-identical."""
+    from backtest import Backtester
+    assert Backtester._handover_exempt(object.__new__(Backtester), "EURUSD") is False
+    assert Backtester._direction_allowed(object.__new__(Backtester), "EURUSD", 1, None) is True
+    print("ok  backtest hooks are pure no-ops")
+
+
 def test_amd_sweep_logic():
     """Replicate LiveTrader._levels_amd_dir with a stub bar series."""
     from risk import pip_size
@@ -122,6 +143,8 @@ def main():
     test_parse_bias_filter()
     test_parse_levels()
     test_clear_and_auto()
+    test_parse_hold_and_release()
+    test_backtest_handover_hook_is_noop()
     test_amd_sweep_logic()
     print("\nALL SEMI-AUTO TESTS PASSED")
 

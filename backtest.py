@@ -978,6 +978,8 @@ class Backtester:
             return
 
         for pair in list(self.active.keys()):
+            if self._handover_exempt(pair):
+                continue  # trader's /hold — let it run across the session boundary
             st = self.active[pair]
             wamd = self._get_weekly_amd(pair, t)
             if wamd is None:
@@ -1867,6 +1869,12 @@ class Backtester:
         direction filter + full-manual-AMD levels gate.
         """
         return True
+
+    def _handover_exempt(self, pair):
+        """Hook: True = keep this pair's trade open across the session handover
+        (the trader's /hold instruction). Default (backtest): never exempt — a
+        pure no-op so backtest numbers are byte-identical. LiveTrader overrides."""
+        return False
 
     def _maybe_open(self, pair, t):
         g = self.gate
