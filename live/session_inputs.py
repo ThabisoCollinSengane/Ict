@@ -94,6 +94,17 @@ class SessionInputs:
         self.save()
         return f"{pair}: hunting {bias.upper()}S only (bot still needs its own setup)"
 
+    def set_hold(self, pair: str, on: bool = True) -> str:
+        self._rollover()
+        if on:
+            self._p(pair)["hold"] = True
+            self.save()
+            return (f"{pair}: HOLD on — trade runs across the session handover "
+                    f"(London→NY, NY AM→PM); managed by stop/target/trail only")
+        self._p(pair).pop("hold", None)
+        self.save()
+        return f"{pair}: hold off — normal session-handover management"
+
     def set_levels(self, pair: str, buy: list | None, sell: list | None) -> str:
         self._rollover()
         p = self._p(pair)
@@ -134,6 +145,10 @@ class SessionInputs:
         self._rollover()
         return self._pairs.get(pair, {}).get("sell", [])
 
+    def hold(self, pair: str) -> bool:
+        self._rollover()
+        return bool(self._pairs.get(pair, {}).get("hold"))
+
     def has_levels(self, pair: str) -> bool:
         return bool(self.buy_levels(pair) or self.sell_levels(pair))
 
@@ -152,5 +167,7 @@ class SessionInputs:
                 bits.append(f"buy {d['buy']}")
             if d.get("sell"):
                 bits.append(f"sell {d['sell']}")
+            if d.get("hold"):
+                bits.append("HOLD across sessions")
             lines.append(f"  {pair}: {', '.join(bits) if bits else 'auto'}")
         return "\n".join(lines)

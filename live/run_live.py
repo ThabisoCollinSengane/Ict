@@ -275,6 +275,11 @@ class LiveTrader(Backtester):
             return -1
         return 0
 
+    def _handover_exempt(self, pair) -> bool:
+        """Live override: the trader's /hold keeps a pair open across the session
+        handover (London→NY, NY AM→PM) — it then runs on stop/target/trail only."""
+        return bool(self.inputs.hold(pair))
+
     def _direction_allowed(self, pair, direction, t) -> bool:
         """Live override of the backtest hook: apply the Telegram filters."""
         b = self.inputs.bias(pair)
@@ -690,17 +695,44 @@ class LiveTrader(Backtester):
             )
         return not stale
 
-    def _session_template(self, day_key) -> str:
-        """The start-of-session Telegram prompt the trader replies to."""
-        return (
-            f"SESSION START — {day_key}\n"
-            f"Reply to set today's plan (or ignore for full auto):\n"
-            f"/lot 0.02\n"
-            f"/bias EURUSD long   (long | short | both)\n"
-            f"/levels EURUSD buy 1.0950 1.0975 sell 1.0900\n"
-            f"/status to review · /clear to reset\n"
-            f"\n{self.inputs.status_text()}"
-        )
+    @staticmethod
+    def _current_session(now: datetime):
+        """Which session are we in, by New York time? (mirrors the engine's
+        _is_london / _is_ny / _is_pm windows). Returns london / ny / ny_pm / None."""
+        import pytz
+        ny = now.astimezone(pytz.timezone("America/New_York"))
+        h = ny.hour
+        if 2 <= h < 5:
+            return "london"
+        if 7 <= h < 10:
+            return "ny"
+        if config.NY_PM_ENABLED and 13 <= h < 16:
+            return "ny_pm"
+        return None
+
+    def _session_template(self, day_key, sess) -> str:
+        """The start-of-session Telegram prompt the trader replies to. Fires at
+        the top of every session (London / NY AM / NY PM)."""
+        head = {"london": "LONDON", "ny": "NEW YORK AM", "ny_pm": "NEW YORK PM"}.get(
+            sess, sess.upper())
+        lines = [
+            f"{head} SESSION START — {day_key}",
+            "Set this session's plan (or ignore for full auto):",
+            "/lot 0.02",
+            "/bias EURUSD long   (long | short | both)",
+            "/levels EURUSD buy 1.0975 sell 1.0900",
+            "/hold EURUSD   (let a trade run into the next session)",
+            "/status · /clear",
+        ]
+        # On NY / PM, surface what's already open so you can decide to /hold it.
+        if sess in ("ny", "ny_pm") and self.active:
+            held = [p for p in self.active if self.inputs.hold(p)]
+            note = f"Open now: {', '.join(self.active.keys())}"
+            if held:
+                note += f"  ·  holding: {', '.join(held)}"
+            lines.insert(1, note)
+        lines += ["", self.inputs.status_text()]
+        return "\n".join(lines)
 
     # ── Main loop ─────────────────────────────────────────────────────────────
 
@@ -772,11 +804,12 @@ class LiveTrader(Backtester):
         if can_open_new_trade(now):
             self._check_session_handover(now)
 
-        # Session-start template: at the first killzone bar of the day, prompt
-        # the trader for the day's plan (or leave it for full auto).
-        if day_key not in self._templated and can_open_new_trade(now):
-            self._templated.add(day_key)
-            _notify(self._session_template(day_key))
+        # Session-start template: fire once at the start of EACH session
+        # (London / NY AM / NY PM), prompting the trader for that session's plan.
+        sess = self._current_session(now)
+        if sess and (day_key, sess) not in self._templated:
+            self._templated.add((day_key, sess))
+            _notify(self._session_template(day_key, sess))
 
         # New entry checks for each tradeable pair.
         for pair in config.PAIRS:

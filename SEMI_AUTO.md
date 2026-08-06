@@ -1,83 +1,132 @@
-# Semi-auto mode — daily inputs via Telegram
+# Talking to the algorithm — the Telegram manual
 
-Steer the live bot each day from your phone: set the **lot**, tell it which
-**direction** to hunt per pair, and hand it the **buy-side / sell-side levels**
-you're watching. The bot still runs its full validated ICT logic — your inputs
-**filter and aim** it, they don't replace it.
+Everything you can tell the live bot from your phone, and exactly how to say it.
+You steer it; it still runs its full validated ICT logic underneath. Your inputs
+**filter, aim, and hold** it — they never replace the strategy.
 
-It's **opt-in per pair per day.** Set nothing → that pair trades fully automatic,
-exactly as before. Inputs auto-expire at 00:00 UTC, so yesterday's levels never
-leak into today.
-
----
-
-## The three inputs
-
-| You send | Effect |
-|---|---|
-| **`/lot 0.02`** | Day lot (all pairs). `/lot GBPUSD 0.03` sets one pair. This becomes the **base** lot — the draw 2×/3× and 1.25× confluence/CRT/PDL bumps still stack on top (they only fire at R3k+ anyway). |
-| **`/bias EURUSD long`** | Hunt **longs only** on EURUSD today (`short` / `both`). A **filter**: the bot still needs its own ICT setup to fire — it just won't take the other direction. |
-| **`/levels EURUSD buy 1.0950 1.0975 sell 1.0900 1.0880`** | Your **buy-side** (above) and **sell-side** (below) liquidity. Runs **full manual AMD** — see below. |
-
-Plus: **`/status`** (echo today's plan), **`/auto EURUSD`** (revert one pair),
-**`/clear`** (revert all), **`/help`**.
-
-Every command gets an acknowledgement back so you always see what registered.
+Everything is **opt-in, per pair, per day.** Say nothing → that pair trades fully
+automatic, exactly as backtested. All inputs auto-expire at **00:00 UTC**, so
+nothing you set today leaks into tomorrow.
 
 ---
 
-## How the levels work — full manual AMD
+## Session templates — you get one at the start of every session
 
-Your two sides define the day's range. The bot waits for **manipulation** (a
-sweep of one side) then trades the **distribution** toward the other:
+At the top of **each** session the bot messages you a template. You reply with
+that session's plan (or ignore it and it runs on full auto):
 
-- Price **sweeps the sell-side** (dips below it) and **reclaims** → the bot hunts
-  **LONGS**, targeting the **buy-side**.
-- Price **sweeps the buy-side** (pokes above) and drops back → the bot hunts
-  **SHORTS**, targeting the **sell-side**.
-- **Neither side swept yet** → the bot **waits** (no trade — manipulation hasn't
-  happened).
+- **LONDON SESSION START** — ~02:00 ET
+- **NEW YORK AM SESSION START** — ~07:00 ET (also lists what's already open, so
+  you can decide to `/hold` it into NY)
+- **NEW YORK PM SESSION START** — ~13:00 ET (only if PM trading is enabled)
 
-So the levels do two things at once: they **gate the direction** (only trade the
-post-sweep way) and they **set the target** (the opposite side becomes the TP,
-when it's a valid ≥1R / ≥ min-target draw). The bot's own MSS + FVG entry still
-has to trigger — the levels decide *which way* and *where to*, your engine decides
-*whether the setup is there*.
-
-If both `/bias` and `/levels` are set, **both must agree** — they're both filters.
+You don't have to wait for the template — any command works any time.
 
 ---
 
-## A typical morning
+## The commands
 
-At the first killzone bar the bot sends you a **SESSION START** template. Reply:
+### 1 · Lot for the day
+```
+/lot 0.02              → all pairs
+/lot GBPUSD 0.03       → one pair
+```
+Becomes the **base** lot. The draw 2×/3× and the 1.25× confluence/CRT/PDL bumps
+still stack on top (they only fire at R3k+ equity anyway).
 
+### 2 · Direction to hunt
+```
+/bias EURUSD long      → longs only on EURUSD today
+/bias EURUSD short     → shorts only
+/bias EURUSD both      → clear the filter (back to auto)
+```
+A **filter**: the bot still needs its own ICT setup to fire — it just won't take
+the other side.
+
+### 3 · Your liquidity levels (full manual AMD)
+```
+/levels EURUSD buy 1.0950 1.0975 sell 1.0900 1.0880
+```
+- **buy** = buy-side liquidity **above** price · **sell** = sell-side **below**.
+- The bot waits for **manipulation** — price sweeps one side and reclaims — then
+  trades the **distribution** toward the other side:
+  - sell-side swept & reclaimed → hunt **LONG**, target the **buy-side**
+  - buy-side swept & dropped back → hunt **SHORT**, target the **sell-side**
+  - neither side swept yet → **waits** (no trade)
+- So your levels set **which way** (direction gate) and **where to** (the opposite
+  side becomes the TP). Your engine still decides **whether the setup is there.**
+- If both `/bias` and `/levels` are set, **both must agree.**
+
+### 4 · Let a trade run across sessions
+```
+/hold EURUSD           → don't close it at the session handover; let it run
+/hold all              → every pair
+/release EURUSD        → back to normal handover management
+```
+Normally, at the London→NY (and NY→PM) boundary the bot closes a trade **only if
+it's losing AND fighting the weekly bias**. `/hold` exempts that pair from that
+close, so a London trade **runs into New York** — and a NY-AM trade **runs into
+the afternoon** — managed purely by its **stop, target, and milestone trail**.
+(Winning trades already carry across by default; `/hold` also keeps the
+losing-but-you-believe-in-it ones alive.)
+
+### 5 · Review & reset
+```
+/status                → echo this session's plan for every pair
+/auto EURUSD           → revert one pair to full auto
+/clear                 → revert ALL pairs to full auto
+/help                  → the command list
+```
+
+Every command gets an acknowledgement back, so you always see exactly what the
+bot registered.
+
+---
+
+## A full day, worked
+
+**London template arrives.** You reply:
 ```
 /lot 0.02
 /bias EURUSD long
 /levels EURUSD buy 1.0975 sell 1.0900 1.0880
-/status
+/hold EURUSD
 ```
+→ Bot acks each line. It trades EURUSD **long-only**, but only **after** price
+sweeps 1.0900/1.0880 and reclaims, aiming at **1.0975**, and only if its own
+MSS+FVG setup fires. GBPUSD / NZDUSD (untouched) trade fully automatic.
 
-The bot acks each line, then trades EURUSD **long-only**, but only **after**
-price sweeps 1.0900/1.0880 and reclaims — aiming at 1.0975 — and only if its own
-setup fires. GBPUSD / NZDUSD (untouched) keep trading fully automatic.
+**NY-AM template arrives** — "Open now: EURUSD · holding: EURUSD." Your London
+long is running into New York (because you `/hold`-ed it) instead of being closed
+at the handover. You could add `/bias GBPUSD short` for the NY session, or
+`/release EURUSD` if you've changed your mind.
 
-Change your mind mid-session? Send another `/bias` or `/levels`; `/auto EURUSD`
-drops EURUSD back to automatic.
+**NY-PM template** (if enabled) — same idea for the afternoon.
 
 ---
 
-## Setup
+## Safety
 
-Nothing extra to install — it reuses your existing Telegram bot token + chat id
-(the same ones already sending trade alerts). The bot only obeys **your** chat
-id; no one else can steer it.
+- **Only your Telegram chat can steer the bot** — anyone else messaging it is ignored.
+- **The backtest is byte-identical.** The two engine hooks (`_direction_allowed`,
+  `_handover_exempt`) are pure no-ops in the backtester; only the live engine
+  overrides them. Your 810-trade / PF 4.47 / MaxDD −12.95% numbers are untouched.
+- **Offline self-test** (no MT5, no network): `python -m live.test_semi_auto`.
+- **DEMO first**, same as the go-live checklist in `AZURE_WINDOWS_SETUP.md`.
+  Prove the whole flow — including a `/hold` across a real handover — on a demo
+  account before it touches the funded one.
 
-- Config lives in `live/session_inputs.py` (state) + `live/telegram_control.py`
-  (command parsing/polling). The engine reads it in `live/run_live.py`.
-- Offline self-test (no MT5/network): `python -m live.test_semi_auto`.
+---
 
-> **DEMO first**, same as the rest of the go-live checklist in
-> `AZURE_WINDOWS_SETUP.md`. Prove the semi-auto flow on a demo account before it
-> touches the funded one.
+## Quick reference card
+
+| Command | Meaning |
+|---|---|
+| `/lot 0.02` / `/lot GBPUSD 0.03` | day lot (base; multipliers stack) |
+| `/bias EURUSD long\|short\|both` | direction filter |
+| `/levels EURUSD buy … sell …` | manual-AMD liquidity (sweep→target) |
+| `/hold EURUSD` / `/hold all` | run across the session handover |
+| `/release EURUSD` | normal handover management |
+| `/status` | echo today's plan |
+| `/auto EURUSD` / `/clear` | revert one / all to auto |
+| `/help` | command list |
