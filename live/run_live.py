@@ -43,6 +43,8 @@ from news_filter import NewsCalendar
 from risk import pip_size
 from trade_log import TradeLog
 import live.mt5_connector as mt
+from live.session_inputs import SessionInputs
+from live import telegram_control
 
 try:
     from scripts.notify import send_message as _notify
@@ -95,6 +97,12 @@ class LiveTrader(Backtester):
         # active positions: pair → {direction, target, legs:[{entry,stop,units,ticket,…}],…}
         self.active = {}
         self.trades = []
+
+        # Semi-auto manual overrides (Telegram). Per-day, per-pair: base lot,
+        # direction filter, buy/sell-side levels for full manual AMD.
+        self.inputs = SessionInputs()
+        self._current_pair = None       # set before super()._maybe_open so
+        self._templated = set()         # _pyramid_lots knows which pair it sizes
 
         # Circuit-breaker state
         self._consec_losses     = 0
@@ -220,16 +228,101 @@ class LiveTrader(Backtester):
     def _market_profile(self, pair, t):
         return None   # skip (uses tf_dfs not available in live)
 
+    # ── Semi-auto manual overrides ───────────────────────────────────────────
+
+    def _pyramid_lots(self):
+        """Base lot for the current pair. When the trader set a day lot via
+        Telegram, that becomes the 1x base — the P18/P19/P41/draw multipliers
+        still stack on top of it (per the trader's 'base lot' choice)."""
+        lot = self.inputs.day_lot(self._current_pair) if self._current_pair else None
+        if lot:
+            return (lot, lot, lot)
+        return super()._pyramid_lots()
+
+    def _levels_amd_dir(self, pair, t) -> int:
+        """Full manual AMD from the trader's levels: which side was swept?
+
+        sell-side (below) swept + price reclaimed above it → +1 (hunt LONG toward
+        buy-side). buy-side (above) swept + price back below → -1 (hunt SHORT
+        toward sell-side). 0 = manipulation not done yet → wait. Uses the last 12
+        completed M15 bars; the most recent sweep wins if both fired.
+        """
+        buy  = self.inputs.buy_levels(pair)
+        sell = self.inputs.sell_levels(pair)
+        if not buy and not sell:
+            return 0
+        bars = self.bars_up_to(pair, "15T", t, max_bars=60)
+        look = bars[-12:] if bars else []
+        if not look:
+            return 0
+        price = look[-1].Close
+        tol = pip_size(pair)                       # 1-pip buffer beyond the level
+        sell_sweep = buy_sweep = None              # (recency_index, level)
+        for i, b in enumerate(look):
+            for lv in sell:
+                if b.Low < lv - tol and (sell_sweep is None or i >= sell_sweep[0]):
+                    sell_sweep = (i, lv)
+            for lv in buy:
+                if b.High > lv + tol and (buy_sweep is None or i >= buy_sweep[0]):
+                    buy_sweep = (i, lv)
+        sell_ok = sell_sweep is not None and price > sell_sweep[1]   # reclaimed up
+        buy_ok  = buy_sweep  is not None and price < buy_sweep[1]    # reclaimed down
+        if sell_ok and buy_ok:
+            return 1 if sell_sweep[0] >= buy_sweep[0] else -1
+        if sell_ok:
+            return 1
+        if buy_ok:
+            return -1
+        return 0
+
+    def _direction_allowed(self, pair, direction, t) -> bool:
+        """Live override of the backtest hook: apply the Telegram filters."""
+        b = self.inputs.bias(pair)
+        if b == "long" and direction != 1:
+            return False
+        if b == "short" and direction != -1:
+            return False
+        if self.inputs.has_levels(pair):
+            amd = self._levels_amd_dir(pair, t)
+            if amd == 0:                 # neither side swept yet — wait for the sweep
+                return False
+            if direction != amd:         # setup fights the manual AMD
+                return False
+        return True
+
+    def _apply_manual_target(self, pair, st) -> None:
+        """Full manual AMD target: aim the TP at the opposite-side level (the
+        distribution draw). Uses the nearest qualifying level (RR>=1 and >=
+        MIN_PIPS_TARGET); leaves the engine target if none qualifies."""
+        if not self.inputs.has_levels(pair):
+            return
+        leg = st["legs"][0]
+        entry, stop, d = leg["entry"], leg["stop"], st["direction"]
+        pip = pip_size(pair)
+        min_dist = max(config.MIN_PIPS_TARGET * pip, abs(entry - stop))
+        if d > 0:
+            cands = [l for l in self.inputs.buy_levels(pair) if l - entry >= min_dist]
+            tgt = min(cands) if cands else None
+        else:
+            cands = [l for l in self.inputs.sell_levels(pair) if entry - l >= min_dist]
+            tgt = max(cands) if cands else None
+        if tgt is not None and tgt != st["target"]:
+            log.info("Manual-AMD target %s: %.5f → %.5f (opposite-side draw)",
+                     pair, st["target"], tgt)
+            st["target"] = tgt
+
     # ── Trade entry — wrap parent + place real MT5 order ─────────────────────
 
     def _maybe_open(self, pair, t):
         was_active = pair in self.active
+        self._current_pair = pair            # so _pyramid_lots sizes THIS pair
         super()._maybe_open(pair, t)
 
         if was_active or pair not in self.active:
             return   # nothing new opened
 
         st  = self.active[pair]
+        self._apply_manual_target(pair, st)  # full-manual-AMD TP override (if set)
         leg = st["legs"][0]
         lots = round(leg["units"] / config.LOT_UNITS, 2)
         lots = max(lots, config.MIN_LOT_SIZE)
@@ -282,6 +375,7 @@ class LiveTrader(Backtester):
     def _maybe_pyramid(self, pair, t):
         if pair not in self.active:
             return
+        self._current_pair = pair            # so _pyramid_lots sizes THIS pair
         st = self.active[pair]
         n_before   = len(st["legs"])
         prior_stop = st["legs"][-1]["stop"] if st["legs"] else None
@@ -596,6 +690,18 @@ class LiveTrader(Backtester):
             )
         return not stale
 
+    def _session_template(self, day_key) -> str:
+        """The start-of-session Telegram prompt the trader replies to."""
+        return (
+            f"SESSION START — {day_key}\n"
+            f"Reply to set today's plan (or ignore for full auto):\n"
+            f"/lot 0.02\n"
+            f"/bias EURUSD long   (long | short | both)\n"
+            f"/levels EURUSD buy 1.0950 1.0975 sell 1.0900\n"
+            f"/status to review · /clear to reset\n"
+            f"\n{self.inputs.status_text()}"
+        )
+
     # ── Main loop ─────────────────────────────────────────────────────────────
 
     def run(self):
@@ -638,6 +744,10 @@ class LiveTrader(Backtester):
         # Sync equity from MT5 (uses balance = realised P&L).
         self._update_equity()
 
+        # Semi-auto: pull any new Telegram commands (lot / bias / levels). Safe —
+        # poll() never raises, so a Telegram hiccup can't interrupt trading.
+        telegram_control.poll(self.inputs)
+
         # Record day-open equity for daily-loss and session-kill checks.
         if day_key not in self._day_open_eq:
             self._day_open_eq[day_key] = self.equity
@@ -661,6 +771,12 @@ class LiveTrader(Backtester):
         # Session handover: close positions fighting the weekly AMD.
         if can_open_new_trade(now):
             self._check_session_handover(now)
+
+        # Session-start template: at the first killzone bar of the day, prompt
+        # the trader for the day's plan (or leave it for full auto).
+        if day_key not in self._templated and can_open_new_trade(now):
+            self._templated.add(day_key)
+            _notify(self._session_template(day_key))
 
         # New entry checks for each tradeable pair.
         for pair in config.PAIRS:
