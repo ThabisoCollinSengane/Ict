@@ -209,10 +209,11 @@ def handle(text: str) -> str | None:
 
     if cmd == "setaccount":
         if len(args) < 2 or not args[0].isdigit():
-            return "usage: /setaccount <login> <server>   e.g. /setaccount 12345678 Exness-MT5Trial14"
+            return "usage: /setaccount <login> <server>   e.g. /setaccount 591937412 FxPro-MT5 Demo"
+        server = " ".join(args[1:])   # server names can contain spaces (e.g. 'FxPro-MT5 Demo')
         set_env_var("MT5_LOGIN", args[0])
-        set_env_var("MT5_SERVER", args[1])
-        return f"saved MT5_LOGIN={args[0]}, MT5_SERVER={args[1]} to live.env"
+        set_env_var("MT5_SERVER", server)
+        return f"saved MT5_LOGIN={args[0]}, MT5_SERVER={server} to live.env"
 
     if cmd == "setpassword":
         if not args:
