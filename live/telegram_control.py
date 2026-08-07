@@ -61,7 +61,7 @@ HELP = (
     "CONTROL (act now):\n"
     "/test EURUSD long|short  (demo test entry, bot's own stop)\n"
     "/pyramid EURUSD [1.1600]  (add to a WINNER; same TP or a set level)\n"
-    "/close EURUSD | all  ·  /flat  ·  /halt  ·  /resume\n"
+    "/close EURUSD [leg#] | all  ·  /flat  ·  /halt  ·  /resume\n"
     "/auto EURUSD  ·  /clear  ·  /status  ·  /whoami\n"
     "\n"
     "(Setup/backtest/logs live on the Ops Bot.)"
@@ -240,7 +240,7 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
 
     if cmd == "close":
         if not args:
-            return "usage: /close EURUSD   (or /close all)"
+            return "usage: /close EURUSD   ·   /close EURUSD 2 (one leg)   ·   /close all"
         if args[0].lower() == "all":
             if trader is None:
                 return "close all — (no live engine attached)"
@@ -251,7 +251,8 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
             return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
         if trader is None:
             return f"close {p} — (no live engine attached)"
-        return trader.manual_close(p)
+        leg = args[1] if len(args) >= 2 else None      # optional leg number
+        return trader.manual_close(p, leg)
 
     if cmd in ("halt", "stop", "pause"):
         if trader is not None:

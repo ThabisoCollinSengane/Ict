@@ -380,13 +380,28 @@ class LiveTrader(Backtester):
 
     # ── Manual actions (Telegram /close, /halt, /resume) ─────────────────────
 
-    def manual_close(self, pair) -> str:
-        """Close every open leg on `pair` at market now (Telegram /close PAIR)."""
-        if pair not in self.active:
+    def manual_close(self, pair, leg=None) -> str:
+        """Close a pair at market. `leg` None = the whole position; a 1-based leg
+        number closes just that pyramid leg and leaves the rest running."""
+        st = self.active.get(pair)
+        if st is None:
             return f"no open {pair} position"
-        self._force_close(pair, 0, datetime.now(timezone.utc), "manual_close")
-        log.warning("MANUAL CLOSE %s (Telegram)", pair)
-        return f"{pair}: closing all legs at market"
+        if leg is None:
+            self._force_close(pair, 0, datetime.now(timezone.utc), "manual_close")
+            log.warning("MANUAL CLOSE %s all legs (Telegram)", pair)
+            return f"{pair}: closing all {len(st['legs'])} leg(s) at market"
+        try:
+            idx = int(leg) - 1
+        except (TypeError, ValueError):
+            return "usage: /close EURUSD   (whole)   or   /close EURUSD 2   (leg 2 only)"
+        if idx < 0 or idx >= len(st["legs"]):
+            return f"{pair} has {len(st['legs'])} leg(s); leg {leg} doesn't exist."
+        tk = st["legs"][idx].get("ticket")
+        if not tk:
+            return f"{pair} leg {leg} has no ticket to close."
+        mt.close_position(tk)      # _sync_closed_positions removes just this leg next tick
+        log.warning("MANUAL CLOSE %s leg %s ticket=%s (Telegram)", pair, leg, tk)
+        return f"{pair}: closing leg {leg} (ticket {tk}). The other leg(s) keep running."
 
     def manual_close_all(self) -> int:
         """Close every open position across all pairs. Returns how many pairs."""
@@ -643,22 +658,31 @@ class LiveTrader(Backtester):
             price = (q[0] + q[1]) / 2 if q else None
             pip = pip_size(p)
             d = st["direction"]
-            leg = st["legs"][0]
-            entry, stop, tgt = leg["entry"], leg["stop"], st["target"]
-            units = sum(l["units"] for l in st["legs"])
-            lines.append(f"{p} {'LONG' if d > 0 else 'SHORT'}  {round(units / config.LOT_UNITS, 2)} lots")
+            legs = st["legs"]
+            tgt = st["target"]
+            units = sum(l["units"] for l in legs) or 1
+            avg_entry = sum(l["entry"] * l["units"] for l in legs) / units
+            lots_total = round(units / config.LOT_UNITS, 2)
+            n = len(legs)
+            lines.append(f"{p} {'LONG' if d > 0 else 'SHORT'}  {lots_total} lots  ({n} leg{'s' if n != 1 else ''})")
             if price is not None:
-                pips = (price - entry) * d / pip
-                zar = (price - entry) * units * d * config.USD_ZAR
-                lines.append(f"  now {price:.5f}   {pips:+.1f} pips  (R{zar:+,.2f})")
-                if tgt != entry:
-                    prog = max(0.0, min(100.0, (price - entry) / (tgt - entry) * 100))
+                pips = (price - avg_entry) * d / pip
+                zar = sum((price - l["entry"]) * l["units"] for l in legs) * d * config.USD_ZAR
+                lines.append(f"  now {price:.5f}   {pips:+.1f} pips avg  (R{zar:+,.2f})")
+                if tgt != avg_entry:
+                    prog = max(0.0, min(100.0, (price - avg_entry) / (tgt - avg_entry) * 100))
                     lines.append(f"  {prog:.0f}% of the way to target")
-            lines.append(f"  SL {stop:.5f}  ({abs(entry - stop) / pip:.0f} pips)  <- {st.get('stop_reason', 'structural swing')}")
-            lines.append(f"  TP {tgt:.5f}  ({abs(tgt - entry) / pip:.0f} pips)  <- {self._why_target(st.get('target_type'))}")
+            # per-leg breakdown so you can close one pyramid without the whole stack
+            for i, l in enumerate(legs, 1):
+                lp = f"{(price - l['entry']) * d / pip:+.1f}p" if price is not None else "-"
+                lines.append(f"  leg {i}: {round(l['units'] / config.LOT_UNITS, 2)} @ {l['entry']:.5f}"
+                             f"  {lp}  SL {l['stop']:.5f}  (#{l.get('ticket', '?')})")
+            lines.append(f"  TP {tgt:.5f}  <- {self._why_target(st.get('target_type'))}")
             scen = st.get("im_scenario", "?")
             scen = "" if scen in ("?", "adopted", "test") else f" (scenario {scen})"
             lines.append(f"  Model: {self._model_word(st.get('entry_model'))}{scen}")
+            if n > 1:
+                lines.append(f"  close one leg: /close {p} <leg#>   ·   whole: /close {p}")
         return "\n".join(lines)
 
     def read_account(self) -> str:

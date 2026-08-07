@@ -32,9 +32,10 @@ You don't have to wait for the template — any command works any time.
 /read            market-structure template for all pairs
 /read EURUSD     just that pair
 /markets         all pairs at a glance
-/positions       open trades: live P&L + % to target, the Model (Judas reversal /
-                 Breakout), the TP idea (H1 FVG / ITH draw / fib ext) and the SL
-                 basis (structural ITL/ITH). Reasoning is saved and survives restarts.
+/positions       open trades broken out PER LEG (e.g. 2 x 0.02 = 0.04), each with
+                 its entry, live pips, SL and ticket — so you can /close one leg.
+                 Plus total P&L, % to target, Model, TP idea + SL basis (saved,
+                 survives restarts).
 /account         equity, day P&L, drawdown, halt state (also /equity)
 /dxy             synthetic dollar index right now
 /session         which killzone, and whether new entries are allowed
@@ -110,7 +111,8 @@ losing-but-you-believe-in-it ones alive.)
 /pyramid EURUSD        → add a leg to a WINNING position, exiting at the SAME TP
 /pyramid EURUSD 1.1600 → same, but the whole position exits at 1.1600 instead
                           (only adds if the position is in profit; structural stop)
-/close EURUSD          → close EURUSD's open position(s) at market, now
+/close EURUSD          → close the WHOLE EURUSD position (all legs) at market
+/close EURUSD 2        → close ONLY leg 2 (one pyramid), the rest keeps running
 /close all             → flatten everything
 /flat                  → flatten everything (shortcut for /close all)
 /halt                  → stop all new entries AND pyramid adds; open trades
