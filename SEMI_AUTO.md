@@ -112,8 +112,11 @@ losing-but-you-believe-in-it ones alive.)
 ### 5 · Manual control — close & halt (act now)
 ```
 /test EURUSD long      → open a TEST trade NOW on the demo (also short; /buy /sell)
-                          uses the bot's own structural stop + a 2R target,
-                          then trails and /close works like any trade
+                          uses the bot's own structural stop + a 2R target
+/test EURUSD long 0.05 → same, at a chosen lot size (0.01 .. 0.05 etc.)
+/sl EURUSD 1.15550     → move the stop to a price (all legs)
+/sl EURUSD 2 1.15560   → move only leg 2's stop
+/be EURUSD             → move the stop to breakeven (each leg's entry)
 /pyramid EURUSD        → add a leg to a WINNING position, exiting at the SAME TP
 /pyramid EURUSD 1.1600 → same, but the whole position exits at 1.1600 instead
                           (only adds if the position is in profit; structural stop)

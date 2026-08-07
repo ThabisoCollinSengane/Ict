@@ -59,10 +59,11 @@ HELP = (
     "/hold EURUSD (run across sessions) · /release EURUSD\n"
     "\n"
     "CONTROL (act now):\n"
-    "/test EURUSD long|short  (demo test entry, bot's own stop)\n"
+    "/test EURUSD long|short [lot]  (e.g. /test EURUSD long 0.05)\n"
     "/pyramid EURUSD [1.1600]  (add to a WINNER; same TP or a set level)\n"
+    "/sl EURUSD 1.15550 [leg#]  (move stop)  ·  /be EURUSD (breakeven)\n"
     "/close EURUSD [leg#] | all  ·  /flat  ·  /halt  ·  /resume\n"
-    "/auto EURUSD  ·  /clear  ·  /status  ·  /whoami\n"
+    "/lot 0.01..0.05  (size all trades)  ·  /auto  ·  /clear  ·  /whoami\n"
     "\n"
     "(Setup/backtest/logs live on the Ops Bot.)"
 )
@@ -208,18 +209,40 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
     if cmd in ("test", "testtrade", "buy", "sell"):
         if trader is None:
             return "test needs the live bot running."
+        lot = None
         if cmd == "buy":
             pair, d = (_match_pair(args[0]) if args else None), 1
+            lot = args[1] if len(args) >= 2 else None
         elif cmd == "sell":
             pair, d = (_match_pair(args[0]) if args else None), -1
+            lot = args[1] if len(args) >= 2 else None
         else:
             if len(args) < 2:
-                return "usage: /test EURUSD long|short   (or /buy EURUSD, /sell EURUSD)"
+                return "usage: /test EURUSD long|short [lot]   (e.g. /test EURUSD long 0.05)"
             pair = _match_pair(args[0])
             d = 1 if args[1].lower().startswith("l") else -1
+            lot = args[2] if len(args) >= 3 else None
         if not pair:
-            return "usage: /test EURUSD long|short   (or /buy EURUSD, /sell EURUSD)"
-        return trader.manual_test_trade(pair, d)
+            return "usage: /test EURUSD long|short [lot]   (or /buy EURUSD 0.05, /sell EURUSD)"
+        return trader.manual_test_trade(pair, d, lot)
+
+    if cmd in ("sl", "stop"):
+        if len(args) < 2:
+            return "usage: /sl EURUSD 1.15550   (or /sl EURUSD 2 1.15550 for one leg)"
+        p = _match_pair(args[0])
+        if not p:
+            return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
+        if len(args) >= 3:            # /sl PAIR LEG LEVEL
+            return trader.manual_move_stop(p, args[2], args[1])
+        return trader.manual_move_stop(p, args[1])   # /sl PAIR LEVEL (all legs)
+
+    if cmd in ("be", "breakeven"):
+        if not args:
+            return "usage: /be EURUSD   (or /be EURUSD 2 for one leg)"
+        p = _match_pair(args[0])
+        if not p:
+            return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
+        return trader.manual_breakeven(p, args[1] if len(args) >= 2 else None)
 
     if cmd in ("pyramid", "add"):
         if trader is None:

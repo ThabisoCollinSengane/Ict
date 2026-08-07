@@ -421,7 +421,7 @@ class LiveTrader(Backtester):
         self._manual_halt = False
         log.info("Manual halt cleared (Telegram) — entries re-enabled")
 
-    def manual_test_trade(self, pair, direction) -> str:
+    def manual_test_trade(self, pair, direction, lot=None) -> str:
         """Open a TEST market order NOW on the connected account, using the bot's
         OWN structural stop (fractal ITL/ITH, capped ~10 pips) and a 2R target.
         Fully managed afterwards — trailing + /close work. For demo verification;
@@ -447,8 +447,11 @@ class LiveTrader(Backtester):
             stop_reason = "fixed 10-pip (default)"
         stop_dist = abs(entry - stop)
         target = entry + 2 * stop_dist * direction        # 2R test target
-        lots = self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
-        lots = max(round(float(lots), 2), config.MIN_LOT_SIZE)
+        lots = lot or self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
+        try:
+            lots = max(round(float(lots), 2), config.MIN_LOT_SIZE)
+        except (TypeError, ValueError):
+            return f"bad lot '{lot}' — use e.g. 0.01 .. 0.05"
 
         res = mt.market_order(pair, lots, direction, sl=stop, tp=target, comment="ict_test")
         if not (res and res.get("ok")):
@@ -548,6 +551,60 @@ class LiveTrader(Backtester):
                 f"Entry:  {price:.5f}\n"
                 f"Stop:   {stop:.5f}  ({abs(price - stop) / pip:.1f} pips — structural)\n"
                 f"Target: {target:.5f}  ({note})")
+
+    def _legs_for(self, st, leg):
+        """Resolve `leg` (1-based, or None=all) to a list of leg dicts, or a str error."""
+        if leg is None:
+            return st["legs"]
+        try:
+            idx = int(leg) - 1
+        except (TypeError, ValueError):
+            return "bad leg number"
+        if idx < 0 or idx >= len(st["legs"]):
+            return f"leg {leg} doesn't exist ({len(st['legs'])} open)"
+        return [st["legs"][idx]]
+
+    def manual_move_stop(self, pair, level, leg=None) -> str:
+        """Move the stop of a pair (all legs, or one leg) to `level`."""
+        st = self.active.get(pair)
+        if st is None:
+            return f"no open {pair} position"
+        try:
+            level = float(level)
+        except (TypeError, ValueError):
+            return "usage: /sl EURUSD 1.15550   (or /sl EURUSD 2 1.15550 for one leg)"
+        legs = self._legs_for(st, leg)
+        if isinstance(legs, str):
+            return legs
+        moved = 0
+        for l in legs:
+            if l.get("ticket") and mt.modify_sl_tp(l["ticket"], sl=level, tp=st["target"]):
+                l["stop"] = level
+                moved += 1
+        if not moved:
+            return (f"couldn't move stop — the broker rejected it (a stop must be on "
+                    f"the correct side of price: below for longs, above for shorts).")
+        log.warning("MANUAL SL %s -> %.5f on %d leg(s) (Telegram)", pair, level, moved)
+        return f"{pair}: stop moved to {level:.5f} on {moved} leg(s)."
+
+    def manual_breakeven(self, pair, leg=None) -> str:
+        """Move the stop to breakeven (each leg's own entry)."""
+        st = self.active.get(pair)
+        if st is None:
+            return f"no open {pair} position"
+        legs = self._legs_for(st, leg)
+        if isinstance(legs, str):
+            return legs
+        moved = 0
+        for l in legs:
+            be = l["entry"]
+            if l.get("ticket") and mt.modify_sl_tp(l["ticket"], sl=be, tp=st["target"]):
+                l["stop"] = be
+                moved += 1
+        if not moved:
+            return "couldn't move to breakeven (broker rejected — price may be too close)."
+        log.warning("MANUAL BE %s on %d leg(s) (Telegram)", pair, moved)
+        return f"{pair}: stop -> breakeven on {moved} leg(s)."
 
     # ── Telegram read / query commands (read-only; never raise) ──────────────
 
