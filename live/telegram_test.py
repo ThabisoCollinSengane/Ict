@@ -1,4 +1,4 @@
-"""Standalone TWO-WAY Telegram test - no MT5, no broker required.
+r"""Standalone TWO-WAY Telegram test - no MT5, no broker required.
 
     .\.venv\Scripts\python.exe -m live.telegram_test
     (or: powershell -ExecutionPolicy Bypass -File scripts\telegram_test.ps1)
