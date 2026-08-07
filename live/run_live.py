@@ -101,6 +101,7 @@ class LiveTrader(Backtester):
         # active positions: pair → {direction, target, legs:[{entry,stop,units,ticket,…}],…}
         self.active = {}
         self.trades = []
+        self.reject_log = []   # near-misses (setups that hit a gate); used by _log_reject
 
         # Semi-auto manual overrides (Telegram). Per-day, per-pair: base lot,
         # direction filter, buy/sell-side levels for full manual AMD.
@@ -135,6 +136,15 @@ class LiveTrader(Backtester):
         self._mp_cache   = {}
         self._weekly_amd = {}
         self._draw_cache = {}
+
+        # Backtest-only data structures the inherited methods may touch. LiveTrader
+        # overrides the methods that really use these, but empty defaults prevent an
+        # AttributeError if any inherited code path references them.
+        self._tickvol = {}
+        self.tf_bars = {}
+        self.tf_dfs = {}
+        self.tf_index = {}
+        self.tf_pos = {}
 
         # Diagnostic counters
         self.gate = {
