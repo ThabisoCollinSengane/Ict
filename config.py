@@ -120,6 +120,18 @@ STRUCTURE_STOP_ENABLED = True     # A/B toggle — validate on full continuous r
 STRUCTURE_STOP_TF      = "1T"      # timeframe whose fractal ITL/ITH anchors the stop
 STRUCTURE_STOP_LOOKBACK = 90       # bars to scan for the intermediate swing
 
+# --- Structure-based entry trigger (Ep-12 "read HTF, enter LTF") — OPTIONAL ---
+# After the HTF read + 2-of-3 MSS confirm the ITH/ITL, require a freshly-confirmed
+# lower-TF fractal REVERSAL swing in the trade direction before entering — the
+# trader's "anticipate the STL/STH forming and enter on it, the moment its 3rd bar
+# prints" model. LONG needs a confirmed, still-intact Short-Term LOW (STL); SHORT a
+# Short-Term HIGH (STH). This makes the entry literally the swing formation rather
+# than the FVG/OB alone. Default OFF -> baseline byte-identical; validate full + IS/OOS.
+STRUCTURE_ENTRY_ENABLED  = int(_os.environ.get("STRUCTURE_ENTRY_ENABLED", "0"))
+STRUCTURE_ENTRY_TF       = _os.environ.get("STRUCTURE_ENTRY_TF", "5T")   # LTF for the swing
+STRUCTURE_ENTRY_LOOKBACK = int(_os.environ.get("STRUCTURE_ENTRY_LOOKBACK", "60"))
+STRUCTURE_ENTRY_MAX_AGE  = int(_os.environ.get("STRUCTURE_ENTRY_MAX_AGE", "3"))  # bars since 3rd bar printed
+
 # --- Account protection (wipeout prevention) ---
 # 1. Peak drawdown halt: if equity falls >MAX_DRAWDOWN_HALT_PCT% from its highest
 #    point, stop trading for DRAWDOWN_PAUSE_DAYS calendar days before retrying.
