@@ -96,8 +96,8 @@ def test_action_commands_parse_and_dispatch():
         def __init__(self):
             self.halted = False
             self.closed = []
-        def manual_close(self, pair):
-            self.closed.append(pair); return f"{pair}: closing all legs at market"
+        def manual_close(self, pair, leg=None):
+            self.closed.append((pair, leg)); return f"{pair}: closing (leg={leg})"
         def manual_close_all(self):
             self.closed.append("ALL"); return 2
         def manual_halt(self):
@@ -112,7 +112,9 @@ def test_action_commands_parse_and_dispatch():
     # With a trader, they dispatch.
     tr = StubTrader()
     tc.parse_command(f"/close {p}", si, trader=tr)
-    assert tr.closed == [p]
+    assert tr.closed == [(p, None)]
+    tc.parse_command(f"/close {p} 2", si, trader=tr)      # per-leg close
+    assert tr.closed[-1] == (p, "2")
     tc.parse_command("/close all", si, trader=tr)
     assert tr.closed[-1] == "ALL"
     tc.parse_command("/halt", si, trader=tr)
