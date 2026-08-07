@@ -323,6 +323,58 @@ class LiveTrader(Backtester):
         self._manual_halt = False
         log.info("Manual halt cleared (Telegram) — entries re-enabled")
 
+    def manual_test_trade(self, pair, direction) -> str:
+        """Open a TEST market order NOW on the connected account, using the bot's
+        OWN structural stop (fractal ITL/ITH, capped ~10 pips) and a 2R target.
+        Fully managed afterwards — trailing + /close work. For demo verification;
+        places a real order on whatever account is connected."""
+        if pair not in config.PAIRS:
+            return f"unknown pair '{pair}' (have: {', '.join(config.PAIRS)})"
+        if pair in self.active:
+            return f"{pair} already has an open position — /close {pair} first."
+        q = mt.tick(pair)
+        if not q:
+            return f"no live tick for {pair} — is the MT5 terminal up?"
+        now = datetime.now(timezone.utc)
+        entry = (q[0] + q[1]) / 2
+        pip = pip_size(pair)
+        stop = None
+        try:
+            stop = self._structure_stop(pair, direction, entry, pip, now)
+        except Exception:
+            stop = None
+        if not stop or abs(entry - stop) < pip:
+            stop = entry - 10 * pip * direction          # bot's default 10-pip stop
+        stop_dist = abs(entry - stop)
+        target = entry + 2 * stop_dist * direction        # 2R test target
+        lots = self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
+        lots = max(round(float(lots), 2), config.MIN_LOT_SIZE)
+
+        res = mt.market_order(pair, lots, direction, sl=stop, tp=target, comment="ict_test")
+        if not (res and res.get("ok")):
+            return f"TEST order FAILED for {pair}: {res}"
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st = {
+            "direction": direction, "target": target,
+            "legs": [{"entry": entry, "stop": stop,
+                      "units": int(lots * config.LOT_UNITS),
+                      "ticket": ticket, "leg_idx": 0}],
+            "entry_model": "test", "im_scenario": "test", "draw_score": 0,
+        }
+        self.active[pair] = st
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        d = "LONG" if direction > 0 else "SHORT"
+        log.warning("MANUAL TEST TRADE %s %s %.2f lots (Telegram)", d, pair, lots)
+        return (f"TEST TRADE OPENED\n"
+                f"{pair} {d}  {lots} lots\n"
+                f"Entry:  {entry:.5f}\n"
+                f"Stop:   {stop:.5f}  ({stop_dist / pip:.1f} pips — bot's structural stop)\n"
+                f"Target: {target:.5f}  (2R)\n"
+                f"Now managed live — it trails and /close works. (Demo account.)")
+
     # ── Telegram read / query commands (read-only; never raise) ──────────────
 
     @staticmethod

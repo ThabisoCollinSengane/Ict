@@ -102,6 +102,9 @@ losing-but-you-believe-in-it ones alive.)
 
 ### 5 · Manual control — close & halt (act now)
 ```
+/test EURUSD long      → open a TEST trade NOW on the demo (also short; /buy /sell)
+                          uses the bot's own structural stop + a 2R target,
+                          then trails and /close works like any trade
 /close EURUSD          → close EURUSD's open position(s) at market, now
 /close all             → flatten everything
 /flat                  → flatten everything (shortcut for /close all)
