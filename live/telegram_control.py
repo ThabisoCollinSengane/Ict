@@ -60,6 +60,7 @@ HELP = (
     "\n"
     "CONTROL (act now):\n"
     "/test EURUSD long|short  (demo test entry, bot's own stop)\n"
+    "/pyramid EURUSD [1.1600]  (add to a WINNER; same TP or a set level)\n"
     "/close EURUSD | all  ·  /flat  ·  /halt  ·  /resume\n"
     "/auto EURUSD  ·  /clear  ·  /status  ·  /whoami\n"
     "\n"
@@ -219,6 +220,17 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
         if not pair:
             return "usage: /test EURUSD long|short   (or /buy EURUSD, /sell EURUSD)"
         return trader.manual_test_trade(pair, d)
+
+    if cmd in ("pyramid", "add"):
+        if trader is None:
+            return "pyramid needs the live bot running."
+        if not args:
+            return "usage: /pyramid EURUSD   (or /pyramid EURUSD 1.1600 for a set exit)"
+        p = _match_pair(args[0])
+        if not p:
+            return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
+        level = args[1] if len(args) >= 2 else None
+        return trader.manual_pyramid(p, level)
 
     if cmd == "flat":
         if trader is None:

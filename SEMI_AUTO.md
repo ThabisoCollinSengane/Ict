@@ -107,6 +107,9 @@ losing-but-you-believe-in-it ones alive.)
 /test EURUSD long      → open a TEST trade NOW on the demo (also short; /buy /sell)
                           uses the bot's own structural stop + a 2R target,
                           then trails and /close works like any trade
+/pyramid EURUSD        → add a leg to a WINNING position, exiting at the SAME TP
+/pyramid EURUSD 1.1600 → same, but the whole position exits at 1.1600 instead
+                          (only adds if the position is in profit; structural stop)
 /close EURUSD          → close EURUSD's open position(s) at market, now
 /close all             → flatten everything
 /flat                  → flatten everything (shortcut for /close all)
