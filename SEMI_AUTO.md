@@ -32,8 +32,9 @@ You don't have to wait for the template — any command works any time.
 /read            market-structure template for all pairs
 /read EURUSD     just that pair
 /markets         all pairs at a glance
-/positions       open trades + live P&L, and WHY: TP source (e.g. H1 FVG,
-                 ITH draw, fib ext) + SL basis (structural ITL/ITH, M1 swing)
+/positions       open trades: live P&L + % to target, the Model (Judas reversal /
+                 Breakout), the TP idea (H1 FVG / ITH draw / fib ext) and the SL
+                 basis (structural ITL/ITH). Reasoning is saved and survives restarts.
 /account         equity, day P&L, drawdown, halt state (also /equity)
 /dxy             synthetic dollar index right now
 /session         which killzone, and whether new entries are allowed
@@ -151,25 +152,39 @@ at the handover. You could add `/bias GBPUSD short` for the NY session, or
 
 ---
 
-## Sharing the bot with someone else
+## Sharing the bot with your partner
 
-You can let another person use the bot, at one of two levels:
+**You do NOT create a second bot.** Your partner opens the **same GameTheory bot**
+(share the link — `t.me/GameTheory2026bot`) and texts it like any normal chat.
+The only question is what they're allowed to do. Three ways, easiest first:
 
-- **Viewer (read-only)** — they can `/brief`, `/read`, `/positions`, `/account`,
-  `/dxy`, `/session`, `/news`. They **cannot** change the plan or touch trades.
-- **Admin (full control)** — same as you: they can also `/lot`, `/bias`,
-  `/levels`, `/hold`, `/close`, `/halt`.
-
-Setup: the person opens your **GameTheory** bot, sends `/start`, then `/whoami`
-to get their chat id (or gets it from **@userinfobot**). Add their id to
-`live.env` and restart the bot:
+**Option 1 — Open read-only (zero setup, "just text it"):**
+Set one flag and anyone you share the link with can read the bot — no ids, no
+restarts per person:
 ```
-TELEGRAM_VIEWER_IDS=5111111111,5222222222     # read-only people
-TELEGRAM_ADMIN_IDS=5333333333                 # full-control people
+TELEGRAM_OPEN_VIEW=1
 ```
-Everyone authorised also receives the trade alerts and session briefs. Anyone
-not listed is ignored. (The **Ops Bot** honours owner + admins only — never
-viewers — since it can change settings and run the VM.)
+They can `/brief`, `/read`, `/positions`, `/account`, `/dxy`, `/session`, `/news`.
+They **cannot** touch trades. This is the "share it like WhatsApp" mode you wanted.
+(Push alerts still go only to listed people; open-view users read on demand.)
+
+**Option 2 — Named viewer (read-only, also gets alerts):** add their chat id:
+```
+TELEGRAM_VIEWER_IDS=5111111111,5222222222
+```
+
+**Option 3 — Admin (full control, trades like you):** add their chat id:
+```
+TELEGRAM_ADMIN_IDS=5333333333
+```
+Trading control **can't** be open (it moves real money) — an admin must be a
+listed id.
+
+**Getting a chat id:** the person sends `/start` to @userinfobot (it replies with
+their `Id`), or — once they can already read the bot — `/whoami`. Add the id in
+`live.env`, restart the bot, done. Anyone not covered by the above is ignored.
+The **Ops Bot** honours owner + admins only — never viewers/open-view — since it
+changes settings and runs the VM.
 
 ## Safety
 

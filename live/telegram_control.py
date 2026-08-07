@@ -87,6 +87,11 @@ def _access():
     return owner, admins, viewers
 
 
+def _open_view() -> bool:
+    v = getattr(config, "TELEGRAM_OPEN_VIEW", 0) or os.getenv("TELEGRAM_OPEN_VIEW", "0")
+    return str(v).strip().lower() not in ("", "0", "false", "no")
+
+
 def _role(cid):
     """'full' | 'view' | None for a chat id."""
     cid = str(cid)
@@ -94,6 +99,8 @@ def _role(cid):
     if cid and (cid == owner or cid in admins):
         return "full"
     if cid in viewers:
+        return "view"
+    if _open_view():          # open read-only: anyone who messages can read
         return "view"
     return None
 

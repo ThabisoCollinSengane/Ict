@@ -137,6 +137,9 @@ STRUCTURE_ENTRY_MAX_AGE  = int(_os.environ.get("STRUCTURE_ENTRY_MAX_AGE", "3")) 
 # read-only (/read /positions /account ...). Empty = owner-only (default).
 TELEGRAM_ADMIN_IDS  = _os.environ.get("TELEGRAM_ADMIN_IDS", "")
 TELEGRAM_VIEWER_IDS = _os.environ.get("TELEGRAM_VIEWER_IDS", "")
+# 1 = ANYONE who messages the bot gets READ-ONLY access automatically (no id setup)
+# — so you can just share the bot link. Trading control still needs ADMIN ids.
+TELEGRAM_OPEN_VIEW  = int(_os.environ.get("TELEGRAM_OPEN_VIEW", "0"))
 
 # --- Account protection (wipeout prevention) ---
 # 1. Peak drawdown halt: if equity falls >MAX_DRAWDOWN_HALT_PCT% from its highest
