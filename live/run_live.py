@@ -1,4 +1,4 @@
-"""Phase 2 live strategy loop — drives backtest signal logic on live MT5 bars.
+r"""Phase 2 live strategy loop — drives backtest signal logic on live MT5 bars.
 
 Architecture
 ------------

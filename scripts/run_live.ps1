@@ -33,6 +33,12 @@ New-Item -ItemType Directory -Force -Path "data" | Out-Null
 $log  = "data\live.log"
 $py   = ".\.venv\Scripts\python.exe"
 $fails = 0
+# The bot logs to STDERR (that's normal for Python logging). Under
+# ErrorActionPreference="Stop", PowerShell would treat every stderr line piped
+# via 2>&1 as a fatal NativeCommandError and kill the bot on its first log line.
+# Switch to Continue so we rely on the PROCESS EXIT CODE (below) to detect real
+# crashes, not on stderr output.
+$ErrorActionPreference = "Continue"
 while ($true) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     "[$ts] === starting live bot ===" | Tee-Object -FilePath $log -Append
