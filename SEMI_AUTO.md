@@ -50,14 +50,20 @@ The `/read` template shows, per pair: current price, H4/H1/M15 structure
 ```
 MARKET READ - 08:20 UTC
 Session: NY AM
-DXY: 99.97
 
-EURUSD  1.15206
+BIAS (gate drivers):
+DXY: UP (USD strong)  [99.97]
+EURGBP: EUR > GBP (EUR family)
+
+EURUSD  1.15206   SHORT lean 75%
   H4 bullish | H1 bearish | M15 bullish
   buy-side draw (ITH): 1.15800
   sell-side draw (ITL): 1.14900
   your plan: EURUSD long only, levels set
 ```
+Every read leads with the **two gate drivers** — **DXY** (dollar direction) and
+**EURGBP** (which family, EUR vs GBP). Then each pair gets a **directional lean %**
+from its H4/H1/M15 structure combined with the dollar (USD pairs lean opposite DXY).
 
 ### 1 · Lot for the day
 ```
