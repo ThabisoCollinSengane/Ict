@@ -176,6 +176,45 @@ class LiveTrader(Backtester):
         log.info("LiveTrader initialised — equity %.2f ZAR (acct: %.2f %s lev 1:%s)",
                  self.equity, acc.balance, acc.currency, acc.leverage)
 
+        # Re-adopt any open MT5 positions (our magic) so a restart/reboot doesn't
+        # orphan live trades — they stay visible (/positions) and managed (trail/close).
+        self._adopt_open_positions()
+
+    def _adopt_open_positions(self):
+        """Rebuild self.active from open MT5 positions stamped with our magic."""
+        try:
+            allpos = mt.positions() or []
+        except Exception:
+            return
+        adopted = 0
+        for pos in allpos:
+            if getattr(pos, "magic", 0) != mt.MT5_MAGIC:
+                continue
+            pair = next((b for b in config.PAIRS if mt.resolve_symbol(b) == pos.symbol), None)
+            if pair is None:
+                continue
+            d = 1 if getattr(pos, "type", 0) == 0 else -1     # POSITION_TYPE_BUY == 0
+            leg = {"entry": pos.price_open,
+                   "stop": pos.sl or pos.price_open,
+                   "units": int(round(pos.volume * config.LOT_UNITS)),
+                   "ticket": pos.ticket, "leg_idx": 0}
+            st = self.active.get(pair)
+            if st is None:
+                self.active[pair] = {
+                    "direction": d, "target": pos.tp or pos.price_open,
+                    "legs": [leg], "entry_model": "adopted", "im_scenario": "adopted",
+                    "draw_score": 0, "target_type": "adopted (pre-restart)",
+                    "stop_reason": "adopted (pre-restart)",
+                }
+            else:
+                leg["leg_idx"] = len(st["legs"])
+                st["legs"].append(leg)
+            adopted += 1
+        if adopted:
+            log.info("Re-adopted %d open MT5 position(s) on restart", adopted)
+            _notify(f"Re-adopted {adopted} open position(s) after restart — "
+                    f"still managed. Send /positions to view.")
+
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
