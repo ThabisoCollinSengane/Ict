@@ -260,17 +260,25 @@ def positions(base: str | None = None) -> list:
 
 
 # ── Order execution ───────────────────────────────────────────────────────────
-def _filling_mode(name: str):
-    """Pick a supported order-filling mode for the symbol (IOC→FOK→RETURN)."""
+def _filling_modes(name: str):
+    """Ordered candidate order-filling modes to try for this symbol.
+
+    symbol_info.filling_mode is a BITMASK: bit 1 = FOK, bit 2 = IOC. The
+    MetaTrader5 Python package does NOT expose the SYMBOL_FILLING_* names (only
+    the ORDER_FILLING_* ones), so we test the raw bits. Returns IOC/FOK per the
+    mask, then RETURN as a last resort. De-duplicated, order preserved.
+    """
     mt5 = _mt5()
     info = mt5.symbol_info(name)
     modes = getattr(info, "filling_mode", 0) if info else 0
-    # filling_mode is a bitmask; prefer IOC, then FOK, else RETURN
-    if modes & mt5.SYMBOL_FILLING_IOC:
-        return mt5.ORDER_FILLING_IOC
-    if modes & mt5.SYMBOL_FILLING_FOK:
-        return mt5.ORDER_FILLING_FOK
-    return mt5.ORDER_FILLING_RETURN
+    out = []
+    if modes & 2:            # SYMBOL_FILLING_IOC
+        out.append(mt5.ORDER_FILLING_IOC)
+    if modes & 1:            # SYMBOL_FILLING_FOK
+        out.append(mt5.ORDER_FILLING_FOK)
+    out.append(mt5.ORDER_FILLING_RETURN)
+    seen = set()
+    return [x for x in out if not (x in seen or seen.add(x))]
 
 
 def market_order(base: str, volume_lots: float, direction: int,
@@ -301,23 +309,31 @@ def market_order(base: str, volume_lots: float, direction: int,
         "magic": int(magic),
         "comment": comment,
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": _filling_mode(name),
     }
     if sl is not None:
         req["sl"] = float(sl)
     if tp is not None:
         req["tp"] = float(tp)
 
-    res = mt5.order_send(req)
-    if res is None:
-        return {"ok": False, "ticket": None, "retcode": -1,
-                "comment": f"order_send None: {mt5.last_error()}"}
-    ok = res.retcode == mt5.TRADE_RETCODE_DONE
-    if not ok:
-        log.error("market_order %s %s %.2f failed: retcode=%s %s",
-                  base, direction, volume_lots, res.retcode, res.comment)
-    return {"ok": ok, "ticket": getattr(res, "order", None),
-            "retcode": res.retcode, "comment": res.comment}
+    # Try each supported filling mode; retry the next one on "invalid fill".
+    invalid_fill = getattr(mt5, "TRADE_RETCODE_INVALID_FILL", 10030)
+    last = {"ok": False, "ticket": None, "retcode": -1, "comment": "no filling mode worked"}
+    for fill in _filling_modes(name):
+        req["type_filling"] = fill
+        res = mt5.order_send(req)
+        if res is None:
+            last = {"ok": False, "ticket": None, "retcode": -1,
+                    "comment": f"order_send None: {mt5.last_error()}"}
+            continue
+        if res.retcode == mt5.TRADE_RETCODE_DONE:
+            return {"ok": True, "ticket": getattr(res, "order", None),
+                    "retcode": res.retcode, "comment": res.comment}
+        last = {"ok": False, "ticket": None, "retcode": res.retcode, "comment": res.comment}
+        if res.retcode != invalid_fill:
+            break            # a real rejection (funds/price/stops) — don't retry fills
+    log.error("market_order %s %s %.2f failed: retcode=%s %s",
+              base, direction, volume_lots, last["retcode"], last["comment"])
+    return last
 
 
 def modify_sl_tp(ticket: int, sl: float | None = None,
