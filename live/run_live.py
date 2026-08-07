@@ -600,18 +600,19 @@ class LiveTrader(Backtester):
         return ", ".join(bits) if bits else "auto"
 
     def read_structure(self, pair=None) -> str:
-        """The market-structure read template (one pair, or all when pair=None)."""
+        """The market-structure read template (one pair, or all when pair=None).
+        Always leads with the gate drivers (DXY + EURGBP), then rates each pair's
+        directional lean %."""
         now = datetime.now(timezone.utc)
         sess = self._current_session(now) or "outside killzone"
-        dxy = self.read_dxy_value()
+        dxy_dir, hdr = self._bias_header(now)
+        lines = [f"MARKET READ - {now:%H:%M} UTC", f"Session: {sess}", "",
+                 "BIAS (gate drivers):"] + hdr + [""]
         pairs = [pair] if pair else list(config.PAIRS)
-        lines = [f"MARKET READ - {now:%H:%M} UTC",
-                 f"Session: {sess}",
-                 (f"DXY: {dxy:.2f}" if dxy else "DXY: n/a"), ""]
         for p in pairs:
             s = self._pair_structure(p)
             h4 = s.get("H4", {})
-            lines.append(f"{p}  {s.get('price', '?')}")
+            lines.append(f"{p}  {s.get('price', '?')}   {self._pair_lean(s, dxy_dir)}")
             lines.append(f"  H4 {self._dir_word(h4.get('dir', 0))} | "
                          f"H1 {self._dir_word(s.get('H1', {}).get('dir', 0))} | "
                          f"M15 {self._dir_word(s.get('M15', {}).get('dir', 0))}")
@@ -648,6 +649,39 @@ class LiveTrader(Backtester):
 
     def _model_word(self, m) -> str:
         return self._MODEL_WORDS.get(str(m), str(m) if m else "?")
+
+    def _bias_header(self, now):
+        """The two intermarket gate drivers, shown at the top of every read:
+        DXY (dollar direction) and EURGBP (EUR-vs-GBP family). Returns
+        (dxy_dir, [lines])."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        dxy_val = self.read_dxy_value()
+        try:
+            dxy_dir = self._dxy_bias("60T", now, lookback=lb)
+        except Exception:
+            dxy_dir = 0
+        try:
+            eg_dir = self._sym_bias(config.REF_EURGBP, "60T", now, lookback=lb)
+        except Exception:
+            eg_dir = 0
+        dxy_word = {1: "UP (USD strong)", -1: "DOWN (USD weak)", 0: "FLAT"}[dxy_dir]
+        eg_word = {1: "EUR > GBP (EUR family)", -1: "GBP > EUR (GBP family)",
+                   0: "flat (EUR~GBP)"}[eg_dir]
+        dv = f"{dxy_val:.2f}" if dxy_val else "n/a"
+        return dxy_dir, [f"DXY: {dxy_word}  [{dv}]", f"EURGBP: {eg_word}"]
+
+    def _pair_lean(self, s, dxy_dir):
+        """A directional lean % for a pair from H4/H1/M15 structure + the dollar.
+        USD-quote pairs move inverse to DXY, so DXY-up votes short."""
+        votes = [s.get("H4", {}).get("dir", 0), s.get("H1", {}).get("dir", 0),
+                 s.get("M15", {}).get("dir", 0), -dxy_dir]
+        score = sum(1 if v > 0 else -1 if v < 0 else 0 for v in votes)
+        pct = round(abs(score) / len(votes) * 100)
+        if score > 0:
+            return f"LONG lean {pct}%"
+        if score < 0:
+            return f"SHORT lean {pct}%"
+        return "no clear lean"
 
     def read_positions(self) -> str:
         if not self.active:
@@ -727,23 +761,22 @@ class LiveTrader(Backtester):
         now = datetime.now(timezone.utc)
         self._update_equity()
         dopen = self._day_open_eq.get(now.date(), self.equity)
-        dxy = self.read_dxy_value()
         sess = self._current_session(now) or "outside killzone"
+        dxy_dir, hdr = self._bias_header(now)
 
         def w(x):
             return {1: "bull", -1: "bear", 0: "flat"}[x.get("dir", 0)]
 
         lines = [header or f"BRIEF - {now:%Y-%m-%d %H:%M} UTC",
                  f"Equity R{self.equity:,.0f} | day P&L R{self.equity - dopen:+,.0f} | "
-                 f"{len(self.active)} open | {sess}",
-                 (f"DXY {dxy:.2f}" if dxy else "DXY n/a"), ""]
+                 f"{len(self.active)} open | {sess}"] + hdr + [""]
         for p in config.PAIRS:
             s = self._pair_structure(p)
             h4 = s.get("H4", {})
             lines.append(
-                f"{p} {s.get('price', '?')} | H4 {w(h4)} H1 {w(s.get('H1', {}))} "
-                f"M15 {w(s.get('M15', {}))} | ITH {h4.get('ith') or '-'} "
-                f"ITL {h4.get('itl') or '-'} | {self._plan_str(p)}")
+                f"{p} {s.get('price', '?')}  {self._pair_lean(s, dxy_dir)} | "
+                f"H4 {w(h4)} H1 {w(s.get('H1', {}))} M15 {w(s.get('M15', {}))} | "
+                f"ITH {h4.get('ith') or '-'} ITL {h4.get('itl') or '-'} | {self._plan_str(p)}")
         if self.active:
             lines += ["", self.read_positions()]
         lines += ["", "Reply — read: /read /positions /account /news | "
