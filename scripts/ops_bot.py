@@ -107,7 +107,8 @@ def _allowed_ids():
 TRADING_CMDS = {"read", "structure", "markets", "positions", "open", "trades",
                 "account", "equity", "dxy", "session", "brief", "news",
                 "lot", "bias", "levels", "hold", "release", "close", "flat",
-                "halt", "resume", "auto", "clear", "test", "testtrade", "buy", "sell"}
+                "halt", "resume", "auto", "clear", "test", "testtrade", "buy", "sell",
+                "pyramid", "add"}
 
 
 def send(text: str, chat_id: str = None) -> bool:

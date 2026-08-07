@@ -462,6 +462,78 @@ class LiveTrader(Backtester):
                 f"Target: {target:.5f}  (2R)\n"
                 f"Now managed live — it trails and /close works. (Demo account.)")
 
+    def manual_pyramid(self, pair, level=None) -> str:
+        """Add a leg to a WINNING open position. Exits at the same TP as the
+        position by default, or at `level` if given. Stop = the bot's structural
+        stop. /pyramid PAIR   or   /pyramid PAIR 1.1600"""
+        st = self.active.get(pair)
+        if st is None:
+            return f"no open {pair} position to add to."
+        if len(st["legs"]) >= config.MAX_LEGS:
+            return f"{pair} is already at max legs ({config.MAX_LEGS})."
+        d = st["direction"]
+        q = mt.tick(pair)
+        if not q:
+            return f"no live tick for {pair} — is MT5 up?"
+        price = (q[0] + q[1]) / 2
+        pip = pip_size(pair)
+
+        # Only add to a position that is IN PROFIT (a winner).
+        u = sum(l["units"] for l in st["legs"]) or 1
+        avg_entry = sum(l["entry"] * l["units"] for l in st["legs"]) / u
+        if (price - avg_entry) * d <= 0:
+            return (f"{pair} is not in profit yet — pyramid adds only to a winning "
+                    f"position (price {price:.5f} vs avg entry {avg_entry:.5f}).")
+
+        # Target: same TP as the position, or the level the trader gave.
+        if level is not None:
+            try:
+                level = float(level)
+            except (TypeError, ValueError):
+                return f"bad target level '{level}'"
+            if (level - price) * d <= 0:
+                return f"target {level} is not beyond current price in the trade direction."
+            target = level
+        else:
+            target = st["target"]
+
+        stop = None
+        try:
+            stop = self._structure_stop(pair, d, price, pip, datetime.now(timezone.utc))
+        except Exception:
+            stop = None
+        if not stop or abs(price - stop) < pip:
+            stop = price - 10 * pip * d
+        lots = self.inputs.day_lot(pair) or round(st["legs"][0]["units"] / config.LOT_UNITS, 2)
+        lots = max(round(float(lots or config.MIN_LOT_SIZE), 2), config.MIN_LOT_SIZE)
+
+        res = mt.market_order(pair, lots, d, sl=stop, tp=target, comment=f"ict_pyr{len(st['legs'])}")
+        if not (res and res.get("ok")):
+            return f"pyramid add FAILED for {pair}: {res}"
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st["legs"].append({"entry": price, "stop": stop,
+                           "units": int(lots * config.LOT_UNITS),
+                           "ticket": ticket, "leg_idx": len(st["legs"])})
+        # If a new level was given, make the whole position exit there.
+        note = "same TP as the position"
+        if level is not None and target != st["target"]:
+            st["target"] = target
+            note = "new shared level"
+            for lg in st["legs"][:-1]:
+                if lg.get("ticket"):
+                    mt.modify_sl_tp(lg["ticket"], sl=lg["stop"], tp=target)
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        self._save_pos_meta()
+        log.warning("MANUAL PYRAMID %s +%.2f lots (leg %d, Telegram)", pair, lots, len(st["legs"]))
+        return (f"PYRAMID ADDED\n"
+                f"{pair} {'LONG' if d > 0 else 'SHORT'}  +{lots} lots (leg {len(st['legs'])})\n"
+                f"Entry:  {price:.5f}\n"
+                f"Stop:   {stop:.5f}  ({abs(price - stop) / pip:.1f} pips — structural)\n"
+                f"Target: {target:.5f}  ({note})")
+
     # ── Telegram read / query commands (read-only; never raise) ──────────────
 
     @staticmethod
