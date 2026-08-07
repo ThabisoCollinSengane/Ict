@@ -26,6 +26,7 @@ Credentials via env vars only — NEVER hardcode them.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
@@ -66,6 +67,11 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger("ict.live")
+
+# Per-ticket trade reasoning (target idea + stop basis + model), persisted so a
+# restart can restore the "why" onto re-adopted positions.
+_POS_META_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "data", "positions_meta.json")
 
 # Backtest Bar is namedtuple("Bar", "Open High Low Close").
 # MT5 Bar has (time, open, high, low, close, volume) with lowercase fields.
@@ -180,12 +186,44 @@ class LiveTrader(Backtester):
         # orphan live trades — they stay visible (/positions) and managed (trail/close).
         self._adopt_open_positions()
 
+    def _save_pos_meta(self):
+        """Persist each open ticket's reasoning (target idea / stop basis / model)
+        so it survives a restart. Only current tickets are kept (prunes closed)."""
+        meta = {}
+        for st in self.active.values():
+            for leg in st["legs"]:
+                tk = leg.get("ticket")
+                if tk:
+                    meta[str(tk)] = {
+                        "target_type": st.get("target_type"),
+                        "stop_reason": st.get("stop_reason"),
+                        "entry_model": st.get("entry_model"),
+                        "im_scenario": st.get("im_scenario"),
+                        "draw_score": st.get("draw_score", 0),
+                    }
+        try:
+            os.makedirs(os.path.dirname(_POS_META_PATH), exist_ok=True)
+            with open(_POS_META_PATH, "w") as f:
+                json.dump(meta, f)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _load_pos_meta() -> dict:
+        try:
+            with open(_POS_META_PATH) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
     def _adopt_open_positions(self):
-        """Rebuild self.active from open MT5 positions stamped with our magic."""
+        """Rebuild self.active from open MT5 positions stamped with our magic, and
+        restore each one's saved reasoning (target idea / stop basis / model)."""
         try:
             allpos = mt.positions() or []
         except Exception:
             return
+        saved = self._load_pos_meta()
         adopted = 0
         for pos in allpos:
             if getattr(pos, "magic", 0) != mt.MT5_MAGIC:
@@ -198,19 +236,23 @@ class LiveTrader(Backtester):
                    "stop": pos.sl or pos.price_open,
                    "units": int(round(pos.volume * config.LOT_UNITS)),
                    "ticket": pos.ticket, "leg_idx": 0}
+            m = saved.get(str(pos.ticket), {})
             st = self.active.get(pair)
             if st is None:
                 self.active[pair] = {
-                    "direction": d, "target": pos.tp or pos.price_open,
-                    "legs": [leg], "entry_model": "adopted", "im_scenario": "adopted",
-                    "draw_score": 0, "target_type": "adopted (pre-restart)",
-                    "stop_reason": "adopted (pre-restart)",
+                    "direction": d, "target": pos.tp or pos.price_open, "legs": [leg],
+                    "entry_model": m.get("entry_model") or "adopted",
+                    "im_scenario": m.get("im_scenario") or "adopted",
+                    "draw_score": m.get("draw_score", 0),
+                    "target_type": m.get("target_type") or "adopted (pre-restart)",
+                    "stop_reason": m.get("stop_reason") or "adopted (pre-restart)",
                 }
             else:
                 leg["leg_idx"] = len(st["legs"])
                 st["legs"].append(leg)
             adopted += 1
         if adopted:
+            self._save_pos_meta()
             log.info("Re-adopted %d open MT5 position(s) on restart", adopted)
             _notify(f"Re-adopted {adopted} open position(s) after restart — "
                     f"still managed. Send /positions to view.")
@@ -410,6 +452,7 @@ class LiveTrader(Backtester):
             self.log.upsert_position(pair, st)
         except Exception:
             pass
+        self._save_pos_meta()
         d = "LONG" if direction > 0 else "SHORT"
         log.warning("MANUAL TEST TRADE %s %s %.2f lots (Telegram)", d, pair, lots)
         return (f"TEST TRADE OPENED\n"
@@ -504,10 +547,20 @@ class LiveTrader(Backtester):
         "itl_liquidity": "intermediate-low liquidity (ITL draw)",
     }
 
+    # Plain-English names for the entry model that produced the trade.
+    _MODEL_WORDS = {
+        "judas": "Judas reversal", "breakout": "Breakout continuation",
+        "draw_cont": "Draw continuation", "test": "Manual test",
+        "adopted": "Adopted (pre-restart)",
+    }
+
     def _why_target(self, tt) -> str:
         if not tt or tt == "unknown":
             return "nearest institutional draw"
         return self._TGT_WORDS.get(str(tt), str(tt))
+
+    def _model_word(self, m) -> str:
+        return self._MODEL_WORDS.get(str(m), str(m) if m else "?")
 
     def read_positions(self) -> str:
         if not self.active:
@@ -529,9 +582,11 @@ class LiveTrader(Backtester):
                 if tgt != entry:
                     prog = max(0.0, min(100.0, (price - entry) / (tgt - entry) * 100))
                     lines.append(f"  {prog:.0f}% of the way to target")
-            lines.append(f"  SL {stop:.5f}  ({abs(entry - stop) / pip:.0f}p)  <- {st.get('stop_reason', 'structural swing')}")
-            lines.append(f"  TP {tgt:.5f}  ({abs(tgt - entry) / pip:.0f}p)  <- {self._why_target(st.get('target_type'))}")
-            lines.append(f"  entry: {st.get('entry_model', '?')} / {st.get('im_scenario', '?')}")
+            lines.append(f"  SL {stop:.5f}  ({abs(entry - stop) / pip:.0f} pips)  <- {st.get('stop_reason', 'structural swing')}")
+            lines.append(f"  TP {tgt:.5f}  ({abs(tgt - entry) / pip:.0f} pips)  <- {self._why_target(st.get('target_type'))}")
+            scen = st.get("im_scenario", "?")
+            scen = "" if scen in ("?", "adopted", "test") else f" (scenario {scen})"
+            lines.append(f"  Model: {self._model_word(st.get('entry_model'))}{scen}")
         return "\n".join(lines)
 
     def read_account(self) -> str:
@@ -692,6 +747,7 @@ class LiveTrader(Backtester):
                 f"Equity: R{self.equity:,.2f}"
             )
             self.log.upsert_position(pair, st)
+            self._save_pos_meta()
         else:
             log.error("MT5 order FAILED for %s: %s", pair, res)
             del self.active[pair]
@@ -742,6 +798,7 @@ class LiveTrader(Backtester):
             log.info("PYRAMID %s leg %d  %.2f lots  entry≈%.5f",
                      pair, new_leg["leg_idx"], lots, new_leg["entry"])
             self.log.upsert_position(pair, st)
+            self._save_pos_meta()
         else:
             log.error("Pyramid order FAILED for %s leg %d: %s",
                       pair, new_leg["leg_idx"], res)
@@ -841,6 +898,7 @@ class LiveTrader(Backtester):
             if not st["legs"]:
                 del self.active[pair]
                 self.log.delete_position(pair)
+        self._save_pos_meta()   # prune closed tickets from the reasoning store
 
     def _deal_pnl_zar(self, ticket: int) -> float | None:
         """Retrieve realised P&L for a closed position from MT5 deal history."""
