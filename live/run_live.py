@@ -341,12 +341,14 @@ class LiveTrader(Backtester):
         entry = (q[0] + q[1]) / 2
         pip = pip_size(pair)
         stop = None
+        stop_reason = "structural swing (intact ITL/ITH)"
         try:
             stop = self._structure_stop(pair, direction, entry, pip, now)
         except Exception:
             stop = None
         if not stop or abs(entry - stop) < pip:
             stop = entry - 10 * pip * direction          # bot's default 10-pip stop
+            stop_reason = "fixed 10-pip (default)"
         stop_dist = abs(entry - stop)
         target = entry + 2 * stop_dist * direction        # 2R test target
         lots = self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
@@ -362,6 +364,7 @@ class LiveTrader(Backtester):
                       "units": int(lots * config.LOT_UNITS),
                       "ticket": ticket, "leg_idx": 0}],
             "entry_model": "test", "im_scenario": "test", "draw_score": 0,
+            "target_type": "fixed 2R (test)", "stop_reason": stop_reason,
         }
         self.active[pair] = st
         try:
@@ -449,6 +452,24 @@ class LiveTrader(Backtester):
             lines.append("")
         return "\n".join(lines).strip()
 
+    # Plain-English names for the target's source family (what the TP is drawn to).
+    _TGT_WORDS = {
+        "fib_extension": "Fibonacci extension", "fib": "Fibonacci extension",
+        "fvg": "fair-value gap (FVG)", "fvg_h1": "H1 FVG", "fvg_m15": "M15 FVG",
+        "fvg_m5": "M5 FVG", "ob": "order block (OB)",
+        "equal_hl": "equal highs/lows", "round_number": "round number",
+        "swing": "prior swing high/low",
+        "pdh_pdl": "previous day high/low (PDH/PDL)",
+        "pwh_pwl": "previous week high/low (PWH/PWL)",
+        "ith_liquidity": "intermediate-high liquidity (ITH draw)",
+        "itl_liquidity": "intermediate-low liquidity (ITL draw)",
+    }
+
+    def _why_target(self, tt) -> str:
+        if not tt or tt == "unknown":
+            return "nearest institutional draw"
+        return self._TGT_WORDS.get(str(tt), str(tt))
+
     def read_positions(self) -> str:
         if not self.active:
             return "No open positions."
@@ -459,11 +480,19 @@ class LiveTrader(Backtester):
             pip = pip_size(p)
             d = st["direction"]
             leg = st["legs"][0]
-            lines.append(f"{p} {'LONG' if d > 0 else 'SHORT'}  x{len(st['legs'])} leg(s)")
-            lines.append(f"  entry {leg['entry']:.5f} | stop {leg['stop']:.5f} | tgt {st['target']:.5f}")
+            entry, stop, tgt = leg["entry"], leg["stop"], st["target"]
+            units = sum(l["units"] for l in st["legs"])
+            lines.append(f"{p} {'LONG' if d > 0 else 'SHORT'}  {round(units / config.LOT_UNITS, 2)} lots")
             if price is not None:
-                lines.append(f"  now {price:.5f}  ({(price - leg['entry']) * d / pip:+.1f} pips)")
-            lines.append(f"  {st.get('entry_model', '?')} | {st.get('im_scenario', '?')}")
+                pips = (price - entry) * d / pip
+                zar = (price - entry) * units * d * config.USD_ZAR
+                lines.append(f"  now {price:.5f}   {pips:+.1f} pips  (R{zar:+,.2f})")
+                if tgt != entry:
+                    prog = max(0.0, min(100.0, (price - entry) / (tgt - entry) * 100))
+                    lines.append(f"  {prog:.0f}% of the way to target")
+            lines.append(f"  SL {stop:.5f}  ({abs(entry - stop) / pip:.0f}p)  <- {st.get('stop_reason', 'structural swing')}")
+            lines.append(f"  TP {tgt:.5f}  ({abs(tgt - entry) / pip:.0f}p)  <- {self._why_target(st.get('target_type'))}")
+            lines.append(f"  entry: {st.get('entry_model', '?')} / {st.get('im_scenario', '?')}")
         return "\n".join(lines)
 
     def read_account(self) -> str:
@@ -618,8 +647,8 @@ class LiveTrader(Backtester):
                 f"TRADE OPENED\n"
                 f"{pair} {_dir_str} | {st.get('entry_model','?').upper()}\n"
                 f"Entry:  {leg['entry']:.5f}\n"
-                f"Stop:   {leg['stop']:.5f} ({_stop_pips:.1f} pips)\n"
-                f"Target: {st['target']:.5f} ({_rwd_pips:.1f} pips)\n"
+                f"Stop:   {leg['stop']:.5f} ({_stop_pips:.1f} pips) <- {st.get('stop_reason','structural swing')}\n"
+                f"Target: {st['target']:.5f} ({_rwd_pips:.1f} pips) <- {self._why_target(st.get('target_type'))}\n"
                 f"Scenario: {st.get('im_scenario','?')} | Draw: {st.get('draw_score','?')}/3\n"
                 f"Equity: R{self.equity:,.2f}"
             )
