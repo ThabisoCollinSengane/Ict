@@ -75,13 +75,16 @@ HELP = (
 # ── env + telegram plumbing ───────────────────────────────────────────────────
 
 def _load_env_file():
+    """Load live.env into the process env. OVERRIDES existing vars so live.env is
+    always the source of truth (a stale value inherited from the launching shell
+    must not win)."""
     if not os.path.exists(LIVE_ENV):
         return
     for line in open(LIVE_ENV, encoding="utf-8"):
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            os.environ[k.strip()] = v.strip().strip('"').strip("'")
 
 
 def _token_chat():
@@ -177,6 +180,7 @@ def set_env_var(key: str, value: str) -> None:
 
 
 def status_text() -> str:
+    _load_env_file()   # re-read live.env so /status always reflects the file, not startup
     def present(k):
         return "set" if os.getenv(k) else "-"
     _, sha = run(["git", "rev-parse", "--short", "HEAD"], 10)
