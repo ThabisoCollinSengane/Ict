@@ -30,7 +30,10 @@ if ($mt5 -and (Test-Path $mt5) -and -not (Get-Process terminal64 -ErrorAction Si
 # 3. Run the bot in a restart loop. run_live's main() returns on a fatal error;
 #    we log, back off, and relaunch so a transient failure self-heals.
 New-Item -ItemType Directory -Force -Path "data" | Out-Null
-$log  = "data\live.log"
+# The bot itself writes data\live.log via Python's file logger. The launcher must
+# NOT open that same file (Windows sharing violation) - it captures the raw
+# stdout/stderr + its own wrapper messages to a SEPARATE runner log instead.
+$log  = "data\runner.log"
 $py   = ".\.venv\Scripts\python.exe"
 $fails = 0
 # The bot logs to STDERR (that's normal for Python logging). Under
