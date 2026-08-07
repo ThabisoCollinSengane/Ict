@@ -26,6 +26,31 @@ You don't have to wait for the template — any command works any time.
 
 ## The commands
 
+### 0 · Ask the bot (read anytime — no effect on trading)
+```
+/read            market-structure template for all pairs
+/read EURUSD     just that pair
+/markets         all pairs at a glance
+/positions       open trades + live P&L (also /open, /trades)
+/account         equity, day P&L, drawdown, halt state (also /equity)
+/dxy             synthetic dollar index right now
+/session         which killzone, and whether new entries are allowed
+```
+The `/read` template shows, per pair: current price, H4/H1/M15 structure
+(bullish / bearish / flat), the intact **ITH** (buy-side draw) and **ITL**
+(sell-side draw), and your current plan for that pair. Example:
+```
+MARKET READ - 08:20 UTC
+Session: NY AM
+DXY: 99.97
+
+EURUSD  1.15206
+  H4 bullish | H1 bearish | M15 bullish
+  buy-side draw (ITH): 1.15800
+  sell-side draw (ITL): 1.14900
+  your plan: EURUSD long only, levels set
+```
+
 ### 1 · Lot for the day
 ```
 /lot 0.02              → all pairs
@@ -133,6 +158,8 @@ at the handover. You could add `/bias GBPUSD short` for the NY session, or
 
 | Command | Meaning |
 |---|---|
+| `/read [EURUSD]` · `/markets` | market-structure read (template) |
+| `/positions` · `/account` · `/dxy` · `/session` | live read-outs |
 | `/lot 0.02` / `/lot GBPUSD 0.03` | day lot (base; multipliers stack) |
 | `/bias EURUSD long\|short\|both` | direction filter |
 | `/levels EURUSD buy … sell …` | manual-AMD liquidity (sweep→target) |

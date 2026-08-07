@@ -40,12 +40,24 @@ _OFFSET_PATH = os.path.join(
 )
 
 HELP = (
-    "Semi-auto commands:\n"
+    "TRADING BOT commands\n"
+    "\n"
+    "READ (ask the bot):\n"
+    "/read [EURUSD]  market-structure template\n"
+    "/markets  all pairs at a glance\n"
+    "/positions  open trades + live P&L\n"
+    "/account  equity / day P&L / drawdown\n"
+    "/dxy  synthetic dollar index\n"
+    "/session  killzone + can-trade now\n"
+    "\n"
+    "PLAN (steer the bot):\n"
     "/lot 0.02  ·  /lot GBPUSD 0.03\n"
     "/bias EURUSD long | short | both\n"
     "/levels EURUSD buy 1.0950 1.0975 sell 1.0900\n"
-    "/hold EURUSD  (run across sessions)  ·  /release EURUSD\n"
-    "/close EURUSD | all   ·   /halt   ·   /resume\n"
+    "/hold EURUSD (run across sessions) · /release EURUSD\n"
+    "\n"
+    "CONTROL (act now):\n"
+    "/close EURUSD | all  ·  /halt  ·  /resume\n"
     "/auto EURUSD  ·  /clear  ·  /status"
 )
 
@@ -82,6 +94,27 @@ def parse_command(text: str, inputs, trader=None) -> str | None:
         return HELP
     if cmd == "status":
         return inputs.status_text()
+
+    # ── read / query (need the live engine) ───────────────────────────────────
+    if cmd in ("read", "structure", "markets", "positions", "open", "trades",
+               "account", "equity", "dxy", "session"):
+        if trader is None:
+            return "read commands need the live bot running."
+        try:
+            if cmd in ("read", "structure", "markets"):
+                p = _match_pair(args[0]) if args else None
+                return trader.read_structure(p)
+            if cmd in ("positions", "open", "trades"):
+                return trader.read_positions()
+            if cmd in ("account", "equity"):
+                return trader.read_account()
+            if cmd == "dxy":
+                d = trader.read_dxy_value()
+                return f"DXY ~ {d:.3f}" if d else "DXY unavailable"
+            if cmd == "session":
+                return trader.read_session()
+        except Exception as exc:  # noqa: BLE001
+            return f"read failed: {exc}"
 
     # ── action commands (need the live engine) ───────────────────────────────
     if cmd == "close":

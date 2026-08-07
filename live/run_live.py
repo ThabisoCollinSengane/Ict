@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import config
 from backtest import Backtester   # reuse all ICT signal logic
+from ict import market_structure as mstruct
 from ict.killzones import can_open_new_trade
 from news_filter import NewsCalendar
 from risk import pip_size
@@ -308,6 +309,117 @@ class LiveTrader(Backtester):
     def manual_resume(self) -> None:
         self._manual_halt = False
         log.info("Manual halt cleared (Telegram) — entries re-enabled")
+
+    # ── Telegram read / query commands (read-only; never raise) ──────────────
+
+    @staticmethod
+    def _dir_word(d) -> str:
+        return "bullish" if d > 0 else ("bearish" if d < 0 else "flat")
+
+    def read_dxy_value(self):
+        """Synthetic DXY from live constituent ticks (same math as the smoke test)."""
+        try:
+            from ict.dxy_synthetic import compute_dxy
+            prices = {}
+            for base in mt.DXY_CONSTITUENTS:
+                q = mt.tick(base)
+                if q:
+                    prices[base] = (q[0] + q[1]) / 2.0
+            return compute_dxy(prices)
+        except Exception:
+            return None
+
+    def _pair_structure(self, pair):
+        """Per-TF fractal structure + the intact ITH/ITL draws for one pair."""
+        now = datetime.now(timezone.utc)
+        q = mt.tick(pair)
+        out = {"price": round((q[0] + q[1]) / 2, 5) if q else None}
+        for tf, lbl in (("240T", "H4"), ("60T", "H1"), ("15T", "M15")):
+            try:
+                res = mstruct.classify(self.bars_up_to(pair, tf, now, max_bars=200))
+                ith = mstruct.last_intact(res, "ITH")
+                itl = mstruct.last_intact(res, "ITL")
+                out[lbl] = {
+                    "dir": mstruct.structure_direction(res),
+                    "ith": round(ith.price, 5) if ith else None,
+                    "itl": round(itl.price, 5) if itl else None,
+                }
+            except Exception:
+                out[lbl] = {"dir": 0, "ith": None, "itl": None}
+        return out
+
+    def _plan_str(self, pair) -> str:
+        bits = []
+        if self.inputs.day_lot(pair) is not None:
+            bits.append(f"lot {self.inputs.day_lot(pair):.2f}")
+        if self.inputs.bias(pair):
+            bits.append(f"{self.inputs.bias(pair)} only")
+        if self.inputs.hold(pair):
+            bits.append("HOLD")
+        if self.inputs.has_levels(pair):
+            bits.append("levels set")
+        return ", ".join(bits) if bits else "auto"
+
+    def read_structure(self, pair=None) -> str:
+        """The market-structure read template (one pair, or all when pair=None)."""
+        now = datetime.now(timezone.utc)
+        sess = self._current_session(now) or "outside killzone"
+        dxy = self.read_dxy_value()
+        pairs = [pair] if pair else list(config.PAIRS)
+        lines = [f"MARKET READ - {now:%H:%M} UTC",
+                 f"Session: {sess}",
+                 (f"DXY: {dxy:.2f}" if dxy else "DXY: n/a"), ""]
+        for p in pairs:
+            s = self._pair_structure(p)
+            h4 = s.get("H4", {})
+            lines.append(f"{p}  {s.get('price', '?')}")
+            lines.append(f"  H4 {self._dir_word(h4.get('dir', 0))} | "
+                         f"H1 {self._dir_word(s.get('H1', {}).get('dir', 0))} | "
+                         f"M15 {self._dir_word(s.get('M15', {}).get('dir', 0))}")
+            lines.append(f"  buy-side draw (ITH): {h4.get('ith') or '-'}")
+            lines.append(f"  sell-side draw (ITL): {h4.get('itl') or '-'}")
+            lines.append(f"  your plan: {self._plan_str(p)}")
+            lines.append("")
+        return "\n".join(lines).strip()
+
+    def read_positions(self) -> str:
+        if not self.active:
+            return "No open positions."
+        lines = ["OPEN POSITIONS"]
+        for p, st in self.active.items():
+            q = mt.tick(p)
+            price = (q[0] + q[1]) / 2 if q else None
+            pip = pip_size(p)
+            d = st["direction"]
+            leg = st["legs"][0]
+            lines.append(f"{p} {'LONG' if d > 0 else 'SHORT'}  x{len(st['legs'])} leg(s)")
+            lines.append(f"  entry {leg['entry']:.5f} | stop {leg['stop']:.5f} | tgt {st['target']:.5f}")
+            if price is not None:
+                lines.append(f"  now {price:.5f}  ({(price - leg['entry']) * d / pip:+.1f} pips)")
+            lines.append(f"  {st.get('entry_model', '?')} | {st.get('im_scenario', '?')}")
+        return "\n".join(lines)
+
+    def read_account(self) -> str:
+        self._update_equity()
+        day = datetime.now(timezone.utc).date()
+        dopen = self._day_open_eq.get(day, self.equity)
+        dpl = self.equity - dopen
+        dd = ((self._peak_equity - self.equity) / self._peak_equity * 100) if self._peak_equity else 0.0
+        return ("ACCOUNT\n"
+                f"equity: R{self.equity:,.2f}\n"
+                f"day open: R{dopen:,.2f}  (P&L R{dpl:+,.2f})\n"
+                f"peak: R{self._peak_equity:,.2f}  (drawdown {dd:.1f}%)\n"
+                f"open positions: {len(self.active)}\n"
+                f"consecutive losses: {self._consec_losses}\n"
+                f"trading: {'HALTED — /resume' if self._manual_halt else 'active'}")
+
+    def read_session(self) -> str:
+        now = datetime.now(timezone.utc)
+        sess = self._current_session(now)
+        return ("SESSION\n"
+                f"now: {now:%H:%M} UTC ({now:%a})\n"
+                f"session: {sess or 'outside killzone'}\n"
+                f"new entries allowed: {'yes' if can_open_new_trade(now) else 'no'}")
 
     def _direction_allowed(self, pair, direction, t) -> bool:
         """Live override of the backtest hook: apply the Telegram filters."""
