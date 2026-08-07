@@ -28,6 +28,7 @@ You don't have to wait for the template — any command works any time.
 
 ### 0 · Ask the bot (read anytime — no effect on trading)
 ```
+/brief           FULL session brief: account + structure + open trades + commands
 /read            market-structure template for all pairs
 /read EURUSD     just that pair
 /markets         all pairs at a glance
@@ -35,7 +36,11 @@ You don't have to wait for the template — any command works any time.
 /account         equity, day P&L, drawdown, halt state (also /equity)
 /dxy             synthetic dollar index right now
 /session         which killzone, and whether new entries are allowed
+/news            next high-impact news events (UTC)
+/whoami          your chat id + access level
 ```
+`/brief` is the same rich summary the bot sends you at the start of every
+session — call it any time to get the current picture in one message.
 The `/read` template shows, per pair: current price, H4/H1/M15 structure
 (bullish / bearish / flat), the intact **ITH** (buy-side draw) and **ITL**
 (sell-side draw), and your current plan for that pair. Example:
@@ -99,6 +104,7 @@ losing-but-you-believe-in-it ones alive.)
 ```
 /close EURUSD          → close EURUSD's open position(s) at market, now
 /close all             → flatten everything
+/flat                  → flatten everything (shortcut for /close all)
 /halt                  → stop all new entries AND pyramid adds; open trades
                           keep running on their stops
 /resume                → re-enable new entries
@@ -141,9 +147,30 @@ at the handover. You could add `/bias GBPUSD short` for the NY session, or
 
 ---
 
+## Sharing the bot with someone else
+
+You can let another person use the bot, at one of two levels:
+
+- **Viewer (read-only)** — they can `/brief`, `/read`, `/positions`, `/account`,
+  `/dxy`, `/session`, `/news`. They **cannot** change the plan or touch trades.
+- **Admin (full control)** — same as you: they can also `/lot`, `/bias`,
+  `/levels`, `/hold`, `/close`, `/halt`.
+
+Setup: the person opens your **GameTheory** bot, sends `/start`, then `/whoami`
+to get their chat id (or gets it from **@userinfobot**). Add their id to
+`live.env` and restart the bot:
+```
+TELEGRAM_VIEWER_IDS=5111111111,5222222222     # read-only people
+TELEGRAM_ADMIN_IDS=5333333333                 # full-control people
+```
+Everyone authorised also receives the trade alerts and session briefs. Anyone
+not listed is ignored. (The **Ops Bot** honours owner + admins only — never
+viewers — since it can change settings and run the VM.)
+
 ## Safety
 
-- **Only your Telegram chat can steer the bot** — anyone else messaging it is ignored.
+- **Only listed Telegram chats can use the bot** — anyone else is ignored; viewers
+  are limited to read-only.
 - **The backtest is byte-identical.** The two engine hooks (`_direction_allowed`,
   `_handover_exempt`) are pure no-ops in the backtester; only the live engine
   overrides them. Your 810-trade / PF 4.47 / MaxDD −12.95% numbers are untouched.
@@ -158,8 +185,10 @@ at the handover. You could add `/bias GBPUSD short` for the NY session, or
 
 | Command | Meaning |
 |---|---|
+| `/brief` | full session brief (structure + positions + account) |
 | `/read [EURUSD]` · `/markets` | market-structure read (template) |
-| `/positions` · `/account` · `/dxy` · `/session` | live read-outs |
+| `/positions` · `/account` · `/dxy` · `/session` · `/news` | live read-outs |
+| `/flat` | flatten everything · `/whoami` your id + access |
 | `/lot 0.02` / `/lot GBPUSD 0.03` | day lot (base; multipliers stack) |
 | `/bias EURUSD long\|short\|both` | direction filter |
 | `/levels EURUSD buy … sell …` | manual-AMD liquidity (sweep→target) |

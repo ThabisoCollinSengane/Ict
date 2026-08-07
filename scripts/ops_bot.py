@@ -61,8 +61,8 @@ VALIDATORS = {   # /validate NAME -> runner script (bash)
 }
 
 HELP = (
-    "OPS commands (owner-only):\n"
-    "/status\n"
+    "OPS commands (owner + admins):\n"
+    "/status  ·  /whoami\n"
     "/setaccount <login> <server>\n"
     "/setpassword <pwd>   /setpath <terminal64.exe>\n"
     "/smoketest\n"
@@ -93,8 +93,26 @@ def _token_chat():
     return tok, str(chat)
 
 
-def send(text: str) -> bool:
-    tok, chat = _token_chat()
+def _ids(s):
+    return {x.strip() for x in str(s or "").replace(";", ",").split(",") if x.strip()}
+
+
+def _allowed_ids():
+    """Ops bot is owner + admins only (viewers can't run VM ops)."""
+    _, owner = _token_chat()
+    return ({owner} if owner else set()) | _ids(os.getenv("TELEGRAM_ADMIN_IDS", ""))
+
+
+# Trading-bot commands — if sent here, point the user at the GameTheory bot.
+TRADING_CMDS = {"read", "structure", "markets", "positions", "open", "trades",
+                "account", "equity", "dxy", "session", "brief", "news",
+                "lot", "bias", "levels", "hold", "release", "close", "flat",
+                "halt", "resume", "auto", "clear"}
+
+
+def send(text: str, chat_id: str = None) -> bool:
+    tok, owner = _token_chat()
+    chat = str(chat_id) if chat_id else owner
     if not tok or not chat:
         return False
     if len(text) > 4000:
@@ -198,7 +216,7 @@ def status_text() -> str:
 
 # ── command dispatch (the whitelist) ──────────────────────────────────────────
 
-def handle(text: str) -> str | None:
+def handle(text: str, sender=None) -> str | None:
     text = (text or "").strip()
     if not text.startswith("/"):
         return None
@@ -206,10 +224,16 @@ def handle(text: str) -> str | None:
     cmd = toks[0][1:].lower().split("@", 1)[0]
     args = toks[1:]
 
+    if cmd == "whoami":
+        return f"chat id: {sender}\naccess: ops (full)"
     if cmd in ("help", "start"):
         return HELP
     if cmd == "status":
         return status_text()
+
+    # Sent to the wrong bot? Point them at the trading bot.
+    if cmd in TRADING_CMDS:
+        return "that's a trading command — send it to the GameTheory bot, not here."
 
     if cmd == "setaccount":
         if len(args) < 2 or not args[0].isdigit():
@@ -296,7 +320,7 @@ def poll_loop() -> int:
         return 1
     off = _read_offset()
     print(f"Ops bot: token {tok[:10]}... chat {chat}. Listening (Ctrl-C to stop).")
-    send("OPS BOT ONLINE\nOwner-only, whitelist-only. Send /help for commands.")
+    send("OPS BOT ONLINE\nOwner + admins, whitelist-only. Send /help for commands.")
     while True:
         params = {"timeout": 25}
         if off:
@@ -315,14 +339,15 @@ def poll_loop() -> int:
         for upd in data.get("result", []):
             off = max(off, upd.get("update_id", 0) + 1)
             msg = upd.get("message") or {}
-            if str(msg.get("chat", {}).get("id")) != chat:
-                continue                 # ignore anyone but the owner
+            cid = str(msg.get("chat", {}).get("id"))
+            if cid not in _allowed_ids():
+                continue                 # owner + admins only
             try:
-                ack = handle(msg.get("text", ""))
+                ack = handle(msg.get("text", ""), sender=cid)
             except Exception as exc:  # noqa: BLE001
                 ack = f"error handling command: {exc}"
             if ack is not None:
-                send(ack)
+                send(ack, chat_id=cid)   # reply to whoever asked
         _write_offset(off)
 
 

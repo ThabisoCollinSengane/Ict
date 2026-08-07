@@ -1,20 +1,16 @@
-"""Two-way Telegram control for the live engine (semi-auto inputs).
+"""Two-way Telegram control for the live engine.
 
-Polls Telegram getUpdates for the trader's replies and applies them to a
-SessionInputs store. Reply to the session-start template with:
+Polls Telegram getUpdates and dispatches a WHITELIST of commands. Three access
+tiers (so the bot can be shared safely):
 
-  /lot 0.02                    day lot for ALL pairs
-  /lot GBPUSD 0.03             day lot for one pair
-  /bias EURUSD long            long | short | both(=auto)
-  /levels EURUSD buy 1.0950 1.0975 sell 1.0900 1.0880
-  /auto EURUSD                 revert one pair to full auto
-  /clear                       revert ALL pairs to full auto
-  /status                      echo today's inputs
-  /help                        command list
+  * owner   — TELEGRAM_CHAT_ID          — full control
+  * admins  — TELEGRAM_ADMIN_IDS (csv)  — full control
+  * viewers — TELEGRAM_VIEWER_IDS (csv) — READ-ONLY (/read /positions /account …)
 
-Only messages from the configured TELEGRAM_CHAT_ID are honoured — no one else
-can steer the bot. Parsing is pure/offline-testable; the network poll is a thin
-wrapper around it (see parse_command).
+Anyone not listed is ignored. Replies go to whoever sent the command; alerts
+(trade open/close, session brief) are broadcast to everyone authorised.
+
+Parsing is pure/offline-testable (parse_command); the network poll wraps it.
 """
 from __future__ import annotations
 
@@ -27,28 +23,34 @@ import urllib.request
 import config
 
 try:
-    from scripts.notify import send_message as _notify, _SSL_CTX  # reuse CA bundle
+    from scripts.notify import _SSL_CTX      # reuse certifi CA bundle if present
 except Exception:  # pragma: no cover
     _SSL_CTX = ssl.create_default_context()
-
-    def _notify(msg):  # noqa: E731
-        return False
 
 _OFFSET_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "data", "telegram_offset.txt",
 )
 
+# Commands a read-only viewer may use. Everything else is full-control only.
+READ_CMDS = {"read", "structure", "markets", "positions", "open", "trades",
+             "account", "equity", "dxy", "session", "brief", "news",
+             "status", "help", "start", "whoami"}
+# Ops-bot commands — if sent here, point the user at the ops bot.
+OPS_CMDS = {"setaccount", "setpassword", "setpath", "smoketest", "installtask",
+            "startbot", "stopbot", "backtest", "validate", "logs", "pull"}
+
 HELP = (
-    "TRADING BOT commands\n"
+    "TRADING BOT — commands\n"
     "\n"
     "READ (ask the bot):\n"
+    "/brief  full session brief (structure + positions + account)\n"
     "/read [EURUSD]  market-structure template\n"
     "/markets  all pairs at a glance\n"
     "/positions  open trades + live P&L\n"
     "/account  equity / day P&L / drawdown\n"
-    "/dxy  synthetic dollar index\n"
-    "/session  killzone + can-trade now\n"
+    "/dxy  dollar index   ·   /session  killzone\n"
+    "/news  upcoming high-impact events\n"
     "\n"
     "PLAN (steer the bot):\n"
     "/lot 0.02  ·  /lot GBPUSD 0.03\n"
@@ -57,9 +59,73 @@ HELP = (
     "/hold EURUSD (run across sessions) · /release EURUSD\n"
     "\n"
     "CONTROL (act now):\n"
-    "/close EURUSD | all  ·  /halt  ·  /resume\n"
-    "/auto EURUSD  ·  /clear  ·  /status"
+    "/close EURUSD | all  ·  /flat  ·  /halt  ·  /resume\n"
+    "/auto EURUSD  ·  /clear  ·  /status  ·  /whoami\n"
+    "\n"
+    "(Setup/backtest/logs live on the Ops Bot.)"
 )
+
+HELP_VIEW = (
+    "TRADING BOT — read-only access\n"
+    "/brief  ·  /read [EURUSD]  ·  /markets\n"
+    "/positions  ·  /account  ·  /dxy  ·  /session  ·  /news\n"
+    "/status  ·  /whoami"
+)
+
+
+# ── access control ────────────────────────────────────────────────────────────
+
+def _ids(s) -> set:
+    return {x.strip() for x in str(s or "").replace(";", ",").split(",") if x.strip()}
+
+
+def _access():
+    owner = str(getattr(config, "TELEGRAM_CHAT_ID", "") or os.getenv("TELEGRAM_CHAT_ID", ""))
+    admins = _ids(getattr(config, "TELEGRAM_ADMIN_IDS", "") or os.getenv("TELEGRAM_ADMIN_IDS", ""))
+    viewers = _ids(getattr(config, "TELEGRAM_VIEWER_IDS", "") or os.getenv("TELEGRAM_VIEWER_IDS", ""))
+    return owner, admins, viewers
+
+
+def _role(cid):
+    """'full' | 'view' | None for a chat id."""
+    cid = str(cid)
+    owner, admins, viewers = _access()
+    if cid and (cid == owner or cid in admins):
+        return "full"
+    if cid in viewers:
+        return "view"
+    return None
+
+
+# ── telegram send ─────────────────────────────────────────────────────────────
+
+def _send(chat_id, text: str) -> bool:
+    token = getattr(config, "TELEGRAM_BOT_TOKEN", "") or os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not token or not chat_id:
+        return False
+    if len(text) > 4000:
+        text = text[:3980] + "\n...(truncated)"
+    data = json.dumps({"chat_id": chat_id, "text": text}).encode()
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=data, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=12, context=_SSL_CTX) as r:
+            return r.status == 200
+    except Exception as exc:  # noqa: BLE001
+        print(f"[telegram_control] send failed: {exc}", flush=True)
+        return False
+
+
+def broadcast(text: str) -> bool:
+    """Send `text` to everyone authorised (owner + admins + viewers). Used for
+    alerts and the session brief so shared users see them too."""
+    owner, admins, viewers = _access()
+    ok = False
+    for cid in ({owner} | admins | viewers):
+        if cid:
+            ok = _send(cid, text) or ok
+    return ok
 
 
 def _pairs() -> list[str]:
@@ -67,7 +133,6 @@ def _pairs() -> list[str]:
 
 
 def _match_pair(tok: str):
-    """Resolve a user token to a configured pair (case-insensitive), else None."""
     t = tok.upper()
     for p in _pairs():
         if p.upper() == t:
@@ -75,35 +140,41 @@ def _match_pair(tok: str):
     return None
 
 
-def parse_command(text: str, inputs, trader=None) -> str | None:
-    """Apply one command line; return an ack string (or None to ignore).
+# ── command dispatch ──────────────────────────────────────────────────────────
 
-    `inputs` holds per-day state (lot/bias/levels/hold). `trader`, when supplied,
-    is the live engine — needed for the ACTION commands (/close /halt /resume)
-    that do something now rather than set state. Parsing is pure and works with
-    trader=None (offline-testable); the action just isn't executed.
+def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> str | None:
+    """Apply one command; return an ack (or None to ignore).
+
+    role: 'full' (owner/admin) or 'view' (read-only). sender: the chat id (for
+    /whoami). Pure — works with trader=None for offline tests.
     """
     text = (text or "").strip()
     if not text.startswith("/"):
         return None
     toks = text.split()
-    cmd = toks[0][1:].lower().split("@", 1)[0]   # strip leading / and any @botname
+    cmd = toks[0][1:].lower().split("@", 1)[0]
     args = toks[1:]
 
+    if cmd == "whoami":
+        r = {"full": "full control", "view": "read-only"}.get(role, str(role))
+        return f"chat id: {sender}\naccess: {r}"
     if cmd in ("help", "start"):
-        return HELP
+        return HELP if role == "full" else HELP_VIEW
     if cmd == "status":
         return inputs.status_text()
 
-    # ── read / query (need the live engine) ───────────────────────────────────
+    # Sent to the wrong bot? Point them at the ops bot.
+    if cmd in OPS_CMDS:
+        return "that's an Ops Bot command — send it to the Ops Bot, not here."
+
+    # Read/query — available to viewers too.
     if cmd in ("read", "structure", "markets", "positions", "open", "trades",
-               "account", "equity", "dxy", "session"):
+               "account", "equity", "dxy", "session", "brief", "news"):
         if trader is None:
             return "read commands need the live bot running."
         try:
             if cmd in ("read", "structure", "markets"):
-                p = _match_pair(args[0]) if args else None
-                return trader.read_structure(p)
+                return trader.read_structure(_match_pair(args[0]) if args else None)
             if cmd in ("positions", "open", "trades"):
                 return trader.read_positions()
             if cmd in ("account", "equity"):
@@ -113,10 +184,24 @@ def parse_command(text: str, inputs, trader=None) -> str | None:
                 return f"DXY ~ {d:.3f}" if d else "DXY unavailable"
             if cmd == "session":
                 return trader.read_session()
+            if cmd == "brief":
+                return trader.read_brief()
+            if cmd == "news":
+                return trader.read_news()
         except Exception as exc:  # noqa: BLE001
             return f"read failed: {exc}"
 
-    # ── action commands (need the live engine) ───────────────────────────────
+    # Everything below changes state or trades — full control only.
+    if role != "full":
+        return ("read-only access — you can use /brief /read /markets /positions "
+                "/account /dxy /session /news")
+
+    if cmd == "flat":
+        if trader is None:
+            return "flat — (no live engine attached)"
+        n = trader.manual_close_all()
+        return f"closing ALL open positions ({n})" if n else "nothing open to close"
+
     if cmd == "close":
         if not args:
             return "usage: /close EURUSD   (or /close all)"
@@ -136,12 +221,13 @@ def parse_command(text: str, inputs, trader=None) -> str | None:
         if trader is not None:
             trader.manual_halt()
         return ("TRADING HALTED — no new entries or pyramid adds. Open trades keep "
-                "running on their stops. Send /resume to re-enable, /close all to flatten.")
+                "running on their stops. /resume to re-enable, /flat to close all.")
 
     if cmd in ("resume", "unhalt"):
         if trader is not None:
             trader.manual_resume()
         return "Resumed — new entries re-enabled."
+
     if cmd == "clear":
         return inputs.clear()
     if cmd == "auto":
@@ -177,7 +263,6 @@ def parse_command(text: str, inputs, trader=None) -> str | None:
             lot = float(args[-1])
         except ValueError:
             return f"bad lot value in: {text}"
-        # No pair given → apply to every configured pair.
         return "\n".join(inputs.set_lot(pp, lot) for pp in _pairs())
 
     if cmd == "bias":
@@ -211,7 +296,7 @@ def parse_command(text: str, inputs, trader=None) -> str | None:
     return f"unknown command '{cmd}' — try /help"
 
 
-# ── network layer ────────────────────────────────────────────────────────────
+# ── network layer ─────────────────────────────────────────────────────────────
 
 def _read_offset() -> int:
     try:
@@ -228,14 +313,9 @@ def _write_offset(o: int) -> None:
 
 
 def poll(inputs, trader=None) -> int:
-    """Fetch new Telegram messages and apply any commands. Returns count applied.
-
-    `trader` (the live engine) enables the action commands /close /halt /resume.
-    Never raises — a Telegram hiccup must never interrupt the trading loop.
-    """
+    """Fetch new messages, dispatch, reply to the sender. Never raises."""
     token = getattr(config, "TELEGRAM_BOT_TOKEN", "") or os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = str(getattr(config, "TELEGRAM_CHAT_ID", "") or os.getenv("TELEGRAM_CHAT_ID", ""))
-    if not token or not chat_id:
+    if not token:
         return 0
 
     offset = _read_offset()
@@ -250,22 +330,22 @@ def poll(inputs, trader=None) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"[telegram_control] poll failed: {exc}", flush=True)
         return 0
-
     if not data.get("ok"):
         return 0
 
     applied = 0
     max_uid = offset
     for upd in data.get("result", []):
-        uid = upd.get("update_id", 0)
-        max_uid = max(max_uid, uid + 1)   # ack this update so it's not re-served
+        max_uid = max(max_uid, upd.get("update_id", 0) + 1)
         msg = upd.get("message") or {}
-        if str(msg.get("chat", {}).get("id")) != chat_id:
-            continue                       # ignore anyone but the owner
-        text = msg.get("text", "")
-        ack = parse_command(text, inputs, trader=trader)
+        cid = msg.get("chat", {}).get("id")
+        role = _role(cid)
+        if role is None:
+            continue                       # not owner/admin/viewer — ignore
+        ack = parse_command(msg.get("text", ""), inputs, trader=trader,
+                            role=role, sender=cid)
         if ack is not None:
-            _notify(f"SEMI-AUTO\n{ack}")
+            _send(cid, ack)                # reply to whoever asked
             applied += 1
 
     if max_uid != offset:

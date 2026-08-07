@@ -47,10 +47,13 @@ import live.mt5_connector as mt
 from live.session_inputs import SessionInputs
 from live import telegram_control
 
-try:
-    from scripts.notify import send_message as _notify
-except Exception:
-    def _notify(msg): return False  # noqa: E731
+def _notify(msg):
+    """Broadcast an alert to every authorised Telegram user (owner + admins +
+    viewers) via the trading bot's token."""
+    try:
+        return telegram_control.broadcast(msg)
+    except Exception:
+        return False
 
 logging.basicConfig(
     level=logging.INFO,
@@ -420,6 +423,49 @@ class LiveTrader(Backtester):
                 f"now: {now:%H:%M} UTC ({now:%a})\n"
                 f"session: {sess or 'outside killzone'}\n"
                 f"new entries allowed: {'yes' if can_open_new_trade(now) else 'no'}")
+
+    def read_news(self) -> str:
+        try:
+            now = datetime.now(timezone.utc)
+            evs = sorted((e for e in getattr(self.news, "events", []) if e[0] >= now),
+                         key=lambda e: e[0])[:6]
+            if not evs:
+                return "No upcoming news events in the calendar."
+            lines = ["UPCOMING NEWS (UTC)"]
+            for dt, ccy, impact, name in evs:
+                lines.append(f"{dt:%m-%d %H:%M} {ccy} [{impact}] {name}")
+            return "\n".join(lines)
+        except Exception as exc:  # noqa: BLE001
+            return f"news unavailable: {exc}"
+
+    def read_brief(self, header=None) -> str:
+        """Full session brief: account line + per-pair structure + open positions
+        + a command hint. Used on demand (/brief) and as the session template."""
+        now = datetime.now(timezone.utc)
+        self._update_equity()
+        dopen = self._day_open_eq.get(now.date(), self.equity)
+        dxy = self.read_dxy_value()
+        sess = self._current_session(now) or "outside killzone"
+
+        def w(x):
+            return {1: "bull", -1: "bear", 0: "flat"}[x.get("dir", 0)]
+
+        lines = [header or f"BRIEF - {now:%Y-%m-%d %H:%M} UTC",
+                 f"Equity R{self.equity:,.0f} | day P&L R{self.equity - dopen:+,.0f} | "
+                 f"{len(self.active)} open | {sess}",
+                 (f"DXY {dxy:.2f}" if dxy else "DXY n/a"), ""]
+        for p in config.PAIRS:
+            s = self._pair_structure(p)
+            h4 = s.get("H4", {})
+            lines.append(
+                f"{p} {s.get('price', '?')} | H4 {w(h4)} H1 {w(s.get('H1', {}))} "
+                f"M15 {w(s.get('M15', {}))} | ITH {h4.get('ith') or '-'} "
+                f"ITL {h4.get('itl') or '-'} | {self._plan_str(p)}")
+        if self.active:
+            lines += ["", self.read_positions()]
+        lines += ["", "Reply — read: /read /positions /account /news | "
+                  "plan: /lot /bias /levels /hold | act: /close /halt | /help"]
+        return "\n".join(lines)
 
     def _direction_allowed(self, pair, direction, t) -> bool:
         """Live override of the backtest hook: apply the Telegram filters."""
@@ -854,28 +900,11 @@ class LiveTrader(Backtester):
         return None
 
     def _session_template(self, day_key, sess) -> str:
-        """The start-of-session Telegram prompt the trader replies to. Fires at
-        the top of every session (London / NY AM / NY PM)."""
+        """Start-of-session brief, fired at the top of each session (London / NY
+        AM / NY PM): account + per-pair structure + open positions + commands."""
         head = {"london": "LONDON", "ny": "NEW YORK AM", "ny_pm": "NEW YORK PM"}.get(
-            sess, sess.upper())
-        lines = [
-            f"{head} SESSION START — {day_key}",
-            "Set this session's plan (or ignore for full auto):",
-            "/lot 0.02",
-            "/bias EURUSD long   (long | short | both)",
-            "/levels EURUSD buy 1.0975 sell 1.0900",
-            "/hold EURUSD   (let a trade run into the next session)",
-            "/status · /clear",
-        ]
-        # On NY / PM, surface what's already open so you can decide to /hold it.
-        if sess in ("ny", "ny_pm") and self.active:
-            held = [p for p in self.active if self.inputs.hold(p)]
-            note = f"Open now: {', '.join(self.active.keys())}"
-            if held:
-                note += f"  ·  holding: {', '.join(held)}"
-            lines.insert(1, note)
-        lines += ["", self.inputs.status_text()]
-        return "\n".join(lines)
+            sess, str(sess).upper())
+        return self.read_brief(header=f"{head} SESSION START - {day_key}")
 
     # ── Main loop ─────────────────────────────────────────────────────────────
 

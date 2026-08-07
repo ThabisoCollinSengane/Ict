@@ -132,6 +132,12 @@ STRUCTURE_ENTRY_TF       = _os.environ.get("STRUCTURE_ENTRY_TF", "5T")   # LTF f
 STRUCTURE_ENTRY_LOOKBACK = int(_os.environ.get("STRUCTURE_ENTRY_LOOKBACK", "60"))
 STRUCTURE_ENTRY_MAX_AGE  = int(_os.environ.get("STRUCTURE_ENTRY_MAX_AGE", "3"))  # bars since 3rd bar printed
 
+# --- Telegram access sharing (optional; comma/;-separated chat ids) ---
+# Owner = TELEGRAM_CHAT_ID (full). ADMIN_IDS get full control too; VIEWER_IDS get
+# read-only (/read /positions /account ...). Empty = owner-only (default).
+TELEGRAM_ADMIN_IDS  = _os.environ.get("TELEGRAM_ADMIN_IDS", "")
+TELEGRAM_VIEWER_IDS = _os.environ.get("TELEGRAM_VIEWER_IDS", "")
+
 # --- Account protection (wipeout prevention) ---
 # 1. Peak drawdown halt: if equity falls >MAX_DRAWDOWN_HALT_PCT% from its highest
 #    point, stop trading for DRAWDOWN_PAUSE_DAYS calendar days before retrying.
