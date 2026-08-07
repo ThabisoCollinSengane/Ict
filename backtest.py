@@ -1861,6 +1861,32 @@ class Backtester:
             "dxy_minor_sweep": dxy_minor_sweep,
         }
 
+    def _structure_entry_confirmed(self, pair, direction, t):
+        """Optional Ep-12 entry trigger — 'enter on the LTF reversal swing'.
+
+        After the HTF read + MSS confirm the bias, require a freshly-confirmed
+        lower-TF fractal swing in the trade direction:
+          LONG  -> a confirmed, still-intact Short-Term LOW  (STL)
+          SHORT -> a confirmed, still-intact Short-Term HIGH (STH)
+        'Confirmed' = the swing's right-side (3rd) bar has printed (age >= 1);
+        'fresh'     = it formed within STRUCTURE_ENTRY_MAX_AGE bars;
+        'intact'    = not yet swept (the reversal is holding).
+        Gated by STRUCTURE_ENTRY_ENABLED; a pure no-op (never called) when off.
+        """
+        bars = self.bars_up_to(pair, config.STRUCTURE_ENTRY_TF, t,
+                               max_bars=config.STRUCTURE_ENTRY_LOOKBACK)
+        if len(bars) < 5:
+            return False
+        res = mstruct.classify(bars)
+        swings = res.get("stl" if direction > 0 else "sth", [])
+        if not swings:
+            return False
+        last = swings[-1]
+        age = (len(bars) - 1) - last.bar_index   # completed bars to the swing's right
+        if age < 1 or age > config.STRUCTURE_ENTRY_MAX_AGE:
+            return False
+        return not last.swept
+
     def _direction_allowed(self, pair, direction, t):
         """Hook for the live semi-auto layer to veto a trade direction.
 
@@ -2136,6 +2162,14 @@ class Backtester:
             self._log_reject(t, pair, direction, f"no MSS ({mss_count}/3 structure shift, need 2)")
             return   # Need at least 2-of-3 MSS
         g["mss_h1_m15_m5_ok"] += 1
+
+        # Optional Ep-12 structure entry trigger (default OFF -> no-op). Require a
+        # freshly-confirmed LTF reversal swing (STL for longs / STH for shorts) —
+        # "enter on the swing formation, the moment its 3rd bar prints".
+        if config.STRUCTURE_ENTRY_ENABLED and not self._structure_entry_confirmed(pair, direction, t):
+            g["structure_entry_blocked"] = g.get("structure_entry_blocked", 0) + 1
+            self._log_reject(t, pair, direction, "no confirmed LTF reversal swing (structure entry)")
+            return
 
         # Dealing range: informational only (DR over-rejects in trending markets).
         bars1h = self.bars_up_to(pair, "60T", t)
