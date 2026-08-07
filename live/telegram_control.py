@@ -59,6 +59,7 @@ HELP = (
     "/hold EURUSD (run across sessions) · /release EURUSD\n"
     "\n"
     "CONTROL (act now):\n"
+    "/test EURUSD long|short  (demo test entry, bot's own stop)\n"
     "/close EURUSD | all  ·  /flat  ·  /halt  ·  /resume\n"
     "/auto EURUSD  ·  /clear  ·  /status  ·  /whoami\n"
     "\n"
@@ -195,6 +196,22 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
     if role != "full":
         return ("read-only access — you can use /brief /read /markets /positions "
                 "/account /dxy /session /news")
+
+    if cmd in ("test", "testtrade", "buy", "sell"):
+        if trader is None:
+            return "test needs the live bot running."
+        if cmd == "buy":
+            pair, d = (_match_pair(args[0]) if args else None), 1
+        elif cmd == "sell":
+            pair, d = (_match_pair(args[0]) if args else None), -1
+        else:
+            if len(args) < 2:
+                return "usage: /test EURUSD long|short   (or /buy EURUSD, /sell EURUSD)"
+            pair = _match_pair(args[0])
+            d = 1 if args[1].lower().startswith("l") else -1
+        if not pair:
+            return "usage: /test EURUSD long|short   (or /buy EURUSD, /sell EURUSD)"
+        return trader.manual_test_trade(pair, d)
 
     if cmd == "flat":
         if trader is None:
