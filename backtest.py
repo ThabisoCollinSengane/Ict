@@ -2691,16 +2691,19 @@ class Backtester:
         # valid M1 swing is found.
         # Stage 3 (toggle): prefer the intact INTERMEDIATE swing (ITL/ITH) so the
         # stop survives a minor short-term sweep; fall back to the STL/STH stop.
+        _stop_reason = "pattern (FVG/OB boundary)"   # default: pattern-invalidation stop
         _struct_stop = None
         if config.STRUCTURE_STOP_ENABLED:
             _struct_stop = self._structure_stop(pair, direction, entry, pip, t)
         if _struct_stop is not None:
             stop = _struct_stop
+            _stop_reason = "structural swing (intact ITL/ITH)"
             g["structure_stop_used"] = g.get("structure_stop_used", 0) + 1
         else:
             _m1_stop = self._m1_structure_stop(bars1m, direction, entry, pip)
             if _m1_stop is not None:
                 stop = _m1_stop
+                _stop_reason = "M1 swing"
                 g["m1_stop_used"] = g.get("m1_stop_used", 0) + 1
 
         # High-impact news nearby: override to fixed 10-pip stop (protects against
@@ -2708,6 +2711,7 @@ class Backtester:
         if news_impact == "High":
             stop = entry - config.FIXED_STOP_PIPS * pip if direction > 0 \
                    else entry + config.FIXED_STOP_PIPS * pip
+            _stop_reason = "fixed 10-pip (high-impact news)"
 
         # Universal stop cap: never risk more than FIXED_STOP_PIPS on any trade.
         # The structural stop can sit 30–50 pips away, which at the broker min-lot
@@ -2910,6 +2914,7 @@ class Backtester:
             "tp1_price": target if _runner_applies else None,
             "tp_runner": _runner_applies,
             "target_type": target_type,
+            "stop_reason": _stop_reason,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir,
             "profile_score": p_score,

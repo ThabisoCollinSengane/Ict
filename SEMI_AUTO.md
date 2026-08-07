@@ -32,7 +32,8 @@ You don't have to wait for the template — any command works any time.
 /read            market-structure template for all pairs
 /read EURUSD     just that pair
 /markets         all pairs at a glance
-/positions       open trades + live P&L (also /open, /trades)
+/positions       open trades + live P&L, and WHY: TP source (e.g. H1 FVG,
+                 ITH draw, fib ext) + SL basis (structural ITL/ITH, M1 swing)
 /account         equity, day P&L, drawdown, halt state (also /equity)
 /dxy             synthetic dollar index right now
 /session         which killzone, and whether new entries are allowed
