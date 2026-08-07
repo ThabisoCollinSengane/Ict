@@ -187,15 +187,16 @@ def story():
         "1.  What the algorithm is",
         "2.  The trading day - sessions &amp; killzones",
         "3.  The AMD cycle - the heartbeat of every trade",
-        "4.  The intermarket gate - which pair, which way",
-        "5.  How the bot enters - the two models",
-        "6.  Session handovers - reading them, trading them",
-        "7.  Liquidity levels - your buy-side / sell-side inputs",
-        "8.  Targets &amp; exits - where the bot takes profit",
-        "9.  Talking to the algorithm - the Telegram manual",
-        "10. Risk &amp; circuit breakers",
-        "11. A day in the life - worked example",
-        "12. Go-live checklist &amp; quick reference",
+        "4.  How market structure is detected &amp; traded",
+        "5.  The intermarket gate - which pair, which way",
+        "6.  How the bot enters - the two models",
+        "7.  Session handovers - reading them, trading them",
+        "8.  Liquidity levels - your buy-side / sell-side inputs",
+        "9.  Targets &amp; exits - where the bot takes profit",
+        "10. Talking to the algorithm - the Telegram manual",
+        "11. Risk &amp; circuit breakers",
+        "12. A day in the life - worked example",
+        "13. Go-live checklist &amp; quick reference",
     ]
     s += [Paragraph(t, styles["TOC"]) for t in toc]
     s += [PageBreak()]
@@ -237,7 +238,7 @@ def story():
     s += [P("Each session is evaluated <b>independently</b> - a clean handover. London's "
             "read does not bleed into New York; when NY opens it starts a fresh AMD "
             "cycle. That separation is exactly what lets you treat the handover as its "
-            "own trade setup (Section 6).")]
+            "own trade setup (Section 7).")]
 
     # ---- 3 ----
     s += [H1("3 - The AMD cycle: the heartbeat of every trade")]
@@ -254,8 +255,87 @@ def story():
                   "trade the other way. Your <b>/levels</b> tell it which pools you expect "
                   "to be swept and delivered to.", kind="gold")]
 
-    # ---- 4 ----
-    s += [H1("4 - The intermarket gate: which pair, which way")]
+    # ---- 4  (structure detection + the HTF-read / LTF-entry play) ----
+    s += [H1("4 - How market structure is detected &amp; traded")]
+    s += [P("Structure is the skeleton the whole strategy hangs on - it says where the "
+            "swing highs and lows are, which are still holding, and therefore which way "
+            "price is really going. Here is how the bot finds them, and the key point: it "
+            "<b>reads structure on the higher timeframe but takes the entry on the lower</b>.")]
+
+    s += [H2("The atomic unit - a 3-bar fractal")]
+    s += [P("A swing is the simplest ICT pattern: a candle whose extreme is beyond the "
+            "candle on <b>each</b> side.")]
+    s += [mono([
+        "Swing HIGH (STH) - middle bar's HIGH above BOTH neighbours:",
+        "",
+        "          b2",
+        "         /  \\          b2.High &gt; b1.High  AND  b2.High &gt; b3.High",
+        "       b1    b3        -&gt; b2 is a Short-Term High (STH)",
+        "",
+        "Swing LOW (STL) - middle bar's LOW below BOTH neighbours:",
+        "",
+        "       b1    b3        b2.Low &lt; b1.Low   AND  b2.Low &lt; b3.Low",
+        "         \\  /          -&gt; b2 is a Short-Term Low (STL)",
+        "          b2",
+    ])]
+    s += [P("Because a swing needs a candle on <b>each</b> side, it is only confirmed when "
+            "the <b>third (right-side) bar</b> prints. The bot works off completed bars, so "
+            "nothing repaints - and that third-bar rule is the whole key to the entry "
+            "timing below.")]
+
+    s += [H2("The tiers are recursive, not wider lookbacks")]
+    s += [P("The three ICT tiers are built by promoting the tier below - each is a fractal "
+            "of the one under it:")]
+    s += [table([
+        ["Tier", "Definition"],
+        ["STH / STL (short-term)", "A 3-bar fractal on the raw candles."],
+        ["ITH / ITL (intermediate)", "A short-term high with a LOWER short-term high on each side (a fractal WITHIN the STH sequence). ITL is the inverse on STLs."],
+        ["LTH / LTL (long-term)", "An intermediate high with a lower intermediate high on each side - one tier up again."],
+    ], widths=[4.6 * cm, 11.8 * cm])]
+
+    s += [H2("Swept vs. intact - the level that still matters")]
+    s += [P("After classifying, every swing is tagged: a high is <b>swept</b> once a later "
+            "bar trades through it, a low once a later bar drops below it. The most recent "
+            "<b>unswept</b> swing of a tier is the live reference - the level still holding. "
+            "That one distinction drives the strategy:")]
+    s += [bullets([
+        "The <b>stop</b> sits beyond the intact intermediate swing (ITL for longs / ITH for "
+        "shorts) - not the short-term swing, which gets run constantly.",
+        "The <b>trend read</b> is the intermediate tier: higher ITLs = bullish, lower ITHs "
+        "= bearish.",
+        "<b>Judas vs. real break:</b> short-term swings getting taken while the ITH/ITL "
+        "stays intact is a minor liquidity run (a Judas) - NOT a trend change. That double "
+        "sweep is exactly what the bot fades.",
+    ])]
+
+    s += [H2("The play: read structure HIGH, enter LOW")]
+    s += [P("This is the heart of the entry. Structure is confirmed on the higher "
+            "timeframe, but the entry is taken on the lower - so you are filled early, not "
+            "waiting for a slow HTF candle to close.")]
+    s += [bullets([
+        "<b>1. Read the HTF.</b> On H4/H1 the draw cascade + fractal show the ITH/ITL is in "
+        "place and an MSS (break of structure) has fired - you now know the bias and the "
+        "draw (which way, and the pool price is headed for).",
+        "<b>2. Anticipate the reversal swing on the LTF.</b> Drop to M5/M15 and wait for the "
+        "counter-swing to form - an <b>STL</b> for a long (or <b>STH</b> for a short) at "
+        "your entry zone (the FVG / OB).",
+        "<b>3. Enter as that swing confirms.</b> The moment the LTF swing's <b>third bar</b> "
+        "prints, the reversal is confirmed and price is already turning your way - you are "
+        "in the move as it happens, stop just beyond the swing.",
+    ])]
+    s += [callout("Because the LTF swing's third bar confirms in minutes, you do NOT wait "
+                  "for the higher-timeframe candle to close - by the time an H1/H4 candle "
+                  "would confirm the same swing, the move is long gone. The HTF gives the "
+                  "direction and the draw; the LTF 3-bar swing gives the early, precise "
+                  "entry.", kind="gold")]
+    s += [P("In the engine this is literal: the HTF draw cascade (W/D/H4) sets the bias, the "
+            "<b>MSS is checked on M15/M5</b>, entry is a limit into the M5/M15 FVG/OB, and "
+            "the stop is anchored on the <b>M1</b> intact swing. The bot re-evaluates on "
+            "<b>every M5 close</b> - so the LTF swing confirms and you are filled while the "
+            "H1/H4 candle is still only part-formed.")]
+
+    # ---- 5 ----
+    s += [H1("5 - The intermarket gate: which pair, which way")]
     s += [P("Before any pair can trade, the dollar has to agree. This is a hard gate - "
             "no intermarket signal, no trade.")]
     s += [bullets([
@@ -271,7 +351,7 @@ def story():
             "real intermarket signal to produce a trade.")]
 
     # ---- 5 ----
-    s += [H1("5 - How the bot enters: the two models")]
+    s += [H1("6 - How the bot enters: the two models")]
     s += [H2("Model 1 - Judas reversal (the default)")]
     s += [bullets([
         "An M15 consolidation range must exist (both extremes tested).",
@@ -291,7 +371,7 @@ def story():
                   "fired in the Telegram trade alert.", kind="note")]
 
     # ---- 6  (the requested deep dive) ----
-    s += [H1("6 - Session handovers: reading them, trading them")]
+    s += [H1("7 - Session handovers: reading them, trading them")]
     s += [P("A <b>handover</b> is the gap between two sessions - most importantly "
             "<b>London &#8594; New York</b> (roughly 05:00-07:00 ET). This is where a lot "
             "of the day's best entries are made, so it's worth understanding well.")]
@@ -335,7 +415,7 @@ def story():
                   "your /levels + /bias point the bot straight at it.", kind="gold")]
 
     # ---- 7  (levels deep dive) ----
-    s += [H1("7 - Liquidity levels: your buy-side / sell-side inputs")]
+    s += [H1("8 - Liquidity levels: your buy-side / sell-side inputs")]
     s += [P("This is how you hand the bot the levels you're watching. In ICT terms:")]
     s += [table([
         ["Term", "Where", "What rests there", "Typical sources"],
@@ -370,7 +450,7 @@ def story():
                   "for your target.", kind="tip")]
 
     # ---- 8 ----
-    s += [H1("8 - Targets &amp; exits: where the bot takes profit")]
+    s += [H1("9 - Targets &amp; exits: where the bot takes profit")]
     s += [P("Left on auto, the bot chooses the <b>nearest qualifying</b> institutional "
             "draw as its target - never a far moonshot. Candidate draws, scored by how "
             "many agree at one price (confluence):")]
@@ -396,7 +476,7 @@ def story():
                   "it gives back profit. The far pools are the NEXT cycle's job.", kind="note")]
 
     # ---- 9  (Telegram manual) ----
-    s += [H1("9 - Talking to the algorithm: the Telegram manual")]
+    s += [H1("10 - Talking to the algorithm: the Telegram manual")]
     s += [P("You control the bot by replying to its messages in Telegram. It only obeys "
             "<b>your</b> chat - no one else can steer it. Every command is acknowledged so "
             "you always see what registered. Send <b>/help</b> any time for the list.")]
@@ -410,7 +490,7 @@ def story():
         ["Command", "What it does"],
         ["/lot 0.02", "Day lot for all pairs (/lot GBPUSD 0.03 for one). Base lot - the sizing multipliers still stack."],
         ["/bias EURUSD long", "Hunt one direction only (long | short | both). A filter: the bot still needs its own setup."],
-        ["/levels EURUSD buy 1.0975 sell 1.0900", "Your buy-side / sell-side liquidity -> full manual AMD (Section 7)."],
+        ["/levels EURUSD buy 1.0975 sell 1.0900", "Your buy-side / sell-side liquidity -> full manual AMD (Section 8)."],
         ["/hold EURUSD", "Let this pair run across the session handover (also /hold all). /release EURUSD undoes it."],
         ["/close EURUSD", "Close this pair's open position(s) at market now (/close all flattens everything)."],
         ["/halt", "Stop ALL new entries and pyramid adds. Open trades keep running on their stops."],
@@ -423,7 +503,7 @@ def story():
                   "new trades but let current winners run: just <b>/halt</b>.", kind="tip")]
 
     # ---- 10 ----
-    s += [H1("10 - Risk &amp; circuit breakers")]
+    s += [H1("11 - Risk &amp; circuit breakers")]
     s += [P("Sizing follows equity tiers (it grows as the account grows). A day lot you "
             "set with <b>/lot</b> becomes the base; the conviction multipliers "
             "(2x/3x on a full higher-timeframe draw, 1.25x on high-confluence / CRT / "
@@ -440,7 +520,7 @@ def story():
     ], widths=[3.6 * cm, 5.6 * cm, 7.2 * cm])]
 
     # ---- 11 ----
-    s += [H1("11 - A day in the life")]
+    s += [H1("12 - A day in the life")]
     s += [P("A worked example of driving the bot through a full day.")]
     s += [H2("07:55 ET - the LONDON template already fired; you reply")]
     s += [mono([
@@ -466,7 +546,7 @@ def story():
             "<b>/halt</b> stops new entries until you <b>/resume</b>.")]
 
     # ---- 12 ----
-    s += [H1("12 - Go-live checklist &amp; quick reference")]
+    s += [H1("13 - Go-live checklist &amp; quick reference")]
     s += [H2("Go-live checklist (do not skip)")]
     s += [bullets([
         "Bootstrap the VM, install MT5, log into your Exness <b>DEMO</b> account.",
