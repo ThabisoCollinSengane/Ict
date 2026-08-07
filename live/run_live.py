@@ -29,6 +29,8 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
+import time
 import urllib.request
 from collections import namedtuple
 from datetime import datetime, timezone
@@ -979,6 +981,11 @@ class LiveTrader(Backtester):
         log.info("DEMO mode until smoke test confirmed — see LIVE_SETUP.md")
         log.info("=" * 60)
 
+        # Poll Telegram in the background every ~2s so commands feel instant,
+        # independent of the M5 strategy cadence. Only ONE poller runs (this
+        # thread) — the per-bar poll was removed from _run_once to avoid a 409.
+        threading.Thread(target=self._telegram_loop, daemon=True).start()
+
         _feed_timeout = (config.STALE_FEED_MAX_MINUTES * 60
                          if config.STALE_FEED_GUARD_ENABLED else None)
         while True:
@@ -999,6 +1006,15 @@ class LiveTrader(Backtester):
         mt.shutdown()
         log.info("Live loop stopped. Open positions left in MT5 if any.")
 
+    def _telegram_loop(self):
+        """Background: poll Telegram every ~2s for commands. Never dies."""
+        while True:
+            try:
+                telegram_control.poll(self.inputs, trader=self)
+            except Exception:
+                log.exception("telegram poll thread — continuing")
+            time.sleep(2)
+
     def _run_once(self, now: datetime):
         """One M5 bar: sync state → trail → new entries."""
         day_key = now.date()
@@ -1010,10 +1026,8 @@ class LiveTrader(Backtester):
         # Sync equity from MT5 (uses balance = realised P&L).
         self._update_equity()
 
-        # Semi-auto: pull any new Telegram commands (lot / bias / levels / hold /
-        # close / halt). Passing self enables the action commands. poll() never
-        # raises, so a Telegram hiccup can't interrupt trading.
-        telegram_control.poll(self.inputs, trader=self)
+        # (Telegram is polled by the background _telegram_loop thread, not here —
+        # a second poller on the same bot token would 409.)
 
         # Record day-open equity for daily-loss and session-kill checks.
         if day_key not in self._day_open_eq:

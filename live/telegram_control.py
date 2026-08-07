@@ -359,8 +359,11 @@ def poll(inputs, trader=None) -> int:
         role = _role(cid)
         if role is None:
             continue                       # not owner/admin/viewer — ignore
-        ack = parse_command(msg.get("text", ""), inputs, trader=trader,
-                            role=role, sender=cid)
+        try:
+            ack = parse_command(msg.get("text", ""), inputs, trader=trader,
+                                role=role, sender=cid)
+        except Exception as exc:  # noqa: BLE001
+            ack = f"command error: {exc}"   # never let one bad command re-queue forever
         if ack is not None:
             _send(cid, ack)                # reply to whoever asked
             applied += 1
