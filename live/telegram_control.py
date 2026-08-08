@@ -57,7 +57,8 @@ HELP = (
     "/bias EURUSD long | short | both\n"
     "/levels EURUSD buy 1.0950 1.0975 sell 1.0900\n"
     "/hold EURUSD (run across sessions) · /release EURUSD\n"
-    "/mm EURUSD buy|sell|off  (Market Maker model: watch D1/H4/H1 IFVGs)\n"
+    "/mm EURUSD buy|sell [auto]|off  (MM model: watch D1/H4/H1 IFVGs;\n"
+    "    add 'auto' to pre-permit ONE entry on the IFVG retracement)\n"
     "\n"
     "CONTROL (act now):\n"
     "/test EURUSD long|short [lot]  (e.g. /test EURUSD long 0.05)\n"
@@ -247,11 +248,12 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
 
     if cmd == "mm":
         if len(args) < 2:
-            return "usage: /mm EURUSD buy | sell | off"
+            return "usage: /mm EURUSD buy|sell [auto] | off"
         p = _match_pair(args[0])
         if not p:
             return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
-        return inputs.set_mm(p, args[1])
+        auto = len(args) >= 3 and args[2].lower() in ("auto", "arm", "go", "on", "enter")
+        return inputs.set_mm(p, args[1], auto)
 
     if cmd in ("pyramid", "add"):
         if trader is None:

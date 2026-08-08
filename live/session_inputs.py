@@ -94,23 +94,39 @@ class SessionInputs:
         self.save()
         return f"{pair}: hunting {bias.upper()}S only (bot still needs its own setup)"
 
-    def set_mm(self, pair: str, model: str) -> str:
+    def set_mm(self, pair: str, model: str, auto: bool = False) -> str:
         self._rollover()
         model = model.lower()
         if model in ("off", "none", "clear"):
             self._p(pair).pop("mm", None)
+            self._p(pair).pop("mm_auto", None)
             self.save()
             return f"{pair}: Market Maker model OFF"
         if model in ("buy", "sell"):
             self._p(pair)["mm"] = model
+            self._p(pair)["mm_auto"] = bool(auto)
             self.save()
-            return (f"{pair}: Market Maker {model.upper()} model ARMED — watching "
-                    f"D1/H4/H1 inversion FVGs; you'll be alerted on reach + break.")
-        return "usage: /mm EURUSD buy | sell | off"
+            if auto:
+                return (f"{pair}: Market Maker {model.upper()} model — AUTO-ENTER ARMED.\n"
+                        f"It will place ONE {model} trade when price retraces into a D1/H4/H1 "
+                        f"IFVG AND a swing confirms. Then it disarms. /mm {pair} off to cancel.")
+            return (f"{pair}: Market Maker {model.upper()} model — WATCH (alerts only). "
+                    f"Add 'auto' to permit an entry: /mm {pair} {model} auto")
+        return "usage: /mm EURUSD buy|sell [auto] | off"
 
     def mm(self, pair: str):
         self._rollover()
         return self._pairs.get(pair, {}).get("mm")
+
+    def mm_auto(self, pair: str) -> bool:
+        self._rollover()
+        return bool(self._pairs.get(pair, {}).get("mm_auto"))
+
+    def clear_mm_auto(self, pair: str) -> None:
+        """Consume the one-shot auto-entry permission (leaves watch on)."""
+        self._rollover()
+        self._pairs.get(pair, {}).pop("mm_auto", None)
+        self.save()
 
     def set_hold(self, pair: str, on: bool = True) -> str:
         self._rollover()
@@ -188,6 +204,6 @@ class SessionInputs:
             if d.get("hold"):
                 bits.append("HOLD across sessions")
             if d.get("mm"):
-                bits.append(f"MM {d['mm']} model")
+                bits.append(f"MM {d['mm']} {'AUTO' if d.get('mm_auto') else 'watch'}")
             lines.append(f"  {pair}: {', '.join(bits) if bits else 'auto'}")
         return "\n".join(lines)
