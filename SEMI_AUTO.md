@@ -113,13 +113,24 @@ direction (buy = demand/support zones, sell = supply/resistance) — the HTF Jud
 areas that repel price toward the same liquidity draws you already target. Then:
 
 - **In `/read` / `/brief`** each armed pair shows its IFVG zones with **how far
-  price is** — pips away and a **% of the way** from where you armed the model:
+  price is** (pips + % of the way from where you armed it) and **which beat of the
+  setup each zone is on** — so you can see at a glance what to do:
   ```
-  MM BUY model - IFVG watch (D1/H4/H1):
-    D1 IFVG 1.14900-1.15050   62p away  (73%)
-    H4 IFVG 1.15400-1.15470   8p away   (95%)
-    H1 IFVG 1.15560-1.15600   REACHED
+  MM BUY model - IFVG watch (D1/H4/H1)  [AUTO-ARMED]:
+    D1 IFVG 1.14900-1.15050   62p  [1] approaching 73%
+    H4 IFVG 1.15400-1.15470    8p  [2] TAGGED - waiting on swing
+    H1 IFVG 1.15560-1.15600    0p  [3] CONFIRMED - entry trigger
   ```
+  The beat tags are your playbook:
+  - **`[1] approaching NN%`** — price still travelling to the zone; just watch the % climb.
+  - **`[2] TAGGED - waiting on swing`** — price is *inside* the IFVG; get ready, but
+    the touch alone is not the entry.
+  - **`[3] CONFIRMED - entry trigger`** — a fresh LTF swing has formed off the zone;
+    this is the entry (auto takes it here; by hand, `/test` or `/pyramid` now).
+  - **`[x] BROKEN - spent, watch next`** — a full body closed through it; that zone is
+    done — drop to the next zone down the list.
+  `[AUTO-ARMED]` in the header means auto-entry is pre-permitted and will fire itself
+  when a zone hits beat 3.
 - **Alerts** fire once per zone: **"price REACHED H4 IFVG …"** when price enters a
   zone, and **"H4 IFVG BROKEN — closed above/below …"** when a bar closes a full
   body through it — your cue to look for the retracement entry on swing formation.

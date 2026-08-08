@@ -783,37 +783,58 @@ class LiveTrader(Backtester):
         return out
 
     def _mm_block(self, pair):
-        """Template lines for an armed Market Maker model: each IFVG zone + how far
-        price is from it (pips + % of the way from where the model was armed)."""
+        """Template lines for an armed Market Maker model: each IFVG zone, how far
+        price is from it (pips + % of the way from where the model was armed), and
+        which BEAT of the setup it's on:
+          [1] approaching NN%      — price still travelling toward the zone
+          [2] TAGGED               — price inside the zone; waiting on the swing
+          [3] CONFIRMED            — a fresh LTF swing has formed → entry trigger
+          [x] BROKEN               — a full body closed through it; zone spent
+        """
         model = self.inputs.mm(pair) if self.inputs else None
         if not model:
             return []
         model_dir = 1 if model == "buy" else -1
+        now = datetime.now(timezone.utc)
         q = mt.tick(pair)
         price = (q[0] + q[1]) / 2 if q else None
         pip = pip_size(pair)
         st = self._mm_state.get(pair, {})
         arm = st.get("arm_price") or price
         zones = self._mm_zones(pair, model_dir)
-        lines = [f"  MM {model.upper()} model - IFVG watch (D1/H4/H1):"]
+        armed = self.inputs.mm_auto(pair) if self.inputs else False
+        head = f"  MM {model.upper()} model - IFVG watch (D1/H4/H1)"
+        head += "  [AUTO-ARMED]:" if armed else ":"
+        lines = [head]
         if not zones:
             lines.append("    (no qualifying inversion FVGs yet)")
             return lines
         for z in zones:
             lo, hi, mid = z["lo"], z["hi"], z["mid"]
+            key = f"{z['tf']}:{round(mid, 5)}"
+            inside = price is not None and lo <= price <= hi
             if price is None:
-                tag = "-"
-                dist = "?"
-            elif lo <= price <= hi:
-                tag = "REACHED"
-                dist = "0"
+                dist, pct = "?", 0
+            elif inside:
+                dist, pct = "0", 100
             else:
                 dist = f"{abs(price - mid) / pip:.0f}"
                 total = abs(mid - arm)
-                trav = abs(price - arm)
-                pct = min(100, round(trav / total * 100)) if total > 0 else 0
-                tag = f"{pct}%"
-            lines.append(f"    {z['tf']} IFVG {lo:.5f}-{hi:.5f}   {dist}p away  ({tag})")
+                pct = min(100, round(abs(price - arm) / total * 100)) if total > 0 else 0
+            # which beat of the setup this zone is on
+            if key in st.get("broke", set()):
+                beat = "[x] BROKEN - spent, watch next"
+            elif inside:
+                confirmed = False
+                try:
+                    confirmed = self._structure_entry_confirmed(pair, model_dir, now)
+                except Exception:
+                    confirmed = False
+                beat = "[3] CONFIRMED - entry trigger" if confirmed \
+                    else "[2] TAGGED - waiting on swing"
+            else:
+                beat = f"[1] approaching {pct}%"
+            lines.append(f"    {z['tf']} IFVG {lo:.5f}-{hi:.5f}   {dist}p  {beat}")
         return lines
 
     def _mm_scan(self):
