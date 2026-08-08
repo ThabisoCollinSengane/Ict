@@ -101,11 +101,12 @@ the other side.
   side becomes the TP). Your engine still decides **whether the setup is there.**
 - If both `/bias` and `/levels` are set, **both must agree.**
 
-### 3b · Market Maker model — IFVG watcher (D1/H4/H1)
+### 3b · Market Maker model — IFVG watcher + auto-enter (D1/H4/H1)
 ```
-/mm EURUSD buy      → arm the Market Maker BUY model on EURUSD
-/mm EURUSD sell     → sell model
-/mm EURUSD off      → disarm
+/mm EURUSD buy       → arm the Market Maker BUY model (WATCH — alerts only)
+/mm EURUSD sell      → sell model (watch)
+/mm EURUSD buy auto  → arm AND pre-permit ONE auto-entry on the retracement
+/mm EURUSD off       → disarm
 ```
 Arm a model and the bot scans **D1, H4 and H1 for inversion FVGs** in that
 direction (buy = demand/support zones, sell = supply/resistance) — the HTF Judas
@@ -123,9 +124,32 @@ areas that repel price toward the same liquidity draws you already target. Then:
   zone, and **"H4 IFVG BROKEN — closed above/below …"** when a bar closes a full
   body through it — your cue to look for the retracement entry on swing formation.
 
-It's a **watch layer** — it doesn't auto-trade the model. You take the retracement
-entries yourself (`/test`, `/pyramid`, or the bot's own swing entry). Same target
-liquidity as always; the IFVGs just time the pushes toward it.
+**Watch mode (`/mm PAIR buy`)** is a pure alert layer — it never trades. You take
+the retracement entries yourself (`/test`, `/pyramid`, or the bot's own swing entry).
+
+**Auto mode (`/mm PAIR buy auto`)** — the *pre-permission*. You authorise **one**
+entry **before** price gets to the zone; the bot then pulls the trigger for you the
+moment its two conditions line up:
+
+1. **Retracement** — price is **inside** one of the armed D1/H4/H1 IFVGs, in the
+   model direction (the HTF Judas zone repelling price toward the draw).
+2. **Reversal** — a **freshly-confirmed, still-intact lower-timeframe swing** in
+   the model direction (the same "swing formation" you'd wait for by hand — the
+   bot's `_structure_entry_confirmed` check).
+
+When **both** are true it enters with the bot's **own structural stop** (fractal
+ITL/ITH, capped ~10 pips) and its **nearest-liquidity target** — the opposite-side
+level you set with `/levels` if any, else the nearest **H4 ITH/ITL** draw, else a
+2R fallback. Lot = your `/lot` for the pair (or the minimum). It then **disarms
+itself** — one shot. You get a full `MM AUTO-ENTRY` message with entry / stop /
+target and why.
+
+- If a position is **already open the same way and winning**, auto instead adds a
+  **pyramid** leg (then disarms). If one is open the **opposite** way it does
+  nothing and stays armed.
+- `/halt` blocks auto-entry (and every other new entry). `/mm PAIR off` cancels it.
+- Auto expires at **00:00 UTC** with everything else, and it's **one entry only** —
+  re-arm with `/mm PAIR buy auto` if you want it to take another.
 
 ### 4 · Let a trade run across sessions
 ```
@@ -256,6 +280,7 @@ changes settings and runs the VM.
 | `/lot 0.02` / `/lot GBPUSD 0.03` | day lot (base; multipliers stack) |
 | `/bias EURUSD long\|short\|both` | direction filter |
 | `/levels EURUSD buy … sell …` | manual-AMD liquidity (sweep→target) |
+| `/mm EURUSD buy\|sell [auto]\|off` | Market Maker IFVG model — watch, or `auto` to pre-permit one entry |
 | `/hold EURUSD` / `/hold all` | run across the session handover |
 | `/release EURUSD` | normal handover management |
 | `/close EURUSD` / `/close all` | close position(s) at market now |

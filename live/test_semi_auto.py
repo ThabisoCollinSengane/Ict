@@ -199,14 +199,44 @@ def test_mm_flag():
     p = config.PAIRS[0] if config.PAIRS else "EURUSD"
     tc.parse_command(f"/mm {p} buy", si)
     assert si.mm(p) == "buy"
+    assert si.mm_auto(p) is False            # watch-only by default
     tc.parse_command(f"/mm {p} off", si)
     assert si.mm(p) is None
     print("ok  /mm arm + off")
 
 
+def test_mm_auto_arm_and_consume():
+    """`/mm PAIR buy auto` pre-permits ONE entry; clear_mm_auto consumes it
+    (leaving the watch layer on); `/mm PAIR off` clears both."""
+    si = _fresh_inputs()
+    import config
+    p = config.PAIRS[0] if config.PAIRS else "EURUSD"
+
+    # watch → auto
+    tc.parse_command(f"/mm {p} sell", si)
+    assert si.mm_auto(p) is False
+    tc.parse_command(f"/mm {p} sell auto", si)
+    assert si.mm(p) == "sell" and si.mm_auto(p) is True
+    # synonyms all arm
+    for word in ("arm", "go", "on", "enter"):
+        tc.parse_command(f"/mm {p} sell {word}", si)
+        assert si.mm_auto(p) is True, word
+
+    # one-shot consume: auto off, model still watched
+    si.clear_mm_auto(p)
+    assert si.mm_auto(p) is False
+    assert si.mm(p) == "sell"
+
+    # off clears everything
+    tc.parse_command(f"/mm {p} off", si)
+    assert si.mm(p) is None and si.mm_auto(p) is False
+    print("ok  /mm auto arm + one-shot consume + off")
+
+
 def main():
     test_ifvg_detection()
     test_mm_flag()
+    test_mm_auto_arm_and_consume()
     test_parse_lot_all_and_pair()
     test_parse_bias_filter()
     test_parse_levels()

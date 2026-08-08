@@ -817,7 +817,9 @@ class LiveTrader(Backtester):
         return lines
 
     def _mm_scan(self):
-        """Alert on reach + break-and-close of armed MM IFVG zones (once each)."""
+        """Alert on reach + break-and-close of armed MM IFVG zones (once each),
+        and — when the trader pre-permitted it with `/mm PAIR buy|sell auto` —
+        auto-enter the model on a confirmed retracement into an IFVG."""
         if not self.inputs:
             return
         now = datetime.now(timezone.utc)
@@ -833,7 +835,8 @@ class LiveTrader(Backtester):
             st = self._mm_state.setdefault(
                 pair, {"arm_price": price, "reached": set(), "broke": set()})
             model_dir = 1 if model == "buy" else -1
-            for z in self._mm_zones(pair, model_dir):
+            zones = self._mm_zones(pair, model_dir)   # compute once; reuse for auto-entry
+            for z in zones:
                 lo, hi = z["lo"], z["hi"]
                 key = f"{z['tf']}:{round(z['mid'], 5)}"
                 if lo <= price <= hi and key not in st["reached"]:
@@ -850,6 +853,140 @@ class LiveTrader(Backtester):
                         _notify(f"MM {model.upper()} {pair}\n{z['tf']} IFVG BROKEN - "
                                 f"closed {side} {lo:.5f}-{hi:.5f}\nRetracement-entry window "
                                 f"(swing formation).")
+            # Auto-enter the model on a confirmed retracement — only if the trader
+            # pre-armed it (one-shot; disarmed on entry).
+            if self.inputs.mm_auto(pair):
+                try:
+                    self._mm_auto_entry(pair, model, zones, price, now)
+                except Exception:
+                    log.exception("MM auto-entry failed for %s", pair)
+
+    def _mm_target(self, pair, d, price, stop_dist, now):
+        """Target for an MM auto-entry, in preference order:
+          (a) the trader's own /levels opposite-side liquidity (buy model targets
+              the buy-side above; sell model targets the sell-side below);
+          (b) the nearest H4 ITH (buy) / ITL (sell) liquidity draw beyond the RR
+              floor — the same institutional draw the bot targets normally;
+          (c) a 2R fallback off the structural stop.
+        All candidates must clear max(MIN_PIPS_TARGET, stop_dist * MIN_RR)."""
+        pip = pip_size(pair)
+        floor = max(self._min_pips_target() * pip, stop_dist * config.MIN_RR)
+        # (a) trader's own opposite-side liquidity level
+        if self.inputs:
+            lvls = self.inputs.buy_levels(pair) if d > 0 else self.inputs.sell_levels(pair)
+            cand = [lv for lv in lvls if (lv - price) * d >= floor]
+            if cand:
+                return (min(cand, key=lambda lv: abs(lv - price)),
+                        "manual level (opposite-side liquidity)")
+        # (b) nearest H4 ITH/ITL institutional draw beyond the RR floor
+        try:
+            bars = self.bars_up_to(pair, "240T", now,
+                                   max_bars=(config.ITHL_TARGET_MAX_BARS or None))
+            draws = self._ithl_targets(bars, d, price, pair, "240T")
+            cand = [c for c in draws if (c[0] - price) * d >= floor]
+            if cand:
+                best = min(cand, key=lambda c: abs(c[0] - price))
+                return (best[0], "H4 " + ("ITH" if d > 0 else "ITL") + " liquidity draw")
+        except Exception:
+            pass
+        # (c) 2R fallback
+        return (price + 2 * stop_dist * d, "fixed 2R (fallback)")
+
+    def _mm_auto_entry(self, pair, model, zones, price, now):
+        """Auto-enter the armed Market Maker model on an IFVG retracement.
+
+        Fires ONLY when the trader pre-permitted it (`/mm PAIR buy|sell auto`).
+        One shot: the permission is consumed on entry (or on a pyramid add to a
+        winner), leaving the WATCH layer on. Two conditions, both required:
+          (1) retracement — price is inside a D1/H4/H1 IFVG in the model
+              direction (the HTF Judas zone that repels price toward the draw);
+          (2) reversal — a freshly-confirmed, still-intact LTF fractal swing in
+              the model direction (_structure_entry_confirmed) — the swing
+              formation the trader looks for by hand.
+        Uses the bot's own structural stop and nearest-liquidity target."""
+        if self._manual_halt:
+            return
+        d = 1 if model == "buy" else -1
+
+        # (1) retracement: price must be inside one of the armed IFVG zones.
+        in_zone = next((z for z in zones if z["lo"] <= price <= z["hi"]), None)
+        if in_zone is None:
+            return
+
+        # (2) reversal: a fresh, still-intact LTF swing in the model direction.
+        try:
+            if not self._structure_entry_confirmed(pair, d, now):
+                return
+        except Exception:
+            return
+
+        pip = pip_size(pair)
+
+        # If a position is already open: same direction + winning → pyramid the
+        # add; opposite direction → never fight it (skip, keep armed).
+        st_open = self.active.get(pair)
+        if st_open is not None:
+            if st_open["direction"] != d:
+                return
+            u = sum(l["units"] for l in st_open["legs"]) or 1
+            avg = sum(l["entry"] * l["units"] for l in st_open["legs"]) / u
+            if (price - avg) * d > 0:
+                msg = self.manual_pyramid(pair)
+                self.inputs.clear_mm_auto(pair)     # one-shot
+                _notify(f"MM {model.upper()} AUTO-ADD {pair} "
+                        f"({in_zone['tf']} IFVG retrace + swing)\n{msg}")
+            return
+
+        # Fresh entry. Structural stop (fractal ITL/ITH, capped ~10 pips), else 10-pip.
+        stop = None
+        stop_reason = "structural swing (intact ITL/ITH)"
+        try:
+            stop = self._structure_stop(pair, d, price, pip, now)
+        except Exception:
+            stop = None
+        if not stop or abs(price - stop) < pip:
+            stop = price - 10 * pip * d
+            stop_reason = "fixed 10-pip (default)"
+        stop_dist = abs(price - stop)
+
+        target, target_type = self._mm_target(pair, d, price, stop_dist, now)
+
+        lots = self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
+        lots = max(round(float(lots), 2), config.MIN_LOT_SIZE)
+
+        res = mt.market_order(pair, lots, d, sl=stop, tp=target, comment="ict_mm")
+        if not (res and res.get("ok")):
+            _notify(f"MM {model.upper()} AUTO-ENTRY FAILED {pair}: {res}")
+            return
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st = {
+            "direction": d, "target": target,
+            "legs": [{"entry": price, "stop": stop,
+                      "units": int(lots * config.LOT_UNITS),
+                      "ticket": ticket, "leg_idx": 0}],
+            "entry_model": f"mm_{model}", "im_scenario": "MM", "draw_score": 0,
+            "target_type": target_type, "stop_reason": stop_reason,
+        }
+        self.active[pair] = st
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        self._save_pos_meta()
+        self.inputs.clear_mm_auto(pair)             # one-shot: disarm after entry
+        dstr = "LONG" if d > 0 else "SHORT"
+        tgt_pips = abs(target - price) / pip
+        log.warning("MM AUTO-ENTRY %s %s %.2f lots (%s IFVG retrace)",
+                    dstr, pair, lots, in_zone["tf"])
+        _notify(
+            f"MM {model.upper()} AUTO-ENTRY {pair} {dstr}\n"
+            f"Retrace into {in_zone['tf']} IFVG {in_zone['lo']:.5f}-{in_zone['hi']:.5f}"
+            f" + swing confirmed.\n"
+            f"Entry:  {price:.5f}   {lots} lots\n"
+            f"Stop:   {stop:.5f}  ({stop_dist / pip:.1f} pips) <- {stop_reason}\n"
+            f"Target: {target:.5f}  ({tgt_pips:.1f} pips) <- {target_type}\n"
+            f"Auto-entry DISARMED (one shot). Now managed live — it trails and /close works."
+        )
 
     def _pair_lean(self, s, dxy_dir):
         """A directional lean % for a pair from H4/H1/M15 structure + the dollar.
