@@ -14,7 +14,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.platypus import (
     BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, HRFlowable, ListFlowable, ListItem, KeepTogether,
+    PageBreak, HRFlowable, ListFlowable, ListItem, KeepTogether, Preformatted,
 )
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "docs/ICT_Algorithm_Manual.pdf"
@@ -126,6 +126,20 @@ def mono(lines):
     return KeepTogether([Spacer(1, 2), t, Spacer(1, 8)])
 
 
+def sketch(text):
+    """Monospace ASCII diagram with whitespace preserved (Preformatted). Use for
+    price-ladder sketches where alignment matters - Paragraph collapses spaces."""
+    p = Preformatted(text.strip("\n"), styles["Mono"])
+    t = Table([[p]], colWidths=[16.4 * cm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F1F5F2")),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD9CF")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    return KeepTogether([Spacer(1, 2), t, Spacer(1, 8)])
+
+
 # ── page furniture ───────────────────────────────────────────────────────────
 def footer(canvas, doc):
     canvas.saveState()
@@ -189,7 +203,7 @@ def story():
         "3.  The AMD cycle - the heartbeat of every trade",
         "4.  How market structure is detected &amp; traded",
         "5.  The intermarket gate - which pair, which way",
-        "6.  How the bot enters - the two models",
+        "6.  How the bot enters - the entry models (incl. Market Maker IFVG)",
         "7.  Session handovers - reading them, trading them",
         "8.  Liquidity levels - your buy-side / sell-side inputs",
         "9.  Targets &amp; exits - where the bot takes profit",
@@ -351,7 +365,7 @@ def story():
             "real intermarket signal to produce a trade.")]
 
     # ---- 5 ----
-    s += [H1("6 - How the bot enters: the two models")]
+    s += [H1("6 - How the bot enters: the entry models")]
     s += [H2("Model 1 - Judas reversal (the default)")]
     s += [bullets([
         "An M15 consolidation range must exist (both extremes tested).",
@@ -369,6 +383,86 @@ def story():
     s += [callout("Reversal fades the sweep; breakout rides the break. The bot tags every "
                   "trade as <b>judas</b> or <b>breakout</b> so you can see which model "
                   "fired in the Telegram trade alert.", kind="note")]
+
+    s += [H2("Model 3 - Market Maker IFVG model (watch or auto-enter)")]
+    s += [P("A third, <b>opt-in</b> model you arm per pair from Telegram with "
+            "<b>/mm</b>. It watches the higher timeframes for an <b>inversion fair-value "
+            "gap (IFVG)</b> - a gap that price later closes a full body back through, "
+            "flipping its polarity. That flip is a <b>Judas swing one timeframe up</b>: "
+            "the level that repelled price now supports it, drawing price toward the same "
+            "liquidity targets the bot already uses.")]
+    s += [P("An FVG that gets a bullish full-body close back <b>above</b> it becomes a "
+            "<b>demand (support)</b> zone; a bearish full-body close <b>below</b> makes a "
+            "<b>supply (resistance)</b> zone. The bot scans <b>D1, H4 and H1</b> and keeps "
+            "only the still-defended zones in your model's direction.")]
+    s += [sketch(
+        "BUY model - a demand IFVG (support)\n"
+        "\n"
+        "  a bearish gap forms as price drops through it, then price\n"
+        "  RETURNS and closes a full body back ABOVE it -> the gap\n"
+        "  inverts into a DEMAND zone that now holds price up.\n"
+        "\n"
+        "     1.15470  +----------------+  zone top\n"
+        "              |  DEMAND  IFVG  |\n"
+        "     1.15400  +----------------+  zone bottom")]
+    s += [H2("The three beats - what to do, and when")]
+    s += [P("In <b>/read</b> and <b>/brief</b> each armed zone shows how far price is "
+            "(pips + % of the way from where you armed it) and <b>which beat</b> of the "
+            "setup it is on. Read the beat, take the action:")]
+    s += [table([
+        ["Beat", "Read shows", "Meaning", "Do"],
+        ["[1]", "approaching NN%", "price still travelling to the zone", "wait (watch the % climb)"],
+        ["[2]", "TAGGED", "price is inside the zone", "get ready - a touch is not the entry"],
+        ["[3]", "CONFIRMED", "a fresh lower-TF swing formed off the zone", "ENTER (auto fires here)"],
+        ["[x]", "BROKEN", "a full body closed through the zone", "skip it - use the next zone down"],
+    ], widths=[1.5 * cm, 3.4 * cm, 6.6 * cm, 4.9 * cm])]
+    s += [sketch(
+        "BUY entry (demand IFVG sits BELOW price)\n"
+        "\n"
+        "  1.15800  = = = TARGET (buy-side draw: ITH / PDH)     ^ 3 ride up\n"
+        "  1.15600  o  price now                                |\n"
+        "             |  1 price retraces DOWN toward the zone\n"
+        "             v\n"
+        "  1.15470  +----------------+  zone top\n"
+        "           |  DEMAND  IFVG  |   2 TAG -> swing UP = ENTER (beat 3)\n"
+        "  1.15400  +----------------+  zone bottom\n"
+        "  1.15380  x  stop (just below the zone - bot's structural stop)")]
+    s += [sketch(
+        "SELL entry (supply IFVG sits ABOVE price) - the mirror\n"
+        "\n"
+        "  1.16120  x  stop (just above the zone)\n"
+        "  1.16100  +----------------+  zone top\n"
+        "           |  SUPPLY  IFVG  |   2 TAG -> swing DOWN = ENTER (beat 3)\n"
+        "  1.16030  +----------------+  zone bottom\n"
+        "             ^  1 price rises UP toward the zone\n"
+        "  1.15900  o  price now\n"
+        "             |  3 ride down\n"
+        "             v\n"
+        "  1.15600  = = = TARGET (sell-side draw: ITL / PDL)")]
+    s += [sketch(
+        "A zone that FAILS (beat [x] BROKEN) - do NOT trade it\n"
+        "\n"
+        "  1.15470  +----------------+  zone top\n"
+        "           |  DEMAND  IFVG  |\n"
+        "  1.15400  +----------------+  zone bottom\n"
+        "             |  a full body CLOSES below the zone\n"
+        "             v\n"
+        "  1.15350  XX  zone SPENT -> skip it, drop to the next zone")]
+    s += [H2("Watch vs. auto-enter")]
+    s += [bullets([
+        "<b>/mm EURUSD buy</b> (or <b>sell</b>) - <b>WATCH</b> mode: the bot only alerts "
+        "you (\"price REACHED ...\", \"... IFVG BROKEN\") and shows the beats. You place the "
+        "entry yourself at beat [3] with <b>/test</b> (or <b>/pyramid</b> to add to a winner).",
+        "<b>/mm EURUSD buy auto</b> - <b>AUTO</b> mode: you pre-permit <b>one</b> entry. "
+        "When a zone hits beat [3] (price inside the IFVG AND a fresh LTF swing confirms) "
+        "the bot enters it for you - own structural stop, nearest-liquidity target, your "
+        "/lot size - then <b>disarms</b> (one shot). The header shows <b>[AUTO-ARMED]</b>.",
+        "<b>/mm EURUSD off</b> - disarm. Everything expires at 00:00 UTC like all inputs.",
+    ])]
+    s += [callout("Auto is one entry only and obeys every safety rule: <b>/halt</b> blocks "
+                  "it, and if a same-direction winner is already open it adds a pyramid leg "
+                  "instead of a second position (opposite - it skips). Re-arm with "
+                  "<b>/mm PAIR buy auto</b> to allow another.", kind="gold")]
 
     # ---- 6  (the requested deep dive) ----
     s += [H1("7 - Session handovers: reading them, trading them")]
@@ -485,22 +579,49 @@ def story():
             "(<b>LONDON</b> ~02:00 ET, <b>NEW YORK AM</b> ~07:00 ET, and <b>NEW YORK PM</b> "
             "if enabled). The NY templates also list what's already open, so you can "
             "decide whether to <b>/hold</b> it across the handover.")]
-    s += [H2("Command reference")]
+    s += [H2("Ask the bot (read anytime - no effect on trading)")]
+    s += [table([
+        ["Command", "What it shows"],
+        ["/brief", "Full session brief: account + structure + open trades + your plan. The same rich summary the bot sends at each session start."],
+        ["/read [EURUSD]", "Market-structure template per pair: price, H4/H1/M15 structure, ITH/ITL draws, directional lean %, the bot's intended trade + scenario, plus any armed MM IFVG beats. /markets = all at a glance."],
+        ["/positions", "Open trades broken out PER LEG (e.g. 2 x 0.02 = 0.04), each with entry, live pips, SL and ticket - plus P&amp;L, % to target, model, TP idea + SL basis (survives restarts)."],
+        ["/account", "Equity, day P&amp;L, drawdown, halt state (also /equity)."],
+        ["/dxy - /session - /news", "Dollar index now - which killzone &amp; if entries are allowed - next high-impact news."],
+        ["/whoami", "Your chat id + access level."],
+    ], widths=[4.3 * cm, 12.1 * cm])]
+    s += [H2("Plan &amp; control")]
     s += [table([
         ["Command", "What it does"],
         ["/lot 0.02", "Day lot for all pairs (/lot GBPUSD 0.03 for one). Base lot - the sizing multipliers still stack."],
         ["/bias EURUSD long", "Hunt one direction only (long | short | both). A filter: the bot still needs its own setup."],
         ["/levels EURUSD buy 1.0975 sell 1.0900", "Your buy-side / sell-side liquidity -> full manual AMD (Section 8)."],
+        ["/mm EURUSD buy [auto]", "Arm the Market Maker IFVG model: watch-only, or 'auto' to pre-permit one entry (Section 6, Model 3). /mm EURUSD off disarms."],
         ["/hold EURUSD", "Let this pair run across the session handover (also /hold all). /release EURUSD undoes it."],
-        ["/close EURUSD", "Close this pair's open position(s) at market now (/close all flattens everything)."],
-        ["/halt", "Stop ALL new entries and pyramid adds. Open trades keep running on their stops."],
-        ["/resume", "Re-enable new entries after a /halt."],
-        ["/status", "Echo today's plan for every pair."],
-        ["/auto EURUSD", "Revert one pair to full auto (/clear reverts all)."],
-        ["/help", "The command list."],
+        ["/test EURUSD long [0.05]", "Open a trade NOW (also short; /buy /sell) with the bot's structural stop + 2R target, at an optional lot size."],
+        ["/pyramid EURUSD [1.1600]", "Add a leg to a WINNING position - same TP, or a level you give."],
+        ["/sl EURUSD 1.1555 - /be EURUSD", "Move the stop to a price (or /sl EURUSD 2 ... for one leg); /be moves it to break-even."],
+        ["/close EURUSD [2]", "Close the whole position, or just leg 2 (/close all flattens everything; /flat is the shortcut)."],
+        ["/halt - /resume", "Stop ALL new entries + pyramid adds (open trades keep running) - then re-enable."],
+        ["/status - /auto EURUSD - /clear - /help", "Echo today's plan - revert one pair - revert all - command list."],
     ], widths=[5.6 * cm, 10.8 * cm])]
     s += [callout("To go flat and stay out: <b>/close all</b> then <b>/halt</b>. To stop "
                   "new trades but let current winners run: just <b>/halt</b>.", kind="tip")]
+    s += [H2("Sharing the bot with a partner")]
+    s += [P("Your partner opens the <b>same</b> bot (share the link) and texts it - you do "
+            "NOT create a second bot. What they can do depends on how you list their Telegram "
+            "chat id (they get theirs from @userinfobot, or /whoami once they can read):")]
+    s += [bullets([
+        "<b>Admin</b> (full control, trades like you) - add their id to "
+        "<font face='Courier'>TELEGRAM_ADMIN_IDS</font> in live.env.",
+        "<b>Viewer</b> (read-only + alerts) - add it to "
+        "<font face='Courier'>TELEGRAM_VIEWER_IDS</font>.",
+        "<b>Open read-only</b> for anyone with the link - set "
+        "<font face='Courier'>TELEGRAM_OPEN_VIEW=1</font> (trading still needs an admin id).",
+    ])]
+    s += [callout("Easiest way to add someone: "
+                  "<font face='Courier'>scripts\\add_access.ps1 -Id &lt;id&gt; -Role admin|viewer</font> "
+                  "on the VM, then restart the bot so it re-reads live.env. Trading control "
+                  "can never be open - it moves real money.", kind="note")]
 
     # ---- 10 ----
     s += [H1("11 - Risk &amp; circuit breakers")]
@@ -561,8 +682,11 @@ def story():
         ["/lot 0.02", "day lot (base; multipliers stack)"],
         ["/bias EURUSD long|short|both", "direction filter"],
         ["/levels EURUSD buy ... sell ...", "manual-AMD liquidity (sweep -> target)"],
+        ["/mm EURUSD buy|sell [auto]|off", "Market Maker IFVG model (watch / auto-enter)"],
+        ["/test EURUSD long [0.05]  |  /pyramid EURUSD", "open now / add to a winner"],
+        ["/sl EURUSD 1.1555  |  /be EURUSD", "move stop to price / break-even"],
         ["/hold EURUSD  |  /release EURUSD", "run across the handover / undo"],
-        ["/close EURUSD  |  /close all", "close now / flatten"],
+        ["/close EURUSD [leg]  |  /close all", "close position / one leg / flatten"],
         ["/halt  |  /resume", "pause / re-enable new entries + adds"],
         ["/status  |  /auto EURUSD  |  /clear", "review / revert one / revert all"],
     ], widths=[6.4 * cm, 10.0 * cm], header=False)]
