@@ -568,6 +568,23 @@ def story():
     s += [callout("The take-profit is the END of the AMD delivery cycle. The bot exits "
                   "into the draw rather than holding for more - testing showed holding past "
                   "it gives back profit. The far pools are the NEXT cycle's job.", kind="note")]
+    s += [H2("Structure trail - riding the swings (optional)")]
+    s += [P("On top of the automatic ladder you can trail the stop by <b>market "
+            "structure</b> from Telegram with <b>/trail</b> - the stop follows the latest "
+            "<b>intact fractal swing</b> on a lower timeframe, keeping a pip buffer you "
+            "choose. It only ever tightens, and stacks with the ladder above (whichever "
+            "stop is tighter wins).")]
+    s += [table([
+        ["Choice", "Options", "Effect"],
+        ["Timeframe", "m15 / m5 / m1", "How fine the swings it follows are (m1 = tightest)."],
+        ["Tier", "st = STH/STL, it = ITH/ITL", "Short-term locks faster; intermediate is looser, fewer stop-outs."],
+        ["Buffer", "a pip number (default 2)", "How far beyond the swing the stop sits."],
+    ], widths=[2.8 * cm, 5.0 * cm, 8.6 * cm])]
+    s += [P("For a <b>long</b> the stop trails under the latest intact low (STL/ITL minus "
+            "buffer); for a <b>short</b>, above the latest intact high (STH/ITH plus buffer) "
+            "- the bot picks the correct side. Example: <font face='Courier'>/trail EURUSD "
+            "m5 st 3</font> rides the M5 short-term structure 3 pips behind each swing; "
+            "<font face='Courier'>/trail EURUSD off</font> stops it.")]
 
     # ---- 9  (Telegram manual) ----
     s += [H1("10 - Talking to the algorithm: the Telegram manual")]
@@ -597,6 +614,7 @@ def story():
         ["/levels EURUSD buy 1.0975 sell 1.0900", "Your buy-side / sell-side liquidity -> full manual AMD (Section 8)."],
         ["/mm EURUSD buy [auto]", "Arm the Market Maker IFVG model: watch-only, or 'auto' to pre-permit one entry (Section 6, Model 3). /mm EURUSD off disarms."],
         ["/hold EURUSD", "Let this pair run across the session handover (also /hold all). /release EURUSD undoes it."],
+        ["/trail EURUSD m5 st 3", "Trail the stop behind the latest intact swing: tf m15|m5|m1, tier st (STH/STL) or it (ITH/ITL), pip buffer. Only tightens. /trail EURUSD off."],
         ["/test EURUSD long [0.05]", "Open a trade NOW (also short; /buy /sell) with the bot's structural stop + 2R target, at an optional lot size."],
         ["/pyramid EURUSD [1.1600]", "Add a leg to a WINNING position - same TP, or a level you give."],
         ["/sl EURUSD 1.1555 - /be EURUSD", "Move the stop to a price (or /sl EURUSD 2 ... for one leg); /be moves it to break-even."],
@@ -685,6 +703,7 @@ def story():
         ["/mm EURUSD buy|sell [auto]|off", "Market Maker IFVG model (watch / auto-enter)"],
         ["/test EURUSD long [0.05]  |  /pyramid EURUSD", "open now / add to a winner"],
         ["/sl EURUSD 1.1555  |  /be EURUSD", "move stop to price / break-even"],
+        ["/trail EURUSD m15|m5|m1 st|it [pips]", "trail stop behind the latest intact swing"],
         ["/hold EURUSD  |  /release EURUSD", "run across the handover / undo"],
         ["/close EURUSD [leg]  |  /close all", "close position / one leg / flatten"],
         ["/halt  |  /resume", "pause / re-enable new entries + adds"],

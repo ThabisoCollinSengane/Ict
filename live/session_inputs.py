@@ -128,6 +128,48 @@ class SessionInputs:
         self._pairs.get(pair, {}).pop("mm_auto", None)
         self.save()
 
+    _TRAIL_TF = {"m15": "15T", "15": "15T", "15m": "15T",
+                 "m5": "5T", "5": "5T", "5m": "5T",
+                 "m1": "1T", "1": "1T", "1m": "1T"}
+    _TRAIL_TF_LBL = {"15T": "M15", "5T": "M5", "1T": "M1"}
+
+    def set_trail(self, pair: str, tf: str, tier: str | None = None,
+                  buf: str | float | None = None) -> str:
+        """Structure trail: follow the latest intact swing on M15/M5/M1
+        (short-term STH/STL or intermediate ITH/ITL) with a pip buffer."""
+        self._rollover()
+        tf = (tf or "").lower()
+        if tf in ("off", "none", "clear"):
+            self._p(pair).pop("trail", None)
+            self.save()
+            return f"{pair}: structure trail OFF"
+        if tf not in self._TRAIL_TF:
+            return "usage: /trail EURUSD m15|m5|m1 st|it [pips] | off"
+        tier = (tier or "st").lower()
+        if tier in ("st", "sth", "stl", "short", "s"):
+            tier_k = "st"
+        elif tier in ("it", "ith", "itl", "inter", "i"):
+            tier_k = "it"
+        else:
+            return "tier must be st (STH/STL) or it (ITH/ITL)"
+        try:
+            b = float(buf) if buf is not None else 2.0
+        except (TypeError, ValueError):
+            return f"bad buffer '{buf}' — use a pip number, e.g. 3"
+        if b < 0:
+            return "buffer must be >= 0 pips"
+        self._p(pair)["trail"] = {"tf": self._TRAIL_TF[tf], "tier": tier_k, "buf": b}
+        self.save()
+        tfl = self._TRAIL_TF_LBL[self._TRAIL_TF[tf]]
+        tl = "ITH/ITL" if tier_k == "it" else "STH/STL"
+        return (f"{pair}: structure trail ON — {tfl} {tl}, {b:g}-pip buffer.\n"
+                f"Stop follows the latest intact swing (up for longs / down for "
+                f"shorts) and only ever tightens. /trail {pair} off to stop.")
+
+    def trail(self, pair: str):
+        self._rollover()
+        return self._pairs.get(pair, {}).get("trail")
+
     def set_hold(self, pair: str, on: bool = True) -> str:
         self._rollover()
         if on:
@@ -203,6 +245,11 @@ class SessionInputs:
                 bits.append(f"sell {d['sell']}")
             if d.get("hold"):
                 bits.append("HOLD across sessions")
+            if d.get("trail"):
+                tr = d["trail"]
+                _tfl = self._TRAIL_TF_LBL.get(tr.get("tf"), tr.get("tf"))
+                _tl = "ITH/ITL" if tr.get("tier") == "it" else "STH/STL"
+                bits.append(f"trail {_tfl} {_tl} {tr.get('buf'):g}p")
             if d.get("mm"):
                 bits.append(f"MM {d['mm']} {'AUTO' if d.get('mm_auto') else 'watch'}")
             lines.append(f"  {pair}: {', '.join(bits) if bits else 'auto'}")

@@ -57,6 +57,8 @@ HELP = (
     "/bias EURUSD long | short | both\n"
     "/levels EURUSD buy 1.0950 1.0975 sell 1.0900\n"
     "/hold EURUSD (run across sessions) · /release EURUSD\n"
+    "/trail EURUSD m15|m5|m1 st|it [pips] | off  (trail stop behind the\n"
+    "    latest intact swing: st=STH/STL, it=ITH/ITL; only tightens)\n"
     "/mm EURUSD buy|sell [auto]|off  (MM model: watch D1/H4/H1 IFVGs;\n"
     "    add 'auto' to pre-permit ONE entry on the IFVG retracement)\n"
     "\n"
@@ -323,6 +325,26 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
             return "\n".join(inputs.set_hold(pp, False) for pp in _pairs())
         p = _match_pair(args[0])
         return inputs.set_hold(p, False) if p else f"unknown pair '{args[0]}'"
+
+    if cmd == "trail":
+        if not args:
+            return "usage: /trail EURUSD m15|m5|m1 st|it [pips] | off"
+        p = _match_pair(args[0])
+        if not p:
+            return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
+        rest = args[1:]
+        if not rest:
+            return "usage: /trail EURUSD m15|m5|m1 st|it [pips] | off"
+        tf = rest[0]
+        tier = None
+        buf = None
+        for tok in rest[1:]:
+            if tok.lower() in ("st", "sth", "stl", "short", "s",
+                               "it", "ith", "itl", "inter", "i"):
+                tier = tok
+            else:
+                buf = tok        # a pip number (validated in set_trail)
+        return inputs.set_trail(p, tf, tier, buf)
 
     if cmd == "lot":
         if not args:

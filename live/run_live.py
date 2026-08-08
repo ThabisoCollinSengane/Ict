@@ -1398,6 +1398,10 @@ class LiveTrader(Backtester):
         target    = st["target"]
         pip       = pip_size(pair)
 
+        # Semi-auto structure trail (opt-in via /trail): one level for all legs,
+        # computed once. Folds into new_stop below with the same only-tighten rule.
+        struct_stop = self._structure_trail_level(pair, direction, cur_price, now)
+
         for leg in st["legs"]:
             old_stop    = leg["stop"]
             entry       = leg["entry"]
@@ -1432,6 +1436,14 @@ class LiveTrader(Backtester):
                 else:
                     new_stop = min(new_stop, _lock_ms)
 
+            # Structure trail (/trail): ratchet to just beyond the latest intact
+            # M15/M5/M1 swing. Only-tighten via max/min, same as the other trails.
+            if struct_stop is not None:
+                if direction > 0:
+                    new_stop = max(new_stop, struct_stop)
+                else:
+                    new_stop = min(new_stop, struct_stop)
+
             if new_stop != old_stop:
                 leg["stop"] = new_stop
                 if leg.get("ticket"):
@@ -1439,6 +1451,29 @@ class LiveTrader(Backtester):
                     log.info("Trail %s %s  stop %.5f → %.5f  (+%.1f pips profit)",
                              "long" if direction > 0 else "short", pair,
                              old_stop, new_stop, pips_profit)
+
+    def _structure_trail_level(self, pair, direction, cur_price, now):
+        """Structural trailing-stop candidate for a /trail-armed pair, or None.
+
+        Reads the trader's /trail config (M15/M5/M1 · short-term STH/STL or
+        intermediate ITH/ITL · pip buffer), classifies that timeframe's fractal
+        structure and returns the level just beyond the latest INTACT swing:
+        (STL/ITL − buffer) for longs, (STH/ITH + buffer) for shorts. The caller
+        applies it only when it TIGHTENS the current stop."""
+        cfg = self.inputs.trail(pair) if self.inputs else None
+        if not cfg:
+            return None
+        try:
+            bars = self.bars_up_to(pair, cfg["tf"], now,
+                                   max_bars=config.STRUCT_TRAIL_LOOKBACK)
+        except Exception:
+            return None
+        if not bars or len(bars) < 5:
+            return None
+        return mstruct.trail_stop_level(
+            bars, direction, cfg.get("tier", "st"),
+            float(cfg.get("buf", config.STRUCT_TRAIL_DEFAULT_BUFFER)),
+            pip_size(pair), cur_price)
 
     def _update_live_positions(self, now):
         """Trail stops and attempt pyramid adds for all open positions."""

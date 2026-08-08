@@ -87,6 +87,13 @@ MILESTONE_TRAIL_ENABLED = bool(int(_os.environ.get("MILESTONE_TRAIL_ENABLED", 1)
 MILESTONE_TRAIL_STEP    = int(_os.environ.get("MILESTONE_TRAIL_STEP",   20))
 MILESTONE_TRAIL_BUFFER  = int(_os.environ.get("MILESTONE_TRAIL_BUFFER", 5))
 
+# Semi-auto structure trail (live only, opt-in per pair via Telegram /trail).
+# Follows the latest intact fractal swing on M15/M5/M1 (STH/STL or ITH/ITL),
+# keeping a trader-set pip buffer; only ever tightens. Backtest is unaffected
+# (the live layer reads it; the backtester never sets a /trail).
+STRUCT_TRAIL_LOOKBACK       = int(_os.environ.get("STRUCT_TRAIL_LOOKBACK", 200))
+STRUCT_TRAIL_DEFAULT_BUFFER = float(_os.environ.get("STRUCT_TRAIL_DEFAULT_BUFFER", 2))
+
 # HTF draw preference: when an unswept ITH/ITL, PDH/PDL, or PWH/PWL is within
 # this many pips, prefer it over a closer fib extension as the primary target.
 # These are RESTING LIQUIDITY pools (actual institutional destination); fib

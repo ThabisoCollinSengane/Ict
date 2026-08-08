@@ -247,6 +247,29 @@ the afternoon** — managed purely by its **stop, target, and milestone trail**.
 (Winning trades already carry across by default; `/hold` also keeps the
 losing-but-you-believe-in-it ones alive.)
 
+### 4b · Trail the stop by market structure
+```
+/trail EURUSD m5 st 3    → trail on M5 short-term swings, 3-pip buffer
+/trail EURUSD m15 it 5   → trail on M15 intermediate swings, 5-pip buffer
+/trail EURUSD m1 st      → M1 short-term, default 2-pip buffer
+/trail EURUSD off        → stop trailing by structure
+```
+Follows the **latest intact fractal swing** and ratchets your stop behind it,
+keeping a **pip buffer you choose**. Three timeframes and two structure tiers:
+
+- **Timeframe** — `m15` · `m5` · `m1` (how fine the swings it follows are).
+- **Tier** — `st` = short-term **STH/STL**, `it` = intermediate **ITH/ITL**.
+  (Bigger tier = looser, fewer stop-outs; short-term = tighter, locks faster.)
+- **Buffer** — the pips beyond the swing the stop sits (optional; default 2).
+
+The bot picks the correct side automatically: for a **long** it trails under the
+latest intact **low** (STL/ITL − buffer); for a **short**, above the latest intact
+**high** (STH/ITH + buffer). It **only ever tightens** — the stop moves in your
+favour as new swings form and never loosens. It stacks with the built-in
+break-even / lock / milestone trail (whichever is tighter wins), so you can layer
+your structural trail on top of the automatic protection. Per pair, expires at
+00:00 UTC like every input.
+
 ### 5 · Manual control — close & halt (act now)
 ```
 /test EURUSD long      → open a TEST trade NOW on the demo (also short; /buy /sell)
@@ -365,6 +388,7 @@ changes settings and runs the VM.
 | `/levels EURUSD buy … sell …` | manual-AMD liquidity (sweep→target) |
 | `/mm EURUSD buy\|sell [auto]\|off` | Market Maker IFVG model — watch, or `auto` to pre-permit one entry |
 | `/hold EURUSD` / `/hold all` | run across the session handover |
+| `/trail EURUSD m15\|m5\|m1 st\|it [pips]` | trail stop behind the latest intact swing |
 | `/release EURUSD` | normal handover management |
 | `/close EURUSD` / `/close all` | close position(s) at market now |
 | `/halt` / `/resume` | pause / re-enable all new entries + adds |
