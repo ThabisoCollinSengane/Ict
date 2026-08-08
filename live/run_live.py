@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import config
 from backtest import Backtester   # reuse all ICT signal logic
+from intermarket import resolve_pair_direction
 from ict import market_structure as mstruct
 from ict.killzones import can_open_new_trade
 from news_filter import NewsCalendar
@@ -675,6 +676,7 @@ class LiveTrader(Backtester):
                          f"M15 {self._dir_word(s.get('M15', {}).get('dir', 0))}")
             lines.append(f"  buy-side draw (ITH): {h4.get('ith') or '-'}")
             lines.append(f"  sell-side draw (ITL): {h4.get('itl') or '-'}")
+            lines.append(f"  bot would: {self._intended_direction(p, now, dxy_dir)}")
             lines.append(f"  your plan: {self._plan_str(p)}")
             lines.append("")
         return "\n".join(lines).strip()
@@ -726,6 +728,39 @@ class LiveTrader(Backtester):
                    0: "flat (EUR~GBP)"}[eg_dir]
         dv = f"{dxy_val:.2f}" if dxy_val else "n/a"
         return dxy_dir, [f"DXY: {dxy_word}  [{dv}]", f"EURGBP: {eg_word}"]
+
+    def _intended_direction(self, pair, now, dxy_dir):
+        """What the intermarket GATE would trade on this pair right now — the bot's
+        intended direction + scenario (a setup + killzone must still fire to act).
+        Mirrors _maybe_open's gate (H1 + H4 escalation). Returns 'LONG (3b)' etc."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        if dxy_dir == 0:
+            return "no trade (DXY flat)"
+        if pair in ("EURUSD", "GBPUSD"):
+            eg = self._sym_bias(config.REF_EURGBP, "60T", now, lookback=lb)
+            esc = ""
+            if eg == 0:
+                eg_h4 = self._sym_bias(config.REF_EURGBP, "240T", now, lookback=lb)
+                if eg_h4 != 0:
+                    eg, esc = eg_h4, "_h4"
+            d, sc = resolve_pair_direction(dxy_dir, eg, pair, "EURUSD")
+            if d is None or sc < 0.75 or (eg == 0 and pair == "GBPUSD"):
+                return "no gate signal"
+            smap = {(1, 1): "1a", (1, -1): "1b", (-1, 1): "2a",
+                    (-1, -1): "2b", (1, 0): "3a", (-1, 0): "3b"}
+            scen = smap.get((dxy_dir, eg), "?") + esc
+        else:   # NZDUSD
+            an = self._sym_bias(config.REF_AUDNZD, "60T", now, lookback=lb)
+            esc = ""
+            if an == 0:
+                an_h4 = self._sym_bias(config.REF_AUDNZD, "240T", now, lookback=lb)
+                if an_h4 != 0:
+                    an, esc = an_h4, "_h4"
+            d, sc = resolve_pair_direction(dxy_dir, an, "NZDUSD", "AUDUSD")
+            if d is None or sc < 1.0:
+                return "no gate signal"
+            scen = ("N-long" if d > 0 else "N-short") + esc
+        return f"{'LONG' if d > 0 else 'SHORT'} ({scen})"
 
     def _pair_lean(self, s, dxy_dir):
         """A directional lean % for a pair from H4/H1/M15 structure + the dollar.
@@ -833,7 +868,8 @@ class LiveTrader(Backtester):
             lines.append(
                 f"{p} {s.get('price', '?')}  {self._pair_lean(s, dxy_dir)} | "
                 f"H4 {w(h4)} H1 {w(s.get('H1', {}))} M15 {w(s.get('M15', {}))} | "
-                f"ITH {h4.get('ith') or '-'} ITL {h4.get('itl') or '-'} | {self._plan_str(p)}")
+                f"ITH {h4.get('ith') or '-'} ITL {h4.get('itl') or '-'} | "
+                f"bot: {self._intended_direction(p, now, dxy_dir)} | {self._plan_str(p)}")
         if self.active:
             lines += ["", self.read_positions()]
         lines += ["", "Reply — read: /read /positions /account /news | "
