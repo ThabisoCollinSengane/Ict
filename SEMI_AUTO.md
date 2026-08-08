@@ -59,11 +59,16 @@ EURUSD  1.15206   SHORT lean 75%
   H4 bullish | H1 bearish | M15 bullish
   buy-side draw (ITH): 1.15800
   sell-side draw (ITL): 1.14900
+  bot would: SHORT (1b)
   your plan: EURUSD long only, levels set
 ```
 Every read leads with the **two gate drivers** — **DXY** (dollar direction) and
-**EURGBP** (which family, EUR vs GBP). Then each pair gets a **directional lean %**
-from its H4/H1/M15 structure combined with the dollar (USD pairs lean opposite DXY).
+**EURGBP** (which family, EUR vs GBP). Then each pair gets:
+- a **directional lean %** — the market's structural pressure (H4/H1/M15 + dollar);
+- **bot would** — the bot's *intended trade direction + scenario* from the
+  intermarket gate right now (e.g. `SHORT (1b)`), or `no gate signal` / `no trade
+  (DXY flat)`. A setup + killzone must still fire for it to actually enter — this
+  is what it's *leaning to trade*, not a guarantee it will.
 
 ### 1 · Lot for the day
 ```
