@@ -73,6 +73,50 @@ def test_clear_and_auto():
     print("ok  /auto reverts a pair")
 
 
+def test_parse_trail():
+    si = _fresh_inputs()
+    import config
+    p = config.PAIRS[0] if config.PAIRS else "EURUSD"
+    # tf + tier + buffer
+    tc.parse_command(f"/trail {p} m5 it 3", si)
+    assert si.trail(p) == {"tf": "5T", "tier": "it", "buf": 3.0}, si.trail(p)
+    # tf only -> default short-term tier, default 2-pip buffer
+    tc.parse_command(f"/trail {p} m15", si)
+    assert si.trail(p) == {"tf": "15T", "tier": "st", "buf": 2.0}
+    # buffer without an explicit tier
+    tc.parse_command(f"/trail {p} m1 4", si)
+    assert si.trail(p) == {"tf": "1T", "tier": "st", "buf": 4.0}
+    # off clears it
+    tc.parse_command(f"/trail {p} off", si)
+    assert si.trail(p) is None
+    print("ok  parse /trail (tf/tier/buffer + off)")
+
+
+def test_structure_trail_level():
+    """LONG: stop rides just below the latest intact STL, only on the correct
+    side of price; 'it' tier is None when there is no intermediate swing."""
+    from ict.market_structure import trail_stop_level
+    _B = namedtuple("_B", "Open High Low Close")
+    bars = [
+        _B(1.1000, 1.1005, 1.1000, 1.1003),
+        _B(1.1002, 1.1004, 1.0990, 1.0992),   # fractal LOW 1.0990 (the STL)
+        _B(1.0993, 1.1012, 1.0992, 1.1010),
+        _B(1.1011, 1.1020, 1.1008, 1.1018),
+        _B(1.1019, 1.1030, 1.1016, 1.1028),
+        _B(1.1029, 1.1040, 1.1026, 1.1038),
+        _B(1.1039, 1.1050, 1.1036, 1.1048),   # never dips below 1.0990 -> intact
+    ]
+    pip = 0.0001
+    # long, short-term tier, 2-pip buffer, price well above the STL
+    lvl = trail_stop_level(bars, +1, "st", 2, pip, cur_price=1.1050)
+    assert lvl is not None and abs(lvl - (1.0990 - 2 * pip)) < 1e-9, lvl
+    # wrong side of price (candidate would be at/above price) -> None
+    assert trail_stop_level(bars, +1, "st", 2, pip, cur_price=1.0985) is None
+    # no intermediate swing in this short series -> 'it' tier returns None
+    assert trail_stop_level(bars, +1, "it", 2, pip, cur_price=1.1050) is None
+    print("ok  structure trail level (STL - buffer, side check, tier fallback)")
+
+
 def test_parse_hold_and_release():
     si = _fresh_inputs()
     import config
@@ -241,6 +285,8 @@ def main():
     test_parse_bias_filter()
     test_parse_levels()
     test_clear_and_auto()
+    test_parse_trail()
+    test_structure_trail_level()
     test_parse_hold_and_release()
     test_action_commands_parse_and_dispatch()
     test_backtest_handover_hook_is_noop()

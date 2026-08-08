@@ -192,6 +192,33 @@ def last_swing(result: dict, tier: str) -> Swing | None:
     return swings[-1] if swings else None
 
 
+def trail_stop_level(candles, direction, tier, buf_pips, pip, cur_price):
+    """Structural trailing-stop candidate: just beyond the latest INTACT swing.
+
+    LONG  (direction +1): (intact STL or ITL).price - buf_pips*pip  -> stop below.
+    SHORT (direction -1): (intact STH or ITH).price + buf_pips*pip  -> stop above.
+
+    `tier` is "st" (short-term STH/STL) or "it" (intermediate ITH/ITL). Returns
+    None when there is no intact swing of that tier, or the computed level is on
+    the wrong side of `cur_price` (would be an invalid / instant stop). The
+    caller decides whether it improves on the current stop (only-tighten).
+    """
+    res = classify(candles)
+    if direction > 0:
+        sw = last_intact(res, "ITL" if tier == "it" else "STL")
+        if sw is None:
+            return None
+        cand = sw.price - buf_pips * pip
+        return cand if cand < cur_price else None
+    if direction < 0:
+        sw = last_intact(res, "ITH" if tier == "it" else "STH")
+        if sw is None:
+            return None
+        cand = sw.price + buf_pips * pip
+        return cand if cand > cur_price else None
+    return None
+
+
 def structure_direction(result: dict) -> int:
     """Intermediate-term structural read from the ITH/ITL sequence.
 
