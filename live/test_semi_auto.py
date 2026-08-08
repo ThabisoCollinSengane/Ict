@@ -176,7 +176,37 @@ def test_amd_sweep_logic():
     print("ok  manual-AMD sweep direction (long / short / wait)")
 
 
+def test_ifvg_detection():
+    from ict.ifvg import find_inversion_fvgs
+    _B = namedtuple("_B", "Open High Low Close")
+    bars = [_B(1.10, 1.101, 1.099, 1.100)] * 5
+    bars += [_B(1.100, 1.1005, 1.0980, 1.0985),
+             _B(1.0985, 1.0985, 1.0960, 1.0965),
+             _B(1.0965, 1.0968, 1.0940, 1.0945),      # gap-down FVG box
+             _B(1.0975, 1.0990, 1.0972, 1.0988),      # touch
+             _B(1.0988, 1.1010, 1.0986, 1.1005)]      # full body above -> demand IFVG
+    bars += [_B(1.1005, 1.1015, 1.1000, 1.1010)] * 3
+    z = find_inversion_fvgs(bars, direction=1)
+    assert z and z[0]["dir"] == 1, "should find a bullish demand IFVG"
+    assert find_inversion_fvgs(bars, direction=-1) == [] or all(
+        x["dir"] == -1 for x in find_inversion_fvgs(bars, direction=-1))
+    print("ok  IFVG inversion detection (Market Maker model)")
+
+
+def test_mm_flag():
+    si = _fresh_inputs()
+    import config
+    p = config.PAIRS[0] if config.PAIRS else "EURUSD"
+    tc.parse_command(f"/mm {p} buy", si)
+    assert si.mm(p) == "buy"
+    tc.parse_command(f"/mm {p} off", si)
+    assert si.mm(p) is None
+    print("ok  /mm arm + off")
+
+
 def main():
+    test_ifvg_detection()
+    test_mm_flag()
     test_parse_lot_all_and_pair()
     test_parse_bias_filter()
     test_parse_levels()

@@ -94,6 +94,24 @@ class SessionInputs:
         self.save()
         return f"{pair}: hunting {bias.upper()}S only (bot still needs its own setup)"
 
+    def set_mm(self, pair: str, model: str) -> str:
+        self._rollover()
+        model = model.lower()
+        if model in ("off", "none", "clear"):
+            self._p(pair).pop("mm", None)
+            self.save()
+            return f"{pair}: Market Maker model OFF"
+        if model in ("buy", "sell"):
+            self._p(pair)["mm"] = model
+            self.save()
+            return (f"{pair}: Market Maker {model.upper()} model ARMED — watching "
+                    f"D1/H4/H1 inversion FVGs; you'll be alerted on reach + break.")
+        return "usage: /mm EURUSD buy | sell | off"
+
+    def mm(self, pair: str):
+        self._rollover()
+        return self._pairs.get(pair, {}).get("mm")
+
     def set_hold(self, pair: str, on: bool = True) -> str:
         self._rollover()
         if on:
@@ -169,5 +187,7 @@ class SessionInputs:
                 bits.append(f"sell {d['sell']}")
             if d.get("hold"):
                 bits.append("HOLD across sessions")
+            if d.get("mm"):
+                bits.append(f"MM {d['mm']} model")
             lines.append(f"  {pair}: {', '.join(bits) if bits else 'auto'}")
         return "\n".join(lines)

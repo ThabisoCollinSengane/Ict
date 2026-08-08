@@ -101,6 +101,32 @@ the other side.
   side becomes the TP). Your engine still decides **whether the setup is there.**
 - If both `/bias` and `/levels` are set, **both must agree.**
 
+### 3b · Market Maker model — IFVG watcher (D1/H4/H1)
+```
+/mm EURUSD buy      → arm the Market Maker BUY model on EURUSD
+/mm EURUSD sell     → sell model
+/mm EURUSD off      → disarm
+```
+Arm a model and the bot scans **D1, H4 and H1 for inversion FVGs** in that
+direction (buy = demand/support zones, sell = supply/resistance) — the HTF Judas
+areas that repel price toward the same liquidity draws you already target. Then:
+
+- **In `/read` / `/brief`** each armed pair shows its IFVG zones with **how far
+  price is** — pips away and a **% of the way** from where you armed the model:
+  ```
+  MM BUY model - IFVG watch (D1/H4/H1):
+    D1 IFVG 1.14900-1.15050   62p away  (73%)
+    H4 IFVG 1.15400-1.15470   8p away   (95%)
+    H1 IFVG 1.15560-1.15600   REACHED
+  ```
+- **Alerts** fire once per zone: **"price REACHED H4 IFVG …"** when price enters a
+  zone, and **"H4 IFVG BROKEN — closed above/below …"** when a bar closes a full
+  body through it — your cue to look for the retracement entry on swing formation.
+
+It's a **watch layer** — it doesn't auto-trade the model. You take the retracement
+entries yourself (`/test`, `/pyramid`, or the bot's own swing entry). Same target
+liquidity as always; the IFVGs just time the pushes toward it.
+
 ### 4 · Let a trade run across sessions
 ```
 /hold EURUSD           → don't close it at the session handover; let it run
