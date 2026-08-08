@@ -108,7 +108,7 @@ TRADING_CMDS = {"read", "structure", "markets", "positions", "open", "trades",
                 "account", "equity", "dxy", "session", "brief", "news",
                 "lot", "bias", "levels", "hold", "release", "close", "flat",
                 "halt", "resume", "auto", "clear", "test", "testtrade", "buy", "sell",
-                "pyramid", "add", "sl", "stop", "be", "breakeven"}
+                "pyramid", "add", "sl", "stop", "be", "breakeven", "mm"}
 
 
 def send(text: str, chat_id: str = None) -> bool:

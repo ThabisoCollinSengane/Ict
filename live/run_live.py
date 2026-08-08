@@ -118,6 +118,7 @@ class LiveTrader(Backtester):
         self._current_pair = None       # set before super()._maybe_open so
         self._templated = set()         # _pyramid_lots knows which pair it sizes
         self._manual_halt = False       # /halt: pause new entries + pyramid adds
+        self._mm_state = {}             # Market Maker model: per-pair IFVG alert state
 
         # Circuit-breaker state
         self._consec_losses     = 0
@@ -677,6 +678,7 @@ class LiveTrader(Backtester):
             lines.append(f"  buy-side draw (ITH): {h4.get('ith') or '-'}")
             lines.append(f"  sell-side draw (ITL): {h4.get('itl') or '-'}")
             lines.append(f"  bot would: {self._intended_direction(p, now, dxy_dir)}")
+            lines += self._mm_block(p)
             lines.append(f"  your plan: {self._plan_str(p)}")
             lines.append("")
         return "\n".join(lines).strip()
@@ -761,6 +763,93 @@ class LiveTrader(Backtester):
                 return "no gate signal"
             scen = ("N-long" if d > 0 else "N-short") + esc
         return f"{'LONG' if d > 0 else 'SHORT'} ({scen})"
+
+    # ── Market Maker model (IFVG watcher) ────────────────────────────────────
+    _MM_TFS = (("D", "D1"), ("240T", "H4"), ("60T", "H1"))
+
+    def _mm_zones(self, pair, model_dir):
+        """Inversion FVGs on D1/H4/H1 in the model direction (buy -> demand/support
+        +1, sell -> supply/resistance -1). Each dict tagged with its TF label."""
+        from ict.ifvg import find_inversion_fvgs
+        now = datetime.now(timezone.utc)
+        out = []
+        for tf, lbl in self._MM_TFS:
+            try:
+                bars = self.bars_up_to(pair, tf, now, max_bars=200)
+                for z in find_inversion_fvgs(bars, direction=model_dir, max_zones=2):
+                    out.append({"tf": lbl, "tf_key": tf, **z})
+            except Exception:
+                continue
+        return out
+
+    def _mm_block(self, pair):
+        """Template lines for an armed Market Maker model: each IFVG zone + how far
+        price is from it (pips + % of the way from where the model was armed)."""
+        model = self.inputs.mm(pair) if self.inputs else None
+        if not model:
+            return []
+        model_dir = 1 if model == "buy" else -1
+        q = mt.tick(pair)
+        price = (q[0] + q[1]) / 2 if q else None
+        pip = pip_size(pair)
+        st = self._mm_state.get(pair, {})
+        arm = st.get("arm_price") or price
+        zones = self._mm_zones(pair, model_dir)
+        lines = [f"  MM {model.upper()} model - IFVG watch (D1/H4/H1):"]
+        if not zones:
+            lines.append("    (no qualifying inversion FVGs yet)")
+            return lines
+        for z in zones:
+            lo, hi, mid = z["lo"], z["hi"], z["mid"]
+            if price is None:
+                tag = "-"
+                dist = "?"
+            elif lo <= price <= hi:
+                tag = "REACHED"
+                dist = "0"
+            else:
+                dist = f"{abs(price - mid) / pip:.0f}"
+                total = abs(mid - arm)
+                trav = abs(price - arm)
+                pct = min(100, round(trav / total * 100)) if total > 0 else 0
+                tag = f"{pct}%"
+            lines.append(f"    {z['tf']} IFVG {lo:.5f}-{hi:.5f}   {dist}p away  ({tag})")
+        return lines
+
+    def _mm_scan(self):
+        """Alert on reach + break-and-close of armed MM IFVG zones (once each)."""
+        if not self.inputs:
+            return
+        now = datetime.now(timezone.utc)
+        for pair in config.PAIRS:
+            model = self.inputs.mm(pair)
+            if not model:
+                self._mm_state.pop(pair, None)
+                continue
+            q = mt.tick(pair)
+            if not q:
+                continue
+            price = (q[0] + q[1]) / 2
+            st = self._mm_state.setdefault(
+                pair, {"arm_price": price, "reached": set(), "broke": set()})
+            model_dir = 1 if model == "buy" else -1
+            for z in self._mm_zones(pair, model_dir):
+                lo, hi = z["lo"], z["hi"]
+                key = f"{z['tf']}:{round(z['mid'], 5)}"
+                if lo <= price <= hi and key not in st["reached"]:
+                    st["reached"].add(key)
+                    _notify(f"MM {model.upper()} {pair}\nprice REACHED {z['tf']} IFVG "
+                            f"{lo:.5f}-{hi:.5f}\nWatch for a swing-formation retracement entry.")
+                bars = self.bars_up_to(pair, z["tf_key"], now, max_bars=2)
+                if bars:
+                    c = bars[-1]
+                    if ((c.Open > hi and c.Close > hi) or (c.Open < lo and c.Close < lo)) \
+                            and key not in st["broke"]:
+                        st["broke"].add(key)
+                        side = "above" if c.Close > hi else "below"
+                        _notify(f"MM {model.upper()} {pair}\n{z['tf']} IFVG BROKEN - "
+                                f"closed {side} {lo:.5f}-{hi:.5f}\nRetracement-entry window "
+                                f"(swing formation).")
 
     def _pair_lean(self, s, dxy_dir):
         """A directional lean % for a pair from H4/H1/M15 structure + the dollar.
@@ -1400,6 +1489,12 @@ class LiveTrader(Backtester):
         # Session handover: close positions fighting the weekly AMD.
         if can_open_new_trade(now):
             self._check_session_handover(now)
+
+        # Market Maker model: alert on reach / break of armed IFVG zones.
+        try:
+            self._mm_scan()
+        except Exception:
+            log.exception("mm_scan failed — continuing")
 
         # Session-start template: fire once at the start of EACH session
         # (London / NY AM / NY PM), prompting the trader for that session's plan.
