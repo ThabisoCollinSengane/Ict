@@ -162,6 +162,78 @@ target and why.
 - Auto expires at **00:00 UTC** with everything else, and it's **one entry only** —
   re-arm with `/mm PAIR buy auto` if you want it to take another.
 
+#### IFVG entries — how the setup plays out (sketches)
+
+**What an inversion FVG *is* (BUY / demand example).** A fair-value gap that price
+later *closes a full body back through* flips polarity — a down-gap that gets a
+bullish full-body close above it becomes a **demand (support)** zone. That flip is
+the "Judas on a higher timeframe": the level that once repelled price down now
+holds it up, drawing price on toward your liquidity target.
+
+```
+1) a bearish gap (FVG) forms as price falls through it
+2) price returns and a FULL BODY closes back ABOVE the gap
+        -> the gap INVERTS into a DEMAND zone (support)
+3) later price RETRACES down into that demand zone and turns up
+        -> that turn is your entry, riding to the draw above
+```
+
+**BUY model — the entry sequence (demand IFVG sits BELOW price):**
+```
+  1.15800  = = = TARGET  (buy-side draw: ITH / PDH / your level)   ▲
+                                                                   │ ③ up to target
+  1.15600  ● price now                                            │
+              │  ① price drops back toward the zone   (beat [1])
+              ▼
+  1.15470  ┌────────────────┐  zone top
+           │  DEMAND  IFVG   │  ② TAG the zone (beat [2]) -> swing UP = ENTER [3]
+  1.15400  └────────────────┘  zone bottom
+  1.15380  ✗ stop  (just below the zone — the bot's structural stop)
+```
+
+**SELL model — the mirror (supply IFVG sits ABOVE price):**
+```
+  1.16120  ✗ stop  (just above the zone)
+  1.16100  ┌────────────────┐  zone top
+           │  SUPPLY  IFVG   │  ② TAG (beat [2]) -> swing DOWN = ENTER [3]
+  1.16030  └────────────────┘  zone bottom
+              ▲
+              │  ① price rises back toward the zone   (beat [1])
+  1.15900  ● price now
+              │  ③ down to target
+              ▼
+  1.15600  = = = TARGET  (sell-side draw: ITL / PDL / your level)
+```
+
+**When a zone FAILS (beat `[x] BROKEN`) — do NOT trade it:**
+```
+  1.15470  ┌────────────────┐  zone top
+           │  DEMAND  IFVG   │
+  1.15400  └────────────────┘  zone bottom
+              │  a full body CLOSES below the zone
+              ▼
+  1.15350  ██  close < zone  ->  zone is spent
+           the read flips it to [x] BROKEN — drop to the NEXT zone down the list
+```
+
+**A worked BUY, arm to fill:**
+```
+  you send      /mm EURUSD buy auto
+  /brief        H4 IFVG 1.15400-1.15470   9p  [1] approaching 88%
+    ... price drifts down ...
+  alert         price REACHED H4 IFVG 1.15400-1.15470
+  /brief        H4 IFVG 1.15400-1.15470   0p  [2] TAGGED - waiting on swing
+    ... M15 prints a higher-low off the zone (swing forms) ...
+  /brief        H4 IFVG 1.15400-1.15470   0p  [3] CONFIRMED - entry trigger
+  bot fires     MM BUY AUTO-ENTRY EURUSD LONG  entry 1.15430  stop 1.15380
+                target 1.15800  (H4 ITH draw)  -> auto DISARMS (one shot)
+```
+By hand (watch mode) the sequence is identical — you just place the trade yourself
+at beat `[3]` with `/test EURUSD long` (or `/pyramid` if you're adding to a winner).
+
+**Reading the beats at a glance:** `[1]` = wait, `[2]` = get ready, `[3]` = go,
+`[x]` = skip this zone. The `%` next to `[1]` is your countdown to the tag.
+
 ### 4 · Let a trade run across sessions
 ```
 /hold EURUSD           → don't close it at the session handover; let it run
