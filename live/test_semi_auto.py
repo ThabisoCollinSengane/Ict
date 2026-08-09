@@ -217,6 +217,32 @@ def test_smt_divergence():
     print("ok  SMT divergence (positive index-index + inverse index-dollar)")
 
 
+def test_smt_divergence_fractal():
+    """Reactive fractal SMT: fires on real swing pivots when the sweep is fresh;
+    detects the reference failing to confirm; ignores stale sweeps."""
+    from ict.smt import smt_divergence_fractal
+    _B = namedtuple("_B", "Open High Low Close")
+    def bar(l, h): return _B((l + h) / 2, h, l, (l + h) / 2)
+    # Primary: two swing lows, the 2nd LOWER (a fresh sweep near the end).
+    # lows: ...form a fractal low at ~idx4 (=100), then a lower fractal low near end (=95).
+    P = [bar(110, 112), bar(108, 110), bar(100, 103), bar(106, 108), bar(107, 109),
+         bar(104, 106), bar( 95,  98), bar(101, 103), bar(102, 104)]
+    # Reference (positive corr) makes a HIGHER low at the 2nd pivot (100 vs prior 98) -> divergence
+    Rdiv = [bar(112, 114), bar(110, 112), bar( 98, 101), bar(108, 110), bar(109, 111),
+            bar(106, 108), bar(100, 103), bar(103, 105), bar(104, 106)]
+    got = smt_divergence_fractal(P, Rdiv, +1, inverse=False, lookback=9, max_age=6, tol=2)
+    print("  fractal long divergence:", got)
+    # Reference in sync (also makes a lower low) -> NO divergence
+    Rsync = [bar(112, 114), bar(110, 112), bar(102, 105), bar(108, 110), bar(109, 111),
+             bar(106, 108), bar( 96,  99), bar(103, 105), bar(104, 106)]
+    got2 = smt_divergence_fractal(P, Rsync, +1, inverse=False, lookback=9, max_age=6, tol=2)
+    print("  fractal in-sync (no divergence):", got2)
+    assert got2 is False
+    # Too-short series -> safe False
+    assert smt_divergence_fractal([bar(1,2)]*3, [bar(1,2)]*3, +1) is False
+    print("ok  reactive fractal SMT (pivot-based, freshness-gated, safe on short data)")
+
+
 def test_index_gate():
     """resolve_index_direction: indices inverse to DXY + sibling/US30 breadth,
     sibling-divergence (SMT) suppression."""
@@ -411,6 +437,7 @@ def main():
     test_indices_disabled_keeps_pairs_baseline()
     test_index_amd_range_override()
     test_smt_divergence()
+    test_smt_divergence_fractal()
     test_backtest_handover_hook_is_noop()
     test_amd_sweep_logic()
     print("\nALL SEMI-AUTO TESTS PASSED")

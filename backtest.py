@@ -833,8 +833,19 @@ class Backtester:
         out = {"points": 0, "idx_smt": False, "dxy_smt": False}
         if not (config.INDICES_ENABLED and pair in config.INDEX_PAIRS):
             return out
-        from ict.smt import smt_divergence
-        tf, lb = config.SMT_TF, config.SMT_LOOKBACK
+        from ict.smt import smt_divergence, smt_divergence_fractal
+        # Pick the detector: "fractal" = reactive fractal-swing alignment (fires at
+        # the real pivot when fresh); "proxy" = block-half window (default).
+        if config.SMT_MODE == "fractal":
+            lb = config.SMT_FRACTAL_LOOKBACK
+            _diverges = lambda p, r, inv: smt_divergence_fractal(
+                p, r, direction, inverse=inv, lookback=lb,
+                max_age=config.SMT_FRACTAL_MAX_AGE)
+        else:
+            lb = config.SMT_LOOKBACK
+            _diverges = lambda p, r, inv: smt_divergence(
+                p, r, direction, inverse=inv, lookback=lb)
+        tf = config.SMT_TF
         prim = self.bars_up_to(pair, tf, t)
         if len(prim) < lb:
             return out
@@ -842,13 +853,12 @@ class Backtester:
         refs = [p for p in config.INDEX_PAIRS if p != pair] + [config.INDEX_REF]
         for rsym in refs:
             rb = self.bars_up_to(rsym, tf, t)
-            if len(rb) >= lb and smt_divergence(prim, rb, direction, inverse=False, lookback=lb):
+            if len(rb) >= lb and _diverges(prim, rb, False):
                 out["idx_smt"] = True
                 break
         # 2. index-vs-dollar (inverse corr).
         dxy_bars = self._dxy_bars(tf, t)
-        if len(dxy_bars) >= lb and smt_divergence(prim, dxy_bars, direction,
-                                                  inverse=True, lookback=lb):
+        if len(dxy_bars) >= lb and _diverges(prim, dxy_bars, True):
             out["dxy_smt"] = True
         out["points"] = (config.SMT_CONVICTION_PTS if out["idx_smt"] else 0) \
             + (config.SMT_CONVICTION_PTS if out["dxy_smt"] else 0)
