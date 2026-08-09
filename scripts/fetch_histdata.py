@@ -33,7 +33,11 @@ import urllib.parse
 import urllib.request
 
 BASE = "https://www.histdata.com"
-ASCII_PAIRS = ("EURUSD", "GBPUSD", "EURGBP", "NZDUSD", "AUDNZD")
+# Core FX + the gold complex. XAUUSD (gold), XAGUSD (silver) and AUDUSD are the
+# DXY+silver+AUDUSD intraday gate for the gold build; HistData serves all three
+# under the same ASCII 1-minute product, so they route exactly like the FX pairs.
+ASCII_PAIRS = ("EURUSD", "GBPUSD", "EURGBP", "NZDUSD", "AUDNZD",
+               "AUDUSD", "XAUUSD", "XAGUSD")
 MT_PAIRS = ("UDXUSD",)
 ALL_PAIRS = ASCII_PAIRS + MT_PAIRS
 _UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
