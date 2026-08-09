@@ -5,6 +5,17 @@ import os as _os
 # --- Capital + risk ---
 STARTING_CASH = 500                # R500 ZAR starting capital
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
+
+# --- Profit withdrawal model (realistic account, no runaway compounding) ---
+# When the working balance reaches WITHDRAW_AT, cash out everything above
+# WITHDRAW_KEEP (i.e. bank the profit) and keep trading from WITHDRAW_KEEP. This
+# keeps position sizing, growth AND drawdowns realistic instead of compounding to
+# hundreds of millions. Money withdrawn is tracked separately; the reported MaxDD
+# is on the TOTAL-value curve (working + withdrawn) so a withdrawal never shows as
+# a drawdown. WITHDRAW_AT=0 disables it (byte-identical baseline).
+#   e.g. WITHDRAW_AT=20000 WITHDRAW_KEEP=500  -> grow 500->20k, bank ~19.5k, repeat.
+WITHDRAW_AT   = float(_os.environ.get("WITHDRAW_AT", 0))          # ceiling; 0 = off
+WITHDRAW_KEEP = float(_os.environ.get("WITHDRAW_KEEP", STARTING_CASH))  # keep-working level
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
 # Max-risk-per-trade guard: at small equity the broker min-lot floor (0.01) overrides
