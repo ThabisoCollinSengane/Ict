@@ -693,6 +693,11 @@ SMT_TF             = _os.environ.get("SMT_TF", "15T")
 SMT_LOOKBACK       = int(_os.environ.get("SMT_LOOKBACK", 20))
 SMT_CONVICTION_PTS = int(_os.environ.get("SMT_CONVICTION_PTS", 1))
 INDEX_SMT_REQUIRED = bool(int(_os.environ.get("INDEX_SMT_REQUIRED", 0)))
+# SMT detector: "proxy" = block-half window (robust, smoothed); "fractal" =
+# reactive fractal-swing alignment (fires at the real pivot, only when fresh).
+SMT_MODE           = _os.environ.get("SMT_MODE", "proxy")
+SMT_FRACTAL_LOOKBACK = int(_os.environ.get("SMT_FRACTAL_LOOKBACK", 60))
+SMT_FRACTAL_MAX_AGE  = int(_os.environ.get("SMT_FRACTAL_MAX_AGE", 6))   # bars: freshness = reactivity
 if INDICES_ENABLED:
     for _s in INDEX_PAIRS:
         if _s not in PAIRS:
