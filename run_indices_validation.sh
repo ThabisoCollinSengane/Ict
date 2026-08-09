@@ -23,7 +23,7 @@ YEARS=(2022 2023 2024 2025)
 # ── withdrawal policy (override by exporting before the run) ──────────────────
 export WITHDRAW_SCHEDULE="${WITHDRAW_SCHEDULE:-1}"
 export WITHDRAW_KEEP="${WITHDRAW_KEEP:-10000}"      # start withdrawing at R10k
-export WITHDRAW_FRACTION="${WITHDRAW_FRACTION:-0.7}"# bank 70% income / compound 30%
+export WITHDRAW_FRACTION="${WITHDRAW_FRACTION:-0.7}"   # bank 70% income / compound 30%
 export WITHDRAW_BAND="${WITHDRAW_BAND:-10000}"      # cadence steps up every R10k
 export INDEX_PAIRS="SPXUSD NSXUSD"
 export INDEX_REF="${INDEX_REF:-US30}"
