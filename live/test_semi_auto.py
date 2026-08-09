@@ -190,6 +190,35 @@ def test_gold_gate():
     print("ok  gold gate (DXY inverse + silver/AUD 2-of-3 + divergence suppress)")
 
 
+def test_index_gate():
+    """resolve_index_direction: indices inverse to DXY + sibling/US30 breadth,
+    sibling-divergence (SMT) suppression."""
+    from intermarket import resolve_index_direction as r
+    assert r(0, 1, 1) == (None, 0.0)          # DXY flat -> hard gate
+    assert r(-1, 1, 1) == (1, 1.0)            # DXY down + sibling + US30 -> LONG full
+    assert r(-1, 1, 0) == (1, 0.75)           # DXY down + sibling only -> 0.75
+    assert r(-1, 0, 1) == (1, 0.75)           # DXY down + US30 only -> 0.75
+    assert r(-1, 0, 0) == (None, 0.0)         # only DXY -> below 2-of-3
+    assert r(-1, -1, 1) == (None, 0.0)        # sibling diverges (SMT) -> suppress
+    assert r(1, -1, -1) == (-1, 1.0)          # DXY up -> index SHORT
+    print("ok  index gate (inverse-dollar + sibling/US30 breadth + SMT suppress)")
+
+
+def test_indices_disabled_keeps_pairs_baseline():
+    """INDICES_ENABLED=0 must NOT add US500/US100 to PAIRS (baseline byte-identical)."""
+    import os, importlib
+    prev = os.environ.get("INDICES_ENABLED")
+    os.environ["INDICES_ENABLED"] = "0"
+    import config as _c; importlib.reload(_c)
+    assert not any(p in _c.PAIRS for p in _c.INDEX_PAIRS), _c.PAIRS
+    if prev is None:
+        os.environ.pop("INDICES_ENABLED", None)
+    else:
+        os.environ["INDICES_ENABLED"] = prev
+    importlib.reload(_c)
+    print("ok  INDICES_ENABLED=0 leaves PAIRS at baseline (no US500/US100)")
+
+
 def test_gold_disabled_keeps_pairs_baseline():
     """GOLD_ENABLED=0 must NOT add XAUUSD to PAIRS (baseline byte-identical)."""
     import os, importlib
@@ -328,6 +357,8 @@ def main():
     test_action_commands_parse_and_dispatch()
     test_gold_gate()
     test_gold_disabled_keeps_pairs_baseline()
+    test_index_gate()
+    test_indices_disabled_keeps_pairs_baseline()
     test_backtest_handover_hook_is_noop()
     test_amd_sweep_logic()
     print("\nALL SEMI-AUTO TESTS PASSED")

@@ -595,6 +595,29 @@ GOLD_MIN_IMSCORE   = float(_os.environ.get("GOLD_MIN_IMSCORE", 1.0))
 GOLD_SIZE_MULT     = float(_os.environ.get("GOLD_SIZE_MULT", 1.0))
 if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
     PAIRS = PAIRS + (GOLD_PAIR,)
+
+# --- US index intermarket gate — US500 + US100 traded, US30 + DXY confirm ---
+# Indices move INVERSE to the dollar (weak USD -> risk-on -> indices up), so the
+# SAME 3-market breadth logic as gold applies: DXY (primary, sign-flipped) + the
+# sibling index + US30 (ref). SMT is the mechanism — the two traded indices should
+# move together; if the SIBLING diverges the move lacks breadth -> suppress. US500
+# and US100 are traded; US30 is a confirmer only. ICT index concepts (SMT, the
+# 9:30 cash open, NY killzones) are heavily active on these. Default OFF ->
+# byte-identical baseline (indices not in PAIRS).
+INDICES_ENABLED   = bool(int(_os.environ.get("INDICES_ENABLED", 0)))
+_ip = _os.environ.get("INDEX_PAIRS")
+INDEX_PAIRS       = tuple(_ip.split()) if _ip else ("US500", "US100")   # traded
+INDEX_REF         = _os.environ.get("INDEX_REF", "US30")                # confirmer only
+INDEX_MIN_IMSCORE = float(_os.environ.get("INDEX_MIN_IMSCORE", 0.75))   # 0.75=2of3, 1.0=all3
+INDEX_PIP         = float(_os.environ.get("INDEX_PIP", 1.0))            # indices move in points
+INDEX_LOT_UNITS   = int(_os.environ.get("INDEX_LOT_UNITS", 1))         # PROVISIONAL contract
+INDEX_STOP_TF       = _os.environ.get("INDEX_STOP_TF", "5T")            # structural stop TF
+INDEX_STOP_LOOKBACK = int(_os.environ.get("INDEX_STOP_LOOKBACK", 120))
+INDEX_SIZE_MULT   = float(_os.environ.get("INDEX_SIZE_MULT", 1.0))      # DD-fit lever; 1.0=off
+if INDICES_ENABLED:
+    for _s in INDEX_PAIRS:
+        if _s not in PAIRS:
+            PAIRS = PAIRS + (_s,)
 # DXY synthetic uses these (all available on OANDA):
 DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 

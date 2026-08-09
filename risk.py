@@ -11,6 +11,9 @@ def pip_size(symbol: str) -> float:
         return config.GOLD_PIP
     if symbol == "XAGUSD":
         return config.SILVER_PIP
+    # US indices move in points, not FX pips.
+    if symbol in config.INDEX_PAIRS or symbol == config.INDEX_REF:
+        return config.INDEX_PIP
     return 0.01 if symbol.endswith("JPY") else 0.0001
 
 

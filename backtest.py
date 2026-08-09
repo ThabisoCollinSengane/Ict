@@ -48,6 +48,7 @@ from intermarket import (
     resolve as resolve_intermarket,
     resolve_pair_direction,
     resolve_gold_direction,
+    resolve_index_direction,
 )
 from news_filter import NewsCalendar
 from risk import position_size, pip_size
@@ -665,13 +666,22 @@ class Backtester:
                 return lots
         return config.EQUITY_TIERS[-1][1]
 
+    def _is_point_instrument(self, pair):
+        """True for point-based (non-FX) instruments — gold and the US indices.
+        These are dollar/point priced, so they use their own contract size,
+        structural-only stops (no fixed-pip cap/news override), and pip units."""
+        return ((config.GOLD_ENABLED and pair == config.GOLD_PAIR)
+                or (config.INDICES_ENABLED and pair in config.INDEX_PAIRS))
+
     def _contract_units(self, pair):
-        """Units per 1.0 lot for this symbol. Gold's contract (100 oz) is ~1000x
-        smaller than the FX 100k-unit lot AND gold prices move in dollars, so the
-        min-lot floor must use the gold contract or every gold position is grossly
-        oversized. FX pairs keep config.LOT_UNITS (byte-identical baseline)."""
+        """Units per 1.0 lot for this symbol. Gold (100 oz) and the indices are
+        ~1000x smaller than the FX 100k-unit lot AND move in dollars/points, so the
+        min-lot floor must use their contract or the position is grossly oversized.
+        FX pairs keep config.LOT_UNITS (byte-identical baseline)."""
         if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
             return config.GOLD_LOT_UNITS
+        if config.INDICES_ENABLED and pair in config.INDEX_PAIRS:
+            return config.INDEX_LOT_UNITS
         return config.LOT_UNITS
 
     # ------------------------------------------------------------------
@@ -1285,8 +1295,10 @@ class Backtester:
         The universal 10-pip cap downstream enforces the "if 10 pips permit"
         rule — a structural stop wider than the cap is pulled in to 10 pips.
         """
-        # Gold reads structure on a slightly higher TF (M1 is noise at gold's scale).
-        if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+        # Point instruments read structure on a higher TF (M1 is noise at their scale).
+        if config.INDICES_ENABLED and pair in config.INDEX_PAIRS:
+            _sstf, _sslb = config.INDEX_STOP_TF, config.INDEX_STOP_LOOKBACK
+        elif config.GOLD_ENABLED and pair == config.GOLD_PAIR:
             _sstf, _sslb = config.GOLD_STOP_TF, config.GOLD_STOP_LOOKBACK
         else:
             _sstf, _sslb = config.STRUCTURE_STOP_TF, config.STRUCTURE_STOP_LOOKBACK
@@ -2173,6 +2185,25 @@ class Backtester:
             mss_sym1, mss_sym2 = config.GOLD_PAIR, config.GOLD_REF_SILVER
             _im_scenario = "G-long" if direction > 0 else "G-short"
 
+        elif config.INDICES_ENABLED and pair in config.INDEX_PAIRS:
+            # US indices (US500 / US100) — DXY + sibling index + US30 (ref), inverse
+            # to the dollar. SMT: the two traded indices should move together; the
+            # sibling diverging suppresses (resolve_index_direction). US30 confirms.
+            sibling  = next((p for p in config.INDEX_PAIRS if p != pair), None)
+            sib_bias = (self._sym_bias(sibling, "60T", t,
+                                       lookback=config.SWING_LOOKBACK_STH)
+                        if sibling else 0)
+            ref_bias = self._sym_bias(config.INDEX_REF, "60T", t,
+                                      lookback=config.SWING_LOOKBACK_STH)
+            direction, im_score = resolve_index_direction(dxy_bias, sib_bias, ref_bias)
+            if direction is None:
+                return
+            if im_score < config.INDEX_MIN_IMSCORE:
+                return
+            # MSS breadth: this index + its sibling, DXY inverse.
+            mss_sym1, mss_sym2 = pair, (sibling or config.INDEX_REF)
+            _im_scenario = "IDX-long" if direction > 0 else "IDX-short"
+
         else:   # NZDUSD — DXY + AUDNZD cross (independent of EUR/GBP family)
             audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
                                          lookback=config.SWING_LOOKBACK_STH)
@@ -2214,8 +2245,8 @@ class Backtester:
         _brk_dir = self._intermarket_breakout(t)
         _is_breakout = (_brk_dir != 0 and _brk_dir == direction)
         # The triple-confirmed breakout is a EURUSD+GBPUSD+DXY model — it has no
-        # meaning for gold, so never let it tag/exempt a gold trade.
-        if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+        # meaning for gold or the indices, so never let it tag/exempt those trades.
+        if self._is_point_instrument(pair):
             _is_breakout = False
         if _is_breakout:
             g["breakout_confirmed"] = g.get("breakout_confirmed", 0) + 1
@@ -2800,14 +2831,15 @@ class Backtester:
                 _stop_reason = "M1 swing"
                 g["m1_stop_used"] = g.get("m1_stop_used", 0) + 1
 
-        # Gold: stop is placed PURELY by structure — no fixed-pip news override and
-        # no universal cap (both are FX conventions; a $10 stop is far too tight for
-        # a ~$2000 instrument and would over-size the position). Risk-based sizing
-        # scales the position down for the wider structural stop.
-        _is_gold = config.GOLD_ENABLED and pair == config.GOLD_PAIR
+        # Point instruments (gold, indices): stop is placed PURELY by structure — no
+        # fixed-pip news override and no universal cap (both are FX conventions; a
+        # ~$10 fixed stop is far too tight for a dollar/point-priced instrument and
+        # would over-size the position). Risk-based sizing scales the position down
+        # for the wider structural stop.
+        _is_gold = self._is_point_instrument(pair)
 
         # High-impact news nearby: override to fixed 10-pip stop (protects against
-        # spread widening while still trading the news catalyst). Not for gold.
+        # spread widening while still trading the news catalyst). Not for point instruments.
         if news_impact == "High" and not _is_gold:
             stop = entry - config.FIXED_STOP_PIPS * pip if direction > 0 \
                    else entry + config.FIXED_STOP_PIPS * pip
@@ -2867,12 +2899,18 @@ class Backtester:
         risk_units = int(position_size(equity_usd, entry, stop, pair))
         tier_lots  = self._pyramid_lots()
         min_units  = int(tier_lots[0] * self._contract_units(pair))
-        # Gold trades at a fraction of FX size (GOLD_SIZE_MULT) to cap its drawdown
-        # contribution — the gate's edge is real but clusters DD. Applied to both the
-        # risk-based size and the floor so gold can size below the FX min-lot.
-        if config.GOLD_ENABLED and pair == config.GOLD_PAIR and config.GOLD_SIZE_MULT != 1.0:
-            risk_units = int(risk_units * config.GOLD_SIZE_MULT)
-            min_units  = max(1, int(min_units * config.GOLD_SIZE_MULT))
+        # Point instruments can trade at a fraction of FX size (GOLD_SIZE_MULT /
+        # INDEX_SIZE_MULT) to cap drawdown contribution — the edge can be real but
+        # cluster DD. Applied to both the risk-based size and the floor so they can
+        # size below the FX min-lot.
+        _pt_mult = 1.0
+        if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+            _pt_mult = config.GOLD_SIZE_MULT
+        elif config.INDICES_ENABLED and pair in config.INDEX_PAIRS:
+            _pt_mult = config.INDEX_SIZE_MULT
+        if _pt_mult != 1.0:
+            risk_units = int(risk_units * _pt_mult)
+            min_units  = max(1, int(min_units * _pt_mult))
         units = max(risk_units, min_units)
         # Draw-weighted sizing: scale up the highest-edge setups (3/3 cascade, PF 6.17)
         # so they carry more capital. Applied to the risk-based size, then floored at
