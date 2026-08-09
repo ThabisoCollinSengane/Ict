@@ -571,6 +571,12 @@ GOLD_REF_AUD    = _os.environ.get("GOLD_REF_AUD", "AUDUSD")
 # gate's edge is measurable even before this is tuned, but absolute ZAR equity is not.
 GOLD_PIP        = float(_os.environ.get("GOLD_PIP", 1.0))
 SILVER_PIP      = float(_os.environ.get("SILVER_PIP", 0.01))
+# XAUUSD contract size: 1.0 lot = 100 oz, vs the FX 100,000-unit lot. Gold prices
+# move in DOLLARS, so sizing gold with the FX contract makes every position ~1000x
+# oversized (an early gold validation blew MaxDD to -21% purely from this). P&L is
+# (exit-entry) x units, so the contract must match the instrument. PROVISIONAL —
+# confirm against the broker's XAUUSD spec before trusting absolute gold equity.
+GOLD_LOT_UNITS  = int(_os.environ.get("GOLD_LOT_UNITS", 100))
 if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
     PAIRS = PAIRS + (GOLD_PAIR,)
 # DXY synthetic uses these (all available on OANDA):
