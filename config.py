@@ -670,6 +670,20 @@ INDEX_LOT_UNITS   = int(_os.environ.get("INDEX_LOT_UNITS", 1))         # PROVISI
 INDEX_STOP_TF       = _os.environ.get("INDEX_STOP_TF", "5T")            # structural stop TF
 INDEX_STOP_LOOKBACK = int(_os.environ.get("INDEX_STOP_LOOKBACK", 120))
 INDEX_SIZE_MULT   = float(_os.environ.get("INDEX_SIZE_MULT", 1.0))      # DD-fit lever; 1.0=off
+# --- Index frequency levers (more trades = more income) ---
+# Indices are POINT-priced, so the FX pip thresholds are wrong-scaled and starve
+# the index Judas/AMD path: the 35-"pip" consolidation cap reads as 35 POINTS,
+# which index coils (esp. Nasdaq, 100-200pt coils) blow straight through, so the
+# reversal setup at the NY open rarely qualifies. These override that scale for
+# index pairs only. 0 = use the FX global (off / baseline unchanged).
+INDEX_AMD_MAX_RANGE_PIPS = _envf("INDEX_AMD_MAX_RANGE_PIPS", 0)  # points; fixed index consolidation cap
+# Better: a %-of-price cap auto-scales across indices (US500 ~4.5k vs US100 ~18k),
+# so one setting fits both. 0.8 -> US500 ~36pt / US100 ~144pt coil cap. Takes
+# precedence over the fixed-point cap when >0. 0 = off.
+INDEX_AMD_MAX_RANGE_PCT  = _envf("INDEX_AMD_MAX_RANGE_PCT", 0)   # % of price
+# Separate daily trade budget for indices so they don't compete with the 3
+# currencies for the basket-wide MAX_TRADES_PER_DAY slots. 0 = share the FX cap.
+INDEX_MAX_TRADES_PER_DAY = _envi("INDEX_MAX_TRADES_PER_DAY", 0)
 # Precise ICT SMT divergence (ict/smt.py). Two independent reads per index trade:
 # index-vs-index (US500/US100/US30, positive correlation) and index-vs-dollar
 # (inverse correlation). Each firing adds SMT_CONVICTION_PTS. INDEX_SMT_REQUIRED=1
