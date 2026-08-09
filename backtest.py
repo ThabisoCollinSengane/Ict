@@ -125,6 +125,10 @@ class Backtester:
 
         self.equity = config.STARTING_CASH
         self.start_equity = self.equity
+        self.withdrawn_total = 0.0      # cumulative profit banked (withdrawal model)
+        self.withdrawal_count = 0
+        self._work_peak = self.equity   # peak of the WORKING balance (resets on withdrawal)
+        self._max_work_dd = 0.0         # worst % drawdown seen on the working balance
         self.active = {}
         self.trades = []
         self.reject_log = []   # near-misses: setups that formed then hit a gate
@@ -401,6 +405,8 @@ class Backtester:
         self.equity += pnl_zar
         # Update peak equity and consecutive loss counter after every close.
         self._peak_equity = max(self._peak_equity, self.equity)
+        self._track_working_dd()
+        self._maybe_withdraw()          # bank profit at the ceiling (if enabled)
         if pnl_zar > 0:
             self._consec_losses = 0
         else:
@@ -480,6 +486,8 @@ class Backtester:
         pnl_zar   = pnl_usd * config.USD_ZAR
         self.equity += pnl_zar
         self._peak_equity = max(self._peak_equity, self.equity)
+        self._track_working_dd()
+        self._maybe_withdraw()          # bank profit at the ceiling (if enabled)
         self._consec_losses = 0   # partial TP is a win
 
         record = {
@@ -669,6 +677,32 @@ class Backtester:
             if self.equity >= min_eq:
                 return lots
         return config.EQUITY_TIERS[-1][1]
+
+    def _track_working_dd(self):
+        """Track the worst % drawdown on the WORKING balance (the number you'd see
+        in the real account each base->ceiling cycle). Called after every close,
+        before any withdrawal; the peak resets on withdrawal so a cash-out is not
+        counted as a drawdown."""
+        self._work_peak = max(self._work_peak, self.equity)
+        if self._work_peak > 0:
+            d = (self._work_peak - self.equity) / self._work_peak * 100
+            if d > self._max_work_dd:
+                self._max_work_dd = d
+
+    def _maybe_withdraw(self):
+        """Profit withdrawal: when the working balance reaches WITHDRAW_AT, bank
+        everything above WITHDRAW_KEEP and keep trading from WITHDRAW_KEEP. Keeps
+        the account realistic (no runaway compounding). The peak-equity used by the
+        drawdown breaker is reset so the cash-out isn't seen as a loss; MaxDD in
+        summarize() is on the total-value curve, which is withdrawal-neutral."""
+        if config.WITHDRAW_AT <= 0:
+            return
+        if self.equity >= config.WITHDRAW_AT and self.equity > config.WITHDRAW_KEEP:
+            self.withdrawn_total += self.equity - config.WITHDRAW_KEEP
+            self.withdrawal_count += 1
+            self.equity = config.WITHDRAW_KEEP
+            self._peak_equity = self.equity     # cash-out is not a drawdown
+            self._work_peak = self.equity       # new cycle starts from the keep level
 
     def _is_point_instrument(self, pair):
         """True for point-based (non-FX) instruments — gold and the US indices.
@@ -3364,21 +3398,33 @@ def summarize(bt):
     gp = wins.pnl.sum()
     gl = -losses.pnl.sum()
     pf = gp / gl if gl > 0 else float("inf")
+    # eq = start + cumulative P&L = the TOTAL-value curve (working balance + all
+    # profit withdrawn), so MaxDD here is withdrawal-neutral by construction.
     eq = bt.start_equity + df.pnl.cumsum()
     rmax = eq.cummax()
     dd = ((eq - rmax) / rmax * 100).min() if len(eq) else 0
-    return {
+    withdrawn = getattr(bt, "withdrawn_total", 0.0)
+    total_value = bt.equity + withdrawn        # working balance + banked profit
+    out = {
         "trades": n,
         "win_rate_pct": round(win_rate, 1),
         "profit_factor": "inf" if pf == float("inf") else round(pf, 2),
         f"starting_equity_{ccy}": bt.start_equity,
-        f"ending_equity_{ccy}": round(bt.equity, 2),
-        f"pnl_{ccy}": round(bt.equity - bt.start_equity, 2),
-        "pnl_pct": round((bt.equity - bt.start_equity) / bt.start_equity * 100, 2),
+        f"ending_equity_{ccy}": round(total_value, 2),   # total value (incl. withdrawn)
+        f"pnl_{ccy}": round(total_value - bt.start_equity, 2),
+        "pnl_pct": round((total_value - bt.start_equity) / bt.start_equity * 100, 2),
         "max_drawdown_pct": round(dd, 2),
         f"avg_win_{ccy}": round(wins.pnl.mean() if len(wins) else 0, 2),
         f"avg_loss_{ccy}": round(losses.pnl.mean() if len(losses) else 0, 2),
     }
+    if withdrawn > 0 or config.WITHDRAW_AT > 0:
+        out[f"withdrawn_total_{ccy}"] = round(withdrawn, 2)
+        out["withdrawal_count"] = getattr(bt, "withdrawal_count", 0)
+        out[f"working_balance_{ccy}"] = round(bt.equity, 2)
+        # The realistic per-cycle drawdown seen in the actual account (peak resets
+        # each base->ceiling cycle; cash-outs excluded).
+        out["working_max_drawdown_pct"] = round(getattr(bt, "_max_work_dd", 0.0), 2)
+    return out
 
 
 def main():
