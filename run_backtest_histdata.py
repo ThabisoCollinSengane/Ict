@@ -131,6 +131,12 @@ def main():
     # the backtest runs without them and gains those trades when data is added.
     core_syms     = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
     optional_syms = ["AUDUSD", "NZDUSD", "AUDNZD"]
+    # Gold complex — loaded only when the gold gate is enabled (config.GOLD_ENABLED).
+    # XAUUSD is tradeable (in config.PAIRS); XAGUSD + AUDUSD are the confirmer refs.
+    if config.GOLD_ENABLED:
+        for _s in (config.GOLD_PAIR, config.GOLD_REF_SILVER, config.GOLD_REF_AUD):
+            if _s not in core_syms and _s not in optional_syms:
+                optional_syms.append(_s)
 
     import glob as _glob
 

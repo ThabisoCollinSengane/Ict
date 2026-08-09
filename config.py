@@ -548,6 +548,25 @@ _tp = _os.environ.get("TRADE_PAIRS")
 PAIRS = tuple(_tp.split()) if _tp else ("GBPUSD", "EURUSD", "NZDUSD")   # AUDUSD excluded: poor Asian WR
 REF_EURGBP = "EURGBP"              # EUR vs GBP relative strength
 REF_AUDNZD = "AUDNZD"              # AUDNZD data (loaded for AUDUSD MSS bars; not used as bias signal)
+
+# --- Gold (XAUUSD) intermarket gate — DXY + silver + AUDUSD 2-of-3 breadth ---
+# Gold is inverse to the dollar; silver (XAGUSD) and AUDUSD are positive intraday
+# confirmers (metals complex + commodity/risk currency). See intermarket
+# .resolve_gold_direction. Default OFF: when GOLD_ENABLED=0 gold is NOT in PAIRS,
+# so the engine is byte-identical to the pre-gold baseline. Validate IS/OOS with
+# run_gold_validation.sh before shipping ON.
+GOLD_ENABLED    = bool(int(_os.environ.get("GOLD_ENABLED", 0)))
+GOLD_PAIR       = _os.environ.get("GOLD_PAIR", "XAUUSD")
+GOLD_REF_SILVER = _os.environ.get("GOLD_REF_SILVER", "XAGUSD")
+GOLD_REF_AUD    = _os.environ.get("GOLD_REF_AUD", "AUDUSD")
+# Gold "pip" = 1.0 USD so the FX-calibrated pip thresholds (≈10-pip stop, 30-pip
+# target) map to sane gold moves ($10 stop / $30 target ≈ intraday ATR). PROVISIONAL
+# — the first thing to re-check in validation; PF/WR/MaxDD are scale-invariant so the
+# gate's edge is measurable even before this is tuned, but absolute ZAR equity is not.
+GOLD_PIP        = float(_os.environ.get("GOLD_PIP", 1.0))
+SILVER_PIP      = float(_os.environ.get("SILVER_PIP", 0.01))
+if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
+    PAIRS = PAIRS + (GOLD_PAIR,)
 # DXY synthetic uses these (all available on OANDA):
 DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 

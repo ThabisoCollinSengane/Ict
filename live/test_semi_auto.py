@@ -168,6 +168,43 @@ def test_action_commands_parse_and_dispatch():
     print("ok  /close /halt /resume parse + dispatch")
 
 
+def test_gold_gate():
+    """resolve_gold_direction: DXY inverse primary + silver/AUD 2-of-3 breadth,
+    silver-divergence suppression."""
+    from intermarket import resolve_gold_direction as g
+    # DXY flat -> hard gate
+    assert g(0, 1, 1) == (None, 0.0)
+    # DXY down -> gold LONG (+1). All three agree -> 1.0
+    assert g(-1, 1, 1) == (1, 1.0)
+    # DXY down + one confirmer (other flat) -> 0.75
+    assert g(-1, 1, 0) == (1, 0.75)
+    assert g(-1, 0, 1) == (1, 0.75)
+    # DXY down but NO confirmer (silver & AUD flat) -> below 2-of-3 -> suppress
+    assert g(-1, 0, 0) == (None, 0.0)
+    # silver DIVERGES (opposite gold dir) -> suppress even if AUD agrees
+    assert g(-1, -1, 1) == (None, 0.0)
+    # DXY up -> gold SHORT (-1). All three agree -> 1.0
+    assert g(1, -1, -1) == (-1, 1.0)
+    # DXY up but silver diverges (silver up) -> suppress
+    assert g(1, 1, -1) == (None, 0.0)
+    print("ok  gold gate (DXY inverse + silver/AUD 2-of-3 + divergence suppress)")
+
+
+def test_gold_disabled_keeps_pairs_baseline():
+    """GOLD_ENABLED=0 must NOT add XAUUSD to PAIRS (baseline byte-identical)."""
+    import os, importlib
+    prev = os.environ.get("GOLD_ENABLED")
+    os.environ["GOLD_ENABLED"] = "0"
+    import config as _c; importlib.reload(_c)
+    assert _c.GOLD_PAIR not in _c.PAIRS, _c.PAIRS
+    if prev is None:
+        os.environ.pop("GOLD_ENABLED", None)
+    else:
+        os.environ["GOLD_ENABLED"] = prev
+    importlib.reload(_c)
+    print("ok  GOLD_ENABLED=0 leaves PAIRS at baseline (no XAUUSD)")
+
+
 def test_backtest_handover_hook_is_noop():
     """The backtest base must never exempt a pair — keeps numbers byte-identical."""
     from backtest import Backtester
@@ -289,6 +326,8 @@ def main():
     test_structure_trail_level()
     test_parse_hold_and_release()
     test_action_commands_parse_and_dispatch()
+    test_gold_gate()
+    test_gold_disabled_keeps_pairs_baseline()
     test_backtest_handover_hook_is_noop()
     test_amd_sweep_logic()
     print("\nALL SEMI-AUTO TESTS PASSED")
