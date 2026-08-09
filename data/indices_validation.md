@@ -1,51 +1,50 @@
-# US index gate — validation
+# Realistic full-basket validation — currencies + indices + gold
 
-Baseline (`INDICES_ENABLED=0`) vs indices (`INDICES_ENABLED=1`, US500+US100 via DXY+sibling+US30 SMT-breadth gate). **Sizing is provisional — absolute equity is NOT calibrated; PF/WR/MaxDD are scale-invariant and ARE the edge signal.** Ship indices ON only if the book's MaxDD is not worse and index trades are PF-positive in both splits.
+> ⚠️ Some runs produced no Results — diagnostics at the bottom.
 
-_run commit: `b17aa2c`_
 
-## Full 4yr
+Judged on the **scheduled-withdrawal income model** (start at R10k; every R10k band the account reaches makes withdrawals more frequent + larger; bank 70% / compound 30%). Sizing for indices/gold is provisional, so PF / WR / working-MaxDD and the **income schedule** are the signals, not fantasy equity.
 
-| metric | baseline | +indices | Δ |
-|---|---|---|---|
-| trades | 804.00 | 928.00 | +124.00 |
-| win rate | 44.90% | 44.40% | -0.50 |
-| profit factor | 4.95 | 4.87 | -0.08 |
-| max drawdown | -12.76% | -12.88% | -0.12 |
-| ending equity ZAR | 567,575,614 | 1,441,021,881 | +873,446,267 |
+_run commit: `9dd3869`_
 
-_index trades taken: 124_
+## Metrics — currencies-only vs full basket
 
-## IS 2022-23
+| split | book | trades | WR% | PF | MaxDD% | working-DD% | total value R | income R | withdrawals |
+|---|---|---|---|---|---|---|---|---|---|
+| Full 4yr | FX only | 804.00 | 44.90 | 4.91 | -12.76 | 12.76 | 1,222,169 | 838,314 | 92 |
+| Full 4yr | FX+idx+gold | — | — | — | — | — | — | — | None |
+| IS 2022-23 | FX only | 389.00 | 44.70 | 3.39 | -12.76 | 12.76 | 82,391 | 50,425 | 24 |
+| IS 2022-23 | FX+idx+gold | 466.00 | 43.10 | 3.47 | -12.76 | 14.44 | 156,632 | 101,560 | 30 |
+| OOS 2024-25 | FX only | 409.00 | 45.00 | 4.87 | -12.41 | 13.30 | 186,569 | 121,349 | 31 |
+| OOS 2024-25 | FX+idx+gold | 448.00 | 44.00 | 4.80 | -12.41 | 13.41 | 248,918 | 167,703 | 35 |
 
-| metric | baseline | +indices | Δ |
-|---|---|---|---|
-| trades | 389.00 | 442.00 | +53.00 |
-| win rate | 44.70% | 44.80% | +0.10 |
-| profit factor | 2.88 | 3.36 | +0.48 |
-| max drawdown | -12.76% | -12.76% | +0.00 |
-| ending equity ZAR | 273,481 | 623,657 | +350,176 |
+## Income schedule — FULL basket (currencies + indices + gold), 4yr
 
-_index trades taken: 53_
+```
+(no withdrawals — account never reached R10k)
+```
 
-## OOS 2024-25
+## Income schedule — currencies only, 4yr (for comparison)
 
-| metric | baseline | +indices | Δ |
-|---|---|---|---|
-| trades | 409.00 | 431.00 | +22.00 |
-| win rate | 45.00% | 45.00% | +0.00 |
-| profit factor | 4.95 | 4.88 | -0.07 |
-| max drawdown | -12.55% | -12.55% | +0.00 |
-| ending equity ZAR | 2,241,887 | 2,669,080 | +427,193 |
+```
+Withdrawals (income) per year — amount, frequency, avg ===
+  2022: R       9,834  (  4 withdrawals, ~1 / 91d, avg R2,459)
+  2023: R      40,591  ( 20 withdrawals, ~1 / 18d, avg R2,030)
+  2024: R     143,205  ( 31 withdrawals, ~1 / 12d, avg R4,620)
+  2025: R     644,685  ( 37 withdrawals, ~1 / 10d, avg R17,424)
+  TOTAL income: R838,314 across 92 withdrawals (avg R9,112 each)
+  final working balance: R383,855  (keep-level R369,278)
+```
 
-_index trades taken: 22_
+## Bottom line
 
-## Verdict
+- Working-account MaxDD is the realistic per-cycle drawdown; the total-value MaxDD is withdrawal-neutral. Ship the basket if working-DD stays tolerable and the income schedule is worth it — equity size is capped by design.
 
-**🔴 RED — do NOT ship indices ON (INDICES_ENABLED stays 0).**
+## Diagnostics (why some runs had no Results)
 
-- **Full 4yr: 🔴 fail** — MaxDD -12.88 worse than -12.76
-- **IS 2022-23: 🟢 pass** — ok
-- **OOS 2024-25: 🟢 pass** — ok
+### all_full — NO RESULTS (crash/early-exit)
 
-_Reminder: calibrate INDEX_PIP / INDEX_LOT_UNITS before trusting absolute equity. If MaxDD breaches, tighten INDEX_MIN_IMSCORE=1.0 (all 3 agree) or set INDEX_SIZE_MULT<1 and re-run — same risk-fit path as gold._
+```
+
+```
+
