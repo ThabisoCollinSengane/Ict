@@ -101,7 +101,13 @@ STRUCT_TRAIL_DEFAULT_BUFFER = float(_os.environ.get("STRUCT_TRAIL_DEFAULT_BUFFER
 # and (b) a +NWOG_CONVICTION_PTS conviction add when price sits at the NWOG CE
 # aligned with the trade (gap-up NWOG supports longs, gap-down supports shorts).
 # NWOG_ENABLED=0 makes the engine byte-identical to the pre-NWOG baseline.
-NWOG_ENABLED            = bool(int(_os.environ.get("NWOG_ENABLED", 1)))
+# VALIDATED 🔴 RED (commit e3b24ed, true 4yr + IS/OOS): WR/PF/MaxDD byte-identical
+# to baseline in all three splits (44.9% / 4.95 / -12.76%), equity fractionally
+# DOWN everywhere (full -1.4%, IS -0.6%, OOS -0.5%); only 26 CE-hits/4yr. The +1
+# conviction is saturation-inert (like P9/P15/P16/P19) and the confluence-source
+# nudge to P18 sizing costs a hair. A real ICT concept, no tradeable edge here.
+# DEFAULT OFF. Set NWOG_ENABLED=1 to re-measure; code retained for reference.
+NWOG_ENABLED            = bool(int(_os.environ.get("NWOG_ENABLED", 0)))
 NWOG_MID_TOLERANCE_PIPS = float(_os.environ.get("NWOG_MID_TOLERANCE_PIPS", 10))
 NWOG_CONVICTION_PTS     = int(_os.environ.get("NWOG_CONVICTION_PTS", 1))
 
