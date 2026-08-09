@@ -237,9 +237,16 @@ def main():
             yr = getattr(ts, "year", None) or "?"
             by_year_amt[yr] += amt
             by_year_cnt[yr] += 1
-        print("\n=== Withdrawals (income) per year ===")
+        print("\n=== Withdrawals (income) per year — amount, frequency, avg ===")
         for yr in sorted(by_year_amt, key=lambda x: str(x)):
-            print(f"  {yr}: R{by_year_amt[yr]:>12,.0f}  ({by_year_cnt[yr]} withdrawals)")
+            cnt = by_year_cnt[yr]
+            avg = by_year_amt[yr] / cnt if cnt else 0
+            print(f"  {yr}: R{by_year_amt[yr]:>12,.0f}  ({cnt:>3} withdrawals, "
+                  f"~1 / {round(365/cnt) if cnt else 0}d, avg R{avg:,.0f})")
+        tot = sum(by_year_amt.values())
+        cnt_tot = sum(by_year_cnt.values())
+        print(f"  TOTAL income: R{tot:,.0f} across {cnt_tot} withdrawals "
+              f"(avg R{(tot/cnt_tot if cnt_tot else 0):,.0f} each)")
         print(f"  final working balance: R{backtester.equity:,.0f}  "
               f"(keep-level R{getattr(backtester, '_keep_level', 0):,.0f})")
 
