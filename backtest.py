@@ -2167,8 +2167,8 @@ class Backtester:
             direction, im_score = resolve_gold_direction(dxy_bias, silver_bias, aud_bias)
             if direction is None:
                 return
-            if im_score < 0.75:
-                return
+            if im_score < config.GOLD_MIN_IMSCORE:
+                return   # default 1.0 → require DXY + silver + AUD all to agree
             # MSS breadth for gold: its own structure + silver, DXY inverse.
             mss_sym1, mss_sym2 = config.GOLD_PAIR, config.GOLD_REF_SILVER
             _im_scenario = "G-long" if direction > 0 else "G-short"
@@ -2867,6 +2867,12 @@ class Backtester:
         risk_units = int(position_size(equity_usd, entry, stop, pair))
         tier_lots  = self._pyramid_lots()
         min_units  = int(tier_lots[0] * self._contract_units(pair))
+        # Gold trades at a fraction of FX size (GOLD_SIZE_MULT) to cap its drawdown
+        # contribution — the gate's edge is real but clusters DD. Applied to both the
+        # risk-based size and the floor so gold can size below the FX min-lot.
+        if config.GOLD_ENABLED and pair == config.GOLD_PAIR and config.GOLD_SIZE_MULT != 1.0:
+            risk_units = int(risk_units * config.GOLD_SIZE_MULT)
+            min_units  = max(1, int(min_units * config.GOLD_SIZE_MULT))
         units = max(risk_units, min_units)
         # Draw-weighted sizing: scale up the highest-edge setups (3/3 cascade, PF 6.17)
         # so they carry more capital. Applied to the risk-based size, then floored at
