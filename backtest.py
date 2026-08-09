@@ -665,6 +665,15 @@ class Backtester:
                 return lots
         return config.EQUITY_TIERS[-1][1]
 
+    def _contract_units(self, pair):
+        """Units per 1.0 lot for this symbol. Gold's contract (100 oz) is ~1000x
+        smaller than the FX 100k-unit lot AND gold prices move in dollars, so the
+        min-lot floor must use the gold contract or every gold position is grossly
+        oversized. FX pairs keep config.LOT_UNITS (byte-identical baseline)."""
+        if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+            return config.GOLD_LOT_UNITS
+        return config.LOT_UNITS
+
     # ------------------------------------------------------------------
     # Market profile helpers
     # ------------------------------------------------------------------
@@ -2846,7 +2855,7 @@ class Backtester:
         equity_usd = self.equity / config.USD_ZAR
         risk_units = int(position_size(equity_usd, entry, stop, pair))
         tier_lots  = self._pyramid_lots()
-        min_units  = int(tier_lots[0] * config.LOT_UNITS)
+        min_units  = int(tier_lots[0] * self._contract_units(pair))
         units = max(risk_units, min_units)
         # Draw-weighted sizing: scale up the highest-edge setups (3/3 cascade, PF 6.17)
         # so they carry more capital. Applied to the risk-based size, then floored at
@@ -3197,8 +3206,9 @@ class Backtester:
         tier_lots  = self._pyramid_lots()
         leg_num    = len(st["legs"]) + 1
         lot_idx    = min(leg_num - 1, len(tier_lots) - 1)
-        base_units = int(tier_lots[lot_idx] * config.LOT_UNITS)
-        units = max(int(base_units * im_score), int(tier_lots[-1] * config.LOT_UNITS))
+        base_units = int(tier_lots[lot_idx] * self._contract_units(pair))
+        units = max(int(base_units * im_score),
+                    int(tier_lots[-1] * self._contract_units(pair)))
 
         # Promote prior leg stop to breakeven before adding new leg.
         prior = st["legs"][-1]

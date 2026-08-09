@@ -79,10 +79,8 @@ def grab(label):
     txt = open(p).read()
     def g(k, cast=float):
         m = re.search(rf"{k}\s+(-?[\d.]+)", txt); return cast(m.group(1)) if m else None
-    # gold trade count: count G-long/G-short scenario rows if the report prints them
-    gld = len(re.findall(r"\bG-(?:long|short)\b", txt))
     d = {"trades": g("trades", int), "wr": g("win_rate_pct"), "pf": g("profit_factor"),
-         "dd": g("max_drawdown_pct"), "eq": g("ending_equity_ZAR"), "gold": gld}
+         "dd": g("max_drawdown_pct"), "eq": g("ending_equity_ZAR")}
     return d, txt
 
 L = ["# Gold (XAUUSD) gate — validation", "",
@@ -101,6 +99,11 @@ for split, base, gld in (("Full 4yr","full_base","full_gold"),
                          ("IS 2022-23","is_base","is_gold"),
                          ("OOS 2024-25","oos_base","oos_gold")):
     (b, _), (m, mt) = grab(base), grab(gld)
+    # gold trades = the extra trades the +gold arm took (baseline has no XAUUSD)
+    if b.get("trades") is not None and m.get("trades") is not None:
+        m["gold"] = m["trades"] - b["trades"]
+    else:
+        m["gold"] = None
     res[split] = (b, m)
     L += [f"## {split}", "", "| metric | baseline | +gold | Δ |", "|---|---|---|---|"]
     for k, lbl, suf in (("trades","trades",""),("wr","win rate","%"),
@@ -120,9 +123,9 @@ def ok(split, dd_tol):
     if any(m.get(k) is None or b.get(k) is None for k in ("pf","dd")):
         return None, "run crashed"
     fails = []
+    if not m.get("gold"):          fails.append("gold took 0 trades (data coverage/gate issue)")
     if m["dd"] < b["dd"] - dd_tol: fails.append(f"MaxDD {m['dd']:.2f} worse than {b['dd']:.2f}")
     if m["pf"] <= 1.0:             fails.append(f"book PF {m['pf']:.2f}≤1.0")
-    if m.get("gold", 0) == 0:      fails.append("gold took 0 trades (data/gate issue)")
     return (not fails), ("; ".join(fails) if fails else "ok")
 checks = {"Full 4yr": ok("Full 4yr", 0.10), "IS 2022-23": ok("IS 2022-23", 1.0),
           "OOS 2024-25": ok("OOS 2024-25", 1.0)}
