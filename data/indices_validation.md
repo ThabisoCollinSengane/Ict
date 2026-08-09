@@ -1,110 +1,51 @@
-# Realistic full-basket validation — currencies + indices + gold
+# US index gate — validation
 
-> ⚠️ Some runs produced no Results — diagnostics at the bottom.
+Baseline (`INDICES_ENABLED=0`) vs indices (`INDICES_ENABLED=1`, US500+US100 via DXY+sibling+US30 SMT-breadth gate). **Sizing is provisional — absolute equity is NOT calibrated; PF/WR/MaxDD are scale-invariant and ARE the edge signal.** Ship indices ON only if the book's MaxDD is not worse and index trades are PF-positive in both splits.
 
+_run commit: `b17aa2c`_
 
-Judged on the **scheduled-withdrawal income model** (start at R10k; every R10k band the account reaches makes withdrawals more frequent + larger; bank 70% / compound 30%). Sizing for indices/gold is provisional, so PF / WR / working-MaxDD and the **income schedule** are the signals, not fantasy equity.
+## Full 4yr
 
-_run commit: `e028093`_
+| metric | baseline | +indices | Δ |
+|---|---|---|---|
+| trades | 804.00 | 928.00 | +124.00 |
+| win rate | 44.90% | 44.40% | -0.50 |
+| profit factor | 4.95 | 4.87 | -0.08 |
+| max drawdown | -12.76% | -12.88% | -0.12 |
+| ending equity ZAR | 567,575,614 | 1,441,021,881 | +873,446,267 |
 
-## Metrics — currencies-only vs full basket
+_index trades taken: 124_
 
-| split | book | trades | WR% | PF | MaxDD% | working-DD% | total value R | income R | withdrawals |
-|---|---|---|---|---|---|---|---|---|---|
-| Full 4yr | FX only | — | — | — | — | — | — | — | None |
-| Full 4yr | FX+idx+gold | — | — | — | — | — | — | — | None |
-| IS 2022-23 | FX only | — | — | — | — | — | — | — | None |
-| IS 2022-23 | FX+idx+gold | — | — | — | — | — | — | — | None |
-| OOS 2024-25 | FX only | — | — | — | — | — | — | — | None |
-| OOS 2024-25 | FX+idx+gold | — | — | — | — | — | — | — | None |
+## IS 2022-23
 
-## Income schedule — FULL basket (currencies + indices + gold), 4yr
+| metric | baseline | +indices | Δ |
+|---|---|---|---|
+| trades | 389.00 | 442.00 | +53.00 |
+| win rate | 44.70% | 44.80% | +0.10 |
+| profit factor | 2.88 | 3.36 | +0.48 |
+| max drawdown | -12.76% | -12.76% | +0.00 |
+| ending equity ZAR | 273,481 | 623,657 | +350,176 |
 
-```
-(no withdrawals — account never reached R10k)
-```
+_index trades taken: 53_
 
-## Income schedule — currencies only, 4yr (for comparison)
+## OOS 2024-25
 
-```
-(no withdrawals — account never reached R10k)
-```
+| metric | baseline | +indices | Δ |
+|---|---|---|---|
+| trades | 409.00 | 431.00 | +22.00 |
+| win rate | 45.00% | 45.00% | +0.00 |
+| profit factor | 4.95 | 4.88 | -0.07 |
+| max drawdown | -12.55% | -12.55% | +0.00 |
+| ending equity ZAR | 2,241,887 | 2,669,080 | +427,193 |
 
-## Bottom line
+_index trades taken: 22_
 
-- Working-account MaxDD is the realistic per-cycle drawdown; the total-value MaxDD is withdrawal-neutral. Ship the basket if working-DD stays tolerable and the income schedule is worth it — equity size is capped by design.
+## Verdict
 
-## Diagnostics (why some runs had no Results)
+**🔴 RED — do NOT ship indices ON (INDICES_ENABLED stays 0).**
 
-### fx_full — NO RESULTS (crash/early-exit)
+- **Full 4yr: 🔴 fail** — MaxDD -12.88 worse than -12.76
+- **IS 2022-23: 🟢 pass** — ok
+- **OOS 2024-25: 🟢 pass** — ok
 
-```
-Traceback (most recent call last):
-  File "/workspaces/Ict/run_backtest_histdata.py", line 20, in <module>
-    import config
-  File "/workspaces/Ict/config.py", line 24, in <module>
-    WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: could not convert string to float: '0.7#'
-```
-
-### all_full — NO RESULTS (crash/early-exit)
-
-```
-Traceback (most recent call last):
-  File "/workspaces/Ict/run_backtest_histdata.py", line 20, in <module>
-    import config
-  File "/workspaces/Ict/config.py", line 24, in <module>
-    WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: could not convert string to float: '0.7#'
-```
-
-### fx_is — NO RESULTS (crash/early-exit)
-
-```
-Traceback (most recent call last):
-  File "/workspaces/Ict/run_backtest_histdata.py", line 20, in <module>
-    import config
-  File "/workspaces/Ict/config.py", line 24, in <module>
-    WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: could not convert string to float: '0.7#'
-```
-
-### all_is — NO RESULTS (crash/early-exit)
-
-```
-Traceback (most recent call last):
-  File "/workspaces/Ict/run_backtest_histdata.py", line 20, in <module>
-    import config
-  File "/workspaces/Ict/config.py", line 24, in <module>
-    WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: could not convert string to float: '0.7#'
-```
-
-### fx_oos — NO RESULTS (crash/early-exit)
-
-```
-Traceback (most recent call last):
-  File "/workspaces/Ict/run_backtest_histdata.py", line 20, in <module>
-    import config
-  File "/workspaces/Ict/config.py", line 24, in <module>
-    WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: could not convert string to float: '0.7#'
-```
-
-### all_oos — NO RESULTS (crash/early-exit)
-
-```
-Traceback (most recent call last):
-  File "/workspaces/Ict/run_backtest_histdata.py", line 20, in <module>
-    import config
-  File "/workspaces/Ict/config.py", line 24, in <module>
-    WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: could not convert string to float: '0.7#'
-```
-
+_Reminder: calibrate INDEX_PIP / INDEX_LOT_UNITS before trusting absolute equity. If MaxDD breaches, tighten INDEX_MIN_IMSCORE=1.0 (all 3 agree) or set INDEX_SIZE_MULT<1 and re-run — same risk-fit path as gold._
