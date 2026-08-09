@@ -111,3 +111,26 @@ def resolve_gold_direction(
     if confirmers == 0:                        # only DXY agrees → below 2-of-3
         return None, 0.0
     return direction, (1.0 if confirmers == 2 else 0.75)
+
+
+def resolve_index_direction(
+    dxy_bias: int,
+    sibling_bias: int,
+    ref_bias: int,
+) -> tuple[int, float] | tuple[None, float]:
+    """US index gate (US500 / US100) — indices move INVERSE to the dollar.
+
+    Same 3-market breadth logic as gold: DXY is the primary hard gate (sign-
+    flipped — DXY down → indices long); the SIBLING index (the other traded
+    index) and US30 (ref) are positive confirmers. This IS the SMT read — the
+    correlated indices should move together; if the sibling DIVERGES the move
+    lacks breadth (classic SMT non-confirmation) → suppress, even if US30 agrees.
+    Requires ≥2-of-3.
+
+    Returns (direction, im_score) or (None, 0.0):
+      1.0  — DXY + sibling + US30 all agree
+      0.75 — DXY + one confirmer (the other flat)
+    """
+    # Identical breadth math to gold: primary inverse + 2 positive confirmers,
+    # first-confirmer (sibling) divergence suppresses.
+    return resolve_gold_direction(dxy_bias, sibling_bias, ref_bias)

@@ -137,6 +137,12 @@ def main():
         for _s in (config.GOLD_PAIR, config.GOLD_REF_SILVER, config.GOLD_REF_AUD):
             if _s not in core_syms and _s not in optional_syms:
                 optional_syms.append(_s)
+    # US indices — loaded only when the index gate is enabled. US500/US100 are
+    # tradeable (in config.PAIRS); US30 is the confirmer ref.
+    if config.INDICES_ENABLED:
+        for _s in tuple(config.INDEX_PAIRS) + (config.INDEX_REF,):
+            if _s not in core_syms and _s not in optional_syms:
+                optional_syms.append(_s)
 
     import glob as _glob
 

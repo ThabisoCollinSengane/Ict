@@ -37,7 +37,11 @@ BASE = "https://www.histdata.com"
 # DXY+silver+AUDUSD intraday gate for the gold build; HistData serves all three
 # under the same ASCII 1-minute product, so they route exactly like the FX pairs.
 ASCII_PAIRS = ("EURUSD", "GBPUSD", "EURGBP", "NZDUSD", "AUDNZD",
-               "AUDUSD", "XAUUSD", "XAGUSD")
+               "AUDUSD", "XAUUSD", "XAGUSD",
+               # US indices: HistData ASCII codes. SPXUSD=US500 (S&P), NSXUSD=US100
+               # (Nasdaq100). Dow/US30 is not in HistData free ASCII — supply
+               # separately if you want US30 as the confirmer.
+               "SPXUSD", "NSXUSD")
 MT_PAIRS = ("UDXUSD",)
 ALL_PAIRS = ASCII_PAIRS + MT_PAIRS
 _UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
