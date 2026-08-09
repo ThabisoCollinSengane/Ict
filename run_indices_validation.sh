@@ -129,8 +129,20 @@ L += ["", "## Income schedule — FULL basket (currencies + indices + gold), 4yr
       "", "## Income schedule — currencies only, 4yr (for comparison)", "",
       "```", blk_fx or "(no withdrawals — account never reached R10k)", "```"]
 
+# Crash/exit diagnostics — surface the tail of any run that produced no PF.
+crash = []
+for label in ("fx_full","all_full","fx_is","all_is","fx_oos","all_oos"):
+    d, _ = grab(label)
+    if d.get("pf") is None:
+        p = f"/tmp/rb_{label}.txt"
+        tail = "\n".join(open(p).read().splitlines()[-25:]) if os.path.exists(p) else "(no output file)"
+        crash.append(f"### {label} — NO RESULTS (crash/early-exit)\n\n```\n{tail}\n```\n")
+
 da, _ = grab("all_full"); dfx, _ = grab("fx_full")
 L += ["", "## Bottom line", ""]
+if crash:
+    L = (L[:1] + ["", "> ⚠️ Some runs produced no Results — diagnostics at the bottom.", ""]
+         + L[1:])
 if da.get("income") is not None and dfx.get("income") is not None:
     lift = da["income"] - dfx["income"]
     L += [f"- Full basket banked **R{da['income']:,.0f}** income across "
@@ -141,6 +153,8 @@ if da.get("income") is not None and dfx.get("income") is not None:
 L += ["- Working-account MaxDD is the realistic per-cycle drawdown; the total-value "
       "MaxDD is withdrawal-neutral. Ship the basket if working-DD stays tolerable and "
       "the income schedule is worth it — equity size is capped by design."]
+if crash:
+    L += ["", "## Diagnostics (why some runs had no Results)", ""] + crash
 open("data/indices_validation.md","w").write("\n".join(L) + "\n")
 print("\n".join(L))
 PY
