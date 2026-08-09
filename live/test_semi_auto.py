@@ -190,6 +190,33 @@ def test_gold_gate():
     print("ok  gold gate (DXY inverse + silver/AUD 2-of-3 + divergence suppress)")
 
 
+def test_smt_divergence():
+    """SMT: primary makes a new extreme the reference fails to confirm — positive
+    (index-index) and inverse (index-dollar) correlation modes."""
+    from ict.smt import smt_divergence
+    _B = namedtuple("_B", "Open High Low Close")
+    def series(lows, highs):
+        return [_B(l, h, l, h) for l, h in zip(lows, highs)]
+    # LONG: primary sweeps a LOWER low (recent half lower than prior half).
+    prim = series([10]*5 + [8]*5, [12]*5 + [11]*5)     # recent low 8 < prior low 10
+    # positive ref HOLDS (higher low 10, no lower low) -> divergence
+    ref_pos_div = series([10]*5 + [10]*5, [12]*5 + [12]*5)
+    assert smt_divergence(prim, ref_pos_div, +1, inverse=False, lookback=10) is True
+    # positive ref also makes a lower low -> in sync, NO divergence
+    ref_pos_sync = series([10]*5 + [8]*5, [12]*5 + [11]*5)
+    assert smt_divergence(prim, ref_pos_sync, +1, inverse=False, lookback=10) is False
+    # inverse ref (dollar): index makes lower low -> dollar SHOULD make higher high;
+    # if dollar fails to make a higher high -> divergence.
+    dxy_fail = series([20]*5 + [20]*5, [25]*5 + [25]*5)  # no higher high
+    assert smt_divergence(prim, dxy_fail, +1, inverse=True, lookback=10) is True
+    dxy_confirm = series([20]*5 + [21]*5, [25]*5 + [27]*5)  # higher high -> confirms
+    assert smt_divergence(prim, dxy_confirm, +1, inverse=True, lookback=10) is False
+    # primary did NOT sweep a lower low -> never a long SMT
+    flat = series([10]*10, [12]*10)
+    assert smt_divergence(flat, ref_pos_div, +1, inverse=False, lookback=10) is False
+    print("ok  SMT divergence (positive index-index + inverse index-dollar)")
+
+
 def test_index_gate():
     """resolve_index_direction: indices inverse to DXY + sibling/US30 breadth,
     sibling-divergence (SMT) suppression."""
@@ -359,6 +386,7 @@ def main():
     test_gold_disabled_keeps_pairs_baseline()
     test_index_gate()
     test_indices_disabled_keeps_pairs_baseline()
+    test_smt_divergence()
     test_backtest_handover_hook_is_noop()
     test_amd_sweep_logic()
     print("\nALL SEMI-AUTO TESTS PASSED")

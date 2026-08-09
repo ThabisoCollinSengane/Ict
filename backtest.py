@@ -431,6 +431,8 @@ class Backtester:
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
             "crt_tf": st.get("crt_tf", ""),
             "nwog": st.get("nwog", ""),
+            "smt_idx": st.get("smt_idx", False),
+            "smt_dxy": st.get("smt_dxy", False),
             "target_escalated": st.get("target_escalated", False),
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
@@ -507,6 +509,8 @@ class Backtester:
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
             "crt_tf": st.get("crt_tf", ""),
             "nwog": st.get("nwog", ""),
+            "smt_idx": st.get("smt_idx", False),
+            "smt_dxy": st.get("smt_dxy", False),
             "target_escalated": st.get("target_escalated", False),
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
@@ -716,6 +720,37 @@ class Backtester:
         if ts is None or not bars:
             return None
         return mp_nwog(bars, ts, t)
+
+    def _index_smt(self, pair, direction, t):
+        """Precise ICT SMT divergence for an index trade — TWO independent reads:
+          1. index-vs-index: primary vs the sibling index and US30 (POSITIVE
+             correlation — the classic ES/NQ/YM divergence).
+          2. index-vs-dollar: primary vs DXY (INVERSE correlation — indices move
+             opposite the dollar, so the dollar failing to confirm is divergence).
+        Returns {points, idx_smt, dxy_smt}. Only meaningful for index pairs."""
+        out = {"points": 0, "idx_smt": False, "dxy_smt": False}
+        if not (config.INDICES_ENABLED and pair in config.INDEX_PAIRS):
+            return out
+        from ict.smt import smt_divergence
+        tf, lb = config.SMT_TF, config.SMT_LOOKBACK
+        prim = self.bars_up_to(pair, tf, t)
+        if len(prim) < lb:
+            return out
+        # 1. index-vs-index (positive corr): any correlated index diverging.
+        refs = [p for p in config.INDEX_PAIRS if p != pair] + [config.INDEX_REF]
+        for rsym in refs:
+            rb = self.bars_up_to(rsym, tf, t)
+            if len(rb) >= lb and smt_divergence(prim, rb, direction, inverse=False, lookback=lb):
+                out["idx_smt"] = True
+                break
+        # 2. index-vs-dollar (inverse corr).
+        dxy_bars = self._dxy_bars(tf, t)
+        if len(dxy_bars) >= lb and smt_divergence(prim, dxy_bars, direction,
+                                                  inverse=True, lookback=lb):
+            out["dxy_smt"] = True
+        out["points"] = (config.SMT_CONVICTION_PTS if out["idx_smt"] else 0) \
+            + (config.SMT_CONVICTION_PTS if out["dxy_smt"] else 0)
+        return out
 
     def _nwog_conviction(self, pair, direction, cur_price, t):
         """NWOG PD-array conviction (mirror of _htf_fvg_conviction).
@@ -2572,6 +2607,22 @@ class Backtester:
             conviction += _nwog_pts
             g["nwog_ce_hit"] = g.get("nwog_ce_hit", 0) + 1
 
+        # Precise ICT SMT (index pairs): index-vs-index (positive) + index-vs-dollar
+        # (inverse) divergence at the swept level. Adds conviction; if
+        # INDEX_SMT_REQUIRED, an index entry must show at least one SMT confirmation.
+        _smt = self._index_smt(pair, direction, t)
+        if _smt["points"]:
+            conviction += _smt["points"]
+            if _smt["idx_smt"]:
+                g["smt_index"] = g.get("smt_index", 0) + 1
+            if _smt["dxy_smt"]:
+                g["smt_dollar"] = g.get("smt_dollar", 0) + 1
+        if (config.INDEX_SMT_REQUIRED and config.INDICES_ENABLED
+                and pair in config.INDEX_PAIRS
+                and not (_smt["idx_smt"] or _smt["dxy_smt"])):
+            self._log_reject(t, pair, direction, "index SMT not confirmed")
+            return
+
         # Ep 12 market structure: fractal LTH/ITH/STH read across W→M15, coupled
         # with the inverted draw cascade. Higher-TF intermediate structure agreeing
         # with the trade = a bigger draw on liquidity in our favour → more conviction.
@@ -3083,6 +3134,8 @@ class Backtester:
             "dxy_mstruct_sweep": _ms["dxy_minor_sweep"],
             "crt_tf": _crt_tf,
             "nwog": _nwog_tf,
+            "smt_idx": _smt["idx_smt"],
+            "smt_dxy": _smt["dxy_smt"],
             "target_escalated": _tgt_escalated,
             "soj_sweep": _soj_sweep,
             "soj_type": _soj_type,

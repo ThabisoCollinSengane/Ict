@@ -614,6 +614,15 @@ INDEX_LOT_UNITS   = int(_os.environ.get("INDEX_LOT_UNITS", 1))         # PROVISI
 INDEX_STOP_TF       = _os.environ.get("INDEX_STOP_TF", "5T")            # structural stop TF
 INDEX_STOP_LOOKBACK = int(_os.environ.get("INDEX_STOP_LOOKBACK", 120))
 INDEX_SIZE_MULT   = float(_os.environ.get("INDEX_SIZE_MULT", 1.0))      # DD-fit lever; 1.0=off
+# Precise ICT SMT divergence (ict/smt.py). Two independent reads per index trade:
+# index-vs-index (US500/US100/US30, positive correlation) and index-vs-dollar
+# (inverse correlation). Each firing adds SMT_CONVICTION_PTS. INDEX_SMT_REQUIRED=1
+# makes an index entry REQUIRE at least one SMT confirmation (a quality gate to
+# validate). SMT_TF/SMT_LOOKBACK define the two-swing window.
+SMT_TF             = _os.environ.get("SMT_TF", "15T")
+SMT_LOOKBACK       = int(_os.environ.get("SMT_LOOKBACK", 20))
+SMT_CONVICTION_PTS = int(_os.environ.get("SMT_CONVICTION_PTS", 1))
+INDEX_SMT_REQUIRED = bool(int(_os.environ.get("INDEX_SMT_REQUIRED", 0)))
 if INDICES_ENABLED:
     for _s in INDEX_PAIRS:
         if _s not in PAIRS:
