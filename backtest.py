@@ -32,6 +32,7 @@ from ict.market_profile import (
     daily_open as mp_daily_open,
     weekly_open as mp_weekly_open,
     session_open as mp_session_open,
+    nwog as mp_nwog,
     detect_weekly_amd,
     profile_score,
 )
@@ -424,6 +425,7 @@ class Backtester:
             "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
             "crt_tf": st.get("crt_tf", ""),
+            "nwog": st.get("nwog", ""),
             "target_escalated": st.get("target_escalated", False),
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
@@ -499,6 +501,7 @@ class Backtester:
             "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
             "crt_tf": st.get("crt_tf", ""),
+            "nwog": st.get("nwog", ""),
             "target_escalated": st.get("target_escalated", False),
             "tp_runner": st.get("tp_runner", False),
             "tp1_price": st.get("tp1_price"),
@@ -682,6 +685,35 @@ class Backtester:
         if ts is None or not bars:
             return None
         return mp_session_open(bars, ts, sess_name, t)
+
+    def _nwog(self, pair: str, t):
+        """New Week Opening Gap for this pair/week: (lo, hi, ce, gap_dir) or None."""
+        bars = self.tf_bars.get((pair, "D"), [])
+        ts   = self.tf_index.get((pair, "D"))
+        if ts is None or not bars:
+            return None
+        return mp_nwog(bars, ts, t)
+
+    def _nwog_conviction(self, pair, direction, cur_price, t):
+        """NWOG PD-array conviction (mirror of _htf_fvg_conviction).
+
+        +NWOG_CONVICTION_PTS when price is sitting within NWOG_MID_TOLERANCE_PIPS
+        of the gap's 50% (consequent encroachment) AND the gap polarity agrees
+        with the trade (gap-up NWOG supports longs; gap-down supports shorts) —
+        i.e. price is delivering into the weekend-gap equilibrium in our
+        direction. Returns (points, tag) with tag "NWOG" when it fires."""
+        if not config.NWOG_ENABLED:
+            return 0, ""
+        g = self._nwog(pair, t)
+        if g is None:
+            return 0, ""
+        lo, hi, ce, gap_dir = g
+        if gap_dir != direction:
+            return 0, ""
+        tol = config.NWOG_MID_TOLERANCE_PIPS * pip_size(pair)
+        if abs(cur_price - ce) <= tol:
+            return config.NWOG_CONVICTION_PTS, "NWOG"
+        return 0, ""
 
     def _session_open_judas_sweep(self, pair: str, direction: int,
                                    session_open_price: float, t,
@@ -1412,6 +1444,18 @@ class Backtester:
         if len(w_bars) >= 2:
             candidates.append((w_bars[-2].High, "pwh_pwl"))
             candidates.append((w_bars[-2].Low, "pwh_pwl"))
+
+        # NWOG (New Week Opening Gap): the weekend gap's low, high and 50% (CE) are
+        # HTF PD-array levels price is drawn to. Added as a distinct "nwog" source
+        # family so an NWOG level clustering with a fib/FVG scores as multi-source
+        # confluence (feeding the P18 score sizing), and can itself be the target.
+        if config.NWOG_ENABLED:
+            _ng = self._nwog(pair, t)
+            if _ng is not None:
+                _nlo, _nhi, _nce, _ = _ng
+                candidates.append((_nlo, "nwog"))
+                candidates.append((_nhi, "nwog"))
+                candidates.append((_nce, "nwog"))
 
         # ICT: unswept ITH/ITL are primary institutional liquidity draws (P17). Bigger
         # TF = stronger magnet. config.ITHL_TARGET_TFS selects which timeframes contribute
@@ -2447,6 +2491,16 @@ class Backtester:
             conviction += _crt_pts
             g["crt_turtle_soup"] = g.get("crt_turtle_soup", 0) + 1
 
+        # NWOG (New Week Opening Gap): price delivering into the weekend gap's 50%
+        # (consequent encroachment) aligned with the trade. The NWOG is an ICT HTF
+        # PD array / draw on liquidity — a gap-up week supports longs, gap-down
+        # supports shorts. +NWOG_CONVICTION_PTS, and (below) NWOG bounds/CE are
+        # added as confluence + target candidates via _find_target.
+        _nwog_pts, _nwog_tf = self._nwog_conviction(pair, direction, cur_price, t)
+        if _nwog_pts:
+            conviction += _nwog_pts
+            g["nwog_ce_hit"] = g.get("nwog_ce_hit", 0) + 1
+
         # Ep 12 market structure: fractal LTH/ITH/STH read across W→M15, coupled
         # with the inverted draw cascade. Higher-TF intermediate structure agreeing
         # with the trade = a bigger draw on liquidity in our favour → more conviction.
@@ -2937,6 +2991,7 @@ class Backtester:
             "dxy_mstruct_align": "|".join(_ms["dxy_align"]),
             "dxy_mstruct_sweep": _ms["dxy_minor_sweep"],
             "crt_tf": _crt_tf,
+            "nwog": _nwog_tf,
             "target_escalated": _tgt_escalated,
             "soj_sweep": _soj_sweep,
             "soj_type": _soj_type,

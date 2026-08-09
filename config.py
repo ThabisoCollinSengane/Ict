@@ -94,6 +94,17 @@ MILESTONE_TRAIL_BUFFER  = int(_os.environ.get("MILESTONE_TRAIL_BUFFER", 5))
 STRUCT_TRAIL_LOOKBACK       = int(_os.environ.get("STRUCT_TRAIL_LOOKBACK", 200))
 STRUCT_TRAIL_DEFAULT_BUFFER = float(_os.environ.get("STRUCT_TRAIL_DEFAULT_BUFFER", 2))
 
+# NWOG — New Week Opening Gap (the weekend gap between last week's Friday daily
+# close and this week's Monday daily open). An ICT higher-timeframe PD array:
+# price is drawn to its 50% midpoint (consequent encroachment) and the gap acts
+# as support/resistance. Wired as (a) a confluence/target source family ("nwog")
+# and (b) a +NWOG_CONVICTION_PTS conviction add when price sits at the NWOG CE
+# aligned with the trade (gap-up NWOG supports longs, gap-down supports shorts).
+# NWOG_ENABLED=0 makes the engine byte-identical to the pre-NWOG baseline.
+NWOG_ENABLED            = bool(int(_os.environ.get("NWOG_ENABLED", 1)))
+NWOG_MID_TOLERANCE_PIPS = float(_os.environ.get("NWOG_MID_TOLERANCE_PIPS", 10))
+NWOG_CONVICTION_PTS     = int(_os.environ.get("NWOG_CONVICTION_PTS", 1))
+
 # HTF draw preference: when an unswept ITH/ITL, PDH/PDL, or PWH/PWL is within
 # this many pips, prefer it over a closer fib extension as the primary target.
 # These are RESTING LIQUIDITY pools (actual institutional destination); fib
