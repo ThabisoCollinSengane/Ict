@@ -2,6 +2,25 @@
 
 import os as _os
 
+
+def _envf(name, default):
+    """Tolerant float env read: strips whitespace + any trailing inline comment
+    (e.g. a shell '#value' glued on by a missing space), falls back to default on
+    a bad value. Prevents one bad env var from crashing the whole config import
+    (which would take the live bot down too)."""
+    v = _os.environ.get(name)
+    if v is None:
+        return float(default)
+    try:
+        return float(v.split("#", 1)[0].strip())
+    except (ValueError, AttributeError):
+        return float(default)
+
+
+def _envi(name, default):
+    return int(_envf(name, default))
+
+
 # --- Capital + risk ---
 STARTING_CASH = 500                # R500 ZAR starting capital
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
@@ -14,14 +33,14 @@ ACCOUNT_CURRENCY = "ZAR"          # account denomination
 # is on the TOTAL-value curve (working + withdrawn) so a withdrawal never shows as
 # a drawdown. WITHDRAW_AT=0 disables it (byte-identical baseline).
 #   e.g. WITHDRAW_AT=20000 WITHDRAW_KEEP=500  -> grow 500->20k, bank ~19.5k, repeat.
-WITHDRAW_AT   = float(_os.environ.get("WITHDRAW_AT", 0))          # ceiling; 0 = off
-WITHDRAW_KEEP = float(_os.environ.get("WITHDRAW_KEEP", STARTING_CASH))  # initial keep-working level
+WITHDRAW_AT   = _envf("WITHDRAW_AT", 0)          # ceiling; 0 = off
+WITHDRAW_KEEP = _envf("WITHDRAW_KEEP", STARTING_CASH)  # initial keep-working level
 # Fraction of each cycle's profit to actually WITHDRAW (income); the rest is
 # reinvested — the keep-level and ceiling ratchet UP by the reinvested amount, so
 # the working base compounds while you still draw income. 1.0 = withdraw everything
 # above keep (fixed base, steady income, no compounding of the base). 0.6 = draw
 # 60%, compound 40% — "make ends meet AND grow". Only active when WITHDRAW_AT>0.
-WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
+WITHDRAW_FRACTION = _envf("WITHDRAW_FRACTION", 1.0)
 
 # --- Scheduled (calendar) withdrawal cadence ---
 # The realistic income model: withdraw on a SCHEDULE, and the frequency steps up as
@@ -30,18 +49,18 @@ WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
 # profit above the keep-level and reinvests the rest (so the base compounds and the
 # cadence can climb). Uses WITHDRAW_KEEP as the initial working base. Enable with
 # WITHDRAW_SCHEDULE=1 (this then OWNS withdrawals — the ceiling trigger is off).
-WITHDRAW_SCHEDULE      = bool(int(_os.environ.get("WITHDRAW_SCHEDULE", 0)))
-WITHDRAW_MONTHLY_DAYS  = int(_os.environ.get("WITHDRAW_MONTHLY_DAYS", 30))   # cadence when small
-WITHDRAW_BIWEEKLY_DAYS = int(_os.environ.get("WITHDRAW_BIWEEKLY_DAYS", 14))
-WITHDRAW_WEEKLY_DAYS   = int(_os.environ.get("WITHDRAW_WEEKLY_DAYS", 7))
-WITHDRAW_BIWEEKLY_AT   = float(_os.environ.get("WITHDRAW_BIWEEKLY_AT", 10_000))  # (legacy tier)
-WITHDRAW_WEEKLY_AT     = float(_os.environ.get("WITHDRAW_WEEKLY_AT", 30_000))    # (legacy tier)
+WITHDRAW_SCHEDULE      = bool(_envi("WITHDRAW_SCHEDULE", 0))
+WITHDRAW_MONTHLY_DAYS  = _envi("WITHDRAW_MONTHLY_DAYS", 30)   # cadence when small
+WITHDRAW_BIWEEKLY_DAYS = _envi("WITHDRAW_BIWEEKLY_DAYS", 14)
+WITHDRAW_WEEKLY_DAYS   = _envi("WITHDRAW_WEEKLY_DAYS", 7)
+WITHDRAW_BIWEEKLY_AT   = _envf("WITHDRAW_BIWEEKLY_AT", 10_000)  # (legacy tier)
+WITHDRAW_WEEKLY_AT     = _envf("WITHDRAW_WEEKLY_AT", 30_000)    # (legacy tier)
 # R10k-band cadence: withdrawals START once the account reaches the keep-level
 # (set WITHDRAW_KEEP=10000), then every additional R10k BAND the account reaches
 # makes withdrawals MORE FREQUENT (interval = MONTHLY_DAYS / band, floored at
 # WEEKLY_DAYS) AND larger (a fraction of a bigger base). Evenly distributed at a
 # regular interval within each band. band = floor(equity / WITHDRAW_BAND).
-WITHDRAW_BAND          = float(_os.environ.get("WITHDRAW_BAND", 10_000))
+WITHDRAW_BAND          = _envf("WITHDRAW_BAND", 10_000)
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
 # Max-risk-per-trade guard: at small equity the broker min-lot floor (0.01) overrides
