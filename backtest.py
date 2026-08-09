@@ -130,6 +130,8 @@ class Backtester:
         self.withdrawal_events = []     # (timestamp, amount, keep_level_after)
         self._keep_level = config.WITHDRAW_KEEP   # ratchets up as profit is reinvested
         self._ceiling    = config.WITHDRAW_AT     # ceiling shifts up with the keep-level
+        self._last_withdraw_date = None           # scheduled-withdrawal cadence tracker
+        self._cur_loop_date = None                # run()-loop calendar-day tracker
         self._work_peak = self.equity   # peak of the WORKING balance (resets on withdrawal)
         self._max_work_dd = 0.0         # worst % drawdown seen on the working balance
         self.active = {}
@@ -245,6 +247,12 @@ class Backtester:
                 continue
 
             now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+
+            # Scheduled income withdrawal — checked once per calendar day.
+            if config.WITHDRAW_SCHEDULE and now.date() != self._cur_loop_date:
+                if self._cur_loop_date is not None:
+                    self._maybe_scheduled_withdraw(t)
+                self._cur_loop_date = now.date()
 
             # Session handover runs at any EUR/GBP kill zone start.
             if can_open_new_trade(now):
@@ -681,6 +689,40 @@ class Backtester:
                 return lots
         return config.EQUITY_TIERS[-1][1]
 
+    def _maybe_scheduled_withdraw(self, t):
+        """Calendar-cadence income withdrawal. Frequency steps up as the working
+        base grows: monthly while small, twice a month past WITHDRAW_BIWEEKLY_AT,
+        weekly past WITHDRAW_WEEKLY_AT. Each due date banks WITHDRAW_FRACTION of the
+        profit above the keep-level and reinvests the rest (base compounds, so the
+        cadence can climb). Called once per calendar day from run()."""
+        if not config.WITHDRAW_SCHEDULE:
+            return
+        d = t.date() if hasattr(t, "date") else t
+        if self._last_withdraw_date is None:
+            self._last_withdraw_date = d
+            return
+        if self.equity >= config.WITHDRAW_WEEKLY_AT:
+            interval = config.WITHDRAW_WEEKLY_DAYS
+        elif self.equity >= config.WITHDRAW_BIWEEKLY_AT:
+            interval = config.WITHDRAW_BIWEEKLY_DAYS
+        else:
+            interval = config.WITHDRAW_MONTHLY_DAYS
+        if (d - self._last_withdraw_date).days < interval:
+            return
+        self._last_withdraw_date = d
+        if self.equity <= self._keep_level:
+            return                              # no profit to draw this period
+        excess   = self.equity - self._keep_level
+        withdraw = excess * config.WITHDRAW_FRACTION
+        reinvest = excess - withdraw
+        self.withdrawn_total += withdraw
+        self.withdrawal_count += 1
+        self.withdrawal_events.append((t, withdraw, self._keep_level + reinvest))
+        self._keep_level += reinvest            # compound the reinvested part
+        self.equity = self._keep_level
+        self._peak_equity = self.equity         # cash-out is not a drawdown
+        self._work_peak = self.equity
+
     def _track_working_dd(self):
         """Track the worst % drawdown on the WORKING balance (the number you'd see
         in the real account each base->ceiling cycle). Called after every close,
@@ -700,6 +742,8 @@ class Backtester:
         the fixed-base model (bank all above keep). Keeps the account realistic (no
         runaway compounding). Peak-equity resets so a cash-out isn't seen as a loss;
         summarize() MaxDD is on the total-value curve (withdrawal-neutral)."""
+        if config.WITHDRAW_SCHEDULE:
+            return   # scheduled (calendar) mode owns withdrawals
         if config.WITHDRAW_AT <= 0:
             return
         if self.equity >= self._ceiling and self.equity > self._keep_level:

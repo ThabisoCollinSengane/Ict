@@ -22,6 +22,20 @@ WITHDRAW_KEEP = float(_os.environ.get("WITHDRAW_KEEP", STARTING_CASH))  # initia
 # above keep (fixed base, steady income, no compounding of the base). 0.6 = draw
 # 60%, compound 40% — "make ends meet AND grow". Only active when WITHDRAW_AT>0.
 WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
+
+# --- Scheduled (calendar) withdrawal cadence ---
+# The realistic income model: withdraw on a SCHEDULE, and the frequency steps up as
+# the working base grows — monthly while small, twice a month once it's built,
+# weekly when it's big. Each scheduled withdrawal banks WITHDRAW_FRACTION of the
+# profit above the keep-level and reinvests the rest (so the base compounds and the
+# cadence can climb). Uses WITHDRAW_KEEP as the initial working base. Enable with
+# WITHDRAW_SCHEDULE=1 (this then OWNS withdrawals — the ceiling trigger is off).
+WITHDRAW_SCHEDULE      = bool(int(_os.environ.get("WITHDRAW_SCHEDULE", 0)))
+WITHDRAW_MONTHLY_DAYS  = int(_os.environ.get("WITHDRAW_MONTHLY_DAYS", 30))   # cadence when small
+WITHDRAW_BIWEEKLY_DAYS = int(_os.environ.get("WITHDRAW_BIWEEKLY_DAYS", 14))
+WITHDRAW_WEEKLY_DAYS   = int(_os.environ.get("WITHDRAW_WEEKLY_DAYS", 7))
+WITHDRAW_BIWEEKLY_AT   = float(_os.environ.get("WITHDRAW_BIWEEKLY_AT", 10_000))  # base >= -> biweekly
+WITHDRAW_WEEKLY_AT     = float(_os.environ.get("WITHDRAW_WEEKLY_AT", 30_000))    # base >= -> weekly
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
 # Max-risk-per-trade guard: at small equity the broker min-lot floor (0.01) overrides
