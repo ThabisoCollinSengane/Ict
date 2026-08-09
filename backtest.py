@@ -44,7 +44,11 @@ from ict.dealing_range import (
     is_nfp_week_low_probability,
     is_post_fomc_low_probability,
 )
-from intermarket import resolve as resolve_intermarket, resolve_pair_direction
+from intermarket import (
+    resolve as resolve_intermarket,
+    resolve_pair_direction,
+    resolve_gold_direction,
+)
 from news_filter import NewsCalendar
 from risk import position_size, pip_size
 from trade_log import TradeLog
@@ -2137,6 +2141,25 @@ class Backtester:
             else:
                 _im_scenario = _base
 
+        elif config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+            # Gold (XAUUSD) — DXY + silver + AUDUSD 2-of-3 breadth gate.
+            # Gold is inverse to the dollar; silver (XAGUSD) and AUDUSD are
+            # positive confirmers. DXY is the hard gate (already checked non-zero
+            # above); at least one of silver/AUD must also confirm, and silver
+            # diverging suppresses (see intermarket.resolve_gold_direction).
+            silver_bias = self._sym_bias(config.GOLD_REF_SILVER, "60T", t,
+                                         lookback=config.SWING_LOOKBACK_STH)
+            aud_bias    = self._sym_bias(config.GOLD_REF_AUD, "60T", t,
+                                         lookback=config.SWING_LOOKBACK_STH)
+            direction, im_score = resolve_gold_direction(dxy_bias, silver_bias, aud_bias)
+            if direction is None:
+                return
+            if im_score < 0.75:
+                return
+            # MSS breadth for gold: its own structure + silver, DXY inverse.
+            mss_sym1, mss_sym2 = config.GOLD_PAIR, config.GOLD_REF_SILVER
+            _im_scenario = "G-long" if direction > 0 else "G-short"
+
         else:   # NZDUSD — DXY + AUDNZD cross (independent of EUR/GBP family)
             audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,
                                          lookback=config.SWING_LOOKBACK_STH)
@@ -2177,6 +2200,10 @@ class Backtester:
         # otherwise block every continuation trade).
         _brk_dir = self._intermarket_breakout(t)
         _is_breakout = (_brk_dir != 0 and _brk_dir == direction)
+        # The triple-confirmed breakout is a EURUSD+GBPUSD+DXY model — it has no
+        # meaning for gold, so never let it tag/exempt a gold trade.
+        if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+            _is_breakout = False
         if _is_breakout:
             g["breakout_confirmed"] = g.get("breakout_confirmed", 0) + 1
 

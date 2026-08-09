@@ -76,3 +76,38 @@ def resolve_pair_direction(
         score = 1.0 if (ref_bias < 0) == (pair == primary_pair) else 0.5
 
     return direction, score
+
+
+def resolve_gold_direction(
+    dxy_bias: int,
+    silver_bias: int,
+    aud_bias: int,
+) -> tuple[int, float] | tuple[None, float]:
+    """Gold (XAUUSD) intermarket gate — DXY + silver + AUDUSD 2-of-3 breadth.
+
+    Gold moves INVERSE to the dollar, so the primary direction is -dxy_bias:
+      DXY down → gold LONG ; DXY up → gold SHORT ; DXY flat → no trade (hard gate).
+
+    Silver (XAGUSD) and AUDUSD are POSITIVE confirmers (they co-move with gold —
+    the metals complex and the commodity/risk-currency complex). This mirrors the
+    EURUSD+GBPUSD+DXY 2-of-3 logic: DXY always agrees by construction, so at least
+    one of silver/AUD must also confirm for a valid 2-of-3.
+
+    Silver DIVERGING (moving opposite the gold direction) is a low-breadth warning
+    — the metals move lacks breadth — so it SUPPRESSES the trade even when AUD
+    agrees (a documented gold failure mode).
+
+    Returns (direction, im_score) or (None, 0.0):
+      1.0  — all three agree (DXY + silver + AUD)
+      0.75 — DXY + exactly one confirmer (the other flat)
+    """
+    if dxy_bias == 0:
+        return None, 0.0
+    direction = -dxy_bias                      # gold is inverse to the dollar
+    if silver_bias == -direction:              # silver diverges → suppress
+        return None, 0.0
+    confirmers = ((1 if silver_bias == direction else 0)
+                  + (1 if aud_bias == direction else 0))
+    if confirmers == 0:                        # only DXY agrees → below 2-of-3
+        return None, 0.0
+    return direction, (1.0 if confirmers == 2 else 0.75)
