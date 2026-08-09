@@ -231,6 +231,29 @@ def test_index_gate():
     print("ok  index gate (inverse-dollar + sibling/US30 breadth + SMT suppress)")
 
 
+def test_index_amd_range_override():
+    """Index frequency lever: %-of-price consolidation cap auto-scales per index;
+    FX pairs keep the global cap (byte-identical)."""
+    import os, importlib
+    prev = {k: os.environ.get(k) for k in ("INDICES_ENABLED", "INDEX_AMD_MAX_RANGE_PCT")}
+    os.environ["INDICES_ENABLED"] = "1"
+    os.environ["INDEX_AMD_MAX_RANGE_PCT"] = "0.8"
+    import config as _c; importlib.reload(_c)
+    from backtest import Backtester
+    from risk import pip_size
+    bt = object.__new__(Backtester)
+    # US500@4500 -> 0.8% = 36 pts; US100@18000 -> 144 pts (cap returned in "pips")
+    assert abs(Backtester._amd_max_range(bt, "US500", 4500) * pip_size("US500") - 36) < 1
+    assert abs(Backtester._amd_max_range(bt, "US100", 18000) * pip_size("US100") - 144) < 1
+    # EURUSD unaffected -> FX global
+    assert Backtester._amd_max_range(bt, "EURUSD", 1.09) == _c.AMD_MAX_RANGE_PIPS
+    for k, v in prev.items():
+        if v is None: os.environ.pop(k, None)
+        else: os.environ[k] = v
+    importlib.reload(_c)
+    print("ok  index AMD range override (%-of-price auto-scale; FX unchanged)")
+
+
 def test_indices_disabled_keeps_pairs_baseline():
     """INDICES_ENABLED=0 must NOT add US500/US100 to PAIRS (baseline byte-identical)."""
     import os, importlib
@@ -386,6 +409,7 @@ def main():
     test_gold_disabled_keeps_pairs_baseline()
     test_index_gate()
     test_indices_disabled_keeps_pairs_baseline()
+    test_index_amd_range_override()
     test_smt_divergence()
     test_backtest_handover_hook_is_noop()
     test_amd_sweep_logic()

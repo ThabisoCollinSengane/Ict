@@ -28,6 +28,11 @@ export WITHDRAW_BAND="${WITHDRAW_BAND:-10000}"      # cadence steps up every R10
 export INDEX_PAIRS="SPXUSD NSXUSD"
 export INDEX_REF="${INDEX_REF:-US30}"
 export INDEX_MIN_IMSCORE="${INDEX_MIN_IMSCORE:-0.75}"
+# Index frequency levers (more trades = more income): a %-of-price consolidation
+# cap so the index Judas/AM-open setups qualify (35 FX-pips = 35 POINTS starves
+# them), and a separate index daily budget so indices don't fight FX for slots.
+export INDEX_AMD_MAX_RANGE_PCT="${INDEX_AMD_MAX_RANGE_PCT:-0.8}"   # ~US500 36pt / US100 144pt
+export INDEX_MAX_TRADES_PER_DAY="${INDEX_MAX_TRADES_PER_DAY:-3}"
 
 echo "=== 1. core FX M1 (Drive) ==="
 missing=0

@@ -179,6 +179,7 @@ class Backtester:
         self._week_total        = {}   # (iso_year, iso_week) -> int
         self._week_pair         = {}   # (iso_year, iso_week, pair) -> int
         self._day_total         = {}   # date -> int
+        self._day_idx_total     = {}   # date -> int (separate index daily budget)
         self._day_pair          = {}   # (date, pair) -> int  — London session slot
         self._day_pair_ny       = {}   # (date, pair) -> int  — NY AM session slot
         self._day_pair_pm       = {}   # (date, pair) -> int  — NY PM session slot
@@ -758,6 +759,18 @@ class Backtester:
             self.equity = self._keep_level
             self._peak_equity = self.equity     # cash-out is not a drawdown
             self._work_peak = self.equity       # new cycle starts from the keep level
+
+    def _amd_max_range(self, pair, price=None):
+        """AMD consolidation-range cap (in pips) for this pair. Indices are
+        point-priced, so the FX 35-pip cap reads as 35 points and starves the
+        index Judas path. For index pairs: a %-of-price cap (auto-scales US500 vs
+        US100) if set, else a fixed-point cap, else the FX global."""
+        if config.INDICES_ENABLED and pair in config.INDEX_PAIRS:
+            if config.INDEX_AMD_MAX_RANGE_PCT > 0 and price:
+                return (price * config.INDEX_AMD_MAX_RANGE_PCT / 100.0) / pip_size(pair)
+            if config.INDEX_AMD_MAX_RANGE_PIPS > 0:
+                return config.INDEX_AMD_MAX_RANGE_PIPS
+        return config.AMD_MAX_RANGE_PIPS
 
     def _is_point_instrument(self, pair):
         """True for point-based (non-FX) instruments — gold and the US indices.
@@ -2197,7 +2210,16 @@ class Backtester:
         if week_pair >= config.MAX_PAIR_TRADES_PER_WEEK:
             g["weekly_pair_cap"] += 1
             return
-        if day_total >= config.MAX_TRADES_PER_DAY:
+        # Indices get their OWN daily budget (when configured) so they don't compete
+        # with the currencies for the basket-wide MAX_TRADES_PER_DAY slots. FX path
+        # is unchanged (byte-identical) when INDEX_MAX_TRADES_PER_DAY=0 or off.
+        _idx_budget = (config.INDICES_ENABLED and pair in config.INDEX_PAIRS
+                       and config.INDEX_MAX_TRADES_PER_DAY > 0)
+        if _idx_budget:
+            if self._day_idx_total.get(day_key, 0) >= config.INDEX_MAX_TRADES_PER_DAY:
+                g["daily_cap"] += 1
+                return
+        elif day_total >= config.MAX_TRADES_PER_DAY:
             g["daily_cap"] += 1
             return
         # Each session has its own per-pair slot so sessions don't block each other.
@@ -2549,7 +2571,9 @@ class Backtester:
 
         # AMD on M15 (0-1): Asia/London consolidation + manipulation sweep
         bars15 = self.bars_up_to(pair, "15T", t)
-        amd = detect_amd_setup(bars15, pair)
+        _amd_price = bars15[-1].Close if bars15 else None
+        amd = detect_amd_setup(bars15, pair,
+                               max_range_pips=self._amd_max_range(pair, _amd_price))
         amd_score = 0
         # AMD analytics: accumulation shape + stop-run (manipulation) depth per trade.
         _amd_range_pips = _amd_range_bars = None
@@ -3253,7 +3277,13 @@ class Backtester:
             self._london_dir[_ny_dt.date()] = direction
         self._week_total[week_key]                        = week_total + 1
         self._week_pair[(week_key[0], week_key[1], pair)] = week_pair + 1
-        self._day_total[day_key]                          = day_total + 1
+        # Indices with their own budget increment the index counter only, so they
+        # don't consume the currencies' basket-wide daily slots.
+        if (config.INDICES_ENABLED and pair in config.INDEX_PAIRS
+                and config.INDEX_MAX_TRADES_PER_DAY > 0):
+            self._day_idx_total[day_key] = self._day_idx_total.get(day_key, 0) + 1
+        else:
+            self._day_total[day_key]                      = day_total + 1
         if _is_ny:
             self._day_pair_ny[(day_key, pair)] = day_pair_ny + 1
         elif _is_pm:
