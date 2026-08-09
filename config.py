@@ -584,6 +584,15 @@ GOLD_LOT_UNITS  = int(_os.environ.get("GOLD_LOT_UNITS", 100))
 # risk-based sizing scales the position down for the wider structural stop.
 GOLD_STOP_TF       = _os.environ.get("GOLD_STOP_TF", "5T")
 GOLD_STOP_LOOKBACK = int(_os.environ.get("GOLD_STOP_LOOKBACK", 120))
+# Gold gate strictness. 1.0 = require FULL triple-confirmation (DXY + silver + AUD
+# all agree); 0.75 = allow the weak-breadth bucket (only one confirmer). The first
+# clean gold run (167 trades, PF 3.5-3.7 both splits — real edge) breached the -15%
+# breaker (MaxDD full -15.67%, OOS -20%); requiring all-3 agreement is the principled
+# fix (drop the low-breadth trades the research flagged as a failure mode).
+GOLD_MIN_IMSCORE   = float(_os.environ.get("GOLD_MIN_IMSCORE", 1.0))
+# Gold position multiplier — trade gold at a fraction of FX size to cap its
+# drawdown contribution (edge exists, but it clusters DD). 1.0 = off.
+GOLD_SIZE_MULT     = float(_os.environ.get("GOLD_SIZE_MULT", 1.0))
 if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
     PAIRS = PAIRS + (GOLD_PAIR,)
 # DXY synthetic uses these (all available on OANDA):
