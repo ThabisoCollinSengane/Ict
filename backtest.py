@@ -701,12 +701,12 @@ class Backtester:
         if self._last_withdraw_date is None:
             self._last_withdraw_date = d
             return
-        if self.equity >= config.WITHDRAW_WEEKLY_AT:
-            interval = config.WITHDRAW_WEEKLY_DAYS
-        elif self.equity >= config.WITHDRAW_BIWEEKLY_AT:
-            interval = config.WITHDRAW_BIWEEKLY_DAYS
-        else:
-            interval = config.WITHDRAW_MONTHLY_DAYS
+        # R10k-band cadence: each additional band shortens the interval (more
+        # frequent) — monthly at band 1, biweekly at band 2, ~10d at band 3,
+        # floored at weekly. Amount grows too (fraction of a bigger base).
+        band = max(1, int(self.equity // config.WITHDRAW_BAND))
+        interval = max(config.WITHDRAW_WEEKLY_DAYS,
+                       round(config.WITHDRAW_MONTHLY_DAYS / band))
         if (d - self._last_withdraw_date).days < interval:
             return
         self._last_withdraw_date = d

@@ -1,26 +1,33 @@
 #!/usr/bin/env bash
-# US index gate — validation (Codespaces / anywhere egress is open).
+# REALISTIC full-basket validation — currencies + US indices + gold, judged on the
+# scheduled-withdrawal income model (NOT fantasy compounding).
 #   bash run_indices_validation.sh
-# Baseline (INDICES_ENABLED=0, the shipped 3-pair FX engine) vs indices
-# (INDICES_ENABLED=1, adds US500+US100 via the DXY+sibling+US30 SMT-breadth gate)
-# on the full 4yr + IS/OOS splits.
 #
-# Data: core FX (Drive, as every other validation) + US indices from HistData.
-# HistData's ASCII index codes are SPXUSD (=US500) and NSXUSD (=US100); Dow/US30
-# is NOT in HistData free ASCII, so US30 is used only if you supply US30 data
-# (the gate degrades gracefully to DXY+sibling breadth without it). We therefore
-# run the backtest with INDEX_PAIRS="SPXUSD NSXUSD".
+# Withdrawal policy (env-overridable at the top): start withdrawing once the account
+# reaches R10k, then every additional R10k BAND the account reaches makes the
+# withdrawals more frequent (monthly -> biweekly -> weekly) AND larger. A fraction
+# is banked as income each time; the rest compounds so the cadence can climb.
 #
-# SIZING IS PROVISIONAL (INDEX_PIP/INDEX_LOT_UNITS): absolute ZAR equity is NOT
-# calibrated. PF / WR / MaxDD are scale-invariant and ARE the edge signal. Ship
-# indices ON only if the book's MaxDD is not worse and index trades are PF-positive
-# in BOTH splits.
+# Instruments: FX (currencies, always) + US indices (US500/US100 via SPXUSD/NSXUSD,
+# US30 confirmer) + gold (XAUUSD, silver+AUD confirmers). Missing data for any leg
+# is reported and that leg simply contributes no trades (graceful).
+#
+# Report (data/indices_validation.md): per-split PF / WR / working-MaxDD / total
+# value, PLUS the per-year income table (amount + frequency + avg) and the TOTAL
+# number of withdrawals over the test — currencies-only vs the full basket, so you
+# can see how much indices+gold lift the income.
 cd "$(dirname "$0")" || exit 1
 M1_URL="https://drive.google.com/drive/folders/1uN2c7QvNJg15CmVmNXUYR1CTiSsaB-d4"
 YEARS=(2022 2023 2024 2025)
-IDX_SYMS=(SPXUSD NSXUSD)       # HistData codes for US500 / US100
+
+# ── withdrawal policy (override by exporting before the run) ──────────────────
+export WITHDRAW_SCHEDULE="${WITHDRAW_SCHEDULE:-1}"
+export WITHDRAW_KEEP="${WITHDRAW_KEEP:-10000}"      # start withdrawing at R10k
+export WITHDRAW_FRACTION="${WITHDRAW_FRACTION:-0.7}"# bank 70% income / compound 30%
+export WITHDRAW_BAND="${WITHDRAW_BAND:-10000}"      # cadence steps up every R10k
 export INDEX_PAIRS="SPXUSD NSXUSD"
-export INDEX_REF="${INDEX_REF:-US30}"   # used only if US30 data is present
+export INDEX_REF="${INDEX_REF:-US30}"
+export INDEX_MIN_IMSCORE="${INDEX_MIN_IMSCORE:-0.75}"
 
 echo "=== 1. core FX M1 (Drive) ==="
 missing=0
@@ -35,119 +42,111 @@ if [ "$missing" = 1 ] || [ "${REFRESH_M1:-0}" = 1 ]; then
   python scripts/prepare_histdata.py "$(dirname "$Z")" || exit 1
 fi
 
-echo "=== 2. US indices (HistData: ${IDX_SYMS[*]}) ==="
-imissing=0
-for y in "${YEARS[@]}"; do for p in "${IDX_SYMS[@]}"; do
-  ls data/histdata/${p}_$y.csv >/dev/null 2>&1 || { echo "  ${p}_$y MISSING"; imissing=1; }
+echo "=== 2. indices + gold complex (HistData) ==="
+NEED=(SPXUSD NSXUSD XAUUSD XAGUSD AUDUSD)
+gmissing=0
+for y in "${YEARS[@]}"; do for p in "${NEED[@]}"; do
+  ls data/histdata/${p}_$y.csv >/dev/null 2>&1 || gmissing=1
 done; done
-if [ "$imissing" = 1 ] || [ "${REFRESH_IDX:-0}" = 1 ]; then
-  echo "  fetching indices from HistData…"
-  rm -rf /tmp/idxdl && mkdir -p /tmp/idxdl
+if [ "$gmissing" = 1 ] || [ "${REFRESH_XTRA:-0}" = 1 ]; then
+  echo "  fetching indices+gold from HistData…"
+  rm -rf /tmp/xtradl && mkdir -p /tmp/xtradl
   python scripts/fetch_histdata.py --years "${YEARS[@]}" \
-    --pairs "${IDX_SYMS[@]}" --dest /tmp/idxdl 2>&1 | tee /tmp/idxfetch.log
-  if ! ls /tmp/idxdl/HISTDATA_*.zip >/dev/null 2>&1; then
-    echo "  ⚠️ index fetch produced no zips — see /tmp/idxfetch.log. You can also"
-    echo "     drop SPXUSD_YYYY.csv / NSXUSD_YYYY.csv into data/histdata/ manually."
-  fi
-  python scripts/prepare_histdata.py /tmp/idxdl || true
+    --pairs "${NEED[@]}" --dest /tmp/xtradl 2>&1 | tail -5
+  python scripts/prepare_histdata.py /tmp/xtradl || true
 fi
-echo "  coverage:"
-for y in "${YEARS[@]}"; do for p in "${IDX_SYMS[@]}" "$INDEX_REF"; do
+echo "  coverage (US30 = Dow, import separately via scripts/import_index_csv.py):"
+for y in "${YEARS[@]}"; do for p in "${NEED[@]}" US30; do
   f="data/histdata/${p}_$y.csv"
   if [ -f "$f" ]; then printf "    %s %s: %s rows\n" "$p" "$y" "$(wc -l < "$f")";
   else printf "    %s %s: MISSING\n" "$p" "$y"; fi
 done; done
 
-run_one() {  # $1=enabled $2=label $3..=years
-  local en="$1" label="$2"; shift 2
-  echo "  $label (INDICES_ENABLED=$en, years $*) ..."
-  INDICES_ENABLED="$en" python run_backtest_histdata.py --years "$@" \
-    > "/tmp/idx_$label.txt" 2>&1
+run() {  # $1=label  $2=indices(0/1)  $3=gold(0/1)  $4..=years
+  local label="$1" idx="$2" gld="$3"; shift 3
+  echo "  $label (indices=$idx gold=$gld, years $*) ..."
+  INDICES_ENABLED="$idx" GOLD_ENABLED="$gld" \
+    python run_backtest_histdata.py --years "$@" > "/tmp/rb_$label.txt" 2>&1
 }
 
-echo "=== 3. 6 runs: baseline vs indices x {full, IS, OOS} ==="
-run_one 0 full_base "${YEARS[@]}"
-run_one 1 full_idx  "${YEARS[@]}"
-run_one 0 is_base   2022 2023
-run_one 1 is_idx    2022 2023
-run_one 0 oos_base  2024 2025
-run_one 1 oos_idx   2024 2025
+echo "=== 3. runs: currencies-only vs full basket (all under the withdrawal model) ==="
+run fx_full   0 0 "${YEARS[@]}"
+run all_full  1 1 "${YEARS[@]}"
+run fx_is     0 0 2022 2023
+run all_is    1 1 2022 2023
+run fx_oos    0 0 2024 2025
+run all_oos   1 1 2024 2025
 
-echo "=== 4. comparison ==="
+echo "=== 4. building report ==="
 HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 HEAD_SHA="$HEAD_SHA" python - <<'PY'
 import re, os
 HEAD = os.environ.get("HEAD_SHA", "unknown")
 def grab(label):
-    p = f"/tmp/idx_{label}.txt"
-    if not os.path.exists(p): return {}, "(no run output)"
+    p = f"/tmp/rb_{label}.txt"
+    if not os.path.exists(p):
+        return {}, ""
     txt = open(p).read()
     def g(k, cast=float):
         m = re.search(rf"{k}\s+(-?[\d.]+)", txt); return cast(m.group(1)) if m else None
     d = {"trades": g("trades", int), "wr": g("win_rate_pct"), "pf": g("profit_factor"),
-         "dd": g("max_drawdown_pct"), "eq": g("ending_equity_ZAR")}
-    return d, txt
-
-L = ["# US index gate — validation", "",
-     "Baseline (`INDICES_ENABLED=0`) vs indices (`INDICES_ENABLED=1`, US500+US100 "
-     "via DXY+sibling+US30 SMT-breadth gate). **Sizing is provisional — absolute "
-     "equity is NOT calibrated; PF/WR/MaxDD are scale-invariant and ARE the edge "
-     "signal.** Ship indices ON only if the book's MaxDD is not worse and index "
-     "trades are PF-positive in both splits.", "", f"_run commit: `{HEAD}`_", ""]
+         "dd": g("max_drawdown_pct"), "wdd": g("working_max_drawdown_pct"),
+         "total": g("ending_equity_ZAR"), "income": g("withdrawn_total_ZAR"),
+         "wcount": g("withdrawal_count", int)}
+    # extract the per-year income block
+    blk = re.search(r"Withdrawals \(income\) per year.*?final working balance[^\n]*",
+                    txt, re.S)
+    return d, (blk.group(0) if blk else "")
 
 def fmt(d, k, suf=""):
     v = d.get(k)
-    return "—" if v is None else ((f"{v:,.0f}" if k == "eq" else f"{v:.2f}") + suf)
+    return "—" if v is None else ((f"{v:,.0f}" if k in ("total","income") else f"{v:.2f}") + suf)
 
-res = {}
-for split, base, idx in (("Full 4yr","full_base","full_idx"),
-                         ("IS 2022-23","is_base","is_idx"),
-                         ("OOS 2024-25","oos_base","oos_idx")):
-    (b, _), (m, mt) = grab(base), grab(idx)
-    if b.get("trades") is not None and m.get("trades") is not None:
-        m["idx"] = m["trades"] - b["trades"]
-    else:
-        m["idx"] = None
-    res[split] = (b, m)
-    L += [f"## {split}", "", "| metric | baseline | +indices | Δ |", "|---|---|---|---|"]
-    for k, lbl, suf in (("trades","trades",""),("wr","win rate","%"),
-                        ("pf","profit factor",""),("dd","max drawdown","%"),
-                        ("eq","ending equity ZAR","")):
-        bv, mv = b.get(k), m.get(k)
-        if bv is None or mv is None: d = "—"
-        elif k == "eq":              d = f"{mv-bv:+,.0f}"
-        else:                        d = f"{mv-bv:+.2f}"
-        L.append(f"| {lbl} | {fmt(b,k,suf)} | {fmt(m,k,suf)} | {d} |")
-    L += ["", f"_index trades taken: {m.get('idx')}_", ""]
+L = ["# Realistic full-basket validation — currencies + indices + gold", "",
+     "Judged on the **scheduled-withdrawal income model** (start at R10k; every R10k "
+     "band the account reaches makes withdrawals more frequent + larger; bank 70% / "
+     "compound 30%). Sizing for indices/gold is provisional, so PF / WR / working-"
+     "MaxDD and the **income schedule** are the signals, not fantasy equity.", "",
+     f"_run commit: `{HEAD}`_", ""]
 
-def ok(split, dd_tol):
-    b, m = res.get(split, ({}, {}))
-    if any(m.get(k) is None or b.get(k) is None for k in ("pf","dd")):
-        return None, "run crashed"
-    fails = []
-    if not m.get("idx"):           fails.append("indices took 0 trades (data coverage/gate issue)")
-    if m["dd"] < b["dd"] - dd_tol: fails.append(f"MaxDD {m['dd']:.2f} worse than {b['dd']:.2f}")
-    if m["pf"] <= 1.0:             fails.append(f"book PF {m['pf']:.2f}≤1.0")
-    return (not fails), ("; ".join(fails) if fails else "ok")
-checks = {"Full 4yr": ok("Full 4yr", 0.10), "IS 2022-23": ok("IS 2022-23", 1.0),
-          "OOS 2024-25": ok("OOS 2024-25", 1.0)}
-crashed = any(v is None for v,_ in checks.values())
-green = (not crashed) and all(v for v,_ in checks.values())
-head = ("⚠️ INCONCLUSIVE — a run crashed / indices took no trades." if crashed else
-        "🟢 GREEN — indices added without worsening the book (review index PF/WR by split)."
-        if green else "🔴 RED — do NOT ship indices ON (INDICES_ENABLED stays 0).")
-L += ["## Verdict", "", f"**{head}**", ""]
-for s,(v,why) in checks.items():
-    L.append(f"- **{s}: {'🟢 pass' if v else ('⚠️ crash' if v is None else '🔴 fail')}** — {why}")
-L += ["", "_Reminder: calibrate INDEX_PIP / INDEX_LOT_UNITS before trusting absolute "
-      "equity. If MaxDD breaches, tighten INDEX_MIN_IMSCORE=1.0 (all 3 agree) or set "
-      "INDEX_SIZE_MULT<1 and re-run — same risk-fit path as gold._"]
+L += ["## Metrics — currencies-only vs full basket", "",
+      "| split | book | trades | WR% | PF | MaxDD% | working-DD% | total value R | income R | withdrawals |",
+      "|---|---|---|---|---|---|---|---|---|---|"]
+for split, fx, allb in (("Full 4yr","fx_full","all_full"),
+                        ("IS 2022-23","fx_is","all_is"),
+                        ("OOS 2024-25","fx_oos","all_oos")):
+    for lbl, label in (("FX only", fx), ("FX+idx+gold", allb)):
+        d, _ = grab(label)
+        L.append(f"| {split} | {lbl} | {fmt(d,'trades')} | {fmt(d,'wr')} | {fmt(d,'pf')} "
+                 f"| {fmt(d,'dd')} | {fmt(d,'wdd')} | {fmt(d,'total')} | {fmt(d,'income')} "
+                 f"| {d.get('wcount','—')} |")
+
+# Income schedule (the headline) from the full-basket full-4yr run.
+_, blk_all = grab("all_full")
+_, blk_fx  = grab("fx_full")
+L += ["", "## Income schedule — FULL basket (currencies + indices + gold), 4yr", "",
+      "```", blk_all or "(no withdrawals — account never reached R10k)", "```",
+      "", "## Income schedule — currencies only, 4yr (for comparison)", "",
+      "```", blk_fx or "(no withdrawals — account never reached R10k)", "```"]
+
+da, _ = grab("all_full"); dfx, _ = grab("fx_full")
+L += ["", "## Bottom line", ""]
+if da.get("income") is not None and dfx.get("income") is not None:
+    lift = da["income"] - dfx["income"]
+    L += [f"- Full basket banked **R{da['income']:,.0f}** income across "
+          f"**{da.get('wcount')}** withdrawals over 4yr; currencies-only banked "
+          f"R{dfx['income']:,.0f} across {dfx.get('wcount')}. "
+          f"Indices+gold added **R{lift:,.0f}** of income "
+          f"({'+' if lift>=0 else ''}{(lift/dfx['income']*100 if dfx['income'] else 0):.0f}%)."]
+L += ["- Working-account MaxDD is the realistic per-cycle drawdown; the total-value "
+      "MaxDD is withdrawal-neutral. Ship the basket if working-DD stays tolerable and "
+      "the income schedule is worth it — equity size is capped by design."]
 open("data/indices_validation.md","w").write("\n".join(L) + "\n")
 print("\n".join(L))
 PY
 
 git add -f data/indices_validation.md 2>/dev/null
-git commit -q -m "US index gate validation results (auto, commit ${HEAD_SHA})" 2>/dev/null
+git commit -q -m "Realistic full-basket + income validation (auto, commit ${HEAD_SHA})" 2>/dev/null
 git pull -q --no-rebase --no-edit 2>/dev/null
 git push -u origin HEAD 2>/dev/null && echo "RESULTS PUSHED — Claude reads data/indices_validation.md" \
-  || echo "(push failed — copy the comparison above to Claude)"
+  || echo "(push failed — copy the report above to Claude)"

@@ -34,8 +34,14 @@ WITHDRAW_SCHEDULE      = bool(int(_os.environ.get("WITHDRAW_SCHEDULE", 0)))
 WITHDRAW_MONTHLY_DAYS  = int(_os.environ.get("WITHDRAW_MONTHLY_DAYS", 30))   # cadence when small
 WITHDRAW_BIWEEKLY_DAYS = int(_os.environ.get("WITHDRAW_BIWEEKLY_DAYS", 14))
 WITHDRAW_WEEKLY_DAYS   = int(_os.environ.get("WITHDRAW_WEEKLY_DAYS", 7))
-WITHDRAW_BIWEEKLY_AT   = float(_os.environ.get("WITHDRAW_BIWEEKLY_AT", 10_000))  # base >= -> biweekly
-WITHDRAW_WEEKLY_AT     = float(_os.environ.get("WITHDRAW_WEEKLY_AT", 30_000))    # base >= -> weekly
+WITHDRAW_BIWEEKLY_AT   = float(_os.environ.get("WITHDRAW_BIWEEKLY_AT", 10_000))  # (legacy tier)
+WITHDRAW_WEEKLY_AT     = float(_os.environ.get("WITHDRAW_WEEKLY_AT", 30_000))    # (legacy tier)
+# R10k-band cadence: withdrawals START once the account reaches the keep-level
+# (set WITHDRAW_KEEP=10000), then every additional R10k BAND the account reaches
+# makes withdrawals MORE FREQUENT (interval = MONTHLY_DAYS / band, floored at
+# WEEKLY_DAYS) AND larger (a fraction of a bigger base). Evenly distributed at a
+# regular interval within each band. band = floor(equity / WITHDRAW_BAND).
+WITHDRAW_BAND          = float(_os.environ.get("WITHDRAW_BAND", 10_000))
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
 # Max-risk-per-trade guard: at small equity the broker min-lot floor (0.01) overrides
