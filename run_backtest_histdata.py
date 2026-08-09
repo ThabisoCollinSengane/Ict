@@ -227,6 +227,22 @@ def main():
     for k, v in results.items():
         print(f"  {k:25s} {v}")
 
+    # Per-year withdrawal (income) report — "did it make ends meet each year?"
+    events = getattr(backtester, "withdrawal_events", [])
+    if events:
+        from collections import defaultdict
+        by_year_amt = defaultdict(float)
+        by_year_cnt = defaultdict(int)
+        for ts, amt, _keep in events:
+            yr = getattr(ts, "year", None) or "?"
+            by_year_amt[yr] += amt
+            by_year_cnt[yr] += 1
+        print("\n=== Withdrawals (income) per year ===")
+        for yr in sorted(by_year_amt, key=lambda x: str(x)):
+            print(f"  {yr}: R{by_year_amt[yr]:>12,.0f}  ({by_year_cnt[yr]} withdrawals)")
+        print(f"  final working balance: R{backtester.equity:,.0f}  "
+              f"(keep-level R{getattr(backtester, '_keep_level', 0):,.0f})")
+
     if backtester.trades:
         df = pd.DataFrame(backtester.trades)
         # Full trade dump for offline analysis (Judas vs continuation, session

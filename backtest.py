@@ -127,6 +127,9 @@ class Backtester:
         self.start_equity = self.equity
         self.withdrawn_total = 0.0      # cumulative profit banked (withdrawal model)
         self.withdrawal_count = 0
+        self.withdrawal_events = []     # (timestamp, amount, keep_level_after)
+        self._keep_level = config.WITHDRAW_KEEP   # ratchets up as profit is reinvested
+        self._ceiling    = config.WITHDRAW_AT     # ceiling shifts up with the keep-level
         self._work_peak = self.equity   # peak of the WORKING balance (resets on withdrawal)
         self._max_work_dd = 0.0         # worst % drawdown seen on the working balance
         self.active = {}
@@ -406,7 +409,7 @@ class Backtester:
         # Update peak equity and consecutive loss counter after every close.
         self._peak_equity = max(self._peak_equity, self.equity)
         self._track_working_dd()
-        self._maybe_withdraw()          # bank profit at the ceiling (if enabled)
+        self._maybe_withdraw(t)         # bank profit at the ceiling (if enabled)
         if pnl_zar > 0:
             self._consec_losses = 0
         else:
@@ -487,7 +490,7 @@ class Backtester:
         self.equity += pnl_zar
         self._peak_equity = max(self._peak_equity, self.equity)
         self._track_working_dd()
-        self._maybe_withdraw()          # bank profit at the ceiling (if enabled)
+        self._maybe_withdraw(t)         # bank profit at the ceiling (if enabled)
         self._consec_losses = 0   # partial TP is a win
 
         record = {
@@ -689,18 +692,26 @@ class Backtester:
             if d > self._max_work_dd:
                 self._max_work_dd = d
 
-    def _maybe_withdraw(self):
-        """Profit withdrawal: when the working balance reaches WITHDRAW_AT, bank
-        everything above WITHDRAW_KEEP and keep trading from WITHDRAW_KEEP. Keeps
-        the account realistic (no runaway compounding). The peak-equity used by the
-        drawdown breaker is reset so the cash-out isn't seen as a loss; MaxDD in
-        summarize() is on the total-value curve, which is withdrawal-neutral."""
+    def _maybe_withdraw(self, t=None):
+        """Profit withdrawal at the ceiling. Of the profit above the keep-level,
+        WITHDRAW_FRACTION is banked (income) and the rest is REINVESTED — the
+        keep-level and ceiling both ratchet up by the reinvested amount, so the
+        working base compounds while you still draw income. FRACTION=1.0 reduces to
+        the fixed-base model (bank all above keep). Keeps the account realistic (no
+        runaway compounding). Peak-equity resets so a cash-out isn't seen as a loss;
+        summarize() MaxDD is on the total-value curve (withdrawal-neutral)."""
         if config.WITHDRAW_AT <= 0:
             return
-        if self.equity >= config.WITHDRAW_AT and self.equity > config.WITHDRAW_KEEP:
-            self.withdrawn_total += self.equity - config.WITHDRAW_KEEP
+        if self.equity >= self._ceiling and self.equity > self._keep_level:
+            excess   = self.equity - self._keep_level
+            withdraw = excess * config.WITHDRAW_FRACTION
+            reinvest = excess - withdraw
+            self.withdrawn_total += withdraw
             self.withdrawal_count += 1
-            self.equity = config.WITHDRAW_KEEP
+            self.withdrawal_events.append((t, withdraw, self._keep_level + reinvest))
+            self._keep_level += reinvest        # compound the reinvested part
+            self._ceiling    += reinvest        # shift the band up with the base
+            self.equity = self._keep_level
             self._peak_equity = self.equity     # cash-out is not a drawdown
             self._work_peak = self.equity       # new cycle starts from the keep level
 
