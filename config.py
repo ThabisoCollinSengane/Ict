@@ -15,7 +15,13 @@ ACCOUNT_CURRENCY = "ZAR"          # account denomination
 # a drawdown. WITHDRAW_AT=0 disables it (byte-identical baseline).
 #   e.g. WITHDRAW_AT=20000 WITHDRAW_KEEP=500  -> grow 500->20k, bank ~19.5k, repeat.
 WITHDRAW_AT   = float(_os.environ.get("WITHDRAW_AT", 0))          # ceiling; 0 = off
-WITHDRAW_KEEP = float(_os.environ.get("WITHDRAW_KEEP", STARTING_CASH))  # keep-working level
+WITHDRAW_KEEP = float(_os.environ.get("WITHDRAW_KEEP", STARTING_CASH))  # initial keep-working level
+# Fraction of each cycle's profit to actually WITHDRAW (income); the rest is
+# reinvested — the keep-level and ceiling ratchet UP by the reinvested amount, so
+# the working base compounds while you still draw income. 1.0 = withdraw everything
+# above keep (fixed base, steady income, no compounding of the base). 0.6 = draw
+# 60%, compound 40% — "make ends meet AND grow". Only active when WITHDRAW_AT>0.
+WITHDRAW_FRACTION = float(_os.environ.get("WITHDRAW_FRACTION", 1.0))
 USD_ZAR = 18.5                    # fixed conversion — approximate 2022-2025 mid-rate
 RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above minimum)
 # Max-risk-per-trade guard: at small equity the broker min-lot floor (0.01) overrides
