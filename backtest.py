@@ -1285,11 +1285,15 @@ class Backtester:
         The universal 10-pip cap downstream enforces the "if 10 pips permit"
         rule — a structural stop wider than the cap is pulled in to 10 pips.
         """
-        bars = self.bars_up_to(pair, config.STRUCTURE_STOP_TF, t,
-                               max_bars=config.STRUCTURE_STOP_LOOKBACK)
+        # Gold reads structure on a slightly higher TF (M1 is noise at gold's scale).
+        if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+            _sstf, _sslb = config.GOLD_STOP_TF, config.GOLD_STOP_LOOKBACK
+        else:
+            _sstf, _sslb = config.STRUCTURE_STOP_TF, config.STRUCTURE_STOP_LOOKBACK
+        bars = self.bars_up_to(pair, _sstf, t, max_bars=_sslb)
         if len(bars) < 5:
             return None
-        res = self._classify_cached(bars, pair, config.STRUCTURE_STOP_TF)
+        res = self._classify_cached(bars, pair, _sstf)
         buf = config.M1_STOP_BUFFER_PIPS * pip
         min_dist = config.M1_STOP_MIN_PIPS * pip
         if direction > 0:
@@ -2796,9 +2800,15 @@ class Backtester:
                 _stop_reason = "M1 swing"
                 g["m1_stop_used"] = g.get("m1_stop_used", 0) + 1
 
+        # Gold: stop is placed PURELY by structure — no fixed-pip news override and
+        # no universal cap (both are FX conventions; a $10 stop is far too tight for
+        # a ~$2000 instrument and would over-size the position). Risk-based sizing
+        # scales the position down for the wider structural stop.
+        _is_gold = config.GOLD_ENABLED and pair == config.GOLD_PAIR
+
         # High-impact news nearby: override to fixed 10-pip stop (protects against
-        # spread widening while still trading the news catalyst).
-        if news_impact == "High":
+        # spread widening while still trading the news catalyst). Not for gold.
+        if news_impact == "High" and not _is_gold:
             stop = entry - config.FIXED_STOP_PIPS * pip if direction > 0 \
                    else entry + config.FIXED_STOP_PIPS * pip
             _stop_reason = "fixed 10-pip (high-impact news)"
@@ -2808,11 +2818,12 @@ class Backtester:
         # floor produces 10%+ single-trade losses at small equity. Measure the cap
         # from the spread-adjusted `entry` (the real fill) so the 10-pip buffer is
         # true adverse room, not eaten by the spread. Tighter structural stops are
-        # left as-is; only stops wider than the cap are pulled in.
-        _max_stop = config.FIXED_STOP_PIPS * pip
-        if abs(entry - stop) > _max_stop:
-            stop = entry - _max_stop if direction > 0 else entry + _max_stop
-            g["stop_capped_10pip"] = g.get("stop_capped_10pip", 0) + 1
+        # left as-is; only stops wider than the cap are pulled in. SKIPPED for gold.
+        if not _is_gold:
+            _max_stop = config.FIXED_STOP_PIPS * pip
+            if abs(entry - stop) > _max_stop:
+                stop = entry - _max_stop if direction > 0 else entry + _max_stop
+                g["stop_capped_10pip"] = g.get("stop_capped_10pip", 0) + 1
 
         # P20: escalate to premium liquidity draws when high-conviction signals fire.
         # CRT-D/W (HTF Judas on Daily/Weekly), draw≥2 (2+ HTF levels agree), or

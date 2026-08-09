@@ -577,6 +577,13 @@ SILVER_PIP      = float(_os.environ.get("SILVER_PIP", 0.01))
 # (exit-entry) x units, so the contract must match the instrument. PROVISIONAL —
 # confirm against the broker's XAUUSD spec before trusting absolute gold equity.
 GOLD_LOT_UNITS  = int(_os.environ.get("GOLD_LOT_UNITS", 100))
+# Gold stop is placed PURELY by market structure (intact ITL/ITH) — no fixed-pip
+# cap and no news 10-pip override (those are FX conventions; a $10 fixed stop is
+# far too tight for a ~$2000 instrument and also over-sizes the position). Gold
+# reads structure on a slightly higher TF than FX (M1 is noise at gold's scale);
+# risk-based sizing scales the position down for the wider structural stop.
+GOLD_STOP_TF       = _os.environ.get("GOLD_STOP_TF", "5T")
+GOLD_STOP_LOOKBACK = int(_os.environ.get("GOLD_STOP_LOOKBACK", 120))
 if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
     PAIRS = PAIRS + (GOLD_PAIR,)
 # DXY synthetic uses these (all available on OANDA):
