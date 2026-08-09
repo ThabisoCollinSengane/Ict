@@ -86,6 +86,36 @@ def weekly_open(bars_d: list, ts_d, t) -> Optional[float]:
     return bars_d[idx].Open
 
 
+def nwog(bars_d: list, ts_d, t):
+    """New Week Opening Gap (NWOG): the weekend gap between last week's final
+    daily close (the prior Friday) and this week's Monday daily open.
+
+    Returns (lo, hi, ce, gap_dir) or None:
+      lo/hi   — the gap's bounds (low & high of the two prices)
+      ce      — consequent encroachment (50% midpoint) — the key PD-array level
+      gap_dir — +1 when the week opened ABOVE last week's close (gap up, a
+                bullish PD array), -1 when it opened below (gap down).
+
+    Returns None until this week's Monday daily bar exists, or when there is no
+    gap (open == prior close). Uses the same Monday-of-current-UTC-week anchor as
+    weekly_open, with the prior daily bar as the pre-weekend (Friday) close.
+    """
+    t_pd = pd.Timestamp(t)
+    monday_utc = (t_pd - pd.Timedelta(days=t_pd.weekday())).normalize()
+    idx = ts_d.searchsorted(monday_utc, side="left")
+    if idx <= 0 or idx >= len(ts_d):
+        return None
+    # Holiday Mondays shift to Tuesday — same 48h tolerance as weekly_open.
+    if abs((ts_d[idx] - monday_utc).total_seconds()) > 2 * 86400:
+        return None
+    week_open   = bars_d[idx].Open
+    prior_close = bars_d[idx - 1].Close        # last daily bar before Monday = Fri close
+    if week_open == prior_close:
+        return None
+    lo, hi = (min(prior_close, week_open), max(prior_close, week_open))
+    return (lo, hi, (lo + hi) / 2.0, 1 if week_open > prior_close else -1)
+
+
 def session_open(bars_m5: list, ts_m5, session_name: str, t) -> Optional[float]:
     """Open price of the first M5 bar of the named kill zone session (ET-based).
 
