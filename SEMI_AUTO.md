@@ -38,7 +38,10 @@ You don't have to wait for the template — any command works any time.
                  survives restarts).
 /account         equity, day P&L, drawdown, halt state (also /equity)
 /dxy             synthetic dollar index right now
-/session         which killzone, and whether new entries are allowed
+/session         full day timeline in SAST | ET — every window (London KZ,
+                 silver bullets, NY AM, lunch, NY PM, NY close 16:00-17:00), which
+                 is active NOW + when the next starts, what the earlier sessions
+                 did today (range + delivery), and the PD arrays near price
 /news            next high-impact news events (UTC)
 /whoami          your chat id + access level
 ```
