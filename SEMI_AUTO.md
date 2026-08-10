@@ -234,6 +234,24 @@ at beat `[3]` with `/test EURUSD long` (or `/pyramid` if you're adding to a winn
 **Reading the beats at a glance:** `[1]` = wait, `[2]` = get ready, `[3]` = go,
 `[x]` = skip this zone. The `%` next to `[1]` is your countdown to the tag.
 
+### 3c · Trading the US indices (US500 / US100)
+
+When the index gate is enabled (`INDICES_ENABLED=1` in `live.env`, with the broker
+symbols **US500, US100, US30, XAGUSD** in MT5), the indices join the pair list and
+**every command above works on them exactly like a currency** — steer them and let
+the bot manage the trade:
+```
+/bias US100 long        → hunt US100 longs only today
+/lot US500 0.20         → day lot for US500
+/mm US100 buy auto      → Market Maker IFVG model on US100
+/trail US500 m5 st 3    → structure-trail an open US500 trade
+/read US100             → its structure, lean %, and the bot's intended trade
+```
+The index gate is **DXY + US500/US100 + US30** (indices move *inverse* to the
+dollar), so `/read` shows the bot's intended direction as `IDX-long` / `IDX-short`.
+Your `/bias` still just filters — the bot needs its own ICT setup (AMD/MSS + FVG)
+to actually enter, then manages the stop/target/trail as usual.
+
 ### 4 · Let a trade run across sessions
 ```
 /hold EURUSD           → don't close it at the session handover; let it run
