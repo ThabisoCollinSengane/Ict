@@ -34,7 +34,7 @@ import threading
 import time
 import urllib.request
 from collections import namedtuple
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Add repo root to path so imports work when run as a module from the VPS.
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -1093,13 +1093,129 @@ class LiveTrader(Backtester):
                 f"consecutive losses: {self._consec_losses}\n"
                 f"trading: {'HALTED — /resume' if self._manual_halt else 'active'}")
 
+    # Full daily ICT session timeline (New York time). Killzones + silver bullets
+    # + afternoon + the NY close/after window, for the /session read-out.
+    _SESSION_SCHED = (
+        ("London KZ",        "03:00", "05:00", "kz"),
+        ("London bullet",    "03:00", "04:00", "bullet"),
+        ("NY AM KZ",         "07:00", "10:00", "kz"),
+        ("NY AM bullet",     "10:00", "11:00", "bullet"),
+        ("Lunch (no-trade)", "12:00", "13:00", "block"),
+        ("NY PM KZ",         "13:30", "16:00", "kz"),
+        ("NY PM bullet",     "14:00", "15:00", "bullet"),
+        ("NY close/after",   "16:00", "17:00", "close"),
+    )
+
     def read_session(self) -> str:
+        import pytz
+        NY = pytz.timezone("America/New_York")
+        SAST = pytz.timezone("Africa/Johannesburg")   # SAST = UTC+2, no DST
         now = datetime.now(timezone.utc)
-        sess = self._current_session(now)
-        return ("SESSION\n"
-                f"now: {now:%H:%M} UTC ({now:%a})\n"
-                f"session: {sess or 'outside killzone'}\n"
-                f"new entries allowed: {'yes' if can_open_new_trade(now) else 'no'}")
+        ny = now.astimezone(NY)
+        sa = now.astimezone(SAST)
+        lines = ["SESSION",
+                 f"now: {sa:%H:%M} SAST / {ny:%H:%M} ET  ({ny:%a})",
+                 f"new entries allowed: {'yes' if can_open_new_trade(now) else 'no'}",
+                 "",
+                 "Today (SAST | ET):"]
+
+        def _et(hhmm):
+            h, m = map(int, hhmm.split(":"))
+            return ny.replace(hour=h, minute=m, second=0, microsecond=0)
+
+        active, upcoming = [], []
+        for name, s, e, _kind in self._SESSION_SCHED:
+            st, en = _et(s), _et(e)
+            if en <= st:
+                en += timedelta(days=1)
+            st_sa, en_sa = st.astimezone(SAST), en.astimezone(SAST)
+            if st <= ny < en:
+                mark, _ = "> NOW", active.append(name)
+            elif ny >= en:
+                mark = " done"
+            else:
+                mark, _ = " soon", upcoming.append((st, name))
+            lines.append(f"  {mark} {name:15} {st_sa:%H:%M}-{en_sa:%H:%M} | "
+                         f"{st:%H:%M}-{en:%H:%M} ET")
+
+        lines.append("")
+        lines.append("active: " + (", ".join(active) if active else "between sessions"))
+        upcoming.sort()
+        if upcoming:
+            nxt_t, nxt_n = upcoming[0]
+            mins = max(0, int((nxt_t - ny).total_seconds() // 60))
+            lines.append(f"next: {nxt_n} in {mins // 60}h{mins % 60:02d}m")
+        else:
+            lines.append("next: tomorrow's London KZ")
+
+        try:
+            lines += self._session_recap(now)
+        except Exception:
+            pass
+        try:
+            lines += self._pd_arrays_near(now)
+        except Exception:
+            pass
+        return "\n".join(lines)
+
+    def _session_recap(self, now):
+        """What the completed sessions did today: range + delivery direction."""
+        import pytz, pandas as pd
+        NY = pytz.timezone("America/New_York")
+        ny = now.astimezone(NY)
+        ref = "EURUSD" if "EURUSD" in config.PAIRS else config.PAIRS[0]
+        ts = self.tf_index.get((ref, "5T"))
+        bars = self.tf_bars.get((ref, "5T"))
+        if ts is None or bars is None or len(bars) == 0:
+            return []
+        done = []
+        for nm, s, e in (("London", "03:00", "05:00"),
+                         ("NY AM", "07:00", "10:00"),
+                         ("NY PM", "13:30", "16:00")):
+            h, m = map(int, s.split(":"))
+            h2, m2 = map(int, e.split(":"))
+            st = ny.replace(hour=h, minute=m, second=0, microsecond=0).astimezone(pytz.utc)
+            en = ny.replace(hour=h2, minute=m2, second=0, microsecond=0).astimezone(pytz.utc)
+            if now < en:
+                continue                        # not finished yet
+            i0 = int(ts.searchsorted(pd.Timestamp(st)))
+            i1 = int(ts.searchsorted(pd.Timestamp(en)))
+            seg = bars[i0:i1]
+            if not seg:
+                continue
+            hi = max(b.High for b in seg)
+            lo = min(b.Low for b in seg)
+            deliv = "delivered UP" if seg[-1].Close > seg[0].Open else "delivered DOWN"
+            done.append(f"  {nm}: {lo:.5f}-{hi:.5f}, {deliv}")
+        return (["", f"Earlier sessions today ({ref}):"] + done) if done else []
+
+    def _pd_arrays_near(self, now):
+        """Nearest PD arrays (PDH/PDL + unmitigated H4/H1 FVGs) per traded pair."""
+        out, any_near = ["", "PD arrays near price:"], False
+        for p in config.PAIRS:
+            q = mt.tick(p)
+            if not q:
+                continue
+            price = (q[0] + q[1]) / 2
+            pip = pip_size(p)
+            thr = max(1.0, price * 0.006 / pip)    # ~0.6% of price, in pips/points
+            lv = []
+            d = self.bars_up_to(p, "D", now)
+            if len(d) >= 2:
+                lv += [("PDH", d[-2].High), ("PDL", d[-2].Low)]
+            for tf, lbl in (("240T", "H4fvg"), ("60T", "H1fvg")):
+                try:
+                    for fvg in self._scan_htf_fvgs(self.bars_up_to(p, tf, now), p):
+                        if not fvg.mitigated:
+                            lv.append((lbl, fvg.mid))
+                except Exception:
+                    continue
+            near = sorted(((nm, abs(v - price) / pip) for nm, v in lv
+                           if abs(v - price) / pip <= thr), key=lambda x: x[1])
+            if near:
+                any_near = True
+                out.append(f"  {p}: " + ", ".join(f"{nm} {dst:.0f}p" for nm, dst in near[:3]))
+        return out if any_near else []
 
     def read_news(self) -> str:
         try:
