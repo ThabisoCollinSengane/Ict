@@ -756,7 +756,14 @@ class LiveTrader(Backtester):
                     (-1, -1): "2b", (1, 0): "3a", (-1, 0): "3b"}
             scen = smap.get((dxy_dir, eg), "?") + esc
         elif getattr(config, "INDICES_ENABLED", False) and pair in config.INDEX_PAIRS:
-            # Index gate: DXY (inverse) + sibling index + US30 breadth.
+            # Indices are SEMI-AUTO: the trader supplies the direction via /bias;
+            # the algo hunts its setup on that side and manages it.
+            if getattr(config, "INDEX_SEMI_AUTO_ONLY", True):
+                b = self.inputs.bias(pair) if self.inputs else None
+                if b not in ("long", "short"):
+                    return "semi-auto: set /bias to trade"
+                return f"{b.upper()} (IDX-man, your bias)"
+            # (auto mode) DXY inverse + sibling + US30 breadth.
             sib = next((p for p in config.INDEX_PAIRS if p != pair), None)
             sb = self._sym_bias(sib, "60T", now, lookback=lb) if sib else 0
             rb = self._sym_bias(config.INDEX_REF, "60T", now, lookback=lb)

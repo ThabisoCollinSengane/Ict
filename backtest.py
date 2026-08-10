@@ -2342,23 +2342,33 @@ class Backtester:
             _im_scenario = "G-long" if direction > 0 else "G-short"
 
         elif config.INDICES_ENABLED and pair in config.INDEX_PAIRS:
-            # US indices (US500 / US100) — DXY + sibling index + US30 (ref), inverse
-            # to the dollar. SMT: the two traded indices should move together; the
-            # sibling diverging suppresses (resolve_index_direction). US30 confirms.
-            sibling  = next((p for p in config.INDEX_PAIRS if p != pair), None)
-            sib_bias = (self._sym_bias(sibling, "60T", t,
-                                       lookback=config.SWING_LOOKBACK_STH)
-                        if sibling else 0)
-            ref_bias = self._sym_bias(config.INDEX_REF, "60T", t,
-                                      lookback=config.SWING_LOOKBACK_STH)
-            direction, im_score = resolve_index_direction(dxy_bias, sib_bias, ref_bias)
-            if direction is None:
-                return
-            if im_score < config.INDEX_MIN_IMSCORE:
-                return
-            # MSS breadth: this index + its sibling, DXY inverse.
+            sibling = next((p for p in config.INDEX_PAIRS if p != pair), None)
+            _inp = getattr(self, "inputs", None)
+            if config.INDEX_SEMI_AUTO_ONLY and _inp is not None:
+                # SEMI-AUTO (live): the trader supplies the direction via /bias; the
+                # auto gate does NOT open indices. No bias set -> index doesn't trade.
+                _b = _inp.bias(pair)
+                if _b not in ("long", "short"):
+                    return
+                direction = 1 if _b == "long" else -1
+                im_score = 1.0
+                _im_scenario = "IDX-man"
+            else:
+                # AUTO gate (backtest / auto mode): DXY (inverse) + sibling + US30
+                # breadth; sibling divergence suppresses (SMT), US30 confirms.
+                sib_bias = (self._sym_bias(sibling, "60T", t,
+                                           lookback=config.SWING_LOOKBACK_STH)
+                            if sibling else 0)
+                ref_bias = self._sym_bias(config.INDEX_REF, "60T", t,
+                                          lookback=config.SWING_LOOKBACK_STH)
+                direction, im_score = resolve_index_direction(dxy_bias, sib_bias, ref_bias)
+                if direction is None:
+                    return
+                if im_score < config.INDEX_MIN_IMSCORE:
+                    return
+                _im_scenario = "IDX-long" if direction > 0 else "IDX-short"
+            # MSS breadth: this index + its sibling, DXY inverse (algo still needs its setup).
             mss_sym1, mss_sym2 = pair, (sibling or config.INDEX_REF)
-            _im_scenario = "IDX-long" if direction > 0 else "IDX-short"
 
         else:   # NZDUSD — DXY + AUDNZD cross (independent of EUR/GBP family)
             audnzd_bias = self._sym_bias(config.REF_AUDNZD, "60T", t,

@@ -250,10 +250,18 @@ the bot manage the trade:
 /trail US500 m5 st 3    → structure-trail an open US500 trade
 /read US100             → its structure, lean %, and the bot's intended trade
 ```
-The index gate is **DXY + US500/US100 + US30** (indices move *inverse* to the
-dollar), so `/read` shows the bot's intended direction as `IDX-long` / `IDX-short`.
-Your `/bias` still just filters — the bot needs its own ICT setup (AMD/MSS + FVG)
-to actually enter, then manages the stop/target/trail as usual.
+**Indices are SEMI-AUTO only** (`INDEX_SEMI_AUTO_ONLY=1`, the default): the bot does
+**not** pick index direction on its own (the auto gate wasn't robust enough — it hit
+a 25% drawdown out-of-sample). **You give it the direction with `/bias`, and the algo
+does the rest** — it hunts its ICT setup (AMD/MSS + FVG) on *your* side, enters, and
+manages the stop/target/trail:
+```
+/bias US100 long        → algo trades US100 LONGS only, when its setup fires
+/bias US100 both        → clears the bias → US100 stops trading (no auto)
+```
+No `/bias` set → the index simply doesn't trade. `/read US100` shows
+`your bias` when set, or `semi-auto: set /bias to trade` when not. You can also just
+`/test US100 long` to open one immediately and let the algo manage it.
 
 ### 4 · Let a trade run across sessions
 ```
