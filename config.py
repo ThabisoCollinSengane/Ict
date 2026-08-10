@@ -684,6 +684,13 @@ INDEX_AMD_MAX_RANGE_PCT  = _envf("INDEX_AMD_MAX_RANGE_PCT", 0)   # % of price
 # Separate daily trade budget for indices so they don't compete with the 3
 # currencies for the basket-wide MAX_TRADES_PER_DAY slots. 0 = share the FX cap.
 INDEX_MAX_TRADES_PER_DAY = _envi("INDEX_MAX_TRADES_PER_DAY", 0)
+# SEMI-AUTO ONLY for indices (default ON): the auto index gate is NOT robust
+# enough to pick index direction on its own (OOS fresh-start hit 25% DD), so live
+# the trader supplies the direction with /bias US100 long|short and the algo only
+# hunts its ICT setup on THAT side and manages the trade. No /bias -> no index
+# trade. Backtest (no semi-auto inputs) still uses the auto gate so the validation
+# scripts keep measuring it. Set 0 to let indices auto-trade live (not recommended).
+INDEX_SEMI_AUTO_ONLY = bool(_envi("INDEX_SEMI_AUTO_ONLY", 1))
 # Precise ICT SMT divergence (ict/smt.py). Two independent reads per index trade:
 # index-vs-index (US500/US100/US30, positive correlation) and index-vs-dollar
 # (inverse correlation). Each firing adds SMT_CONVICTION_PTS. INDEX_SMT_REQUIRED=1
