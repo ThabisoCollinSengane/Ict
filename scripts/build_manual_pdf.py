@@ -243,12 +243,29 @@ def story():
             "when institutional flow is active. All times are <b>New York time (ET)</b>, "
             "which is what the engine uses internally.")]
     s += [table([
-        ["Session", "Window (ET)", "Pairs", "Character"],
-        ["London Open", "02:00 - 05:00", "EURUSD, GBPUSD, NZDUSD", "Judas reversal home - the day's manipulation"],
-        ["NY AM", "07:00 - 10:00", "EURUSD, GBPUSD", "Continuation / second delivery (NZD drains here)"],
-        ["NY noon block", "12:00 - 13:00", "none", "Hard no-trade - lunchtime chop"],
-        ["NY PM", "13:00 - 16:00", "optional (off by default)", "Position-squaring / mean-reversion"],
-    ], widths=[3.0 * cm, 2.9 * cm, 4.3 * cm, 6.2 * cm])]
+        ["Session / window", "ET", "SAST", "Character"],
+        ["London KZ", "03:00 - 05:00", "10:00 - 12:00", "Judas reversal home - the day's manipulation"],
+        ["London silver bullet", "03:00 - 04:00", "10:00 - 11:00", "High-probability window inside London"],
+        ["NY AM KZ", "07:00 - 10:00", "14:00 - 17:00", "Continuation / second delivery (incl. 9:30 open)"],
+        ["NY AM silver bullet", "10:00 - 11:00", "17:00 - 18:00", "Prime NY-AM window"],
+        ["Lunch (no-trade)", "12:00 - 13:00", "19:00 - 20:00", "Hard no-trade - lunchtime chop"],
+        ["NY PM KZ", "13:30 - 16:00", "20:30 - 23:00", "Position-squaring / mean-reversion (opt., off by default)"],
+        ["NY PM silver bullet", "14:00 - 15:00", "21:00 - 22:00", "Prime PM window"],
+        ["NY close / after", "16:00 - 17:00", "23:00 - 00:00", "Cash close, late delivery"],
+    ], widths=[3.6 * cm, 2.7 * cm, 2.7 * cm, 7.4 * cm], font=8.0)]
+    s += [P("<b>SAST is UTC+2 (no DST); ET shifts with US daylight time</b>, so the SAST "
+            "column drifts ~1h in the US winter. The <b>silver bullets</b> are the "
+            "one-hour high-probability windows inside the killzones. Send <b>/session</b> "
+            "any time and the bot shows this whole timeline live in SAST | ET, which "
+            "window is active now, when the next starts, what the earlier sessions did "
+            "today, and the PD arrays near price.")]
+    s += [callout("When the US index gate is enabled (INDICES_ENABLED), <b>US500 and "
+                  "US100</b> trade these same NY sessions (gated by DXY + the sibling index "
+                  "+ US30) and are steerable from Telegram exactly like a currency - "
+                  "<font face='Courier'>/bias US100 long</font>, <font face='Courier'>/lot "
+                  "US500 0.20</font>, <font face='Courier'>/mm</font>, <font face='Courier'>"
+                  "/trail</font>. ICT logic (SMT, the 9:30 open, silver bullets) is most "
+                  "active on the indices.", kind="note")]
     s += [P("Each session is evaluated <b>independently</b> - a clean handover. London's "
             "read does not bleed into New York; when NY opens it starts a fresh AMD "
             "cycle. That separation is exactly what lets you treat the handover as its "
@@ -603,7 +620,7 @@ def story():
         ["/read [EURUSD]", "Market-structure template per pair: price, H4/H1/M15 structure, ITH/ITL draws, directional lean %, the bot's intended trade + scenario, plus any armed MM IFVG beats. /markets = all at a glance."],
         ["/positions", "Open trades broken out PER LEG (e.g. 2 x 0.02 = 0.04), each with entry, live pips, SL and ticket - plus P&amp;L, % to target, model, TP idea + SL basis (survives restarts)."],
         ["/account", "Equity, day P&amp;L, drawdown, halt state (also /equity)."],
-        ["/dxy - /session - /news", "Dollar index now - which killzone &amp; if entries are allowed - next high-impact news."],
+        ["/dxy - /session - /news", "Dollar index - full day session timeline (SAST|ET: killzones, silver bullets, PM, NY close) with active/next + earlier-session recap + PD arrays near price - next high-impact news."],
         ["/whoami", "Your chat id + access level."],
     ], widths=[4.3 * cm, 12.1 * cm])]
     s += [H2("Plan &amp; control")]
