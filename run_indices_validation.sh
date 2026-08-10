@@ -36,13 +36,15 @@ export INDEX_MIN_IMSCORE="${INDEX_MIN_IMSCORE:-0.75}"
 # them), and a separate index daily budget so indices don't fight FX for slots.
 export INDEX_AMD_MAX_RANGE_PCT="${INDEX_AMD_MAX_RANGE_PCT:-0.8}"   # ~US500 36pt / US100 144pt
 export INDEX_MAX_TRADES_PER_DAY="${INDEX_MAX_TRADES_PER_DAY:-3}"
-# SMT quality gate on index entries — recovers the WR/PF the frequency loosening
-# costs, and (aim) pulls working-DD back under ~15%. Proxy mode (cheaper + IS
-# winner in the A/B). Inert on the FX-only arm (indices off there). Override with
-# INDEX_SMT_REQUIRED=0 to see the loosened-but-ungated basket, or INDEX_SIZE_MULT<1
-# / INDEX_AMD_MAX_RANGE_PCT=0.6 to trim working-DD further.
-export INDEX_SMT_REQUIRED="${INDEX_SMT_REQUIRED:-1}"
+# SMT gate DROPPED by default: the A/B lifted per-trade PF, but on the withdrawal
+# path it CUT income (+64% -> +12%) AND deepened working-DD (16.2% -> 18.5%) — the
+# removed trades were net-positive to the income path (compounding path-dependency).
+# Trim drawdown by DOWNSIZING indices instead (keeps trade frequency = income
+# cadence, shrinks the index DD contribution directly). Tune INDEX_SIZE_MULT /
+# INDEX_AMD_MAX_RANGE_PCT to land working-DD under ~15% with income still up.
+export INDEX_SMT_REQUIRED="${INDEX_SMT_REQUIRED:-0}"
 export SMT_MODE="${SMT_MODE:-proxy}"
+export INDEX_SIZE_MULT="${INDEX_SIZE_MULT:-0.6}"   # downsize indices to trim working-DD
 
 echo "=== 1. core FX M1 (Drive) ==="
 missing=0
