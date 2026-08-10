@@ -88,11 +88,11 @@ run() {  # $1=label  $2=indices(0/1)  $3=gold(0/1)  $4..=years
 
 echo "=== 3. runs: currencies-only vs full basket (all under the withdrawal model) ==="
 run fx_full   0 0 "${YEARS[@]}"
-run all_full  1 1 "${YEARS[@]}"
+run all_full  1 0 "${YEARS[@]}"
 run fx_is     0 0 2022 2023
-run all_is    1 1 2022 2023
+run all_is    1 0 2022 2023
 run fx_oos    0 0 2024 2025
-run all_oos   1 1 2024 2025
+run all_oos   1 0 2024 2025
 
 echo "=== 4. building report ==="
 HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
@@ -132,7 +132,7 @@ L += ["## Metrics — currencies-only vs full basket", "",
 for split, fx, allb in (("Full 4yr","fx_full","all_full"),
                         ("IS 2022-23","fx_is","all_is"),
                         ("OOS 2024-25","fx_oos","all_oos")):
-    for lbl, label in (("FX only", fx), ("FX+idx+gold", allb)):
+    for lbl, label in (("FX only", fx), ("FX+indices", allb)):
         d, _ = grab(label)
         L.append(f"| {split} | {lbl} | {fmt(d,'trades')} | {fmt(d,'wr')} | {fmt(d,'pf')} "
                  f"| {fmt(d,'dd')} | {fmt(d,'wdd')} | {fmt(d,'total')} | {fmt(d,'income')} "
