@@ -725,13 +725,23 @@ class LiveTrader(Backtester):
             dxy_dir = self._dxy_bias("60T", now, lookback=lb)
         except Exception:
             dxy_dir = 0
+        # Mirror the gate's escalation cascade: H1 EURGBP, and if flat fall back to
+        # H4 (what the gate actually uses) — so the header reflects the REAL read,
+        # not a "flat" H1 while the gate is escalated to a clear H4 direction.
+        eg_tf = "H1"
         try:
             eg_dir = self._sym_bias(config.REF_EURGBP, "60T", now, lookback=lb)
+            if eg_dir == 0:
+                eg_h4 = self._sym_bias(config.REF_EURGBP, "240T", now, lookback=lb)
+                if eg_h4 != 0:
+                    eg_dir, eg_tf = eg_h4, "H4"
         except Exception:
             eg_dir = 0
         dxy_word = {1: "UP (USD strong)", -1: "DOWN (USD weak)", 0: "FLAT"}[dxy_dir]
         eg_word = {1: "EUR > GBP (EUR family)", -1: "GBP > EUR (GBP family)",
                    0: "flat (EUR~GBP)"}[eg_dir]
+        if eg_dir != 0 and eg_tf == "H4":
+            eg_word += " [via H4]"
         dv = f"{dxy_val:.2f}" if dxy_val else "n/a"
         return dxy_dir, [f"DXY: {dxy_word}  [{dv}]", f"EURGBP: {eg_word}"]
 
