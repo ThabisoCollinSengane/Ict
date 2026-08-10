@@ -123,6 +123,7 @@ class LiveTrader(Backtester):
         self._templated = set()         # _pyramid_lots knows which pair it sizes
         self._manual_halt = False       # /halt: pause new entries + pyramid adds
         self._mm_state = {}             # Market Maker model: per-pair IFVG alert state
+        self._fast_state = {}           # fast-read: last sweep side per pair (alert dedup)
 
         # Circuit-breaker state
         self._consec_losses     = 0
@@ -671,6 +672,10 @@ class LiveTrader(Backtester):
         dxy_dir, hdr = self._bias_header(now)
         lines = [f"MARKET READ - {now:%H:%M} UTC", f"Session: {sess}", "",
                  "BIAS (gate drivers):"] + hdr + [""]
+        try:
+            lines += self._fast_block(now)
+        except Exception:
+            pass
         pairs = [pair] if pair else list(config.PAIRS)
         for p in pairs:
             s = self._pair_structure(p)
@@ -714,6 +719,106 @@ class LiveTrader(Backtester):
 
     def _model_word(self, m) -> str:
         return self._MODEL_WORDS.get(str(m), str(m) if m else "?")
+
+    def _live_price(self, sym):
+        q = mt.tick(sym)
+        return (q[0] + q[1]) / 2 if q else None
+
+    def _fast_bias(self, sym, tf, now, price=None, lookback=None):
+        """FAST, no-lag bias — reacts to the CURRENT price taking out the recent
+        swing range, WITHOUT waiting for the candle to close. Returns (dir, swept):
+          +1 = live price broke ABOVE the recent range high (fast bullish),
+          -1 = broke BELOW the recent range low (fast bearish), 0 = still inside.
+        `swept` is 'high' / 'low' / '' for display. ADVISORY only — the auto engine
+        still trades confirmed (closed-bar) structure; this is the live sweep read."""
+        lb = lookback or getattr(config, "SWING_LOOKBACK_STH", 8)
+        bars = self.bars_up_to(sym, tf, now)
+        if len(bars) < lb + 1:
+            return 0, ""
+        window = bars[-lb - 1:-1]                 # recent completed bars
+        hi = max(b.High for b in window)
+        lo = min(b.Low for b in window)
+        px = price if price is not None else (self._live_price(sym) or bars[-1].Close)
+        if px > hi:
+            return 1, "high"
+        if px < lo:
+            return -1, "low"
+        return 0, ""
+
+    def _fast_driver(self, now, lb):
+        """Fast DXY + fast EURGBP (with H4 escalation) + fast AUDNZD — the live gate
+        drivers. Returns (fdxy, feg, feg_tf, fan)."""
+        fdxy, _ = self._fast_bias("UDXUSD", "60T", now,
+                                  price=self.read_dxy_value(), lookback=lb)
+        feg, _ = self._fast_bias(config.REF_EURGBP, "60T", now, lookback=lb)
+        feg_tf = "H1"
+        if feg == 0:
+            feg_h4, _ = self._fast_bias(config.REF_EURGBP, "240T", now, lookback=lb)
+            if feg_h4 != 0:
+                feg, feg_tf = feg_h4, "H4"
+        fan, _ = self._fast_bias(config.REF_AUDNZD, "60T", now, lookback=lb)
+        return fdxy, feg, feg_tf, fan
+
+    def _fast_block(self, now):
+        """Live/fast advisory read for the currencies: what each pair's gate says
+        RIGHT NOW off live price, and whether it just swept a high/low. Updates
+        every time you /read — no lag, reacts the moment a level is taken out."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        fdxy, feg, feg_tf, fan = self._fast_driver(now, lb)
+        dword = {1: "UP", -1: "DOWN", 0: "flat"}
+        egword = {1: "EUR>GBP", -1: "GBP>EUR", 0: "flat"}
+        tag = " [via H4]" if (feg != 0 and feg_tf == "H4") else ""
+        lines = ["FAST read (live, advisory - not auto-traded):",
+                 f"  DXY {dword[fdxy]} | EURGBP {egword[feg]}{tag}"]
+        for p in config.PAIRS:
+            if p not in ("EURUSD", "GBPUSD", "NZDUSD"):
+                continue                              # currencies only
+            _, swept = self._fast_bias(p, "15T", now, lookback=lb)
+            sw = f"swept {swept.upper()}" if swept else "inside range"
+            lines.append(f"  {p}: {sw} -> gate {self._fast_pair_gate(p, fdxy, feg, fan)}")
+        return lines + [""]
+
+    def _fast_pair_gate(self, p, fdxy, feg, fan):
+        """The fast intermarket gate direction for a currency pair, off live
+        drivers. Mirrors _intended_direction's scenario logic. Advisory."""
+        smap = {(1, 1): "1a", (1, -1): "1b", (-1, 1): "2a",
+                (-1, -1): "2b", (1, 0): "3a", (-1, 0): "3b"}
+        if fdxy == 0:
+            return "no-trade (DXY flat)"
+        if p in ("EURUSD", "GBPUSD"):
+            gd, gsc = resolve_pair_direction(fdxy, feg, p, "EURUSD")
+            scen = smap.get((fdxy, feg), "?")
+            bad = (gd is None or gsc < 0.75 or (feg == 0 and p == "GBPUSD"))
+        else:   # NZDUSD
+            gd, gsc = resolve_pair_direction(fdxy, fan, "NZDUSD", "AUDUSD")
+            scen = ("N-long" if (gd or 0) > 0 else "N-short")
+            bad = (gd is None or gsc < 1.0)
+        return "no gate signal" if bad else f"{'LONG' if gd > 0 else 'SHORT'} ({scen})"
+
+    def _fast_scan(self):
+        """Push a FAST alert the moment a currency takes out its recent M15 high/low
+        (a live liquidity sweep), with the updated gate read. Advisory — the auto
+        engine still trades confirmed structure. Fires once per new sweep side."""
+        if not self.inputs:
+            return
+        now = datetime.now(timezone.utc)
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        try:
+            fdxy, feg, _tf, fan = self._fast_driver(now, lb)
+        except Exception:
+            return
+        for p in ("EURUSD", "GBPUSD", "NZDUSD"):
+            if p not in config.PAIRS:
+                continue
+            try:
+                _, swept = self._fast_bias(p, "15T", now, lookback=lb)
+            except Exception:
+                continue
+            if swept and self._fast_state.get(p) != swept:
+                gate = self._fast_pair_gate(p, fdxy, feg, fan)
+                _notify(f"FAST {p}: swept {swept.upper()} -> gate {gate}\n"
+                        f"(advisory - /read for the full picture; /bias or /test to act)")
+            self._fast_state[p] = swept
 
     def _bias_header(self, now):
         """The two intermarket gate drivers, shown at the top of every read:
@@ -1842,6 +1947,12 @@ class LiveTrader(Backtester):
             self._mm_scan()
         except Exception:
             log.exception("mm_scan failed — continuing")
+
+        # Fast read: alert when a currency sweeps its recent M15 high/low (advisory).
+        try:
+            self._fast_scan()
+        except Exception:
+            log.exception("fast_scan failed — continuing")
 
         # Session-start template: fire once at the start of EACH session
         # (London / NY AM / NY PM), prompting the trader for that session's plan.

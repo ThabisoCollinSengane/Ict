@@ -65,6 +65,23 @@ EURUSD  1.15206   SHORT lean 75%
   bot would: SHORT (1b)
   your plan: EURUSD long only, levels set
 ```
+Just under the BIAS header, every read now shows a **FAST read (live, advisory)**
+block. Unlike the main read (which waits for candles to CLOSE so nothing repaints),
+the fast block reacts to the **current live price** the moment it takes out a recent
+swing high/low, and re-runs the intermarket gate on those live drivers:
+```
+FAST read (live, advisory - not auto-traded):
+  DXY UP | EURGBP GBP>EUR [via H4]
+  EURUSD: swept LOW -> gate SHORT (1b)
+  GBPUSD: inside range -> gate no gate signal
+  NZDUSD: swept HIGH -> gate LONG (N-long)
+```
+It's **advisory only** — the auto engine still trades confirmed (closed-bar)
+structure; this is just the no-lag view so **you** can decide to take it (with
+`/bias` or `/test`). The bot also **pushes a FAST alert** the moment any currency
+sweeps its recent M15 high/low, with the updated gate read — so you don't have to
+keep polling `/read`.
+
 Every read leads with the **two gate drivers** — **DXY** (dollar direction) and
 **EURGBP** (which family, EUR vs GBP). Then each pair gets:
 - a **directional lean %** — the market's structural pressure (H4/H1/M15 + dollar);
