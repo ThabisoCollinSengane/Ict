@@ -41,7 +41,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import config
 from backtest import Backtester   # reuse all ICT signal logic
-from intermarket import resolve_pair_direction
+from intermarket import (
+    resolve_pair_direction,
+    resolve_index_direction,
+    resolve_gold_direction,
+)
 from ict import market_structure as mstruct
 from ict.killzones import can_open_new_trade
 from news_filter import NewsCalendar
@@ -751,6 +755,23 @@ class LiveTrader(Backtester):
             smap = {(1, 1): "1a", (1, -1): "1b", (-1, 1): "2a",
                     (-1, -1): "2b", (1, 0): "3a", (-1, 0): "3b"}
             scen = smap.get((dxy_dir, eg), "?") + esc
+        elif getattr(config, "INDICES_ENABLED", False) and pair in config.INDEX_PAIRS:
+            # Index gate: DXY (inverse) + sibling index + US30 breadth.
+            sib = next((p for p in config.INDEX_PAIRS if p != pair), None)
+            sb = self._sym_bias(sib, "60T", now, lookback=lb) if sib else 0
+            rb = self._sym_bias(config.INDEX_REF, "60T", now, lookback=lb)
+            d, sc = resolve_index_direction(dxy_dir, sb, rb)
+            if d is None or sc < config.INDEX_MIN_IMSCORE:
+                return "no gate signal"
+            scen = "IDX-long" if d > 0 else "IDX-short"
+        elif getattr(config, "GOLD_ENABLED", False) and pair == config.GOLD_PAIR:
+            # Gold gate: DXY (inverse) + silver + AUDUSD breadth.
+            sb = self._sym_bias(config.GOLD_REF_SILVER, "60T", now, lookback=lb)
+            ab = self._sym_bias(config.GOLD_REF_AUD, "60T", now, lookback=lb)
+            d, sc = resolve_gold_direction(dxy_dir, sb, ab)
+            if d is None or sc < config.GOLD_MIN_IMSCORE:
+                return "no gate signal"
+            scen = "G-long" if d > 0 else "G-short"
         else:   # NZDUSD
             an = self._sym_bias(config.REF_AUDNZD, "60T", now, lookback=lb)
             esc = ""
