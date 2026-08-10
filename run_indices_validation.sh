@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # REALISTIC full-basket validation — currencies + US indices + gold, judged on the
-# scheduled-withdrawal income model (NOT fantasy compounding).
+# scheduled-withdrawal income model (NOT fantasy compounding). Indices run with the
+# frequency levers (more income) AND the SMT quality gate (recover WR/PF, trim
+# working-DD). Ship criterion: income clearly up vs FX-only AND working-DD back
+# under ~15%.
 #   bash run_indices_validation.sh
 #
 # Withdrawal policy (env-overridable at the top): start withdrawing once the account
@@ -33,6 +36,13 @@ export INDEX_MIN_IMSCORE="${INDEX_MIN_IMSCORE:-0.75}"
 # them), and a separate index daily budget so indices don't fight FX for slots.
 export INDEX_AMD_MAX_RANGE_PCT="${INDEX_AMD_MAX_RANGE_PCT:-0.8}"   # ~US500 36pt / US100 144pt
 export INDEX_MAX_TRADES_PER_DAY="${INDEX_MAX_TRADES_PER_DAY:-3}"
+# SMT quality gate on index entries — recovers the WR/PF the frequency loosening
+# costs, and (aim) pulls working-DD back under ~15%. Proxy mode (cheaper + IS
+# winner in the A/B). Inert on the FX-only arm (indices off there). Override with
+# INDEX_SMT_REQUIRED=0 to see the loosened-but-ungated basket, or INDEX_SIZE_MULT<1
+# / INDEX_AMD_MAX_RANGE_PCT=0.6 to trim working-DD further.
+export INDEX_SMT_REQUIRED="${INDEX_SMT_REQUIRED:-1}"
+export SMT_MODE="${SMT_MODE:-proxy}"
 
 echo "=== 1. core FX M1 (Drive) ==="
 missing=0
@@ -155,9 +165,17 @@ if da.get("income") is not None and dfx.get("income") is not None:
           f"R{dfx['income']:,.0f} across {dfx.get('wcount')}. "
           f"Indices+gold added **R{lift:,.0f}** of income "
           f"({'+' if lift>=0 else ''}{(lift/dfx['income']*100 if dfx['income'] else 0):.0f}%)."]
-L += ["- Working-account MaxDD is the realistic per-cycle drawdown; the total-value "
-      "MaxDD is withdrawal-neutral. Ship the basket if working-DD stays tolerable and "
-      "the income schedule is worth it — equity size is capped by design."]
+da2, _ = grab("all_full"); dfx2, _ = grab("fx_full")
+_wdd = da2.get("wdd")
+if _wdd is not None:
+    _ok = "OK (<15%)" if _wdd < 15.0 else "TOO HIGH (>15% — trim via INDEX_SIZE_MULT<1 or INDEX_AMD_MAX_RANGE_PCT=0.6)"
+    L += [f"- **Full-basket working-DD: {_wdd:.2f}% — {_ok}**"]
+L += ["- Indices run with the SMT quality gate (INDEX_SMT_REQUIRED=1). Compare income "
+      "vs FX-only AND working-DD vs the ~15% line: ship if income is clearly up and "
+      "working-DD is back under ~15%. If DD is still high, dial INDEX_SIZE_MULT / "
+      "INDEX_AMD_MAX_RANGE_PCT and re-run.",
+      "- Working-account MaxDD is the realistic per-cycle drawdown; the total-value "
+      "MaxDD is withdrawal-neutral (a cash-out is never a drawdown)."]
 if crash:
     L += ["", "## Diagnostics (why some runs had no Results)", ""] + crash
 open("data/indices_validation.md","w").write("\n".join(L) + "\n")
