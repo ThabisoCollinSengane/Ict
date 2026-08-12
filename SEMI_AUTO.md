@@ -31,6 +31,12 @@ You don't have to wait for the template — any command works any time.
 /brief           FULL session brief: account + structure + open trades + commands
 /read            market-structure template for all pairs
 /read EURUSD     just that pair
+/mtf [EURUSD]    multi-timeframe structure, TOP-DOWN D1->M5. Uses the fractal
+                 STH/STL->ITH/ITL engine: per-TF direction, flags the swing just
+                 TAKEN OUT (the structural event), marks the [Judas] (STH/STL swept
+                 but ITH/ITL intact), and HTF-vs-LTF alignment (continuation) vs
+                 divergence (pullback/reversal). Read HTF bias first, then the LTF
+                 sweep — the same per-swing method that drives intermarket + SMT.
 /markets         all pairs at a glance
 /positions       open trades broken out PER LEG (e.g. 2 x 0.02 = 0.04), each with
                  its entry, live pips, SL and ticket — so you can /close one leg.
