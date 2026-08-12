@@ -1419,6 +1419,51 @@ PDH/PDL are correct as TARGETS/exits (already used, P15/P17/P18/P41), wrong as c
 + `run_drawcont_validation.sh` retained for reference. Fourth confirmation that the strategy's
 reversal DNA beats every continuation-bypass (P11 NY-exempt, SOJ-draw bypass, now this).
 
+### P42 — Bonds/yields dollar-bias (BUILT 2026-08-12, measurement-first, default OFF, NOT run on real data yet)
+**What:** brings the RATES market — the one genuinely orthogonal dimension the algo never consults —
+into the dollar read. US Treasury yields lead the dollar (higher yields → capital inflow → USD bid),
+so yields (DGS2/5/10) are POSITIVELY correlated with the dollar. Every pair is X/USD (inverse to the
+dollar), so **pair vs yields is INVERSELY correlated** — the exact SMT relationship the algo already
+runs intraday between EURUSD/GBPUSD and index/DXY, pointed at rates instead of another dollar proxy.
+The 2Y is the Fed-policy anchor, the 10Y is growth/inflation, and their divergence from the dollar is
+the reversal tell. **Sign gotcha (pinned in code):** bond PRICE is inverse to YIELD — we fetch yields
+(positive to the dollar); bond futures would be negative. The SMT uses yields as the INVERSE reference.
+
+**Measurement pipeline (`scripts/bonds_analysis.py` + `run_bonds.sh`, measurement-only):**
+- `scripts/fetch_fred.py` — stdlib-only FRED daily-yield fetcher (DGS2/DGS5/DGS10) → `data/bonds_src/`.
+  No API key; handles "." holiday markers + both header variants. `--selftest` parse-only.
+- `scripts/bonds_analysis.py` — three measurements, split IS 2022-23 / OOS 2024-25, per pair × tenor:
+  - **Foundation** — yield↔dollar correlation (daily −pair return vs daily yield change). Must be
+    POSITIVE in both splits or the thesis is void (reported first; gates the verdict).
+  - **Test A (headline)** — SMT divergence reversal rate: pair sweeps an extreme (a dollar move) that
+    yields FAIL to confirm → measure whether the pair reverses over the horizon vs the unconditional
+    baseline (`lift` in pp). Reuses `ict.smt.smt_divergence(inverse=True)`.
+  - **Test B** — structure-agreement continuation: yield intermediate structure (Ep-12 classifier)
+    vs the pair's dollar read → agree-days vs disagree-days continuation reliability.
+  - Writes `data/bonds_report.md` with a **GREEN/YELLOW/RED** verdict (GREEN needs a >3pp reversal
+    lift in BOTH splits on a majority of cells, on top of a positive foundation correlation).
+- **Status: built + validated on synthetic fixtures, NOT yet run on real data.** `--selftest` passes
+  (pearson, reversal walk, lift, verdict gating, SMT inverse wiring); full pandas pipeline exercised
+  end-to-end on a synthetic dollar↔yield fixture (foundation corr +0.89 as constructed; random Test A
+  correctly lands mixed → YELLOW). FRED is proxy-blocked in the cloud session — the run happens in the
+  Codespace via `bash run_bonds.sh`.
+
+**Engine hook (SHIPPED default-OFF, byte-identical when off):** `--emit-bias` writes
+`data/bond_bias.json` (per-date DGS10 intermediate-structure read: +1 dollar-bullish / −1 bearish / 0
+flat). `backtest.py._load_bond_bias` lazy-loads + caches it; in `_maybe_open` a trade whose dollar
+direction (short an X/USD pair = dollar-up +1) AGREES with the yield structure on its date sets
+`_bond_confirm`, and the sizing block scales it `BONDS_SIZE_MULT×` (same 1.25× magnitude + R3k
+`DRAW_SIZE_MIN_EQUITY` floor as P18/P19/P41). Config: `BONDS_BIAS_ENABLED=0`, `BONDS_SIZE_MULT=1.0`
+(both env-overridable) → the file is never read and the multiplier is a no-op, so the default run is
+byte-identical. `bond_confirm` recorded on every trade. Counter: `bond_bias_sized`. **NOT ported to
+main.py** (the LEAN engine) — deliberately, until it ships; the live-engine port follows a GREEN
+validation, as P41 did.
+
+**Ship gate:** `bash run_bonds.sh` → read the verdict. Only a GREEN warrants
+`bash run_bonds_validation.sh` (baseline vs 1.25× on full 4yr + IS/OOS; ships only if full-4yr equity
+up + MaxDD held and both splits stay positive). YELLOW/RED → nothing ships; the study stands as the
+record of why — same measure-first discipline as P39/P40.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

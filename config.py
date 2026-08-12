@@ -433,6 +433,22 @@ CRT_SWEEP_MULT_TF  = "240T"   # H4 CRT sweep is the lever; D1 bucket excluded
 # full + IS/OOS gate (equity up in all three, PF flat, MaxDD held to the decimal).
 PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.25"))
 
+# --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
+# US Treasury yields lead the dollar (higher yields -> USD bid). scripts/
+# bonds_analysis.py measures whether a yield-structure confirmation of the trade's
+# dollar direction adds edge, and (with --emit-bias) writes data/bond_bias.json:
+# a per-date DGS10 intermediate-structure read (+1 dollar-bullish / -1 bearish /
+# 0 flat). When enabled, a trade whose dollar direction (short a USD pair = dollar
+# up) AGREES with the yield structure on its date is scaled BONDS_SIZE_MULT×, same
+# 1.25× magnitude + R3k floor (DRAW_SIZE_MIN_EQUITY) as P18/P19/P41. Default OFF and
+# byte-identical when off: the file is never read and the multiplier is a no-op
+# (1.0). Flip on ONLY if run_bonds.sh returns GREEN and run_bonds_validation.sh
+# passes the full + IS/OOS gate (equity up, PF flat, MaxDD held).
+BONDS_BIAS_ENABLED = bool(int(_os.environ.get("BONDS_BIAS_ENABLED", 0)))
+BONDS_SIZE_MULT    = float(_os.environ.get("BONDS_SIZE_MULT", "1.0"))
+BONDS_BIAS_FILE    = _os.environ.get("BONDS_BIAS_FILE",
+                                     _os.path.join("data", "bond_bias.json"))
+
 # --- Draw-to-liquidity continuation entry (unswept PDH/PDL; OFF by default) ---
 # The strategy is a Judas REVERSAL: wait for the sweep, fade it. This is the
 # opposite thesis — open a CONTINUATION toward an UNSWEPT PDH/PDL (price is drawn

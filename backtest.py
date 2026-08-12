@@ -8,6 +8,7 @@ Usage:  python backtest.py
 """
 
 import itertools
+import json
 import os
 import sys
 from collections import namedtuple
@@ -470,6 +471,7 @@ class Backtester:
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
+            "bond_confirm": st.get("bond_confirm", False),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
             "lad_sess": st.get("lad_sess"), "lad_d3": st.get("lad_d3"),
@@ -550,6 +552,7 @@ class Backtester:
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
+            "bond_confirm": st.get("bond_confirm", False),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
             "lad_sess": st.get("lad_sess"), "lad_d3": st.get("lad_d3"),
@@ -1909,6 +1912,27 @@ class Backtester:
                     return 1, tf
         return 0, ""
 
+    def _load_bond_bias(self):
+        """Lazy-load data/bond_bias.json -> {date_str: +1/-1/0} (DGS10 structure).
+
+        Cached on the instance; a missing/malformed file yields an empty map (the
+        lever simply never fires). Written by
+        `scripts/bonds_analysis.py --emit-bias`. Only called when
+        config.BONDS_BIAS_ENABLED, so the default path never touches disk.
+        """
+        cache = getattr(self, "_bond_bias_cache", None)
+        if cache is not None:
+            return cache
+        cache = {}
+        try:
+            with open(config.BONDS_BIAS_FILE) as f:
+                data = json.load(f)
+            cache = {k: int(v) for k, v in data.get("DGS10", {}).items()}
+        except (OSError, ValueError, TypeError):
+            cache = {}
+        self._bond_bias_cache = cache
+        return cache
+
     def _htf_crt_sweep(self, pair, direction, cur_price, t):
         """P19 — HTF CRT Turtle Soup: sweep of prior H4/D candle range extreme.
 
@@ -2730,6 +2754,20 @@ class Backtester:
             conviction += _crt_pts
             g["crt_turtle_soup"] = g.get("crt_turtle_soup", 0) + 1
 
+        # Bonds/yields dollar-bias (OFF by default). A short on any X/USD pair is a
+        # bet on dollar STRENGTH (+1); a long is dollar WEAKNESS (-1). When yields'
+        # own daily structure agrees with that dollar direction, the rates market
+        # confirms the trade — the sizing lever below acts on it. File is only read
+        # when enabled, so this is byte-identical when off.
+        _bond_confirm = False
+        if config.BONDS_BIAS_ENABLED:
+            _dollar_dir = -direction
+            _yld_dir = self._load_bond_bias().get(str(now.date()))
+            _bond_confirm = (_yld_dir is not None and _yld_dir != 0
+                             and _yld_dir == _dollar_dir)
+            if _bond_confirm:
+                g["bond_confirm"] = g.get("bond_confirm", 0) + 1
+
         # NWOG (New Week Opening Gap): price delivering into the weekend gap's 50%
         # (consequent encroachment) aligned with the trade. The NWOG is an ICT HTF
         # PD array / draw on liquidity — a gap-up week supports longs, gap-down
@@ -3136,6 +3174,14 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.PDLIQ_SWEEP_MULT), min_units)
             g["pdliq_sweep_sized"] = g.get("pdliq_sweep_sized", 0) + 1
+        # Bonds/yields sizing lever: yields' daily structure confirms the trade's
+        # dollar direction (rates lead the dollar). Same 1.25× magnitude + R3k floor
+        # as the P18/P19/P41 buckets. Default off (mult=1.0) until run_bonds.sh is
+        # GREEN and run_bonds_validation.sh passes the full + IS/OOS gate.
+        if (config.BONDS_SIZE_MULT != 1.0 and _bond_confirm
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            units = max(int(units * config.BONDS_SIZE_MULT), min_units)
+            g["bond_bias_sized"] = g.get("bond_bias_sized", 0) + 1
         # Entry-type tag (computed here so the P40 modulator below can read it;
         # also reused at fill time). news upgrade may already have set max_legs.
         base_type  = "amd" if amd_score else "mss"
@@ -3286,6 +3332,7 @@ class Backtester:
             "amd_swept_pdliq": _amd_swept_pdliq,
             "amd_entry_zone": _amd_entry_zone,
             "amd_liq_run": _amd_liq_run,
+            "bond_confirm": _bond_confirm,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
