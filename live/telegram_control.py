@@ -33,7 +33,7 @@ _OFFSET_PATH = os.path.join(
 )
 
 # Commands a read-only viewer may use. Everything else is full-control only.
-READ_CMDS = {"read", "structure", "markets", "positions", "open", "trades",
+READ_CMDS = {"read", "structure", "markets", "mtf", "positions", "open", "trades",
              "account", "equity", "dxy", "session", "brief", "news",
              "status", "help", "start", "whoami"}
 # Ops-bot commands — if sent here, point the user at the ops bot.
@@ -46,6 +46,7 @@ HELP = (
     "READ (ask the bot):\n"
     "/brief  full session brief (structure + positions + account)\n"
     "/read [EURUSD]  market-structure template\n"
+    "/mtf [EURUSD]  multi-TF structure D1->M5 (top-down, event-driven)\n"
     "/markets  all pairs at a glance\n"
     "/positions  open trades + live P&L\n"
     "/account  equity / day P&L / drawdown\n"
@@ -182,13 +183,15 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
         return "that's an Ops Bot command — send it to the Ops Bot, not here."
 
     # Read/query — available to viewers too.
-    if cmd in ("read", "structure", "markets", "positions", "open", "trades",
+    if cmd in ("read", "structure", "markets", "mtf", "positions", "open", "trades",
                "account", "equity", "dxy", "session", "brief", "news"):
         if trader is None:
             return "read commands need the live bot running."
         try:
             if cmd in ("read", "structure", "markets"):
                 return trader.read_structure(_match_pair(args[0]) if args else None)
+            if cmd == "mtf":
+                return trader.read_mtf(_match_pair(args[0]) if args else None)
             if cmd in ("positions", "open", "trades"):
                 return trader.read_positions()
             if cmd in ("account", "equity"):

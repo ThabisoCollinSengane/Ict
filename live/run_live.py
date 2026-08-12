@@ -663,6 +663,67 @@ class LiveTrader(Backtester):
             bits.append("levels set")
         return ", ".join(bits) if bits else "auto"
 
+    # Multi-timeframe structure ladder for the top-down (HTF -> LTF) read.
+    _MTF = (("D", "D1"), ("240T", "H4"), ("60T", "H1"), ("15T", "M15"), ("5T", "M5"))
+
+    def read_mtf(self, pair=None) -> str:
+        """Event-driven, top-down market-structure read (D1 -> M5) per pair, using
+        the fractal STH/STL -> ITH/ITL engine. Shows each TF's structure direction,
+        flags the swing that was just TAKEN OUT (the structural event), and marks
+        HTF-vs-LTF alignment (continuation) or divergence (pullback/reversal). This
+        is the same per-swing method that drives intermarket + SMT. Advisory."""
+        from ict import market_structure as mstruct
+        now = datetime.now(timezone.utc)
+        sess = self._current_session(now) or "outside killzone"
+        pairs = [pair] if pair else [p for p in config.PAIRS
+                                     if p in ("EURUSD", "GBPUSD", "NZDUSD")]
+        out = [f"STRUCTURE (HTF -> LTF)  session: {sess}"]
+        if sess != "outside killzone":
+            out.append("(in a killzone - read the HTF bias first, then drop to the LTF sweep)")
+        dword = {1: "bullish", -1: "bearish", 0: "flat"}
+        for p in pairs:
+            out.append("")
+            out.append(f"{p}:")
+            htf_dir = ltf_dir = 0
+            for tf, lbl in self._MTF:
+                try:
+                    bars = self.bars_up_to(p, tf, now, max_bars=200)
+                except Exception:
+                    bars = []
+                if len(bars) < 6:
+                    out.append(f"  {lbl:3}: -")
+                    continue
+                res = mstruct.classify(bars)
+                d = mstruct.structure_direction(res)
+                sth = mstruct.last_swing(res, "STH")
+                stl = mstruct.last_swing(res, "STL")
+                ev = []
+                if sth is not None and sth.swept:
+                    ev.append("STH taken")
+                if stl is not None and stl.swept:
+                    ev.append("STL taken")
+                judas = mstruct.is_minor_sweep(res, d) if d else False
+                tag = "  [Judas: STH/STL swept, ITH/ITL intact]" if judas else ""
+                evs = ("  <- " + " & ".join(ev)) if ev else ""
+                out.append(f"  {lbl:3}: {dword[d]}{tag}{evs}")
+                if lbl in ("D1", "H4"):
+                    htf_dir = htf_dir or d
+                if lbl in ("M15", "M5") and d:
+                    ltf_dir = d
+            # synthesis
+            if htf_dir and ltf_dir:
+                if htf_dir == ltf_dir:
+                    out.append(f"  => HTF {dword[htf_dir]}, LTF aligned -> CONTINUATION side")
+                else:
+                    out.append(f"  => HTF {dword[htf_dir]}, LTF {dword[ltf_dir]} -> "
+                               f"pullback/reversal (LTF swept against HTF - discount/premium)")
+            elif htf_dir:
+                out.append(f"  => HTF {dword[htf_dir]}; LTF not yet shifted")
+        out.append("")
+        out.append("(advisory - structure updates when a swing is taken out; the auto "
+                   "engine still trades confirmed setups)")
+        return "\n".join(out)
+
     def read_structure(self, pair=None) -> str:
         """The market-structure read template (one pair, or all when pair=None).
         Always leads with the gate drivers (DXY + EURGBP), then rates each pair's
