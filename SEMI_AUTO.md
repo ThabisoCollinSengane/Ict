@@ -106,6 +106,23 @@ Every read leads with the **two gate drivers** — **DXY** (dollar direction) an
   (DXY flat)`. A setup + killzone must still fire for it to actually enter — this
   is what it's *leaning to trade*, not a guarantee it will.
 
+### 0b · Seasonal lean (advisory)
+
+If you've built the seasonal file, each pair in `/read` shows a **seasonal lean**
+line — the historical tendency for the current month + weekday:
+```
+  seasonal: Aug -0.3% (30% up-yrs, moderate) -> SHORT lean | Mon up (56%, mild)
+```
+Build it once (needs long history — drop 15-20yr Dukascopy daily CSVs into
+`data/histdata/` first for a real sample):
+```
+python scripts/build_seasonal.py            # -> data/seasonal_bias.json
+```
+It's **graded** (noise/mild/moderate/strong) from sample size + how far the up-rate
+is from a coin-flip, and shows **"neutral this month"** when the sample says noise —
+so it's never over-trusted. FX seasonality is weak, so treat it as a **tiebreaker**
+for your manual lean, not a signal. Advisory only — the auto engine ignores it.
+
 ### 1 · Lot for the day
 ```
 /lot 0.02              → all pairs
