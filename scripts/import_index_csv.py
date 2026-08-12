@@ -54,7 +54,11 @@ def main():
     ap.add_argument("--tz", default="UTC",
                     help="source timezone (default UTC; use ET-5 sources as-is with --tz Etc/GMT+5)")
     ap.add_argument("--sep", default=None, help="force delimiter (auto by default)")
+    ap.add_argument("--out-dir", default=DATA_DIR,
+                    help="output directory (default data/histdata; use a separate dir "
+                         "for seasonal daily data so it doesn't clobber M1 backtest CSVs)")
     args = ap.parse_args()
+    out_dir = args.out_dir
 
     if not os.path.exists(args.source):
         sys.exit(f"source not found: {args.source}")
@@ -90,15 +94,19 @@ def main():
     # UTC -> fixed ET (UTC-5) INDEX for the on-disk file (load_m1 re-adds 5h).
     out.index = out.index.tz_convert("UTC").tz_localize(None) - _EST
 
-    os.makedirs(DATA_DIR, exist_ok=True)
+    # Adaptive decimal precision so FX isn't rounded to 2dp (1.0952 -> 1.10):
+    # <10 => 5dp (FX majors), <1000 => 3dp (JPY), else 2dp (gold/indices).
+    _med = float(out["Close"].median())
+    dec = 5 if _med < 10 else (3 if _med < 1000 else 2)
+    os.makedirs(out_dir, exist_ok=True)
     total = 0
     for year, grp in out.groupby(out.index.year):
         lines = [
-            f"{ts.strftime('%Y%m%d %H%M%S')};{r.Open:.2f};{r.High:.2f};"
-            f"{r.Low:.2f};{r.Close:.2f};0"
+            f"{ts.strftime('%Y%m%d %H%M%S')};{r.Open:.{dec}f};{r.High:.{dec}f};"
+            f"{r.Low:.{dec}f};{r.Close:.{dec}f};0"
             for ts, r in grp.iterrows()
         ]
-        path = os.path.join(DATA_DIR, f"{args.symbol}_{year}.csv")
+        path = os.path.join(out_dir, f"{args.symbol}_{year}.csv")
         with open(path, "w") as f:
             f.write("\n".join(lines) + "\n")
         print(f"  wrote {path}  ({len(lines):,} M1 bars)")
