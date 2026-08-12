@@ -23,6 +23,11 @@ import sys
 import pandas as pd
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ensure the repo root is importable (run_backtest_histdata lives there). When
+# invoked as `python scripts/build_seasonal.py`, Python only puts scripts/ on the
+# path, so the root import fails without this.
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
 DATA_DIR = os.path.join(_ROOT, "data", "histdata")
 OUT = os.path.join(_ROOT, "data", "seasonal_bias.json")
 
