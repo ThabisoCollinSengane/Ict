@@ -1429,7 +1429,7 @@ The 2Y is the Fed-policy anchor, the 10Y is growth/inflation, and their divergen
 the reversal tell. **Sign gotcha (pinned in code):** bond PRICE is inverse to YIELD — we fetch yields
 (positive to the dollar); bond futures would be negative. The SMT uses yields as the INVERSE reference.
 
-**Measurement pipeline (`scripts/bonds_analysis.py` + `run_bonds.sh`, measurement-only):**
+**Measurement pipeline (`scripts/bonds_analysis.py` + `run_bonds.py`, measurement-only):**
 - `scripts/fetch_fred.py` — stdlib-only FRED daily-yield fetcher (DGS2/DGS5/DGS10) → `data/bonds_src/`.
   No API key; handles "." holiday markers + both header variants. `--selftest` parse-only.
 - `scripts/bonds_analysis.py` — three measurements, split IS 2022-23 / OOS 2024-25, per pair × tenor:
@@ -1446,7 +1446,7 @@ the reversal tell. **Sign gotcha (pinned in code):** bond PRICE is inverse to YI
   (pearson, reversal walk, lift, verdict gating, SMT inverse wiring); full pandas pipeline exercised
   end-to-end on a synthetic dollar↔yield fixture (foundation corr +0.89 as constructed; random Test A
   correctly lands mixed → YELLOW). FRED is proxy-blocked in the cloud session — the run happens in the
-  Codespace via `bash run_bonds.sh`.
+  Codespace via `python run_bonds.py`.
 
 **Engine hook (SHIPPED default-OFF, byte-identical when off):** `--emit-bias` writes
 `data/bond_bias.json` (per-date DGS10 intermediate-structure read: +1 dollar-bullish / −1 bearish / 0
@@ -1459,8 +1459,8 @@ byte-identical. `bond_confirm` recorded on every trade. Counter: `bond_bias_size
 main.py** (the LEAN engine) — deliberately, until it ships; the live-engine port follows a GREEN
 validation, as P41 did.
 
-**Ship gate:** `bash run_bonds.sh` → read the verdict. Only a GREEN warrants
-`bash run_bonds_validation.sh` (baseline vs 1.25× on full 4yr + IS/OOS; ships only if full-4yr equity
+**Ship gate:** `python run_bonds.py` → read the verdict. Only a GREEN warrants
+`python run_bonds_validation.py` (baseline vs 1.25× on full 4yr + IS/OOS; ships only if full-4yr equity
 up + MaxDD held and both splits stay positive). YELLOW/RED → nothing ships; the study stands as the
 record of why — same measure-first discipline as P39/P40.
 
