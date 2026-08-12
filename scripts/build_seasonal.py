@@ -75,13 +75,13 @@ def seasonal_from_daily(d: pd.DataFrame) -> dict:
     return {"month": month, "dow": dow, "n_years": int(round(len(mret) / 12))}
 
 
-def _load_daily(pair: str):
+def _load_daily(pair: str, src_dir: str = DATA_DIR):
     try:
         from run_backtest_histdata import load_m1
     except Exception as exc:
         sys.exit(f"cannot import load_m1: {exc}")
     frames = []
-    for f in sorted(glob.glob(os.path.join(DATA_DIR, f"{pair}_*.csv"))):
+    for f in sorted(glob.glob(os.path.join(src_dir, f"{pair}_*.csv"))):
         try:
             frames.append(load_m1(f))
         except Exception:
@@ -114,6 +114,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pairs", nargs="+",
                     default=["EURUSD", "GBPUSD", "NZDUSD", "EURGBP"])
+    ap.add_argument("--src-dir", default=DATA_DIR,
+                    help="where the daily CSVs live (default data/histdata; use the "
+                         "seasonal folder so long-history daily data is kept separate "
+                         "from the M1 backtest data)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
@@ -121,7 +125,7 @@ def main():
         return
     out = {"_meta": {"pairs": {}}}
     for p in args.pairs:
-        d = _load_daily(p)
+        d = _load_daily(p, args.src_dir)
         if d is None or len(d) < 60:
             print(f"  {p}: no/insufficient data — skipped")
             continue
