@@ -724,6 +724,43 @@ class LiveTrader(Backtester):
                    "engine still trades confirmed setups)")
         return "\n".join(out)
 
+    _SEASONAL_PATH = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "data", "seasonal_bias.json")
+    _MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    _DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    def _load_seasonal(self):
+        if getattr(self, "_seasonal_cache", None) is not None:
+            return self._seasonal_cache
+        try:
+            with open(self._SEASONAL_PATH) as f:
+                self._seasonal_cache = json.load(f)
+        except Exception:
+            self._seasonal_cache = {}
+        return self._seasonal_cache
+
+    def _seasonal_lean(self, pair, now):
+        """Advisory seasonal lean for this month + weekday (from build_seasonal.py).
+        Graded — shows 'neutral' when the sample says noise, so it's never over-
+        trusted. FX seasonality is weak: a tiebreaker, not a signal."""
+        data = self._load_seasonal()
+        if not data or pair not in data:
+            return ""
+        parts = []
+        m = data[pair].get("month", {}).get(str(now.month))
+        if m and m.get("grade") != "noise":
+            dirn = "SHORT" if m["avg_pct"] < 0 else "LONG"
+            parts.append(f"{self._MONTHS[now.month]} {m['avg_pct']:+.1f}% "
+                         f"({int(m['up_rate'] * 100)}% up-yrs, {m['grade']}) -> {dirn} lean")
+        wd = now.weekday()
+        d = data[pair].get("dow", {}).get(str(wd))
+        if d and d.get("grade") != "noise" and wd < 5:
+            dirn = "up" if d["avg_pct"] > 0 else "down"
+            parts.append(f"{self._DOW[wd]} {dirn} ({int(d['up_rate'] * 100)}%, {d['grade']})")
+        return "  seasonal: " + (" | ".join(parts) if parts else "neutral this month")
+
     def read_structure(self, pair=None) -> str:
         """The market-structure read template (one pair, or all when pair=None).
         Always leads with the gate drivers (DXY + EURGBP), then rates each pair's
@@ -750,6 +787,12 @@ class LiveTrader(Backtester):
             lines.append(f"  bot would: {self._intended_direction(p, now, dxy_dir)}")
             lines += self._mm_block(p)
             lines.append(f"  your plan: {self._plan_str(p)}")
+            try:
+                _sl = self._seasonal_lean(p, now)
+                if _sl:
+                    lines.append(_sl)
+            except Exception:
+                pass
             lines.append("")
         return "\n".join(lines).strip()
 
