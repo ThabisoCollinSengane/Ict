@@ -1,4 +1,8 @@
-"""Liquidity helpers: equal highs/lows + sweep detection."""
+"""Liquidity helpers: equal highs/lows + sweep detection + round numbers.
+
+Ep 17: Heavy liquidity clusters at round-number levels ending in 00, 20, 50, 80
+pips.  For EURUSD/GBPUSD these are x.x000, x.x200, x.x500, x.x800.
+"""
 
 import config
 
@@ -54,6 +58,20 @@ def find_equal_lows(candles, symbol: str, lookback: int = 100) -> list[float]:
         if len(group) >= 2:
             clusters.append(sum(group) / len(group))
     return clusters
+
+
+def is_near_round_number(price: float, symbol: str, tol_pips: int = 3) -> bool:
+    """Ep 17: True when `price` is within `tol_pips` of a round-number liquidity level.
+
+    Significant levels end in 00, 20, 50, 80 pips (x.x000, x.x200, x.x500, x.x800
+    for 4-decimal pairs).  These attract institutional liquidity and are both
+    targets and stop-hunt magnets.
+    """
+    pip = _pip(symbol)
+    pips_from_zero = round(price / pip) % 100
+    return pips_from_zero in (0, 20, 50, 80) or any(
+        abs(pips_from_zero - ref) <= tol_pips for ref in (0, 20, 50, 80, 100)
+    )
 
 
 def detect_sweep(candles, direction: int, lookback: int = 20) -> float | None:

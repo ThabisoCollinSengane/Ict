@@ -57,10 +57,15 @@ def detect_consolidation(
     max_bars: int = None,
     max_range_pips: float = None,
     min_touches: int = None,
-    sweep_lookback: int = None,
+    range_end_lookback: int = None,
 ) -> Optional[Range]:
-    """Return the longest valid accumulation range ending within `sweep_lookback`
+    """Return the longest valid accumulation range ending within `range_end_lookback`
     bars of the most recent close, or None if no qualifying range exists.
+
+    `range_end_lookback` controls how far back the RANGE END can be.  This is
+    intentionally separate from `AMD_SWEEP_LOOKBACK` (used by detect_manipulation)
+    because ICT setups have the accumulation range end hours before the manipulation
+    sweep (e.g. Asia range → London/NY manipulation).
 
     A range qualifies when:
       - it spans at least `min_bars` consecutive M15 candles,
@@ -72,7 +77,7 @@ def detect_consolidation(
     max_bars = max_bars or config.AMD_MAX_RANGE_BARS
     max_range_pips = max_range_pips or config.AMD_MAX_RANGE_PIPS
     min_touches = min_touches or config.AMD_MIN_TOUCHES
-    sweep_lookback = sweep_lookback or config.AMD_SWEEP_LOOKBACK
+    range_end_lookback = range_end_lookback or config.AMD_RANGE_END_LOOKBACK
 
     n = len(candles)
     if n < min_bars + 1:
@@ -84,10 +89,11 @@ def detect_consolidation(
 
     best: Optional[Range] = None
 
-    # Range must end somewhere in the last `sweep_lookback` bars so that the
-    # manipulation candle(s) are in the most recent window.
-    earliest_end = max(min_bars, n - sweep_lookback)
-    for end in range(n, earliest_end, -1):
+    # Range end must be within the last `range_end_lookback` bars AND must have
+    # ended at least 1 bar before the current bar so detect_manipulation has
+    # at least one post-range bar to look for the sweep.
+    earliest_end = max(min_bars, n - range_end_lookback)
+    for end in range(n - 1, earliest_end - 1, -1):
         # Slide the range start back as far as max_bars permits.
         lo_start = max(0, end - max_bars)
         for start in range(lo_start, end - min_bars + 1):
@@ -117,28 +123,210 @@ def detect_manipulation(
     rng: Range,
     sweep_lookback: int = None,
 ) -> Optional[int]:
-    """Did price sweep `rng` in the last `sweep_lookback` bars and reject back inside?
+    """Did price sweep `rng` in the last `sweep_lookback` bars from NOW and reject back inside?
 
     Returns +1 if the LOW was swept (bullish manipulation - look long),
             -1 if the HIGH was swept (bearish manipulation - look short),
             None if no clean sweep happened.
+
+    The sweep window is the last `sweep_lookback` bars from the END of `candles`
+    (not from the range end), so this remains tight regardless of how long ago
+    the accumulation range ended.
     """
     sweep_lookback = sweep_lookback or config.AMD_SWEEP_LOOKBACK
-    # Bars after the range that we'll check for a sweep.
-    tail = candles[rng.end_idx:]
-    if not tail:
-        # No bars after the range - the "now" bar IS still inside the range.
+    # Check bars after the range ended, but only within the last `sweep_lookback`
+    # bars from the tail of the full candle array (i.e. recent from "now").
+    n = len(candles)
+    recent_start = max(rng.end_idx, n - sweep_lookback)
+    recent = candles[recent_start:]
+    if not recent:
         return None
-    tail = tail[-sweep_lookback:]
     last = candles[-1]
 
-    low_swept = any(c.Low < rng.low for c in tail) and last.Close > rng.low
-    high_swept = any(c.High > rng.high for c in tail) and last.Close < rng.high
+    low_swept = any(c.Low < rng.low for c in recent) and last.Close > rng.low
+    high_swept = any(c.High > rng.high for c in recent) and last.Close < rng.high
 
     if low_swept and not high_swept:
         return +1
     if high_swept and not low_swept:
         return -1
+    return None
+
+
+def detect_amd_setup(
+    candles,
+    symbol: str,
+    min_bars: int = None,
+    max_bars: int = None,
+    max_range_pips: float = None,
+    min_touches: int = None,
+    range_end_lookback: int = None,
+    sweep_lookback: int = None,
+) -> Optional[tuple]:
+    """Find the most recent consolidation range that has already been swept
+    and rejected, returning (Range, direction) or None.
+
+    Unlike calling detect_consolidation then detect_manipulation separately,
+    this function does NOT stop at the first consolidation it finds.  It keeps
+    scanning earlier range-end positions until it locates a range whose
+    manipulation sweep already occurred within AMD_SWEEP_LOOKBACK bars *after
+    that range end*.  This correctly handles the ICT Asia-range → London-sweep
+    → NY-entry pattern where the sweep can be 20-40 M15 bars after the range.
+    """
+    min_bars = min_bars or config.AMD_MIN_RANGE_BARS
+    max_bars = max_bars or config.AMD_MAX_RANGE_BARS
+    max_range_pips = max_range_pips or config.AMD_MAX_RANGE_PIPS
+    min_touches = min_touches or config.AMD_MIN_TOUCHES
+    range_end_lookback = range_end_lookback or config.AMD_RANGE_END_LOOKBACK
+    sweep_lookback = sweep_lookback or config.AMD_SWEEP_LOOKBACK
+
+    n = len(candles)
+    if n < min_bars + 1:
+        return None
+
+    pip = _pip(symbol)
+    max_width = max_range_pips * pip
+    touch_tol = 1.0 * pip
+    last = candles[-1]
+
+    earliest_end = max(min_bars, n - range_end_lookback)
+
+    for end in range(n - 1, earliest_end - 1, -1):
+        lo_start = max(0, end - max_bars)
+        best: Optional[Range] = None
+        for start in range(lo_start, end - min_bars + 1):
+            window = candles[start:end]
+            hi = max(c.High for c in window)
+            lo = min(c.Low for c in window)
+            if (hi - lo) > max_width:
+                continue
+            th = sum(1 for c in window if abs(c.High - hi) <= touch_tol)
+            tl = sum(1 for c in window if abs(c.Low - lo) <= touch_tol)
+            if th < min_touches or tl < min_touches:
+                continue
+            length = end - start
+            if best is None or length > best.length_bars:
+                best = Range(high=hi, low=lo, start_idx=start, end_idx=end,
+                             touches_high=th, touches_low=tl)
+
+        if best is None:
+            continue
+
+        # Check sweep in the window AFTER the range (not a sliding window from now).
+        tail_end = min(end + sweep_lookback, n)
+        tail = candles[end:tail_end]
+        if not tail:
+            continue
+
+        low_swept = any(c.Low < best.low for c in tail) and last.Close > best.low
+        high_swept = any(c.High > best.high for c in tail) and last.Close < best.high
+
+        if low_swept and not high_swept:
+            return (best, +1)
+        if high_swept and not low_swept:
+            return (best, -1)
+        # Range found but no clean sweep yet — keep scanning for older ranges.
+
+    return None
+
+
+def detect_breakout(
+    candles,
+    symbol: str,
+    min_bars: int = None,
+    max_bars: int = None,
+    max_range_pips: float = None,
+    min_touches: int = None,
+    range_end_lookback: int = None,
+    sweep_lookback: int = None,
+    hold_pips: float = None,
+) -> Optional[tuple]:
+    """Find a consolidation range that price has CLEARED and is HOLDING beyond.
+
+    This is the inverse of detect_amd_setup. Where the Judas model wants a sweep
+    that closes BACK inside the range (manipulation → fade), the breakout model
+    wants price to clear an extreme and HOLD outside it (expansion → follow):
+
+        ACCUMULATION   tight range forms (same as Judas detection).
+        EXPANSION      price closes beyond an extreme by at least `hold_pips`
+                       and the last close is still holding on that side
+                       (no rejection back into the range).
+
+    Returns (Range, direction) where:
+        +1  the HIGH was cleared and held  → bullish continuation (look long)
+        -1  the LOW was cleared and held   → bearish continuation (look short)
+        None if no clean held breakout exists.
+
+    A pullback into the old range is allowed AFTER the hold is confirmed — that
+    retest is where breakers/FVGs form for the entry. The hold is judged from the
+    breakout extreme of the tail, not the very last bar, so a retest still
+    qualifies as long as price cleared and held earlier in the window.
+    """
+    min_bars = min_bars or config.AMD_MIN_RANGE_BARS
+    max_bars = max_bars or config.AMD_MAX_RANGE_BARS
+    max_range_pips = max_range_pips or config.AMD_MAX_RANGE_PIPS
+    min_touches = min_touches or config.AMD_MIN_TOUCHES
+    range_end_lookback = range_end_lookback or config.AMD_RANGE_END_LOOKBACK
+    sweep_lookback = sweep_lookback or config.AMD_SWEEP_LOOKBACK
+    hold_pips = hold_pips if hold_pips is not None else config.BREAKOUT_HOLD_PIPS
+
+    n = len(candles)
+    if n < min_bars + 1:
+        return None
+
+    pip = _pip(symbol)
+    max_width = max_range_pips * pip
+    touch_tol = 1.0 * pip
+    hold_dist = hold_pips * pip
+    last = candles[-1]
+
+    earliest_end = max(min_bars, n - range_end_lookback)
+
+    for end in range(n - 1, earliest_end - 1, -1):
+        lo_start = max(0, end - max_bars)
+        best: Optional[Range] = None
+        for start in range(lo_start, end - min_bars + 1):
+            window = candles[start:end]
+            hi = max(c.High for c in window)
+            lo = min(c.Low for c in window)
+            if (hi - lo) > max_width:
+                continue
+            th = sum(1 for c in window if abs(c.High - hi) <= touch_tol)
+            tl = sum(1 for c in window if abs(c.Low - lo) <= touch_tol)
+            if th < min_touches or tl < min_touches:
+                continue
+            length = end - start
+            if best is None or length > best.length_bars:
+                best = Range(high=hi, low=lo, start_idx=start, end_idx=end,
+                             touches_high=th, touches_low=tl)
+
+        if best is None:
+            continue
+
+        tail_end = min(end + sweep_lookback, n)
+        tail = candles[end:tail_end]
+        if not tail:
+            continue
+
+        # A bar must have CLOSED beyond the extreme by at least hold_pips (not just
+        # wicked through — that would be a sweep). The current price must still be on
+        # the breakout side (a pullback into the range is allowed; a full reversal
+        # back through the opposite extreme is not).
+        high_break = (
+            any(c.Close > best.high + hold_dist for c in tail)
+            and last.Close > best.low
+        )
+        low_break = (
+            any(c.Close < best.low - hold_dist for c in tail)
+            and last.Close < best.high
+        )
+
+        if high_break and not low_break:
+            return (best, +1)
+        if low_break and not high_break:
+            return (best, -1)
+        # Range found but no clean held breakout — keep scanning older ranges.
+
     return None
 
 
