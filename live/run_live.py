@@ -831,6 +831,11 @@ class LiveTrader(Backtester):
         tag = " [via H4]" if (feg != 0 and feg_tf == "H4") else ""
         lines = ["FAST read (live, advisory - not auto-traded):",
                  f"  DXY {dword[fdxy]} | EURGBP {egword[feg]}{tag}"]
+        try:
+            _bs_line, _ = self._breakout_smt(now)
+            lines.append(f"  {_bs_line}")
+        except Exception:
+            pass
         for p in config.PAIRS:
             if p not in ("EURUSD", "GBPUSD", "NZDUSD"):
                 continue                              # currencies only
@@ -856,6 +861,38 @@ class LiveTrader(Backtester):
             bad = (gd is None or gsc < 1.0)
         return "no gate signal" if bad else f"{'LONG' if gd > 0 else 'SHORT'} ({scen})"
 
+    def _breakout_smt(self, now):
+        """Read the USD triad (EURUSD + GBPUSD + DXY) as a SET off live price:
+          - all break the SAME way + DXY confirms inverse  -> ALIGNED breakout
+            (continuation): anticipate the M15/H1 retest swing and go with it.
+          - EURUSD vs GBPUSD DISAGREE (one swept, other held) -> SMT divergence
+            (reversal): fade the sweep.
+          - one alone / DXY not confirming -> single-pair break / weak (fakeout risk).
+        Returns (one-line verdict, state_key). Advisory."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        eu, _ = self._fast_bias("EURUSD", "15T", now, lookback=lb)
+        gu, _ = self._fast_bias("GBPUSD", "15T", now, lookback=lb)
+        dxy, _ = self._fast_bias("UDXUSD", "60T", now,
+                                 price=self.read_dxy_value(), lookback=lb)
+        dw = {1: "UP", -1: "DOWN", 0: "flat"}
+        if eu == 0 and gu == 0:
+            return "SET (EU+GU+DXY): inside ranges - no break", "inside"
+        if eu != 0 and eu == gu:                    # both USD pairs broke the same way
+            if dxy == -eu:                          # DXY confirms (inverse)
+                side = "LONG" if eu > 0 else "SHORT"
+                return (f"SET: ALIGNED BREAKOUT -> {side} continuation (EU+GU+DXY all "
+                        f"confirm) - anticipate the M15/H1 retest swing (AMD) then go with it",
+                        f"aligned_{side}")
+            return (f"SET: EU+GU broke {dw[eu]} but DXY not confirming - weak break, "
+                    f"watch for reversal", "weak")
+        if eu != 0 and gu != 0 and eu == -gu:       # USD pairs disagree = SMT
+            return (f"SET: SMT DIVERGENCE - EURUSD {dw[eu]} vs GBPUSD {dw[gu]} "
+                    f"(one swept, the other held) -> reversal signal", "smt")
+        broke = "EURUSD" if eu != 0 else "GBPUSD"   # only one broke
+        d = eu if eu != 0 else gu
+        return (f"SET: single-pair break ({broke} {dw[d]}) - likely fakeout, "
+                f"wait for the other + DXY", "single")
+
     def _fast_scan(self):
         """Push a FAST alert the moment a currency takes out its recent M15 high/low
         (a live liquidity sweep), with the updated gate read. Advisory — the auto
@@ -880,6 +917,16 @@ class LiveTrader(Backtester):
                 _notify(f"FAST {p}: swept {swept.upper()} -> gate {gate}\n"
                         f"(advisory - /read for the full picture; /bias or /test to act)")
             self._fast_state[p] = swept
+        # Set-level breakout-vs-SMT call: alert when the triad flips into an
+        # ALIGNED breakout or an SMT divergence (the two actionable states).
+        try:
+            bs_line, bs_state = self._breakout_smt(now)
+            if bs_state.startswith("aligned") or bs_state == "smt":
+                if self._fast_state.get("_set") != bs_state:
+                    _notify(f"FAST {bs_line}")
+            self._fast_state["_set"] = bs_state
+        except Exception:
+            pass
 
     def _bias_header(self, now):
         """The two intermarket gate drivers, shown at the top of every read:

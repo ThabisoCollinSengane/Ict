@@ -78,10 +78,20 @@ swing high/low, and re-runs the intermarket gate on those live drivers:
 ```
 FAST read (live, advisory - not auto-traded):
   DXY UP | EURGBP GBP>EUR [via H4]
+  SET: ALIGNED BREAKOUT -> SHORT continuation (EU+GU+DXY all confirm) - anticipate the M15/H1 retest swing (AMD) then go with it
   EURUSD: swept LOW -> gate SHORT (1b)
-  GBPUSD: inside range -> gate no gate signal
-  NZDUSD: swept HIGH -> gate LONG (N-long)
+  GBPUSD: swept LOW -> gate SHORT (1b)
+  NZDUSD: inside range -> gate no gate signal
 ```
+The **SET line** reads EURUSD + GBPUSD + DXY as one set (the breakout-vs-SMT call):
+- **ALIGNED BREAKOUT** — all break the same way + DXY confirms inverse → *continuation*:
+  wait for the M15/H1 **retest swing** (the AMD pullback) and go with it.
+- **SMT DIVERGENCE** — EURUSD and GBPUSD disagree (one swept, the other held) →
+  *reversal*: fade the sweep.
+- **weak / single-pair break** — DXY not confirming, or only one pair broke → likely
+  fakeout, wait for the rest.
+The bot also **alerts** the moment the set flips into an aligned breakout or an SMT
+divergence.
 It's **advisory only** — the auto engine still trades confirmed (closed-bar)
 structure; this is just the no-lag view so **you** can decide to take it (with
 `/bias` or `/test`). The bot also **pushes a FAST alert** the moment any currency
