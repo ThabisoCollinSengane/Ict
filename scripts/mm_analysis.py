@@ -61,6 +61,21 @@ def true_r(entry, stop, exit_, direction):
         return None
 
 
+def pip_size(pair):
+    return 0.01 if str(pair).upper().endswith("JPY") else 0.0001
+
+
+def _stats(vals):
+    """(n, mean, median, max) over a numeric list, Nones dropped."""
+    xs = sorted(v for v in vals if v is not None and v == v)
+    if not xs:
+        return (0, None, None, None)
+    n = len(xs)
+    mean = sum(xs) / n
+    mid = xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
+    return (n, mean, mid, xs[-1])
+
+
 def _pf(rows):
     gp = sum(r for r in rows if r > 0)
     gl = -sum(r for r in rows if r < 0)
@@ -126,6 +141,10 @@ def analyse():
     mm["win"] = mm["pnl"] > 0
     mm["R"] = [true_r(e, s, x, d) for e, s, x, d in
                zip(mm.get("entry"), mm.get("stop"), mm.get("exit"), mm.get("direction"))]
+    mm["pips"] = [((float(x) - float(e)) * float(d) / pip_size(p))
+                  if (x == x and e == e) else None
+                  for e, x, d, p in
+                  zip(mm.get("entry"), mm.get("exit"), mm.get("direction"), mm.get("pair"))]
     yr = pd.to_datetime(mm.get("opened_at"), errors="coerce").dt.year
     mm["split"] = yr.map(lambda y: "IS" if y in (2022, 2023) else
                          ("OOS" if y in (2024, 2025) else "?"))
@@ -161,7 +180,43 @@ def analyse():
                  f"{worst[0]} ({worst[1]:.0f}%, {worst[2]}) |")
     L.append("")
 
-    L += ["## Full breakdown by tag", ""]
+    # win/loss pip + R economics
+    wins = mm[mm["win"]]
+    losses = mm[~mm["win"]]
+    wn, wmean, wmed, wmax = _stats(wins["pips"].tolist())
+    ln, lmean, lmed, lmax = _stats(losses["pips"].tolist())
+    _, wrmean, _, wrmax = _stats([r for r in wins["R"].tolist()])
+    _, lrmean, _, _ = _stats([r for r in losses["R"].tolist()])
+    exp_pips = _stats(mm["pips"].tolist())[1]
+    exp_r = _stats([r for r in mm["R"].tolist()])[1]
+    L += ["## Win / loss economics", "",
+          "| | n | avg pips | median pips | max pips | avg R |",
+          "|---|---|---|---|---|---|",
+          f"| **wins** | {wn} | {_fmt(wmean)} | {_fmt(wmed)} | {_fmt(wmax)} | {_fmt(wrmean)} |",
+          f"| losses | {ln} | {_fmt(lmean)} | {_fmt(lmed)} | {_fmt(lmax)} | {_fmt(lrmean)} |",
+          "",
+          f"_Per-add expectancy: **{_fmt(exp_pips)} pips**, **{_fmt(exp_r)} R**. "
+          f"Biggest win {_fmt(wmax)} pips / {_fmt(wrmax)}R._", ""]
+
+    # where the big wins come from — avg win pips per bucket
+    L += ["## Specs of the winning adds (winners only)", "",
+          "For the winning legs only: how many, their share, and their pip size — "
+          "so the 'good entry' profile is explicit.", ""]
+    for dim in ("ifvg_tf", "pattern", "entry_tf", "pair", "draw_score", "conf_bucket"):
+        if dim not in mm.columns:
+            continue
+        L += [f"### winners by `{dim}`", "",
+              "| value | wins | % of wins | avg win pips | median | max |",
+              "|---|---|---|---|---|---|"]
+        tot = len(wins)
+        for val, cnt in wins[dim].value_counts(dropna=False).items():
+            sub = wins[wins[dim].astype(str) == str(val)]
+            _, mean, med, mx = _stats(sub["pips"].tolist())
+            share = 100.0 * cnt / tot if tot else 0
+            L.append(f"| {val} | {cnt} | {share:.0f}% | {_fmt(mean)} | {_fmt(med)} | {_fmt(mx)} |")
+        L.append("")
+
+    L += ["## Full breakdown by tag (all legs)", ""]
     for dim in DIMS:
         if dim in mm.columns:
             L += _dim_table(mm, dim)
