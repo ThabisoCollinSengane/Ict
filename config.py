@@ -476,7 +476,7 @@ MM_SWING_TF_MAP     = {
 # precision / tight risk ONLY (never the swing read, which is MM_SWING_TF_MAP).
 MM_ENTRY_TFS        = ("5T", "1T")
 MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to the FVG scan
-MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "8"))
+MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "3"))
 MM_STRUCTURE_MAX_AGE = 4                  # retracement swing must be this fresh (bars of its TF)
 # Escalate the position target to the opposing liquidity pool so the trade rides the
 # full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so

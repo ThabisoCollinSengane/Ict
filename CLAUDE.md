@@ -1511,7 +1511,8 @@ is wired for the index book only).
   so it's flat during the chop — the exact failure mode the reverts died on.
 
 **Config:** `MM_CONTINUATION_ENABLED=0`, `MM_TARGET_OPPOSING=0`, `MM_HTF_SMT_REQUIRED=0`,
-`MM_IFVG_TFS=("15T","5T")`, `MM_STRUCTURE_TF="1T"`, `MM_MIN_FAVOUR_PIPS=8`. Default OFF → the loop hook
+`MM_IFVG_TFS=(W,D,H4,H1,M30,M20,M15,M10,M5,M1)`, `MM_SWING_TF_MAP` (IFVG-TF→swing-TF), `MM_ENTRY_TFS=("5T","1T")`,
+`MM_MIN_FAVOUR_PIPS=3`. Default OFF → the loop hook
 returns immediately and `htf_smt` is never computed, so the default run is byte-identical.
 
 **Status: built + helper-unit-tested (IFVG zone containment, M1 structure confirm, H1 EU/GU SMT
