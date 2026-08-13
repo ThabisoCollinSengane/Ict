@@ -23,7 +23,15 @@ import re
 import sys
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DUMP = os.environ.get("TRADE_CSV", os.path.join(_ROOT, "data", "trades_dump.csv"))
+# run_backtest_histdata.py writes the dump under data/histdata/ by default; also
+# accept data/ and the TRADE_CSV override. First existing path wins.
+_DUMP_CANDIDATES = [
+    os.environ.get("TRADE_CSV"),
+    os.path.join(_ROOT, "data", "histdata", "trades_dump.csv"),
+    os.path.join(_ROOT, "data", "trades_dump.csv"),
+]
+DUMP = next((p for p in _DUMP_CANDIDATES if p and os.path.exists(p)),
+            _DUMP_CANDIDATES[1])
 REPORT = os.path.join(_ROOT, "data", "mm_winners_report.md")
 
 _ET = re.compile(r"^mm_(?P<pat>fvg|ob|breaker)_(?P<etf>m5|m1)_ifvg(?P<ifvg>.+)$")
