@@ -1464,6 +1464,51 @@ validation, as P41 did.
 up + MaxDD held and both splits stay positive). YELLOW/RED → nothing ships; the study stands as the
 record of why — same measure-first discipline as P39/P40.
 
+### P43 — Market Maker IFVG continuation to opposing liquidity (BUILT 2026-08-13, backtester, default OFF, NOT validated yet)
+**What (user's model, captured from 12 Aug EU/GU charts + Q&A):** the DISTRIBUTION leg. After the
+Judas sweep + reversal (which the base strategy already trades), price delivers to the OPPOSING
+liquidity pool, retracing into **inversion FVGs (IFVGs)** along the way — each an M15→M5→M1 re-entry /
+pyramid add — **until the opposing pool is reached**. The base strategy fades the sweep ONCE and exits
+at the nearest fib (~30 pips); it does not re-enter down the distribution. The reversal is confirmed by
+**H1 EURUSD↔GBPUSD SMT** (one pair sweeps a higher high, the correlated pair fails to confirm →
+bearish SMT — exactly the 12 Aug setup: GU took 1.35292, EU failed its 1.15792 high, both distributed
+to sell-side).
+
+**The four gaps found (why the algo "doesn't take these entries at all"):** the Market Maker model was
+~60% built but **live-only and inert**: (1) `_mm_scan`/`_mm_auto_entry` in `live/run_live.py` require the
+trader to arm it by hand via Telegram `/mm PAIR sell auto` — never autonomous; (2) it watches D1/H4/H1
+IFVGs only, not the intraday M30→M1 cascade the setup lives on; (3) it's **absent from the backtester**,
+so never validated (the RED `scripts/backtest_ifvg.py` was standalone IFVG w/ fixed 2R + 10-pip stop — a
+different construction); (4) the H1 EU/GU SMT that STARTS the model isn't in the FX entry path (`smt.py`
+is wired for the index book only).
+
+**Implementation (`_mm_continuation` in backtest.py + config `MM_*`, default OFF):**
+- Fires only on an already-open position (the reversal defines model direction + opposing pool).
+- `_mm_ifvg_zone`: price retraced INTO an M15/M5 inversion FVG in the trade direction (`ict.ifvg`).
+- `_mm_structure_confirm`: fresh, still-intact M1 swing in the trade direction (the LTF shift).
+- `_htf_pair_smt`: H1 EU/GU SMT divergence — tag on every trade (`htf_smt`); hard gate only when
+  `MM_HTF_SMT_REQUIRED=1`.
+- `_opposing_liquidity`: furthest unswept H4/D/W ITH/ITL pool — used as the target ONLY when
+  `MM_TARGET_OPPOSING=1` (kept a separate flag: the far-target change is the piece that repeatedly
+  failed — HTF_TARGET_PREF −22%, TRAIL_AT_TP −49%, TP_RUNNER −75% — so it's opt-in ON TOP of the adds).
+- Adds a leg via the same lot/stop machinery as `_maybe_pyramid` (M1 structural stop capped at
+  FIXED_STOP_PIPS), tagged `mm_ifvg_<tf>`. Columns: `htf_smt`, `mm_adds`. Counters: `mm_added`,
+  `mm_target_escalated`, `mm_blocked_*`.
+- **Why it's distinct from the reverted far-target holds:** those held ONE position THROUGH the
+  consolidation (where the strategy has no edge). This BANKS and re-enters on a fresh IFVG + M1 shift,
+  so it's flat during the chop — the exact failure mode the reverts died on.
+
+**Config:** `MM_CONTINUATION_ENABLED=0`, `MM_TARGET_OPPOSING=0`, `MM_HTF_SMT_REQUIRED=0`,
+`MM_IFVG_TFS=("15T","5T")`, `MM_STRUCTURE_TF="1T"`, `MM_MIN_FAVOUR_PIPS=8`. Default OFF → the loop hook
+returns immediately and `htf_smt` is never computed, so the default run is byte-identical.
+
+**Status: built + helper-unit-tested (IFVG zone containment, M1 structure confirm, H1 EU/GU SMT
+direction mapping, dict-key wiring all verified on fixtures), NOT run on real data yet.** Validate with
+`python run_mm_validation.py` (3 arms — baseline / adds-only / adds+opposing-target — × full 4yr + IS/OOS;
+`--smt` to also require H1 SMT). Ships only if an arm lifts full-4yr equity with MaxDD held and both
+splits stay positive. **NOT wired into `live/run_live.py`'s auto-loop** — the live port follows a GREEN
+validation (as P41 did); the manual `/mm ... auto` path is untouched.
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)

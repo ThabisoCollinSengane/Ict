@@ -433,6 +433,36 @@ CRT_SWEEP_MULT_TF  = "240T"   # H4 CRT sweep is the lever; D1 bucket excluded
 # full + IS/OOS gate (equity up in all three, PF flat, MaxDD held to the decimal).
 PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.25"))
 
+# --- Market Maker model: IFVG continuation to opposing liquidity (OFF by default) ---
+# The distribution leg. After the Judas sweep + reversal (which the strategy already
+# trades), price delivers to the OPPOSING liquidity pool, retracing into inversion
+# FVGs (IFVGs) along the way — each a re-entry / pyramid add on the M15→M5→M1 cascade.
+# This is what the base strategy does NOT do: it fades the sweep once and exits at the
+# nearest draw, instead of riding the distribution to the far pool via IFVG re-entries.
+# Distinct from the reverted far-target holds (HTF_TARGET_PREF/TRAIL_AT_TP/TP_RUNNER):
+# those held ONE position through the consolidation; this BANKS and re-enters on a
+# fresh IFVG + M1 structure shift, so it's flat during the chop. Default OFF and
+# byte-identical when off (the loop hook returns immediately). Validate IS/OOS + full
+# 4yr with run_mm_validation.py before shipping — MaxDD must hold.
+MM_CONTINUATION_ENABLED = bool(int(_os.environ.get("MM_CONTINUATION_ENABLED", 0)))
+MM_IFVG_TFS         = ("15T", "5T")       # cascade scanned for inversion FVGs
+MM_STRUCTURE_TF     = "1T"                # M1 structure-shift confirmation
+MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to find_inversion_fvgs
+MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "8"))
+MM_STRUCTURE_MAX_AGE = 4                  # M1 confirm swing must be this fresh
+# Escalate the position target to the opposing liquidity pool so the trade rides the
+# full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so
+# validation can isolate the IFVG adds from the far-target change — the far-target
+# change is the one that has repeatedly failed, so it's opt-in on top of the adds.
+MM_TARGET_OPPOSING  = bool(int(_os.environ.get("MM_TARGET_OPPOSING", 0)))
+MM_TARGET_TFS       = ("240T", "D", "W")  # where the opposing ITH/ITL pool is drawn from
+# H1 EURUSD↔GBPUSD SMT divergence — the reversal confirmation that STARTS the model
+# (one pair sweeps liquidity, the correlated pair fails to confirm). Tagged on every
+# trade (htf_smt column); as a hard requirement for MM adds only when REQUIRED=1.
+MM_HTF_SMT_TF       = "60T"
+MM_HTF_SMT_LOOKBACK = 20
+MM_HTF_SMT_REQUIRED = bool(int(_os.environ.get("MM_HTF_SMT_REQUIRED", 0)))
+
 # --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
 # US Treasury yields lead the dollar (higher yields -> USD bid). scripts/
 # bonds_analysis.py measures whether a yield-structure confirmation of the trade's

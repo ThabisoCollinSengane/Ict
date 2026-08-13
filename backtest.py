@@ -263,6 +263,7 @@ class Backtester:
             for pair in config.PAIRS:
                 if pair in self.active:
                     self._maybe_pyramid(pair, t)
+                    self._mm_continuation(pair, t)
                 elif can_open_new_trade(now, pair):
                     self._maybe_open(pair, t)
 
@@ -472,6 +473,8 @@ class Backtester:
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
             "bond_confirm": st.get("bond_confirm", False),
+            "htf_smt": st.get("htf_smt", False),
+            "mm_adds": st.get("mm_adds", 0),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
             "lad_sess": st.get("lad_sess"), "lad_d3": st.get("lad_d3"),
@@ -553,6 +556,8 @@ class Backtester:
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
             "bond_confirm": st.get("bond_confirm", False),
+            "htf_smt": st.get("htf_smt", False),
+            "mm_adds": st.get("mm_adds", 0),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
             "lad_sess": st.get("lad_sess"), "lad_d3": st.get("lad_d3"),
@@ -2768,6 +2773,16 @@ class Backtester:
             if _bond_confirm:
                 g["bond_confirm"] = g.get("bond_confirm", 0) + 1
 
+        # H1 EURUSD↔GBPUSD SMT at the reversal — the divergence that starts the
+        # Market Maker distribution (one pair sweeps, the other fails to confirm).
+        # Only computed when the MM model is active, so the default path is untouched
+        # (cost-free) and its results stay byte-identical.
+        _htf_smt = False
+        if config.MM_CONTINUATION_ENABLED or config.MM_HTF_SMT_REQUIRED:
+            _htf_smt = self._htf_pair_smt(pair, direction, t)
+            if _htf_smt:
+                g["htf_smt"] = g.get("htf_smt", 0) + 1
+
         # NWOG (New Week Opening Gap): price delivering into the weekend gap's 50%
         # (consequent encroachment) aligned with the trade. The NWOG is an ICT HTF
         # PD array / draw on liquidity — a gap-up week supports longs, gap-down
@@ -3333,6 +3348,7 @@ class Backtester:
             "amd_entry_zone": _amd_entry_zone,
             "amd_liq_run": _amd_liq_run,
             "bond_confirm": _bond_confirm,
+            "htf_smt": _htf_smt,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
@@ -3357,6 +3373,168 @@ class Backtester:
             self._day_pair_pm[(day_key, pair)] = day_pair_pm + 1
         else:
             self._day_pair[(day_key, pair)]    = day_pair + 1
+
+    def _htf_pair_smt(self, pair, direction, t):
+        """H1 EURUSD↔GBPUSD SMT divergence in the trade direction.
+
+        The two pairs are positively correlated (both X/USD). SMT = one sweeps a
+        directional extreme the other FAILS to confirm — the reversal tell that
+        starts the Market Maker distribution. Only meaningful for EUR/GBP; returns
+        False for NZDUSD (no correlated partner in the book).
+        """
+        partner = {"EURUSD": "GBPUSD", "GBPUSD": "EURUSD"}.get(pair)
+        if partner is None:
+            return False
+        from ict.smt import smt_divergence
+        tf = config.MM_HTF_SMT_TF
+        lb = config.MM_HTF_SMT_LOOKBACK
+        p = self.bars_up_to(pair, tf, t, max_bars=lb + 5)
+        r = self.bars_up_to(partner, tf, t, max_bars=lb + 5)
+        if len(p) < lb or len(r) < lb:
+            return False
+        # direction is the TRADE direction (short = -1). smt_divergence's `direction`
+        # is the sweep direction: a short fades a buy-side sweep (higher high) = -1.
+        # positive correlation → inverse=False. Check either pair as the primary.
+        return (smt_divergence(p, r, direction, inverse=False, lookback=lb) or
+                smt_divergence(r, p, direction, inverse=False, lookback=lb))
+
+    def _mm_structure_confirm(self, pair, direction, t):
+        """Fresh, still-intact M1 swing in the trade direction — the LTF structure
+        shift the trader waits for inside the IFVG (short → a rolled-over swing
+        HIGH that still holds; long → a swing LOW that holds)."""
+        bars = self.bars_up_to(pair, config.MM_STRUCTURE_TF, t, max_bars=120)
+        if len(bars) < 5:
+            return False
+        res = mstruct.classify(bars)
+        swings = res.get("stl" if direction > 0 else "sth", [])
+        if not swings:
+            return False
+        last = swings[-1]
+        age = (len(bars) - 1) - last.bar_index
+        if age < 1 or age > config.MM_STRUCTURE_MAX_AGE:
+            return False
+        return not last.swept
+
+    def _mm_ifvg_zone(self, pair, direction, cur_price, t):
+        """The M15→M5 inversion FVG the price is currently retraced INTO, in the
+        trade direction. Returns (tf_label, lo, hi) or None. For a short we want a
+        SUPPLY inversion (idir -1) price has pulled UP into; long → demand (+1)."""
+        from ict.ifvg import find_inversion_fvgs
+        for tf in config.MM_IFVG_TFS:
+            bars = self.bars_up_to(pair, tf, t, max_bars=config.MM_IFVG_SCAN_BARS)
+            if len(bars) < 3:
+                continue
+            for z in find_inversion_fvgs(bars, direction=direction, max_zones=3):
+                if z["lo"] <= cur_price <= z["hi"]:
+                    return (tf, z["lo"], z["hi"])
+        return None
+
+    def _opposing_liquidity(self, pair, direction, price, t):
+        """Nearest UNSWEPT opposing-liquidity pool (ITH/ITL on H4/D/W) beyond the
+        current price in the trade direction — the far draw the distribution leg
+        delivers to. Returns a price or None."""
+        pip = pip_size(pair)
+        floor = self._min_pips_target() * pip
+        best = None
+        for tf in config.MM_TARGET_TFS:
+            try:
+                bars = self.bars_up_to(pair, tf, t,
+                                       max_bars=(config.ITHL_TARGET_MAX_BARS or None))
+                for cand in self._ithl_targets(bars, direction, price, pair, tf):
+                    lvl = cand[0]
+                    if (lvl - price) * direction >= floor:
+                        if best is None or (lvl - price) * direction > (best - price) * direction:
+                            best = lvl      # the FURTHEST qualifying pool = opposing end
+            except Exception:
+                continue
+        return best
+
+    def _mm_continuation(self, pair, t):
+        """Market Maker distribution add: re-enter on an IFVG retrace toward the
+        opposing liquidity pool. Fires only on an already-open position (the Judas
+        reversal defines the model direction). Default OFF — a no-op when
+        config.MM_CONTINUATION_ENABLED is false, so backtest numbers are identical.
+        """
+        if not config.MM_CONTINUATION_ENABLED:
+            return
+        st = self.active.get(pair)
+        if st is None:
+            return
+        g = self.gate
+        g["mm_checks"] = g.get("mm_checks", 0) + 1
+        d = st["direction"]
+        max_legs = st.get("max_legs", config.MAX_LEGS)
+        if len(st["legs"]) >= max_legs:
+            return
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        if not can_open_new_trade(now, pair):
+            return
+        if self.news.nearest_impact(now) in ("Medium", "Critical"):
+            return
+
+        bars5 = self.bars_up_to(pair, "5T", t)
+        if not bars5:
+            return
+        cur_price = bars5[-1].Close
+        pip = pip_size(pair)
+
+        # position must be in profit (distribution underway) before an add
+        u = sum(l["units"] for l in st["legs"]) or 1
+        avg = sum(l["entry"] * l["units"] for l in st["legs"]) / u
+        if (cur_price - avg) * d / pip < config.MM_MIN_FAVOUR_PIPS:
+            g["mm_blocked_favour"] = g.get("mm_blocked_favour", 0) + 1
+            return
+
+        # (1) retrace: price inside an M15/M5 IFVG in the trade direction
+        zone = self._mm_ifvg_zone(pair, d, cur_price, t)
+        if zone is None:
+            g["mm_blocked_no_ifvg"] = g.get("mm_blocked_no_ifvg", 0) + 1
+            return
+        # (2) reversal: fresh, still-intact M1 swing in the trade direction
+        if not self._mm_structure_confirm(pair, d, t):
+            g["mm_blocked_no_structure"] = g.get("mm_blocked_no_structure", 0) + 1
+            return
+        # (3) optional HTF EU/GU SMT confirmation of the reversal
+        if config.MM_HTF_SMT_REQUIRED and not self._htf_pair_smt(pair, d, t):
+            g["mm_blocked_no_smt"] = g.get("mm_blocked_no_smt", 0) + 1
+            return
+
+        # optional: escalate the position target to the opposing liquidity pool so
+        # the trade rides the full distribution (isolated behind its own flag).
+        if config.MM_TARGET_OPPOSING:
+            opp = self._opposing_liquidity(pair, d, cur_price, t)
+            if opp is not None and (opp - st["target"]) * d > 0:
+                st["target"] = opp
+                g["mm_target_escalated"] = g.get("mm_target_escalated", 0) + 1
+
+        # add the leg at market with an M1 structural stop (capped at FIXED_STOP_PIPS)
+        _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
+        entry = cur_price + d * _fric
+        bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
+        stop = self._m1_structure_stop(bars1m, d, entry, pip)
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        if stop is None or abs(entry - stop) > _max_stop:
+            stop = entry - _max_stop * d
+        reward_pips = abs(st["target"] - entry) / pip
+        if reward_pips < self._min_pips_target():
+            g["mm_blocked_min_target"] = g.get("mm_blocked_min_target", 0) + 1
+            return
+
+        tier_lots = self._pyramid_lots()
+        lot_idx = min(len(st["legs"]), len(tier_lots) - 1)
+        units = max(int(tier_lots[lot_idx] * self._contract_units(pair)),
+                    int(tier_lots[-1] * self._contract_units(pair)))
+        st["legs"][-1]["stop"] = st["legs"][-1]["entry"]   # prior leg → breakeven
+        st["legs"].append({
+            "entry": entry, "stop": stop, "units": units,
+            "leg_idx": len(st["legs"]) + 1, "opened_at": t,
+            "entry_type": f"mm_ifvg_{zone[0]}",
+            "tp1": None, "tp1_hit": True, "_units_tp1": 0, "_units_tp2": units,
+            "runner_be_after_tp1": False,
+        })
+        st["mm_adds"] = st.get("mm_adds", 0) + 1
+        g["mm_added"] = g.get("mm_added", 0) + 1
 
     def _maybe_pyramid(self, pair, t):
         """Add a new leg to a winning position at market price with fixed stop.
