@@ -3406,22 +3406,28 @@ class Backtester:
                 return True
         return False
 
-    def _mm_structure_confirm(self, pair, direction, t):
-        """Fresh, still-intact M1 swing in the trade direction — the LTF structure
-        shift the trader waits for inside the IFVG (short → a rolled-over swing
-        HIGH that still holds; long → a swing LOW that holds)."""
-        bars = self.bars_up_to(pair, config.MM_STRUCTURE_TF, t, max_bars=120)
-        if len(bars) < 5:
-            return False
-        res = mstruct.classify(bars)
-        swings = res.get("stl" if direction > 0 else "sth", [])
-        if not swings:
-            return False
-        last = swings[-1]
-        age = (len(bars) - 1) - last.bar_index
-        if age < 1 or age > config.MM_STRUCTURE_MAX_AGE:
-            return False
-        return not last.swept
+    def _mm_structure_confirm(self, pair, direction, ifvg_tf, t):
+        """Fresh, still-intact retracement swing in the trade direction, hunted on
+        the TF(s) PROPORTIONAL to the IFVG timeframe (MM_SWING_TF_MAP): a W1/D1 gap's
+        swing forms on H4/H1, an H1 gap's on M30/M15, etc. — never on M1 for an HTF
+        gap. (Short → a rolled-over swing HIGH still holding; long → a swing LOW.)
+        M1 is reserved for the entry/stop, not this structure read."""
+        swing_tfs = config.MM_SWING_TF_MAP.get(ifvg_tf, ("1T",))
+        for tf in swing_tfs:
+            bars = self.bars_up_to(pair, tf, t, max_bars=120)
+            if len(bars) < 5:
+                continue
+            res = mstruct.classify(bars)
+            swings = res.get("stl" if direction > 0 else "sth", [])
+            if not swings:
+                continue
+            last = swings[-1]
+            age = (len(bars) - 1) - last.bar_index
+            if age < 1 or age > config.MM_STRUCTURE_MAX_AGE:
+                continue
+            if not last.swept:
+                return True
+        return False
 
     def _mm_ifvg_zone(self, pair, direction, cur_price, t):
         """The inversion FVG price is currently retraced INTO, found by cascading
@@ -3512,13 +3518,15 @@ class Backtester:
             g["mm_blocked_favour"] = g.get("mm_blocked_favour", 0) + 1
             return
 
-        # (1) retrace: price inside an M15/M5 IFVG in the trade direction
+        # (1) retrace: price inside the highest-TF inverted FVG in the trade direction
         zone = self._mm_ifvg_zone(pair, d, cur_price, t)
         if zone is None:
             g["mm_blocked_no_ifvg"] = g.get("mm_blocked_no_ifvg", 0) + 1
             return
-        # (2) reversal: fresh, still-intact M1 swing in the trade direction
-        if not self._mm_structure_confirm(pair, d, t):
+        ifvg_tf = zone[0]
+        # (2) reversal: fresh retracement swing on the TF(s) PROPORTIONAL to the IFVG
+        # timeframe (W1/D1 gap → H4/H1 swing) — never M1 for an HTF gap.
+        if not self._mm_structure_confirm(pair, d, ifvg_tf, t):
             g["mm_blocked_no_structure"] = g.get("mm_blocked_no_structure", 0) + 1
             return
         # (3) optional HTF EU/GU SMT confirmation of the reversal
@@ -3534,11 +3542,13 @@ class Backtester:
                 st["target"] = opp
                 g["mm_target_escalated"] = g.get("mm_target_escalated", 0) + 1
 
-        # add the leg at market with an M1 structural stop (capped at FIXED_STOP_PIPS)
+        # entry fill + stop on the SMALL TF only (MM_ENTRY_TF) — precision + tight
+        # risk via market structure, capped at FIXED_STOP_PIPS. The swing read above
+        # already happened on the IFVG-proportional TF; this is purely the entry.
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = cur_price + d * _fric
-        bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
+        bars1m = self.bars_up_to(pair, config.MM_ENTRY_TF, t, max_bars=120)
         stop = self._m1_structure_stop(bars1m, d, entry, pip)
         _max_stop = config.FIXED_STOP_PIPS * pip
         if stop is None or abs(entry - stop) > _max_stop:

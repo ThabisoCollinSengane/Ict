@@ -447,16 +447,34 @@ PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.25"))
 MM_CONTINUATION_ENABLED = bool(int(_os.environ.get("MM_CONTINUATION_ENABLED", 0)))
 # FVG hunt cascade, HIGHEST → lowest. We take the FIRST (highest) TF that has an
 # FVG; its inversion (full-body close) is judged on that TF AND the next-lower one.
-MM_IFVG_TFS         = ("D", "240T", "60T", "30T", "20T", "15T", "10T", "5T", "1T")
+MM_IFVG_TFS         = ("W", "D", "240T", "60T", "30T", "20T", "15T", "10T", "5T", "1T")
 # SMT cascade (the reversal confirmation), HIGHEST → lowest.
 MM_SMT_TFS          = ("D", "240T", "60T", "30T", "15T", "5T", "1T")
 # Extra intraday rungs that aren't in the base resample set (M5→30/20/10min). Built
 # ONLY when MM is enabled, so the default backtester is byte-identical.
 MM_EXTRA_TFS        = (("30T", "30min"), ("20T", "20min"), ("10T", "10min"))
-MM_STRUCTURE_TF     = "1T"                # M1 retracement-entry swing (high/low)
+# CRITICAL — the retracement swing scales with the IFVG timeframe. A W1/D1 IFVG's
+# reversal swing forms on H4/H1 (close + relevant to the gap), NOT on M1. Hunting the
+# swing at M1 for an HTF gap reads noise and ruins the model. Map: IFVG-TF → the TF(s)
+# the retracement swing (high/low) must form on. The ENTRY + stop are then placed on
+# MM_ENTRY_TF (M1) — the small TFs are used ONLY for entry precision / risk, never for
+# the swing read.
+MM_SWING_TF_MAP     = {
+    "W":    ("240T", "60T"),      # W1 IFVG  → H4/H1 swing
+    "D":    ("240T", "60T"),      # D1 IFVG  → H4/H1 swing
+    "240T": ("60T", "30T"),       # H4 IFVG  → H1/M30 swing
+    "60T":  ("30T", "15T"),       # H1 IFVG  → M30/M15 swing
+    "30T":  ("15T", "5T"),        # M30 IFVG → M15/M5 swing
+    "20T":  ("15T", "5T"),        # M20 IFVG → M15/M5 swing
+    "15T":  ("5T", "1T"),         # M15 IFVG → M5/M1 swing
+    "10T":  ("5T", "1T"),         # M10 IFVG → M5/M1 swing
+    "5T":   ("1T",),              # M5 IFVG  → M1 swing
+    "1T":   ("1T",),              # M1 IFVG  → M1 swing
+}
+MM_ENTRY_TF         = "1T"                # entry fill + structural stop only (risk)
 MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to the FVG scan
 MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "8"))
-MM_STRUCTURE_MAX_AGE = 4                  # M1 confirm swing must be this fresh
+MM_STRUCTURE_MAX_AGE = 4                  # retracement swing must be this fresh (bars of its TF)
 # Escalate the position target to the opposing liquidity pool so the trade rides the
 # full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so
 # validation can isolate the IFVG adds from the far-target change — the far-target
