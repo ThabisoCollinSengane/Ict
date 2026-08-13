@@ -445,9 +445,17 @@ PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.25"))
 # byte-identical when off (the loop hook returns immediately). Validate IS/OOS + full
 # 4yr with run_mm_validation.py before shipping — MaxDD must hold.
 MM_CONTINUATION_ENABLED = bool(int(_os.environ.get("MM_CONTINUATION_ENABLED", 0)))
+def _mm_tf_tuple(_name, _default):
+    _v = _os.environ.get(_name)
+    return tuple(x.strip() for x in _v.split(",") if x.strip()) if _v else _default
+
 # FVG hunt cascade, HIGHEST → lowest. We take the FIRST (highest) TF that has an
 # FVG; its inversion (full-body close) is judged on that TF AND the next-lower one.
-MM_IFVG_TFS         = ("W", "D", "240T", "60T", "30T", "20T", "15T", "10T", "5T", "1T")
+# Env-overridable (comma-separated) — the winner-profile study showed W1/D1 IFVG
+# adds are the big losers (tight M5 stop vs a weekly/daily-scale draw), so excluding
+# them (MM_IFVG_TFS=240T,60T,30T,20T,15T,10T,5T) is the first filter to test.
+MM_IFVG_TFS         = _mm_tf_tuple("MM_IFVG_TFS",
+                                   ("W", "D", "240T", "60T", "30T", "20T", "15T", "10T", "5T", "1T"))
 # SMT cascade (the reversal confirmation), HIGHEST → lowest.
 MM_SMT_TFS          = ("D", "240T", "60T", "30T", "15T", "5T", "1T")
 # Extra intraday rungs that aren't in the base resample set (M5→30/20/10min). Built
@@ -474,12 +482,15 @@ MM_SWING_TF_MAP     = {
 # Entry fill + structural stop cascade: START on M5, drop to M1 only if M5 gives no
 # feasible structural stop within the FIXED_STOP_PIPS cap. Small TFs are for entry
 # precision / tight risk ONLY (never the swing read, which is MM_SWING_TF_MAP).
-MM_ENTRY_TFS        = ("5T", "1T")
+MM_ENTRY_TFS        = _mm_tf_tuple("MM_ENTRY_TFS", ("5T", "1T"))
 MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to the FVG scan
 MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "3"))
 # Cap MM re-entry adds per position (0 = unlimited). The raw validation showed the
 # adds cluster losses and deepen MaxDD; a low cap (1–2) limits that. Env-overridable.
 MM_MAX_ADDS         = int(_os.environ.get("MM_MAX_ADDS", "0"))
+# Require the parent trade's HTF draw cascade ≥ this for an MM add (winner study:
+# draw_score=0 adds were 3% WR / near-total loss). 0 = no gate. Env-overridable.
+MM_MIN_DRAW_SCORE   = int(_os.environ.get("MM_MIN_DRAW_SCORE", "0"))
 MM_STRUCTURE_MAX_AGE = 4                  # retracement swing must be this fresh (bars of its TF)
 # Escalate the position target to the opposing liquidity pool so the trade rides the
 # full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so

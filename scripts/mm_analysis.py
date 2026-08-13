@@ -73,7 +73,7 @@ def _agg(df):
     if n == 0:
         return (0, None, None, None)
     wr = 100.0 * df["win"].mean()
-    rs = [r for r in df["R"].tolist() if r is not None]
+    rs = [r for r in df["R"].tolist() if r is not None and r == r]  # drop None + NaN
     pf = _pf(rs) if rs else None
     meanr = (sum(rs) / len(rs)) if rs else None
     return (n, wr, pf, meanr)

@@ -3532,6 +3532,10 @@ class Backtester:
         if config.MM_MAX_ADDS and st.get("mm_adds", 0) >= config.MM_MAX_ADDS:
             g["mm_blocked_max_adds"] = g.get("mm_blocked_max_adds", 0) + 1
             return
+        # Require HTF draw alignment (winner study: draw_score=0 adds were 3% WR).
+        if st.get("draw_score", 0) < config.MM_MIN_DRAW_SCORE:
+            g["mm_blocked_draw"] = g.get("mm_blocked_draw", 0) + 1
+            return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if not can_open_new_trade(now, pair):
             return
