@@ -157,6 +157,16 @@ def main():
     open(out, "w").write(text)
     print(text)
     print(f"[report → {os.path.relpath(out, _ROOT)}]")
+    # auto-publish (data/ is gitignored) so Claude can read it without manual git
+    def _git(*a):
+        return subprocess.run(["git", *a], cwd=_ROOT, capture_output=True, text=True)
+    _git("add", "-f", out)
+    _git("commit", "-q", "-m", f"MM validation results (auto, commit {head})")
+    _git("pull", "-q", "--no-rebase", "--no-edit", "origin", "HEAD")
+    if _git("push", "origin", "HEAD").returncode == 0:
+        print("RESULTS PUSHED — Claude can read data/mm_validation.md")
+    else:
+        print("(auto-push failed — paste the tables above to Claude)")
     return 0
 
 
