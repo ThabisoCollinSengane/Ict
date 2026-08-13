@@ -39,8 +39,11 @@ _ET = re.compile(r"^mm_(?P<pat>fvg|ob|breaker)_(?P<etf>m5|m1)_ifvg(?P<ifvg>.+)$"
 
 # tag columns to profile (only those present in the dump are used)
 DIMS = ["ifvg_tf", "pattern", "entry_tf", "htf_smt", "pair", "profile",
-        "direction", "draw_score", "conf_bucket", "crt_tf", "mstruct_minor_sweep",
-        "amd_swept_pdliq", "soj_type"]
+        "session_phase", "direction", "draw_score", "conf_bucket", "target_type",
+        "crt_tf", "mstruct_minor_sweep", "amd_swept_pdliq", "soj_type"]
+
+# target families we call "fib-aligned" vs "liquidity draw" for the fib-alignment read
+_FIB_TYPES = {"fib_extension", "fib", "ote", "fib_ext"}
 
 
 def parse_entry_type(et):
@@ -146,6 +149,9 @@ def analyse():
                   if (x == x and e == e) else None
                   for e, x, d, p in
                   zip(mm.get("entry"), mm.get("exit"), mm.get("direction"), mm.get("pair"))]
+    mm["stop_pips"] = [(abs(float(e) - float(s)) / pip_size(p))
+                       if (e == e and s == s) else None
+                       for e, s, p in zip(mm.get("entry"), mm.get("stop"), mm.get("pair"))]
     yr = pd.to_datetime(mm.get("opened_at"), errors="coerce").dt.year
     mm["split"] = yr.map(lambda y: "IS" if y in (2022, 2023) else
                          ("OOS" if y in (2024, 2025) else "?"))
@@ -190,14 +196,52 @@ def analyse():
     _, lrmean, _, _ = _stats([r for r in losses["R"].tolist()])
     exp_pips = _stats(mm["pips"].tolist())[1]
     exp_r = _stats([r for r in mm["R"].tolist()])[1]
+    _, wstop, _, _ = _stats(wins["stop_pips"].tolist())
+    _, lstop, _, _ = _stats(losses["stop_pips"].tolist())
     L += ["## Win / loss economics", "",
-          "| | n | avg pips | median pips | max pips | avg R |",
-          "|---|---|---|---|---|---|",
-          f"| **wins** | {wn} | {_fmt(wmean)} | {_fmt(wmed)} | {_fmt(wmax)} | {_fmt(wrmean)} |",
-          f"| losses | {ln} | {_fmt(lmean)} | {_fmt(lmed)} | {_fmt(lmax)} | {_fmt(lrmean)} |",
+          "| | n | avg pips | median pips | max pips | avg R | avg stop pips |",
+          "|---|---|---|---|---|---|---|",
+          f"| **wins** | {wn} | {_fmt(wmean)} | {_fmt(wmed)} | {_fmt(wmax)} | {_fmt(wrmean)} | {_fmt(wstop)} |",
+          f"| losses | {ln} | {_fmt(lmean)} | {_fmt(lmed)} | {_fmt(lmax)} | {_fmt(lrmean)} | {_fmt(lstop)} |",
           "",
           f"_Per-add expectancy: **{_fmt(exp_pips)} pips**, **{_fmt(exp_r)} R**. "
-          f"Biggest win {_fmt(wmax)} pips / {_fmt(wrmax)}R._", ""]
+          f"Biggest win {_fmt(wmax)} pips / {_fmt(wrmax)}R. If winners carry WIDER "
+          f"stops than losers ({_fmt(wstop)} vs {_fmt(lstop)}), the entry-precision "
+          f"fix should tighten them and lift R._", ""]
+
+    # good timeframe cascades — IFVG TFs positive (PF>1) in BOTH splits
+    if "ifvg_tf" in mm.columns:
+        good = []
+        for tf in mm["ifvg_tf"].dropna().unique():
+            sub = mm[mm["ifvg_tf"].astype(str) == str(tf)]
+            i, o = _agg(sub[sub["split"] == "IS"]), _agg(sub[sub["split"] == "OOS"])
+            if len(sub) >= 8 and (i[2] or 0) > 1.0 and (o[2] or 0) > 1.0:
+                good.append((str(tf), len(sub), i[2], o[2]))
+        good.sort(key=lambda r: r[1], reverse=True)
+        L += ["## Good timeframe cascades (PF>1 in BOTH splits, n≥8)", ""]
+        if good:
+            L += ["| IFVG TF | n | IS PF | OOS PF |", "|---|---|---|---|"]
+            L += [f"| {t} | {n} | {_fmt(ip)} | {_fmt(op)} |" for t, n, ip, op in good]
+        else:
+            L += ["_None held PF>1 in both splits at n≥8 — the cascade edge is thin/noisy._"]
+        L += [""]
+
+    # fib alignment — do the MM adds ride the strategy's fib targets, or liquidity draws?
+    if "target_type" in mm.columns:
+        mm["tgt_family"] = mm["target_type"].map(
+            lambda v: "fib" if str(v).lower() in _FIB_TYPES else "liquidity/other")
+        L += ["## Fib alignment", "",
+              "Each MM add inherits the position's target. This shows whether the "
+              "winning adds ride the strategy's **fib** targets or **liquidity** "
+              "draws (ITH/ITL/PDH-PDL) — i.e. how the existing fib logic aligns with "
+              "the MM continuation.", "",
+              "| target family | n | WR | PF | avg win pips |", "|---|---|---|---|---|"]
+        for fam in ("fib", "liquidity/other"):
+            sub = mm[mm["tgt_family"] == fam]
+            n, wr, pf, _mr = _agg(sub)
+            _, wp, _, _ = _stats(sub[sub["win"]]["pips"].tolist())
+            L.append(f"| {fam} | {n} | {_fmt(wr,'wr')} | {_fmt(pf)} | {_fmt(wp)} |")
+        L.append("")
 
     # where the big wins come from — avg win pips per bucket
     L += ["## Specs of the winning adds (winners only)", "",

@@ -3462,16 +3462,25 @@ class Backtester:
             # one materialises (the highest TF that actually "identified" an IFVG).
         return None
 
-    def _mm_entry_pattern(self, pair, direction, zone, t):
+    def _mm_entry_pattern(self, pair, direction, zone, cur_price, t):
         """Entry PD array for the MM add, on M5 first then M1 (MM_ENTRY_TFS).
 
         The entry TRIGGER is a normal FVG / OB / breaker on the small TF — the same
         PD arrays the base strategy enters on. Where a NORMAL FVG OVERLAPS the IFVG
         zone, that normal FVG is the entry (the trader's rule: IFVG is the zone
         context, the overlapping normal FVG is the precise trigger). OB/breaker are
-        the fallback when no overlapping FVG exists. Returns (stop, tag, tf) or None.
+        the fallback when no overlapping FVG exists. Returns (entry_level, stop, tag,
+        tf) or None. The entry_level is the PD-array price (a limit into the
+        retracement), which the caller fills as a limit — this is the precision fix:
+        entering AT the FVG (tight true stop) instead of at market with a wide cap.
+        Only levels on the retracement side of cur_price qualify (a genuine limit).
         """
         _, zlo, zhi = zone
+
+        def _retrace_ok(el):
+            # short (d<0): limit SELL at/above price; long: limit BUY at/below price
+            return (el >= cur_price) if direction < 0 else (el <= cur_price)
+
         for etf in config.MM_ENTRY_TFS:              # ("5T", "1T")
             bars = self.bars_up_to(pair, etf, t,
                                    max_bars=(120 if etf == "1T" else None))
@@ -3481,14 +3490,14 @@ class Backtester:
             lookback = 24 if etf == "5T" else 30
             fvg = self._find_fvg_entry(bars, pair, direction, lookback=lookback)
             # (a) normal FVG overlapping the IFVG zone — the preferred entry
-            if fvg is not None and zlo <= fvg[0] <= zhi:
-                return (fvg[1], f"fvg_{lbl}", etf)
+            if fvg is not None and zlo <= fvg[0] <= zhi and _retrace_ok(fvg[0]):
+                return (fvg[0], fvg[1], f"fvg_{lbl}", etf)
             # (b) OB / breaker fallback, then a non-overlapping FVG on this TF
             for r, tag in ((self._find_ob_entry(bars, pair, direction), f"ob_{lbl}"),
                            (self._find_breaker_entry(bars, pair, direction), f"breaker_{lbl}"),
                            (fvg, f"fvg_{lbl}")):
-                if r is not None:
-                    return (r[1], tag, etf)
+                if r is not None and _retrace_ok(r[0]):
+                    return (r[0], r[1], tag, etf)
         return None
 
     def _opposing_liquidity(self, pair, direction, price, t):
@@ -3581,17 +3590,26 @@ class Backtester:
 
         # (4) entry TRIGGER: an M5 FVG/OB/breaker (drop to M1 if M5 has none), with a
         # normal FVG overlapping the IFVG preferred. Small TF = precision + risk only.
-        pat = self._mm_entry_pattern(pair, d, zone, t)
+        pat = self._mm_entry_pattern(pair, d, zone, cur_price, t)
         if pat is None:
             g["mm_blocked_no_entry"] = g.get("mm_blocked_no_entry", 0) + 1
             return
-        pat_stop, pat_tag, entry_tf = pat
+        el, pat_stop, pat_tag, entry_tf = pat
+        # LIMIT fill at the PD-array level (precision fix): the current M5 bar must
+        # have TRADED to the level (no lookahead), then we fill AT it — tight true
+        # stop instead of a wide market+cap. If price hasn't reached it, retry next bar.
+        _bar = bars5[-1]
+        if (d < 0 and _bar.High < el) or (d > 0 and _bar.Low > el):
+            g["mm_blocked_not_filled"] = g.get("mm_blocked_not_filled", 0) + 1
+            return
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
-        entry = cur_price + d * _fric
+        entry = el + d * _fric                       # fill at the FVG level
         _max_stop = config.FIXED_STOP_PIPS * pip
         stop = pat_stop
-        if stop is None or abs(entry - stop) > _max_stop:
+        # true structural stop kept as-is when tighter than the cap; cap only bounds
+        # a pathological wide stop (rare now that entry sits at the array, not market).
+        if stop is None or abs(entry - stop) > _max_stop or (stop - entry) * d >= 0:
             stop = entry - _max_stop * d
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < self._min_pips_target():
