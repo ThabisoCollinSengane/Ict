@@ -3528,6 +3528,10 @@ class Backtester:
         max_legs = st.get("max_legs", config.MAX_LEGS)
         if len(st["legs"]) >= max_legs:
             return
+        # Cap MM re-entry adds per position (0 = unlimited) — limits loss-clustering.
+        if config.MM_MAX_ADDS and st.get("mm_adds", 0) >= config.MM_MAX_ADDS:
+            g["mm_blocked_max_adds"] = g.get("mm_blocked_max_adds", 0) + 1
+            return
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         if not can_open_new_trade(now, pair):
             return
