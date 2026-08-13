@@ -3462,6 +3462,35 @@ class Backtester:
             # one materialises (the highest TF that actually "identified" an IFVG).
         return None
 
+    def _mm_entry_pattern(self, pair, direction, zone, t):
+        """Entry PD array for the MM add, on M5 first then M1 (MM_ENTRY_TFS).
+
+        The entry TRIGGER is a normal FVG / OB / breaker on the small TF — the same
+        PD arrays the base strategy enters on. Where a NORMAL FVG OVERLAPS the IFVG
+        zone, that normal FVG is the entry (the trader's rule: IFVG is the zone
+        context, the overlapping normal FVG is the precise trigger). OB/breaker are
+        the fallback when no overlapping FVG exists. Returns (stop, tag, tf) or None.
+        """
+        _, zlo, zhi = zone
+        for etf in config.MM_ENTRY_TFS:              # ("5T", "1T")
+            bars = self.bars_up_to(pair, etf, t,
+                                   max_bars=(120 if etf == "1T" else None))
+            if not bars:
+                continue
+            lbl = "m5" if etf == "5T" else "m1"
+            lookback = 24 if etf == "5T" else 30
+            fvg = self._find_fvg_entry(bars, pair, direction, lookback=lookback)
+            # (a) normal FVG overlapping the IFVG zone — the preferred entry
+            if fvg is not None and zlo <= fvg[0] <= zhi:
+                return (fvg[1], f"fvg_{lbl}", etf)
+            # (b) OB / breaker fallback, then a non-overlapping FVG on this TF
+            for r, tag in ((self._find_ob_entry(bars, pair, direction), f"ob_{lbl}"),
+                           (self._find_breaker_entry(bars, pair, direction), f"breaker_{lbl}"),
+                           (fvg, f"fvg_{lbl}")):
+                if r is not None:
+                    return (r[1], tag, etf)
+        return None
+
     def _opposing_liquidity(self, pair, direction, price, t):
         """Nearest UNSWEPT opposing-liquidity pool (ITH/ITL on H4/D/W) beyond the
         current price in the trade direction — the far draw the distribution leg
@@ -3542,15 +3571,18 @@ class Backtester:
                 st["target"] = opp
                 g["mm_target_escalated"] = g.get("mm_target_escalated", 0) + 1
 
-        # entry fill + stop on the SMALL TF only (MM_ENTRY_TF) — precision + tight
-        # risk via market structure, capped at FIXED_STOP_PIPS. The swing read above
-        # already happened on the IFVG-proportional TF; this is purely the entry.
+        # (4) entry TRIGGER: an M5 FVG/OB/breaker (drop to M1 if M5 has none), with a
+        # normal FVG overlapping the IFVG preferred. Small TF = precision + risk only.
+        pat = self._mm_entry_pattern(pair, d, zone, t)
+        if pat is None:
+            g["mm_blocked_no_entry"] = g.get("mm_blocked_no_entry", 0) + 1
+            return
+        pat_stop, pat_tag, entry_tf = pat
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = cur_price + d * _fric
-        bars1m = self.bars_up_to(pair, config.MM_ENTRY_TF, t, max_bars=120)
-        stop = self._m1_structure_stop(bars1m, d, entry, pip)
         _max_stop = config.FIXED_STOP_PIPS * pip
+        stop = pat_stop
         if stop is None or abs(entry - stop) > _max_stop:
             stop = entry - _max_stop * d
         reward_pips = abs(st["target"] - entry) / pip
@@ -3566,7 +3598,7 @@ class Backtester:
         st["legs"].append({
             "entry": entry, "stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
-            "entry_type": f"mm_ifvg_{zone[0]}",
+            "entry_type": f"mm_{pat_tag}_ifvg{zone[0]}",
             "tp1": None, "tp1_hit": True, "_units_tp1": 0, "_units_tp2": units,
             "runner_be_after_tp1": False,
         })

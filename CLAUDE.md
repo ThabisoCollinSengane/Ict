@@ -1493,8 +1493,11 @@ is wired for the index book only).
 - `_mm_structure_confirm`: fresh, still-intact retracement swing (high/low) in the trade direction,
   hunted on the TF(s) **PROPORTIONAL to the IFVG timeframe** (`MM_SWING_TF_MAP`): a W1/D1 gap's swing
   forms on **H4/H1**, an H1 gap's on M30/M15, an M15 gap's on M5/M1. Reading an M1 swing for an HTF gap
-  is noise and ruins the model — the entry + stop are the ONLY thing on M1 (`MM_ENTRY_TF`), for
-  precision/risk. (W1 is in the FVG hunt too, since HTF gaps are the biggest draws.)
+  is noise and ruins the model. (W1 is in the FVG hunt too, since HTF gaps are the biggest draws.)
+- `_mm_entry_pattern`: the entry TRIGGER + stop, on **M5 first, dropping to M1** (`MM_ENTRY_TFS`) — the
+  small TF is entry-precision/risk ONLY. Trigger is a normal **FVG / OB / breaker** (the base
+  strategy's PD arrays); where a **normal FVG OVERLAPS the IFVG zone, that normal FVG is the entry**
+  (IFVG = zone context, overlapping normal FVG = precise trigger), OB/breaker the fallback.
 - `_htf_pair_smt`: EU/GU SMT divergence **cascaded D1→H4→H1→M30→M15→M5→M1** (`MM_SMT_TFS`), fires on
   any rung — tag on every trade (`htf_smt`); hard gate only when `MM_HTF_SMT_REQUIRED=1`.
 - `_opposing_liquidity`: furthest unswept H4/D/W ITH/ITL pool — used as the target ONLY when
