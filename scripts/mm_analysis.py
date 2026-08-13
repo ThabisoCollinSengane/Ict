@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 import sys
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -235,9 +236,28 @@ def _selftest():
     return 0
 
 
+def _publish(path):
+    """Force-add (data/ is gitignored), commit, pull, push the report so Claude
+    can read it without the manual git dance. Best-effort — prints on failure."""
+    def _git(*args):
+        return subprocess.run(["git", *args], cwd=_ROOT,
+                              capture_output=True, text=True)
+    _git("add", "-f", path)
+    sha = (_git("rev-parse", "--short", "HEAD").stdout.strip() or "unknown")
+    _git("commit", "-q", "-m", f"MM winners report (auto, commit {sha})")
+    _git("pull", "-q", "--no-rebase", "--no-edit", "origin", "HEAD")
+    p = _git("push", "origin", "HEAD")
+    if p.returncode == 0:
+        print("RESULTS PUSHED — Claude can read data/mm_winners_report.md")
+    else:
+        print("(auto-push failed — paste the report above to Claude)\n" + p.stderr[-300:])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--no-push", action="store_true",
+                    help="write + print the report but don't commit/push it")
     a = ap.parse_args()
     if a.selftest:
         return _selftest()
@@ -246,6 +266,8 @@ def main():
         f.write(text)
     print(text)
     print(f"[report → {os.path.relpath(REPORT, _ROOT)}]")
+    if not a.no_push:
+        _publish(REPORT)
     return 0
 
 
