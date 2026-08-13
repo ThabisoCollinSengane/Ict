@@ -445,9 +445,16 @@ PDLIQ_SWEEP_MULT   = float(_os.environ.get("PDLIQ_SWEEP_MULT", "1.25"))
 # byte-identical when off (the loop hook returns immediately). Validate IS/OOS + full
 # 4yr with run_mm_validation.py before shipping — MaxDD must hold.
 MM_CONTINUATION_ENABLED = bool(int(_os.environ.get("MM_CONTINUATION_ENABLED", 0)))
-MM_IFVG_TFS         = ("15T", "5T")       # cascade scanned for inversion FVGs
-MM_STRUCTURE_TF     = "1T"                # M1 structure-shift confirmation
-MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to find_inversion_fvgs
+# FVG hunt cascade, HIGHEST → lowest. We take the FIRST (highest) TF that has an
+# FVG; its inversion (full-body close) is judged on that TF AND the next-lower one.
+MM_IFVG_TFS         = ("D", "240T", "60T", "30T", "20T", "15T", "10T", "5T", "1T")
+# SMT cascade (the reversal confirmation), HIGHEST → lowest.
+MM_SMT_TFS          = ("D", "240T", "60T", "30T", "15T", "5T", "1T")
+# Extra intraday rungs that aren't in the base resample set (M5→30/20/10min). Built
+# ONLY when MM is enabled, so the default backtester is byte-identical.
+MM_EXTRA_TFS        = (("30T", "30min"), ("20T", "20min"), ("10T", "10min"))
+MM_STRUCTURE_TF     = "1T"                # M1 retracement-entry swing (high/low)
+MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to the FVG scan
 MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "8"))
 MM_STRUCTURE_MAX_AGE = 4                  # M1 confirm swing must be this fresh
 # Escalate the position target to the opposing liquidity pool so the trade rides the

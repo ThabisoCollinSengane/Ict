@@ -1484,10 +1484,16 @@ is wired for the index book only).
 
 **Implementation (`_mm_continuation` in backtest.py + config `MM_*`, default OFF):**
 - Fires only on an already-open position (the reversal defines model direction + opposing pool).
-- `_mm_ifvg_zone`: price retraced INTO an M15/M5 inversion FVG in the trade direction (`ict.ifvg`).
-- `_mm_structure_confirm`: fresh, still-intact M1 swing in the trade direction (the LTF shift).
-- `_htf_pair_smt`: H1 EU/GU SMT divergence — tag on every trade (`htf_smt`); hard gate only when
-  `MM_HTF_SMT_REQUIRED=1`.
+- `_mm_ifvg_zone`: **cascades the FVG ladder HIGHEST→lowest** (`MM_IFVG_TFS` = D1, H4, H1, M30, M20,
+  M15, M10, M5, M1) and takes the FIRST TF with a valid inverted+retraced-into IFVG in the trade
+  direction. **The full-body-close inversion is judged on that TF AND the next-lower rung** (the
+  trader's cross-TF rule) via `ict.ifvg.latest_inversion` — a box defined on M30 can be inverted by a
+  full-body close seen on M20. M30/M20/M10 aren't in the default resample set; they're built (from M5)
+  ONLY when MM is enabled, so the default backtester is byte-identical.
+- `_mm_structure_confirm`: fresh, still-intact M1 swing (high/low) in the trade direction — the
+  retracement entry hunted on the LTF after the IFVG identifies.
+- `_htf_pair_smt`: EU/GU SMT divergence **cascaded D1→H4→H1→M30→M15→M5→M1** (`MM_SMT_TFS`), fires on
+  any rung — tag on every trade (`htf_smt`); hard gate only when `MM_HTF_SMT_REQUIRED=1`.
 - `_opposing_liquidity`: furthest unswept H4/D/W ITH/ITL pool — used as the target ONLY when
   `MM_TARGET_OPPOSING=1` (kept a separate flag: the far-target change is the piece that repeatedly
   failed — HTF_TARGET_PREF −22%, TRAIL_AT_TP −49%, TP_RUNNER −75% — so it's opt-in ON TOP of the adds).

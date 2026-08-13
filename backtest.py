@@ -113,9 +113,14 @@ class Backtester:
         self.tf_bars = {}     # pre-built list[Bar] for fast slicing
         self.tf_index = {}    # pandas DatetimeIndex per (sym, tf) for searchsorted
         self.tf_pos = {}      # (sym, tf) -> dict[timestamp] -> position (for _bar_at)
+        _tf_list = [("5T", None), ("15T", "15min"), ("60T", "60min"),
+                    ("240T", "240min"), ("D", "1D"), ("W", "1W")]
+        # MM cascade needs M30/M20/M10 (not in the default set). Built only when the
+        # Market Maker model is on, so the default backtester is byte-identical.
+        if config.MM_CONTINUATION_ENABLED:
+            _tf_list += list(config.MM_EXTRA_TFS)
         for sym, df in data_5m.items():
-            for tf_name, rule in [("5T", None), ("15T", "15min"), ("60T", "60min"),
-                                   ("240T", "240min"), ("D", "1D"), ("W", "1W")]:
+            for tf_name, rule in _tf_list:
                 d = df if rule is None else resample(df, rule)
                 self.tf_dfs[(sym, tf_name)] = d
                 self.tf_bars[(sym, tf_name)] = df_to_bars(d)
@@ -3386,17 +3391,20 @@ class Backtester:
         if partner is None:
             return False
         from ict.smt import smt_divergence
-        tf = config.MM_HTF_SMT_TF
         lb = config.MM_HTF_SMT_LOOKBACK
-        p = self.bars_up_to(pair, tf, t, max_bars=lb + 5)
-        r = self.bars_up_to(partner, tf, t, max_bars=lb + 5)
-        if len(p) < lb or len(r) < lb:
-            return False
+        # Walk the SMT cascade (D1→M1); fire if divergence shows on ANY rung.
         # direction is the TRADE direction (short = -1). smt_divergence's `direction`
         # is the sweep direction: a short fades a buy-side sweep (higher high) = -1.
-        # positive correlation → inverse=False. Check either pair as the primary.
-        return (smt_divergence(p, r, direction, inverse=False, lookback=lb) or
-                smt_divergence(r, p, direction, inverse=False, lookback=lb))
+        # positive correlation → inverse=False. Either pair may be the primary.
+        for tf in config.MM_SMT_TFS:
+            p = self.bars_up_to(pair, tf, t, max_bars=lb + 5)
+            r = self.bars_up_to(partner, tf, t, max_bars=lb + 5)
+            if len(p) < lb or len(r) < lb:
+                continue
+            if (smt_divergence(p, r, direction, inverse=False, lookback=lb) or
+                    smt_divergence(r, p, direction, inverse=False, lookback=lb)):
+                return True
+        return False
 
     def _mm_structure_confirm(self, pair, direction, t):
         """Fresh, still-intact M1 swing in the trade direction — the LTF structure
@@ -3416,17 +3424,36 @@ class Backtester:
         return not last.swept
 
     def _mm_ifvg_zone(self, pair, direction, cur_price, t):
-        """The M15→M5 inversion FVG the price is currently retraced INTO, in the
-        trade direction. Returns (tf_label, lo, hi) or None. For a short we want a
-        SUPPLY inversion (idir -1) price has pulled UP into; long → demand (+1)."""
-        from ict.ifvg import find_inversion_fvgs
-        for tf in config.MM_IFVG_TFS:
-            bars = self.bars_up_to(pair, tf, t, max_bars=config.MM_IFVG_SCAN_BARS)
+        """The inversion FVG price is currently retraced INTO, found by cascading
+        the TF ladder HIGHEST→lowest and taking the FIRST TF that has one.
+
+        The full-body-close inversion of a TF's FVG box is judged on THAT TF and the
+        next-lower TF in the cascade (the trader's rule). For a short we want a
+        SUPPLY inversion (idir -1) price pulled UP into; long → demand (+1).
+        Returns (tf_label, lo, hi) or None.
+        """
+        from ict.ifvg import _fvgs, latest_inversion
+        cap = config.MM_IFVG_SCAN_BARS
+        cascade = config.MM_IFVG_TFS
+        for i, tf in enumerate(cascade):
+            bars = self.bars_up_to(pair, tf, t, max_bars=cap)
             if len(bars) < 3:
                 continue
-            for z in find_inversion_fvgs(bars, direction=direction, max_zones=3):
-                if z["lo"] <= cur_price <= z["hi"]:
-                    return (tf, z["lo"], z["hi"])
+            boxes = _fvgs(bars)
+            if not boxes:
+                continue
+            lower = (self.bars_up_to(pair, cascade[i + 1], t, max_bars=cap)
+                     if i + 1 < len(cascade) else [])
+            for (bi, lo, hi) in reversed(boxes):      # most recent box first
+                if not (lo <= cur_price <= hi):       # must be retraced into it
+                    continue
+                idir = latest_inversion(bars[bi:], lo, hi)    # judged on this TF…
+                if idir == 0 and lower:
+                    idir = latest_inversion(lower, lo, hi)    # …and the next lower
+                if idir == direction:
+                    return (tf, lo, hi)
+            # no valid inverted+retraced IFVG on this TF → keep cascading down until
+            # one materialises (the highest TF that actually "identified" an IFVG).
         return None
 
     def _opposing_liquidity(self, pair, direction, price, t):

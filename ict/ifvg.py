@@ -42,6 +42,41 @@ def _inversion(bars, form_idx, lo, hi, scan):
     return None
 
 
+def latest_inversion(bars, lo, hi):
+    """Inversion direction of a KNOWN FVG box (lo, hi), judged against `bars`.
+
+    Cross-timeframe: the box can be defined on a higher timeframe and the
+    full-body close that inverts it judged on this (same or next-lower) timeframe's
+    bars — the cascade rule "the full-body close is judged on the first TF that
+    identified the IFVG and the following lower TF". Requires a TOUCH into the box
+    first (ICT: a gap must be traded into before it can invert), then the first
+    full-body close beyond it decides the side.
+
+    Returns +1 (demand/support — closed a full body ABOVE the box),
+            -1 (supply/resistance — closed a full body BELOW), or 0 (no inversion).
+    A later full-body close back through the other way is treated as spent (0).
+    """
+    touched = False
+    idir = 0
+    for c in bars:
+        if c.Low <= hi and c.High >= lo:
+            touched = True
+        if not touched:
+            continue
+        if idir == 0:
+            if c.Open > hi and c.Close > hi:
+                idir = +1
+            elif c.Open < lo and c.Close < lo:
+                idir = -1
+        else:
+            # spent if a full body later closes the opposite way through the box
+            if idir > 0 and c.Open < lo and c.Close < lo:
+                return 0
+            if idir < 0 and c.Open > hi and c.Close > hi:
+                return 0
+    return idir
+
+
 def find_inversion_fvgs(bars, direction=0, scan=60, max_zones=3, still_intact=True):
     """Recent inversion FVGs as dicts {dir, lo, hi, mid, inv_idx}, newest first.
 
