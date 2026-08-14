@@ -3511,15 +3511,54 @@ class Backtester:
                     return (r[0], r[1], tag, etf)
         return None
 
-    def _mm_structural_stop(self, zone, direction, entry, pip):
-        """Stop just beyond the IFVG gap EDGE (the side an internal manipulation would
-        sweep) — structural, not a flat FIXED_STOP cap. Short → above the gap high;
-        long → below the gap low; + MM_STOP_BUF_PIPS. Clamped to MM_MAX_STOP_PIPS."""
+    def _mm_internal_amd(self, pair, direction, zone, t):
+        """The INTERNAL mini-AMD inside the IFVG (the trader's core model): on M5 then
+        M1, an internal short-term extreme AGAINST the trade was SWEPT and price closed
+        back on our side — the internal manipulation. Returns the stop level just beyond
+        that swept extreme (tight + survivable), or None if the manipulation hasn't
+        happened yet. Short → an internal high wicked + closed back below → stop above
+        it; long → mirror."""
+        _, zlo, zhi = zone
+        pip = pip_size(pair)
+        buf = config.MM_STOP_BUF_PIPS * pip
+        for tf in ("5T", "1T"):
+            bars = self.bars_up_to(pair, tf, t, max_bars=60)
+            if len(bars) < 5:
+                continue
+            res = mstruct.classify(bars)
+            swings = res.get("sth" if direction < 0 else "stl", [])
+            cur = bars[-1].Close
+            for sw in reversed(swings):               # most recent internal extreme
+                if not (zlo - buf <= sw.price <= zhi + buf):
+                    continue                          # must be inside/at the gap
+                if not sw.swept:
+                    continue                          # the extreme must have been TAKEN
+                if direction < 0 and cur < sw.price:  # swept a high, closed back below
+                    return sw.price + buf
+                if direction > 0 and cur > sw.price:  # swept a low, closed back above
+                    return sw.price - buf
+        return None
+
+    def _mm_structural_stop(self, zone, direction, entry, pip, t=None, pair=None):
+        """Stop for an MM entry. Prefers the INTERNAL mini-AMD stop (just beyond the
+        swept internal extreme — tight + survivable). Falls back to the gap EDGE only
+        for narrow gaps; a WIDE (>MM_WIDE_GAP_PIPS) gap with no internal manipulation
+        is too risky (edge stop blew MaxDD to -38%) → returns None so the caller skips.
+        Clamped to MM_MAX_STOP_PIPS."""
         _, zlo, zhi = zone
         buf = config.MM_STOP_BUF_PIPS * pip
-        stop = (zhi + buf) if direction < 0 else (zlo - buf)
-        if (stop - entry) * direction >= 0:          # degenerate (entry beyond edge)
-            return entry - config.MM_STOP_BUF_PIPS * pip * direction
+        gap_pips = (zhi - zlo) / pip
+        internal = None
+        if t is not None and pair is not None:
+            internal = self._mm_internal_amd(pair, direction, zone, t)
+        if internal is not None and (internal - entry) * direction < 0:
+            stop = internal
+        elif config.MM_REQUIRE_INTERNAL_AMD and gap_pips > config.MM_WIDE_GAP_PIPS:
+            return None                               # wide gap, no manip → skip
+        else:
+            stop = (zhi + buf) if direction < 0 else (zlo - buf)   # gap-edge fallback
+            if (stop - entry) * direction >= 0:
+                stop = entry - config.MM_STOP_BUF_PIPS * pip * direction
         cap = config.MM_MAX_STOP_PIPS * pip
         if abs(entry - stop) > cap:
             stop = entry - cap * direction
@@ -3694,7 +3733,10 @@ class Backtester:
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = el + d * _fric
-        stop = self._mm_structural_stop(zone, d, entry, pip)   # beyond the gap edge
+        stop = self._mm_structural_stop(zone, d, entry, pip, t=t, pair=pair)
+        if stop is None:                             # wide gap, no internal manip → skip
+            g["mm_std_wide_gap"] = g.get("mm_std_wide_gap", 0) + 1
+            return
         # DRAW = INTERNAL liquidity (the point of the ERL/IRL model): after the
         # external sweep + reversal, price delivers back INTO the range. Target the
         # nearest qualifying draw, but clamp so it never overshoots the OPPOSITE
@@ -3813,7 +3855,10 @@ class Backtester:
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = el + d * _fric                       # fill at the FVG level
-        stop = self._mm_structural_stop(zone, d, entry, pip)   # beyond the gap edge
+        stop = self._mm_structural_stop(zone, d, entry, pip, t=t, pair=pair)
+        if stop is None:                             # wide gap, no internal manip → skip
+            g["mm_blocked_wide_gap"] = g.get("mm_blocked_wide_gap", 0) + 1
+            return
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < self._min_pips_target():
             g["mm_blocked_min_target"] = g.get("mm_blocked_min_target", 0) + 1

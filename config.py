@@ -491,6 +491,14 @@ MM_ENTRY_TFS        = _mm_tf_tuple("MM_ENTRY_TFS", ("15T", "5T", "1T"))
 # ~10-20 pips; >10 is riskier but the structural stop above the last high is correct).
 MM_STOP_BUF_PIPS    = float(_os.environ.get("MM_STOP_BUF_PIPS", "1.5"))
 MM_MAX_STOP_PIPS    = float(_os.environ.get("MM_MAX_STOP_PIPS", "25"))
+# Require an INTERNAL mini-AMD inside the gap before entry (the trader's core model):
+# an internal short-term extreme AGAINST the trade is swept + closed back (the internal
+# manipulation), THEN we enter with the stop just beyond THAT extreme — tight AND
+# survivable, instead of the full gap-edge (which is too wide on >10-pip gaps and
+# blew MaxDD to -38%). Default on for the MM paths. `MM_WIDE_GAP_PIPS` = the >10-pip
+# threshold above which the gap is "riskier" and the internal-AMD stop is mandatory.
+MM_REQUIRE_INTERNAL_AMD = bool(int(_os.environ.get("MM_REQUIRE_INTERNAL_AMD", 1)))
+MM_WIDE_GAP_PIPS    = float(_os.environ.get("MM_WIDE_GAP_PIPS", "10"))
 MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to the FVG scan
 MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "3"))
 # Cap MM re-entry adds per position (0 = unlimited). The raw validation showed the
