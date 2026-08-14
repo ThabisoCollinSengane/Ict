@@ -51,6 +51,11 @@ def _parse(txt):
     return {"trades": g("trades", int), "wr": g("win_rate_pct"),
             "pf": g("profit_factor"), "dd": g("max_drawdown_pct"),
             "eq": g("ending_equity_ZAR"),
+            # withdrawal-model metrics (the ones that matter under frequent withdrawals)
+            "wdd": g("working_max_drawdown_pct"),      # DD on the working account
+            "wdn": g("withdrawn_total_ZAR"),           # total banked
+            "wbal": g("working_balance_ZAR"),          # working balance (climbing)
+            "wcount": g("withdrawal_count", int),
             "adds": (int(add.group(1)) if add else 0) + (int(std.group(1)) if std else 0),
             "esc": int(esc.group(1)) if esc else 0}
 
@@ -59,7 +64,7 @@ def _fmt(d, k, suf=""):
     v = d.get(k)
     if v is None:
         return "—"
-    return (f"{v:,.0f}" if k == "eq" else f"{v:.2f}") + suf
+    return (f"{v:,.0f}" if k in ("eq", "wdn", "wbal") else f"{v:.2f}") + suf
 
 
 def main():
@@ -68,28 +73,35 @@ def main():
     ap.add_argument("--standalone", action="store_true",
                     help="test the standalone daily-sweep MM entry (opens its own "
                          "trades) instead of the pyramid-add arms")
+    ap.add_argument("--withdraw", action="store_true",
+                    help="frequent-withdrawal model: judge on working-account DD + "
+                         "total withdrawn, not the compounding curve")
     a = ap.parse_args()
 
     smt = {"MM_HTF_SMT_REQUIRED": "1"} if a.smt else {}
-    # every arm sets BOTH MM flags explicitly so an inline env var can't leak into
-    # the baseline. OFF = "0".
-    off = {"MM_CONTINUATION_ENABLED": "0", "MM_STANDALONE_ENABLED": "0"}
+    # `common` is applied to EVERY arm (incl. baseline) so they're comparable. Under
+    # --withdraw: frequent-withdrawal model — bank 70% of profit above the keep-level
+    # on a climbing cadence, reinvest 30% so the base ratchets up. STARTING_CASH is
+    # inherited from the shell (e.g. =1000); WITHDRAW_KEEP defaults to it.
+    common = dict(smt)
+    if a.withdraw:
+        common.update({"WITHDRAW_SCHEDULE": "1", "WITHDRAW_FRACTION": "0.7",
+                       "WITHDRAW_BAND": "1000"})
+    # every arm sets BOTH MM flags explicitly so an inline env var can't leak.
+    off = {"MM_CONTINUATION_ENABLED": "0", "MM_STANDALONE_ENABLED": "0", **common}
     if a.standalone:
         arms = [
             ("baseline", dict(off)),
-            ("MM standalone", {"MM_STANDALONE_ENABLED": "1",
-                               "MM_CONTINUATION_ENABLED": "0", **smt}),
-            ("MM standalone + adds", {"MM_STANDALONE_ENABLED": "1",
-                                      "MM_CONTINUATION_ENABLED": "1", **smt}),
+            ("MM standalone", {**off, "MM_STANDALONE_ENABLED": "1"}),
+            ("MM standalone + adds", {**off, "MM_STANDALONE_ENABLED": "1",
+                                      "MM_CONTINUATION_ENABLED": "1"}),
         ]
     else:
         arms = [
             ("baseline", dict(off)),
-            ("MM adds", {"MM_CONTINUATION_ENABLED": "1", "MM_STANDALONE_ENABLED": "0",
-                         "MM_TARGET_OPPOSING": "0", **smt}),
-            ("MM adds + opp-tgt", {"MM_CONTINUATION_ENABLED": "1",
-                                   "MM_STANDALONE_ENABLED": "0",
-                                   "MM_TARGET_OPPOSING": "1", **smt}),
+            ("MM adds", {**off, "MM_CONTINUATION_ENABLED": "1", "MM_TARGET_OPPOSING": "0"}),
+            ("MM adds + opp-tgt", {**off, "MM_CONTINUATION_ENABLED": "1",
+                                   "MM_TARGET_OPPOSING": "1"}),
         ]
 
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=_ROOT,
@@ -116,13 +128,23 @@ def main():
     crash = []
     for split, _years in SPLITS:
         b = res[(split, "baseline")]
-        L += [f"## {split}", "",
-              "| arm | trades | WR% | PF | MaxDD% | equity ZAR | adds | esc |",
-              "|---|---|---|---|---|---|---|---|"]
+        if a.withdraw:
+            L += [f"## {split}", "",
+                  "| arm | trades | WR% | PF | **workDD%** | **withdrawn ZAR** | work bal | #wd | opens |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        else:
+            L += [f"## {split}", "",
+                  "| arm | trades | WR% | PF | MaxDD% | equity ZAR | adds | esc |",
+                  "|---|---|---|---|---|---|---|---|"]
         for arm, _env in arms:
             d = res[(split, arm)]
-            L.append(f"| {arm} | {_fmt(d,'trades')} | {_fmt(d,'wr')} | {_fmt(d,'pf')} "
-                     f"| {_fmt(d,'dd')} | {_fmt(d,'eq')} | {d.get('adds',0)} | {d.get('esc',0)} |")
+            if a.withdraw:
+                L.append(f"| {arm} | {_fmt(d,'trades')} | {_fmt(d,'wr')} | {_fmt(d,'pf')} "
+                         f"| {_fmt(d,'wdd')} | {_fmt(d,'wdn')} | {_fmt(d,'wbal')} "
+                         f"| {d.get('wcount') or 0} | {d.get('adds',0)} |")
+            else:
+                L.append(f"| {arm} | {_fmt(d,'trades')} | {_fmt(d,'wr')} | {_fmt(d,'pf')} "
+                         f"| {_fmt(d,'dd')} | {_fmt(d,'eq')} | {d.get('adds',0)} | {d.get('esc',0)} |")
             if d.get("pf") is None:
                 tt = logs[(split, arm)]
                 crash.append(f"### {split} / {arm} — NO SUMMARY\n\n```\n"
@@ -151,13 +173,36 @@ def main():
                 fails.append(f"{nm} MaxDD {d['dd']:.2f} worse than {base['dd']:.2f} by >1pp")
         return (not fails), ("; ".join(fails) if fails else "ok")
 
+    # Withdrawal-model verdict: judge on the WORKING-account drawdown (survival) and
+    # total withdrawn (the return) — NOT the compounding curve. Deep DD is acceptable
+    # (user's call) as long as the working account never blows up (workDD < 60%) and
+    # the arm banks more than baseline.
+    def judge_withdraw(arm):
+        f, fb = res[("Full 4yr", arm)], res[("Full 4yr", "baseline")]
+        if any(x.get("wdn") is None for x in (f, fb)) or f.get("wdd") is None:
+            return None, "crashed / no withdrawal metrics (WITHDRAW_SCHEDULE off?)"
+        fails = []
+        if f["wdn"] <= (fb["wdn"] or 0):
+            fails.append(f"withdrew {f['wdn']:,.0f} ≤ baseline {fb['wdn'] or 0:,.0f}")
+        if f["wdd"] is not None and f["wdd"] >= 60:
+            fails.append(f"working DD {f['wdd']:.0f}% — account near-blowup")
+        # both splits must also bank more than baseline (not a single-period fluke)
+        for nm, s in (("IS", "IS 2022-23"), ("OOS", "OOS 2024-25")):
+            fa, ba = res[(s, arm)], res[(s, "baseline")]
+            if (fa.get("wdn") or 0) <= (ba.get("wdn") or 0):
+                fails.append(f"{nm} withdrew ≤ baseline")
+        return (not fails), ("; ".join(fails) if fails else "banks more, working account survives")
+
     L += ["## Verdict", ""]
+    if a.withdraw:
+        L += ["_Withdrawal model: judged on **working-account DD** (survival) and "
+              "**total withdrawn** (return), not the compounding curve._", ""]
     any_green = False
     for arm, _env in arms[1:]:
         adds = sum(res[(s, arm)].get("adds", 0) for s, _y in SPLITS)
-        v, why = judge(arm)
+        v, why = (judge_withdraw(arm) if a.withdraw else judge(arm))
         if adds == 0:
-            mark, why = "⚠️ inert", "0 MM adds fired — no setups matched (check IFVG/structure gates)"
+            mark, why = "⚠️ inert", "0 MM entries fired — no setups matched (check gates)"
         elif v is None:
             mark = "⚠️ crash"
         elif v:
@@ -167,7 +212,7 @@ def main():
         L.append(f"- **{arm}: {mark}** — {why}")
     L += ["", ("_At least one arm passed — Claude reviews split magnitudes before shipping._"
                if any_green else
-               "_No arm passed the full gate. Same measure-first discipline: nothing ships._")]
+               "_No arm passed the gate._")]
     if crash:
         L += ["", "## Crash diagnostics", ""] + crash
 
