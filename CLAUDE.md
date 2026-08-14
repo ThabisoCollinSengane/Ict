@@ -1522,12 +1522,17 @@ run produced just **14 adds over 4yr**, and why leg-level economics — meanR +1
 precision fix — couldn't move the R567M compounding path: too few, equity sign-flipped IS −1% / OOS
 +7.5% = noise, MaxDD held at baseline −12.76%). The daily Judas sweep → distribution happens every day
 regardless of whether the base strategy trades, so the model must open its OWN trades. `_mm_standalone`
-(config `MM_STANDALONE_ENABLED=0`, default OFF) does this: `_mm_day_model` locks the day's distribution
-direction when price sweeps a reference high/low (PDH/PDL, London/NY session open, or recent ITH/ITL
-swing — per `MM_SWEEP_MIN_PIPS`) and closes back inside; then on an IFVG retrace in that direction it
-opens a trade via `_mm_open_position` (same IFVG cascade / proportional swing / M5-FVG entry / SMT as
-the add path), targeting the nearest qualifying draw (`_find_target`) or the opposing pool
-(`MM_STANDALONE_TARGET_OPPOSING=1`). Same direction as the base Judas reversal, just not gated by
+(config `MM_STANDALONE_ENABLED=0`, default OFF) does this using the **EXTERNAL/INTERNAL range-liquidity
+model** (`ict.dealing_range`): the dealing range's two swept extremes are EXTERNAL liquidity (ERL).
+`_mm_day_model` locks the day's direction when price takes out ONE external side (sweeps the DR high or
+low, per `MM_SWEEP_MIN_PIPS`) and closes back inside — the Judas — reversing to deliver toward INTERNAL
+liquidity. **The highs/lows are the DRAW, not the entry** (user correction): the external extreme is the
+sweep trigger, the entry is a PD array in the correct **premium/discount half** (`is_valid_entry_zone` —
+sell in premium after sweeping the high, buy in discount), and the **DRAW/target is INTERNAL** (nearest
+qualifying draw via `_find_target`, clamped to the range **equilibrium** so it never overshoots the
+opposite external — the far-external target `MM_STANDALONE_TARGET_OPPOSING` is kept only for A/B and is
+the repeatedly-failed config). Opens via `_mm_open_position` (same IFVG cascade / proportional swing /
+M5-FVG entry / SMT as the add path). Same direction as the base Judas reversal, just not gated by
 MSS-2of3 / consolidation / draw-cascade. **HIGH RISK — standalone gate-bypass entries have failed
 before (SOJ bypass −17%); default OFF, validate with `python run_mm_validation.py --standalone [--smt]`
 before shipping.** Fib-alignment finding worth harvesting independently: MM adds targeting LIQUIDITY

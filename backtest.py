@@ -142,6 +142,7 @@ class Backtester:
         self._max_work_dd = 0.0         # worst % drawdown seen on the working balance
         self.active = {}
         self._mm_day_dir = {}     # (pair, date) -> locked MM distribution direction
+        self._mm_day_range = {}   # (pair, date) -> (dr_high, dr_low, equilibrium)
         self._mm_day_count = {}   # (pair, date) -> standalone MM entries opened today
         self.trades = []
         self.reject_log = []   # near-misses: setups that formed then hit a gate
@@ -3538,45 +3539,44 @@ class Backtester:
         return "other"
 
     def _mm_day_model(self, pair, t):
-        """The day's Judas-sweep direction (the MM model): +1 distribute UP (sell-side
-        taken), -1 distribute DOWN (buy-side taken), 0 none yet. A sweep = price wicks
-        beyond a reference high/low by ≥ MM_SWEEP_MIN_PIPS then trades back inside.
-        References (any): PDH/PDL, London/NY session open, recent ITH/ITL swing.
-        Locked per (pair, date) once detected so the day's context is carried."""
+        """The day's MM direction from the EXTERNAL/INTERNAL liquidity model.
+
+        The dealing range (ict.dealing_range) is bounded by the two swept liquidity
+        extremes = EXTERNAL range liquidity (ERL). When price takes out ONE external
+        side (sweeps the DR high or low) and closes back inside, that is the Judas:
+        it reverses to deliver toward INTERNAL liquidity (IRL — an FVG / the opposite
+        half). So:
+          sweep DR HIGH (external BSL) + close back below → distribute DOWN → +? no,
+            direction -1 (sell in premium, draw = internal/discount).
+          sweep DR LOW  (external SSL) + close back above → distribute UP → +1.
+        The external extremes are the SWEEP; the DRAW is INTERNAL (handled in the
+        target selection). Locked per (pair, date); the range is cached for targeting.
+        """
+        from ict.dealing_range import detect_dealing_range
         now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
         key = (pair, now.date())
         if key in self._mm_day_dir:
             return self._mm_day_dir[key]
         pip = pip_size(pair)
         buf = config.MM_SWEEP_MIN_PIPS * pip
-        highs, lows = [], []
-        mp = self._market_profile(pair, t)
-        if mp:
-            highs.append(mp["pdh"]); lows.append(mp["pdl"])
-        for sess in ("London", "New York AM"):
-            so = self._session_open(pair, sess, t)
-            if so is not None:
-                highs.append(so); lows.append(so)
-        res = mstruct.classify(self.bars_up_to(pair, "60T", t, max_bars=120))
-        ith, itl = mstruct.last_intact(res, "ITH"), mstruct.last_intact(res, "ITL")
-        if ith:
-            highs.append(ith.price)
-        if itl:
-            lows.append(itl.price)
+        dr = detect_dealing_range(
+            self.bars_up_to(pair, "60T", t, max_bars=150), lookback=100)
+        if dr is None or dr.width <= 0:
+            return 0
         bars = self.bars_up_to(pair, "5T", t, max_bars=config.MM_SWEEP_LOOKBACK)
         if not bars:
             return 0
-        day_high = max(b.High for b in bars)
-        day_low = min(b.Low for b in bars)
+        hi = max(b.High for b in bars)
+        lo = min(b.Low for b in bars)
         cur = bars[-1].Close
         d = 0
-        # buy-side taken (swept a high, closed back below) → distribute DOWN
-        if any(day_high > rh + buf and cur < rh for rh in highs):
-            d = -1
-        elif any(day_low < rl - buf and cur > rl for rl in lows):
-            d = +1
+        if hi > dr.high + buf and cur < dr.high:      # external BSL swept, closed back
+            d = -1                                    # → distribute DOWN to internal
+        elif lo < dr.low - buf and cur > dr.low:      # external SSL swept, closed back
+            d = +1                                    # → distribute UP to internal
         if d != 0:
-            self._mm_day_dir[key] = d      # lock the day's context
+            self._mm_day_dir[key] = d
+            self._mm_day_range[(pair, now.date())] = (dr.high, dr.low, dr.equilibrium)
         return d
 
     def _mm_open_position(self, pair, direction, entry, stop, target, target_type,
@@ -3619,6 +3619,15 @@ class Backtester:
             return
         cur_price = bars5[-1].Close
         pip = pip_size(pair)
+        # entry must be in the correct half — sell in PREMIUM (after sweeping the DR
+        # high), buy in DISCOUNT (after sweeping the DR low). Smart money sells the
+        # premium, buys the discount.
+        _dr = self._mm_day_range.get(daykey)
+        if _dr is not None:
+            from ict.dealing_range import is_valid_entry_zone
+            if not is_valid_entry_zone(cur_price, _dr[0], _dr[1], d):
+                g["mm_std_wrong_half"] = g.get("mm_std_wrong_half", 0) + 1
+                return
         zone = self._mm_ifvg_zone(pair, d, cur_price, t)
         if zone is None:
             g["mm_std_no_ifvg"] = g.get("mm_std_no_ifvg", 0) + 1
@@ -3645,12 +3654,22 @@ class Backtester:
         stop = pat_stop
         if stop is None or abs(entry - stop) > _max_stop or (stop - entry) * d >= 0:
             stop = entry - _max_stop * d
-        # target: opposing pool (opt-in) else nearest qualifying draw (base logic)
-        if config.MM_STANDALONE_TARGET_OPPOSING:
+        # DRAW = INTERNAL liquidity (the point of the ERL/IRL model): after the
+        # external sweep + reversal, price delivers back INTO the range. Target the
+        # nearest qualifying draw, but clamp so it never overshoots the OPPOSITE
+        # external extreme — an over-far external target is the repeatedly-failed
+        # config. The dealing-range equilibrium is the internal-liquidity anchor.
+        dr = self._mm_day_range.get(daykey)
+        if config.MM_STANDALONE_TARGET_OPPOSING:      # kept for A/B; the wrong model
             target = self._opposing_liquidity(pair, d, entry, t)
-            target_type = "opposing_liquidity"
+            target_type = "opposing_external"
         else:
             target, target_type, _ = self._find_target(pair, d, t, entry, stop=stop)
+            if dr is not None and target is not None:
+                dr_hi, dr_lo, dr_eq = dr
+                overshoot = (d < 0 and target < dr_lo) or (d > 0 and target > dr_hi)
+                if overshoot:                          # don't reach past external → use eq
+                    target, target_type = dr_eq, "range_equilibrium"
         if target is None or abs(target - entry) / pip < self._min_pips_target():
             g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
             return

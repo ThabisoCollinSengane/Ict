@@ -494,12 +494,15 @@ MM_MIN_DRAW_SCORE   = int(_os.environ.get("MM_MIN_DRAW_SCORE", "0"))
 # STANDALONE MM entry (OFF by default). The MM continuation above is a pyramid ADD —
 # it only fires while a base position is open, so it's capped by the base strategy's
 # ~4-trades/week frequency (why only ~14 fired over 4yr). This opens the MM model as
-# its OWN trade: identify the day's Judas sweep (price takes out a reference high/low
-# and closes back inside → distribution direction), then enter on IFVG retraces toward
-# the opposing pool — regardless of whether the base strategy took a trade. Same
-# direction as the base Judas reversal (short the swept high), just not gated by MSS/
-# consolidation/draw-cascade. Sweep references (any): PDH/PDL, session open, recent
-# ITH/ITL swing. Default OFF + validate — standalone gate-bypass entries have failed
+# its OWN trade using the EXTERNAL/INTERNAL range-liquidity model (ict.dealing_range):
+# the dealing range's two swept extremes are EXTERNAL liquidity (ERL). When price takes
+# out ONE external side (sweeps the DR high or low) and closes back inside — the Judas —
+# it reverses to deliver toward INTERNAL liquidity (IRL: an FVG / the opposite half).
+# Entry = a PD array in the correct premium/discount half (sell in premium after
+# sweeping the high, buy in discount); DRAW/target = INTERNAL (nearest qualifying draw,
+# clamped to the range equilibrium so it never overshoots the opposite external — the
+# far-external target is the repeatedly-failed config). Not gated by MSS/consolidation/
+# draw-cascade. Default OFF + validate — standalone gate-bypass entries have failed
 # before (SOJ bypass -17%), so this must clear the same MaxDD gate before shipping.
 MM_STANDALONE_ENABLED = bool(int(_os.environ.get("MM_STANDALONE_ENABLED", 0)))
 MM_STANDALONE_MAX_PER_DAY = int(_os.environ.get("MM_STANDALONE_MAX_PER_DAY", "2"))
