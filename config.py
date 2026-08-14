@@ -22,7 +22,7 @@ def _envi(name, default):
 
 
 # --- Capital + risk ---
-STARTING_CASH = 500                # R500 ZAR starting capital
+STARTING_CASH = _envi("STARTING_CASH", 500)   # ZAR starting capital (env-overridable)
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
 
 # --- Profit withdrawal model (realistic account, no runaway compounding) ---
@@ -233,7 +233,7 @@ TELEGRAM_OPEN_VIEW  = int(_os.environ.get("TELEGRAM_OPEN_VIEW", "0"))
 MAX_DRAWDOWN_HALT_PCT   = 15.0    # normal phase: -15% from peak → 10-day pause
 DRAWDOWN_PAUSE_DAYS     = 10      # 2-week break outlasts most short-term adverse regimes
 GROWTH_PHASE_EQUITY     = 3_000   # ZAR — below this the growth-phase floor applies
-GROWTH_PHASE_FLOOR_ZAR  = 250     # halt only when equity drops to this during growth
+GROWTH_PHASE_FLOOR_ZAR  = _envf("GROWTH_PHASE_FLOOR_ZAR", STARTING_CASH / 2)  # half of funding
 # 2. Daily loss cap: stop opening new trades for the rest of the calendar day once
 #    daily losses exceed this % of the account equity at day open.
 MAX_DAILY_LOSS_PCT      = 6.0     # ~2 full stop-losses at 0.03 lots
