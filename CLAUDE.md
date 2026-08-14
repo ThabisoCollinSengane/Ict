@@ -1515,8 +1515,29 @@ is wired for the index book only).
 `MM_MIN_FAVOUR_PIPS=3`. Default OFF → the loop hook
 returns immediately and `htf_smt` is never computed, so the default run is byte-identical.
 
+**Frequency diagnosis + STANDALONE entry (2026-08-13):** the continuation above is a pyramid ADD —
+`_mm_continuation` returns early when `self.active.get(pair) is None`, so it ONLY fires while a base
+position is open. That caps it at the base strategy's ~4-trades/week frequency (why the faithful-entry
+run produced just **14 adds over 4yr**, and why leg-level economics — meanR +1.05, PF 3.65 after the
+precision fix — couldn't move the R567M compounding path: too few, equity sign-flipped IS −1% / OOS
++7.5% = noise, MaxDD held at baseline −12.76%). The daily Judas sweep → distribution happens every day
+regardless of whether the base strategy trades, so the model must open its OWN trades. `_mm_standalone`
+(config `MM_STANDALONE_ENABLED=0`, default OFF) does this: `_mm_day_model` locks the day's distribution
+direction when price sweeps a reference high/low (PDH/PDL, London/NY session open, or recent ITH/ITL
+swing — per `MM_SWEEP_MIN_PIPS`) and closes back inside; then on an IFVG retrace in that direction it
+opens a trade via `_mm_open_position` (same IFVG cascade / proportional swing / M5-FVG entry / SMT as
+the add path), targeting the nearest qualifying draw (`_find_target`) or the opposing pool
+(`MM_STANDALONE_TARGET_OPPOSING=1`). Same direction as the base Judas reversal, just not gated by
+MSS-2of3 / consolidation / draw-cascade. **HIGH RISK — standalone gate-bypass entries have failed
+before (SOJ bypass −17%); default OFF, validate with `python run_mm_validation.py --standalone [--smt]`
+before shipping.** Fib-alignment finding worth harvesting independently: MM adds targeting LIQUIDITY
+draws beat fib-target adds (WR 60% vs 44%, PF 6.24 vs 2.71) — the distribution wants the liquidity pool,
+not the nearer fib. `scripts/mm_analysis.py` reports avg stops (win/loss), good cascades (H4 the only
+robust one), sessions, pairs, fib alignment; auto-pushes its report.
+
 **Status: built + helper-unit-tested (IFVG zone containment, M1 structure confirm, H1 EU/GU SMT
-direction mapping, dict-key wiring all verified on fixtures), NOT run on real data yet.** Validate with
+direction mapping, sweep-direction detection, dict-key wiring all verified on fixtures), continuation
+arms run on real data (RED — real but neutral edge), STANDALONE arm NOT run yet.** Validate with
 `python run_mm_validation.py` (3 arms — baseline / adds-only / adds+opposing-target — × full 4yr + IS/OOS;
 `--smt` to also require H1 SMT). Ships only if an arm lifts full-4yr equity with MaxDD held and both
 splits stay positive. **NOT wired into `live/run_live.py`'s auto-loop** — the live port follows a GREEN

@@ -47,10 +47,11 @@ def _parse(txt):
         return cast(m.group(1)) if m else None
     add = re.search(r"mm_added\s+(\d+)", txt)
     esc = re.search(r"mm_target_escalated\s+(\d+)", txt)
+    std = re.search(r"mm_std_opened\s+(\d+)", txt)
     return {"trades": g("trades", int), "wr": g("win_rate_pct"),
             "pf": g("profit_factor"), "dd": g("max_drawdown_pct"),
             "eq": g("ending_equity_ZAR"),
-            "adds": int(add.group(1)) if add else 0,
+            "adds": (int(add.group(1)) if add else 0) + (int(std.group(1)) if std else 0),
             "esc": int(esc.group(1)) if esc else 0}
 
 
@@ -64,14 +65,32 @@ def _fmt(d, k, suf=""):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--smt", action="store_true")
+    ap.add_argument("--standalone", action="store_true",
+                    help="test the standalone daily-sweep MM entry (opens its own "
+                         "trades) instead of the pyramid-add arms")
     a = ap.parse_args()
 
     smt = {"MM_HTF_SMT_REQUIRED": "1"} if a.smt else {}
-    arms = [
-        ("baseline", {"MM_CONTINUATION_ENABLED": "0"}),
-        ("MM adds", {"MM_CONTINUATION_ENABLED": "1", "MM_TARGET_OPPOSING": "0", **smt}),
-        ("MM adds + opp-tgt", {"MM_CONTINUATION_ENABLED": "1", "MM_TARGET_OPPOSING": "1", **smt}),
-    ]
+    # every arm sets BOTH MM flags explicitly so an inline env var can't leak into
+    # the baseline. OFF = "0".
+    off = {"MM_CONTINUATION_ENABLED": "0", "MM_STANDALONE_ENABLED": "0"}
+    if a.standalone:
+        arms = [
+            ("baseline", dict(off)),
+            ("MM standalone", {"MM_STANDALONE_ENABLED": "1",
+                               "MM_CONTINUATION_ENABLED": "0", **smt}),
+            ("MM standalone + adds", {"MM_STANDALONE_ENABLED": "1",
+                                      "MM_CONTINUATION_ENABLED": "1", **smt}),
+        ]
+    else:
+        arms = [
+            ("baseline", dict(off)),
+            ("MM adds", {"MM_CONTINUATION_ENABLED": "1", "MM_STANDALONE_ENABLED": "0",
+                         "MM_TARGET_OPPOSING": "0", **smt}),
+            ("MM adds + opp-tgt", {"MM_CONTINUATION_ENABLED": "1",
+                                   "MM_STANDALONE_ENABLED": "0",
+                                   "MM_TARGET_OPPOSING": "1", **smt}),
+        ]
 
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=_ROOT,
                           capture_output=True, text=True).stdout.strip() or "unknown"

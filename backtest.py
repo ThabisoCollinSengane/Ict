@@ -141,6 +141,8 @@ class Backtester:
         self._work_peak = self.equity   # peak of the WORKING balance (resets on withdrawal)
         self._max_work_dd = 0.0         # worst % drawdown seen on the working balance
         self.active = {}
+        self._mm_day_dir = {}     # (pair, date) -> locked MM distribution direction
+        self._mm_day_count = {}   # (pair, date) -> standalone MM entries opened today
         self.trades = []
         self.reject_log = []   # near-misses: setups that formed then hit a gate
         # Diagnostic counters: how many times each gate was reached / rejected.
@@ -271,6 +273,8 @@ class Backtester:
                     self._mm_continuation(pair, t)
                 elif can_open_new_trade(now, pair):
                     self._maybe_open(pair, t)
+                    if pair not in self.active:   # base didn't open → standalone MM
+                        self._mm_standalone(pair, t)
 
             if i % 1000 == 0 and i > 0:
                 print(f"    bar {i}/{total} ({t}) - active={len(self.active)} "
@@ -3519,6 +3523,144 @@ class Backtester:
             except Exception:
                 continue
         return best
+
+    def _session_label(self, t):
+        """'london' / 'ny' / 'ny_pm' / 'other' from the ET hour (shared helper)."""
+        import pytz as _pytz
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        h = now.astimezone(_pytz.timezone("America/New_York")).hour
+        if 2 <= h < 5:
+            return "london"
+        if 7 <= h < 10:
+            return "ny"
+        if config.NY_PM_ENABLED and 13 <= h < 16:
+            return "ny_pm"
+        return "other"
+
+    def _mm_day_model(self, pair, t):
+        """The day's Judas-sweep direction (the MM model): +1 distribute UP (sell-side
+        taken), -1 distribute DOWN (buy-side taken), 0 none yet. A sweep = price wicks
+        beyond a reference high/low by ≥ MM_SWEEP_MIN_PIPS then trades back inside.
+        References (any): PDH/PDL, London/NY session open, recent ITH/ITL swing.
+        Locked per (pair, date) once detected so the day's context is carried."""
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        key = (pair, now.date())
+        if key in self._mm_day_dir:
+            return self._mm_day_dir[key]
+        pip = pip_size(pair)
+        buf = config.MM_SWEEP_MIN_PIPS * pip
+        highs, lows = [], []
+        mp = self._market_profile(pair, t)
+        if mp:
+            highs.append(mp["pdh"]); lows.append(mp["pdl"])
+        for sess in ("London", "New York AM"):
+            so = self._session_open(pair, sess, t)
+            if so is not None:
+                highs.append(so); lows.append(so)
+        res = mstruct.classify(self.bars_up_to(pair, "60T", t, max_bars=120))
+        ith, itl = mstruct.last_intact(res, "ITH"), mstruct.last_intact(res, "ITL")
+        if ith:
+            highs.append(ith.price)
+        if itl:
+            lows.append(itl.price)
+        bars = self.bars_up_to(pair, "5T", t, max_bars=config.MM_SWEEP_LOOKBACK)
+        if not bars:
+            return 0
+        day_high = max(b.High for b in bars)
+        day_low = min(b.Low for b in bars)
+        cur = bars[-1].Close
+        d = 0
+        # buy-side taken (swept a high, closed back below) → distribute DOWN
+        if any(day_high > rh + buf and cur < rh for rh in highs):
+            d = -1
+        elif any(day_low < rl - buf and cur > rl for rl in lows):
+            d = +1
+        if d != 0:
+            self._mm_day_dir[key] = d      # lock the day's context
+        return d
+
+    def _mm_open_position(self, pair, direction, entry, stop, target, target_type,
+                          tag, units, t):
+        """Open a standalone MM position (mirrors the base open's essential fields;
+        analytics fields default via .get in consumers)."""
+        leg = {"entry": entry, "stop": stop, "units": units, "leg_idx": 1,
+               "opened_at": t, "entry_type": tag, "tp1": None, "tp1_hit": True,
+               "_units_tp1": 0, "_units_tp2": units, "runner_be_after_tp1": False}
+        self.active[pair] = {
+            "direction": direction, "mfe_price": entry, "target": target,
+            "target_type": target_type, "legs": [leg],
+            "max_legs": config.MAX_LEGS, "draw_score": 0,
+            "entry_model": "mm_standalone", "profile": self._session_label(t),
+            "htf_smt": self._htf_pair_smt(pair, direction, t), "mm_adds": 0,
+            "stop_reason": "mm_pd_array",
+        }
+        self.gate["mm_std_opened"] = self.gate.get("mm_std_opened", 0) + 1
+
+    def _mm_standalone(self, pair, t):
+        """Open the MM model as its OWN trade on the day's Judas sweep + IFVG retrace,
+        independent of the base strategy. Default OFF (no-op when disabled)."""
+        if not config.MM_STANDALONE_ENABLED or pair in self.active:
+            return
+        g = self.gate
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        if not can_open_new_trade(now, pair):
+            return
+        if self.news.nearest_impact(now) in ("Medium", "Critical"):
+            return
+        daykey = (pair, now.date())
+        if self._mm_day_count.get(daykey, 0) >= config.MM_STANDALONE_MAX_PER_DAY:
+            return
+        d = self._mm_day_model(pair, t)
+        if d == 0:
+            g["mm_std_no_sweep"] = g.get("mm_std_no_sweep", 0) + 1
+            return
+        bars5 = self.bars_up_to(pair, "5T", t)
+        if not bars5:
+            return
+        cur_price = bars5[-1].Close
+        pip = pip_size(pair)
+        zone = self._mm_ifvg_zone(pair, d, cur_price, t)
+        if zone is None:
+            g["mm_std_no_ifvg"] = g.get("mm_std_no_ifvg", 0) + 1
+            return
+        if not self._mm_structure_confirm(pair, d, zone[0], t):
+            g["mm_std_no_structure"] = g.get("mm_std_no_structure", 0) + 1
+            return
+        if config.MM_HTF_SMT_REQUIRED and not self._htf_pair_smt(pair, d, t):
+            g["mm_std_no_smt"] = g.get("mm_std_no_smt", 0) + 1
+            return
+        pat = self._mm_entry_pattern(pair, d, zone, cur_price, t)
+        if pat is None:
+            g["mm_std_no_entry"] = g.get("mm_std_no_entry", 0) + 1
+            return
+        el, pat_stop, pat_tag, entry_tf = pat
+        bar = bars5[-1]
+        if (d < 0 and bar.High < el) or (d > 0 and bar.Low > el):
+            g["mm_std_not_filled"] = g.get("mm_std_not_filled", 0) + 1
+            return
+        _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
+        entry = el + d * _fric
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        stop = pat_stop
+        if stop is None or abs(entry - stop) > _max_stop or (stop - entry) * d >= 0:
+            stop = entry - _max_stop * d
+        # target: opposing pool (opt-in) else nearest qualifying draw (base logic)
+        if config.MM_STANDALONE_TARGET_OPPOSING:
+            target = self._opposing_liquidity(pair, d, entry, t)
+            target_type = "opposing_liquidity"
+        else:
+            target, target_type, _ = self._find_target(pair, d, t, entry, stop=stop)
+        if target is None or abs(target - entry) / pip < self._min_pips_target():
+            g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
+            return
+        equity_usd = self.equity / config.USD_ZAR
+        units = int(position_size(equity_usd, entry, stop, pair))
+        min_units = int(self._pyramid_lots()[0] * self._contract_units(pair))
+        units = max(units, min_units)
+        self._mm_open_position(pair, d, entry, stop, target, target_type,
+                               f"mmstd_{pat_tag}_ifvg{zone[0]}", units, t)
+        self._mm_day_count[daykey] = self._mm_day_count.get(daykey, 0) + 1
 
     def _mm_continuation(self, pair, t):
         """Market Maker distribution add: re-enter on an IFVG retrace toward the

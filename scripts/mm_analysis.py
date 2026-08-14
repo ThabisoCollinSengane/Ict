@@ -35,7 +35,7 @@ DUMP = next((p for p in _DUMP_CANDIDATES if p and os.path.exists(p)),
             _DUMP_CANDIDATES[1])
 REPORT = os.path.join(_ROOT, "data", "mm_winners_report.md")
 
-_ET = re.compile(r"^mm_(?P<pat>fvg|ob|breaker)_(?P<etf>m5|m1)_ifvg(?P<ifvg>.+)$")
+_ET = re.compile(r"^mm(?:std)?_(?P<pat>fvg|ob|breaker)_(?P<etf>m5|m1)_ifvg(?P<ifvg>.+)$")
 
 # tag columns to profile (only those present in the dump are used)
 DIMS = ["ifvg_tf", "pattern", "entry_tf", "htf_smt", "pair", "profile",

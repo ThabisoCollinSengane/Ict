@@ -491,6 +491,21 @@ MM_MAX_ADDS         = int(_os.environ.get("MM_MAX_ADDS", "0"))
 # Require the parent trade's HTF draw cascade ≥ this for an MM add (winner study:
 # draw_score=0 adds were 3% WR / near-total loss). 0 = no gate. Env-overridable.
 MM_MIN_DRAW_SCORE   = int(_os.environ.get("MM_MIN_DRAW_SCORE", "0"))
+# STANDALONE MM entry (OFF by default). The MM continuation above is a pyramid ADD —
+# it only fires while a base position is open, so it's capped by the base strategy's
+# ~4-trades/week frequency (why only ~14 fired over 4yr). This opens the MM model as
+# its OWN trade: identify the day's Judas sweep (price takes out a reference high/low
+# and closes back inside → distribution direction), then enter on IFVG retraces toward
+# the opposing pool — regardless of whether the base strategy took a trade. Same
+# direction as the base Judas reversal (short the swept high), just not gated by MSS/
+# consolidation/draw-cascade. Sweep references (any): PDH/PDL, session open, recent
+# ITH/ITL swing. Default OFF + validate — standalone gate-bypass entries have failed
+# before (SOJ bypass -17%), so this must clear the same MaxDD gate before shipping.
+MM_STANDALONE_ENABLED = bool(int(_os.environ.get("MM_STANDALONE_ENABLED", 0)))
+MM_STANDALONE_MAX_PER_DAY = int(_os.environ.get("MM_STANDALONE_MAX_PER_DAY", "2"))
+MM_SWEEP_LOOKBACK   = 96          # M5 bars scanned for the day's sweep (~8h session)
+MM_SWEEP_MIN_PIPS   = 2.0         # wick must exceed the reference by this to count
+MM_STANDALONE_TARGET_OPPOSING = bool(int(_os.environ.get("MM_STANDALONE_TARGET_OPPOSING", 0)))
 MM_STRUCTURE_MAX_AGE = 4                  # retracement swing must be this fresh (bars of its TF)
 # Escalate the position target to the opposing liquidity pool so the trade rides the
 # full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so
