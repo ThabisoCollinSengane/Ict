@@ -1,6 +1,6 @@
 # What separates winning MM IFVG adds from losers
 
-Isolated **14 MM continuation legs** from the trade dump. Overall: **WR 50% · PF 3.65 · meanR 1.05**. Each table below is the SAME legs bucketed by one tag — a value with clearly higher WR/PF that HOLDS in both IS and OOS is a shippable quality filter; one that flips between splits is noise.
+Isolated **1075 MM continuation legs** from the trade dump. Overall: **WR 21% · PF 0.46 · meanR -0.45**. Each table below is the SAME legs bucketed by one tag — a value with clearly higher WR/PF that HOLDS in both IS and OOS is a shippable quality filter; one that flips between splits is noise.
 
 _IS = 2022-23, OOS = 2024-25. R = (exit−entry)·dir / |entry−stop|._
 
@@ -8,33 +8,31 @@ _IS = 2022-23, OOS = 2024-25. R = (exit−entry)·dir / |entry−stop|._
 
 | tag | best value (WR, n) | worst value (WR, n) |
 |---|---|---|
-| ifvg_tf | 240T (62%, 8) | 240T (62%, 8) |
-| pattern | fvg (56%, 9) | fvg (56%, 9) |
-| entry_tf | m5 (50%, 14) | m5 (50%, 14) |
-| htf_smt | True (46%, 13) | True (46%, 13) |
-| pair | EURUSD (50%, 10) | EURUSD (50%, 10) |
-| profile | ny (56%, 9) | ny (56%, 9) |
-| session_phase | ny_judas (56%, 9) | ny_judas (56%, 9) |
-| direction | -1 (50%, 8) | -1 (50%, 8) |
-| draw_score | 2 (40%, 10) | 2 (40%, 10) |
-| conf_bucket | <3 (50%, 8) | <3 (50%, 8) |
-| target_type | fib_extension (44%, 9) | fib_extension (44%, 9) |
-| mstruct_minor_sweep | False (50%, 12) | False (50%, 12) |
+| ifvg_tf | 60T (24%, 94) | 1T (16%, 77) |
+| pattern | fvg (29%, 265) | breaker (14%, 462) |
+| entry_tf | m1 (24%, 316) | m5 (20%, 759) |
+| htf_smt | True (21%, 1075) | True (21%, 1075) |
+| pair | GBPUSD (22%, 592) | EURUSD (20%, 483) |
+| profile | ny (22%, 612) | london (21%, 463) |
+| session_phase | unknown (21%, 1075) | unknown (21%, 1075) |
+| direction | -1 (23%, 522) | 1 (20%, 553) |
+| draw_score | 0 (21%, 1075) | 0 (21%, 1075) |
+| conf_bucket | <3 (21%, 1075) | <3 (21%, 1075) |
+| target_type | range_equilibrium (35%, 20) | equal_hl (9%, 44) |
+| mstruct_minor_sweep | False (21%, 1075) | False (21%, 1075) |
 
 ## Win / loss economics
 
 | | n | avg pips | median pips | max pips | avg R | avg stop pips |
 |---|---|---|---|---|---|---|
-| **wins** | 7 | 26.26 | 31.20 | 37.29 | 2.27 | 13.57 |
-| losses | 7 | -4.14 | -2.90 | -0.40 | -1.09 | 3.71 |
+| **wins** | 230 | 20.28 | 9.60 | 114.50 | 1.54 | 14.89 |
+| losses | 845 | -4.00 | -3.10 | -0.40 | -1.14 | 3.55 |
 
-_Per-add expectancy: **11.06 pips**, **1.05 R**. Biggest win 37.29 pips / 3.73R. If winners carry WIDER stops than losers (13.57 vs 3.71), the entry-precision fix should tighten them and lift R._
+_Per-add expectancy: **1.19 pips**, **-0.45 R**. Biggest win 114.50 pips / 3.72R. If winners carry WIDER stops than losers (14.89 vs 3.55), the entry-precision fix should tighten them and lift R._
 
 ## Good timeframe cascades (PF>1 in BOTH splits, n≥8)
 
-| IFVG TF | n | IS PF | OOS PF |
-|---|---|---|---|
-| 240T | 8 | ∞ | 3.52 |
+_None held PF>1 in both splits at n≥8 — the cascade edge is thin/noisy._
 
 ## Fib alignment
 
@@ -42,8 +40,8 @@ Each MM add inherits the position's target. This shows whether the winning adds 
 
 | target family | n | WR | PF | avg win pips |
 |---|---|---|---|---|
-| fib | 9 | 44% | 2.71 | 21.67 |
-| liquidity/other | 5 | 60% | 6.24 | 32.37 |
+| fib | 141 | 25% | 0.65 | 20.95 |
+| liquidity/other | 934 | 21% | 0.44 | 20.16 |
 
 ## Specs of the winning adds (winners only)
 
@@ -53,46 +51,47 @@ For the winning legs only: how many, their share, and their pip size — so the 
 
 | value | wins | % of wins | avg win pips | median | max |
 |---|---|---|---|---|---|
-| 240T | 5 | 71% | 28.80 | 31.30 | 37.29 |
-| 10T | 1 | 14% | 9.60 | 9.60 | 9.60 |
-| 5T | 1 | 14% | 30.20 | 30.20 | 30.20 |
+| D | 71 | 31% | 19.42 | 9.60 | 39.30 |
+| W | 58 | 25% | 20.96 | 9.60 | 114.50 |
+| 240T | 36 | 16% | 20.83 | 9.60 | 54.60 |
+| 60T | 23 | 10% | 18.14 | 9.60 | 35.40 |
+| 15T | 18 | 8% | 22.34 | 29.90 | 35.10 |
+| 1T | 12 | 5% | 19.18 | 9.50 | 54.50 |
+| 5T | 12 | 5% | 22.61 | 30.20 | 34.50 |
 
 ### winners by `pattern`
 
 | value | wins | % of wins | avg win pips | median | max |
 |---|---|---|---|---|---|
-| fvg | 5 | 71% | 23.26 | 31.20 | 34.60 |
-| breaker | 1 | 14% | 37.29 | 37.29 | 37.29 |
-| ob | 1 | 14% | 30.20 | 30.20 | 30.20 |
+| ob | 90 | 39% | 19.82 | 9.60 | 54.60 |
+| fvg | 77 | 33% | 20.28 | 9.60 | 74.50 |
+| breaker | 63 | 27% | 20.95 | 9.60 | 114.50 |
 
 ### winners by `entry_tf`
 
 | value | wins | % of wins | avg win pips | median | max |
 |---|---|---|---|---|---|
-| m5 | 7 | 100% | 26.26 | 31.20 | 37.29 |
+| m5 | 154 | 67% | 21.10 | 9.60 | 114.50 |
+| m1 | 76 | 33% | 18.64 | 9.60 | 74.50 |
 
 ### winners by `pair`
 
 | value | wins | % of wins | avg win pips | median | max |
 |---|---|---|---|---|---|
-| EURUSD | 5 | 71% | 23.04 | 30.20 | 34.60 |
-| GBPUSD | 2 | 29% | 34.29 | 34.29 | 37.29 |
+| GBPUSD | 132 | 57% | 21.78 | 9.50 | 114.50 |
+| EURUSD | 98 | 43% | 18.27 | 9.60 | 54.60 |
 
 ### winners by `draw_score`
 
 | value | wins | % of wins | avg win pips | median | max |
 |---|---|---|---|---|---|
-| 2 | 4 | 57% | 27.92 | 32.40 | 37.29 |
-| 1 | 2 | 29% | 20.45 | 20.45 | 31.30 |
-| 3 | 1 | 14% | 31.20 | 31.20 | 31.20 |
+| 0 | 230 | 100% | 20.28 | 9.60 | 114.50 |
 
 ### winners by `conf_bucket`
 
 | value | wins | % of wins | avg win pips | median | max |
 |---|---|---|---|---|---|
-| <3 | 4 | 57% | 22.77 | 22.10 | 37.29 |
-| 3 | 2 | 29% | 31.25 | 31.25 | 31.30 |
-| ≥4 | 1 | 14% | 30.20 | 30.20 | 30.20 |
+| <3 | 230 | 100% | 20.28 | 9.60 | 114.50 |
 
 ## Full breakdown by tag (all legs)
 
@@ -100,113 +99,107 @@ For the winning legs only: how many, their share, and their pip size — so the 
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| 240T | 8 | 62% | 10.28 | 1.79 | 100%/∞ | 40%/3.52 |
-| 5T | 2 | 50% | 2.89 | 0.99 | 0%/0.00 | 100%/∞ |
-| 10T | 2 | 50% | 0.87 | -0.07 | —/— | 50%/0.87 |
-| 60T | 1 | 0% | 0.00 | -1.05 | 0%/0.00 | —/— |
-| 15T | 1 | 0% | — | — | —/— | 0%/— |
+| D | 329 | 22% | 0.49 | -0.43 | 21%/0.51 | 22%/0.47 |
+| W | 264 | 22% | 0.43 | -0.47 | 23%/0.36 | 21%/0.47 |
+| 240T | 150 | 24% | 0.56 | -0.35 | 26%/0.66 | 21%/0.44 |
+| 60T | 94 | 24% | 0.58 | -0.35 | 26%/0.62 | 22%/0.52 |
+| 15T | 92 | 20% | 0.45 | -0.49 | 25%/0.54 | 9%/0.28 |
+| 1T | 77 | 16% | 0.23 | -0.71 | 12%/0.16 | 22%/0.36 |
+| 5T | 69 | 17% | 0.42 | -0.53 | 19%/0.46 | 14%/0.35 |
 
 ### by `pattern`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| fvg | 9 | 56% | 4.37 | 1.01 | 50%/1.97 | 60%/∞ |
-| ob | 3 | 33% | 2.73 | 0.96 | —/— | 33%/2.73 |
-| breaker | 2 | 50% | 3.21 | 1.28 | 100%/∞ | 0%/0.00 |
+| breaker | 462 | 14% | 0.23 | -0.78 | 15%/0.28 | 11%/0.17 |
+| ob | 348 | 26% | 0.63 | -0.28 | 25%/0.61 | 26%/0.66 |
+| fvg | 265 | 29% | 0.93 | -0.05 | 29%/0.84 | 29%/1.08 |
 
 ### by `entry_tf`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| m5 | 14 | 50% | 3.65 | 1.05 | 60%/3.75 | 44%/3.56 |
+| m5 | 759 | 20% | 0.46 | -0.47 | 20%/0.43 | 21%/0.49 |
+| m1 | 316 | 24% | 0.48 | -0.43 | 27%/0.61 | 19%/0.32 |
 
 ### by `htf_smt`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| True | 13 | 46% | 2.93 | 0.84 | 60%/3.75 | 38%/2.18 |
-| False | 1 | 100% | ∞ | 3.12 | —/— | 100%/∞ |
+| True | 1075 | 21% | 0.46 | -0.45 | 22%/0.48 | 20%/0.44 |
 
 ### by `pair`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| EURUSD | 10 | 50% | 4.10 | 0.98 | 50%/0.95 | 50%/6.95 |
-| GBPUSD | 4 | 50% | 3.18 | 1.18 | 67%/6.53 | 0%/0.00 |
+| GBPUSD | 592 | 22% | 0.48 | -0.44 | 23%/0.50 | 22%/0.46 |
+| EURUSD | 483 | 20% | 0.45 | -0.47 | 21%/0.46 | 19%/0.43 |
 
 ### by `profile`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| ny | 9 | 56% | 4.21 | 1.33 | 67%/6.56 | 50%/3.13 |
-| london | 5 | 40% | 1.86 | 0.30 | 50%/0.94 | 33%/∞ |
+| ny | 612 | 22% | 0.47 | -0.44 | 22%/0.48 | 22%/0.46 |
+| london | 463 | 21% | 0.45 | -0.47 | 23%/0.48 | 18%/0.42 |
 
 ### by `session_phase`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| ny_judas | 9 | 56% | 4.21 | 1.33 | 67%/6.56 | 50%/3.13 |
-| london_judas | 5 | 40% | 1.86 | 0.30 | 50%/0.94 | 33%/∞ |
+| unknown | 1075 | 21% | 0.46 | -0.45 | 22%/0.48 | 20%/0.44 |
 
 ### by `direction`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| -1 | 8 | 50% | 2.48 | 0.69 | 0%/0.00 | 67%/6.95 |
-| 1 | 6 | 50% | 7.09 | 1.69 | 100%/∞ | 0%/0.00 |
+| 1 | 553 | 20% | 0.43 | -0.49 | 20%/0.41 | 20%/0.45 |
+| -1 | 522 | 23% | 0.50 | -0.42 | 25%/0.56 | 21%/0.44 |
 
 ### by `draw_score`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| 2 | 10 | 40% | 1.99 | 0.54 | 50%/2.25 | 33%/1.76 |
-| 1 | 3 | 67% | ∞ | 2.05 | 100%/∞ | 50%/∞ |
-| 3 | 1 | 100% | ∞ | 3.12 | —/— | 100%/∞ |
+| 0 | 1075 | 21% | 0.46 | -0.45 | 22%/0.48 | 20%/0.44 |
 
 ### by `conf_bucket`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| <3 | 8 | 50% | 3.00 | 0.74 | 67%/4.49 | 40%/1.66 |
-| 3 | 3 | 67% | 5.98 | 1.73 | 50%/2.99 | 100%/∞ |
-| ≥4 | 3 | 33% | 2.73 | 0.96 | —/— | 33%/2.73 |
+| <3 | 1075 | 21% | 0.46 | -0.45 | 22%/0.48 | 20%/0.44 |
 
 ### by `target_type`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| fib_extension | 9 | 44% | 2.71 | 0.78 | 33%/1.78 | 50%/4.47 |
-| pdh_pdl | 4 | 50% | 3.54 | 0.98 | 100%/∞ | 33%/2.69 |
-| round_number | 1 | 100% | ∞ | 3.13 | 100%/∞ | —/— |
+| swing | 587 | 21% | 0.47 | -0.45 | 22%/0.50 | 20%/0.45 |
+| round_number | 194 | 22% | 0.37 | -0.53 | 22%/0.38 | 20%/0.34 |
+| fib_extension | 141 | 25% | 0.65 | -0.29 | 26%/0.65 | 24%/0.63 |
+| pdh_pdl | 73 | 19% | 0.46 | -0.47 | 23%/0.64 | 12%/0.22 |
+| equal_hl | 44 | 9% | 0.15 | -0.86 | 4%/0.04 | 14%/0.31 |
+| range_equilibrium | 20 | 35% | 0.75 | -0.15 | 33%/0.85 | 38%/0.65 |
+| pwh_pwl | 16 | 31% | 0.47 | -0.40 | 22%/0.29 | 43%/0.79 |
 
 ### by `crt_tf`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
 | nan | 0 | — | — | — | —/— | —/— |
-| D | 5 | 40% | 3.52 | 0.97 | —/— | 40%/3.52 |
-| 240T | 2 | 100% | ∞ | 2.00 | 100%/∞ | 100%/∞ |
 
 ### by `mstruct_minor_sweep`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| False | 12 | 50% | 3.86 | 1.05 | 75%/7.47 | 38%/2.18 |
-| True | 2 | 50% | 2.98 | 1.04 | 0%/0.00 | 100%/∞ |
+| False | 1075 | 21% | 0.46 | -0.45 | 22%/0.48 | 20%/0.44 |
 
 ### by `amd_swept_pdliq`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
 | nan | 0 | — | — | — | —/— | —/— |
-| False | 4 | 25% | 0.44 | -0.43 | 100%/∞ | 0%/0.00 |
-| True | 4 | 50% | 4.49 | 1.21 | 50%/3.57 | 50%/∞ |
 
 ### by `soj_type`
 
 | value | n | WR | PF | meanR | IS WR/PF | OOS WR/PF |
 |---|---|---|---|---|---|---|
-| single | 7 | 57% | 3.71 | 1.00 | 67%/3.92 | 50%/3.52 |
-| dual | 5 | 40% | 3.60 | 0.96 | —/— | 40%/3.60 |
 | nan | 0 | — | — | — | —/— | —/— |
 
