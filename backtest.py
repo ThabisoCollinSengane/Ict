@@ -3664,7 +3664,11 @@ class Backtester:
             target = self._opposing_liquidity(pair, d, entry, t)
             target_type = "opposing_external"
         else:
-            target, target_type, _ = self._find_target(pair, d, t, entry, stop=stop)
+            _tgt = self._find_target(pair, d, t, entry, stop=stop)
+            if _tgt is None:
+                g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
+                return
+            target, target_type = _tgt[0], _tgt[1]
             if dr is not None and target is not None:
                 dr_hi, dr_lo, dr_eq = dr
                 overshoot = (d < 0 and target < dr_lo) or (d > 0 and target > dr_hi)
