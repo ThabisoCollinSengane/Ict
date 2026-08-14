@@ -479,10 +479,18 @@ MM_SWING_TF_MAP     = {
     "5T":   ("1T",),              # M5 IFVG  → M1 swing
     "1T":   ("1T",),              # M1 IFVG  → M1 swing
 }
-# Entry fill + structural stop cascade: START on M5, drop to M1 only if M5 gives no
-# feasible structural stop within the FIXED_STOP_PIPS cap. Small TFs are for entry
-# precision / tight risk ONLY (never the swing read, which is MM_SWING_TF_MAP).
-MM_ENTRY_TFS        = _mm_tf_tuple("MM_ENTRY_TFS", ("5T", "1T"))
+# Entry PD-array cascade: START on M15, drop to M5 then M1. The entry must be a PD
+# array (FVG / OB / breaker) that forms INSIDE the IFVG gap; the small TFs are entry
+# precision only. (Trader's rule: "start taking these fvg entries from the m15 tf".)
+MM_ENTRY_TFS        = _mm_tf_tuple("MM_ENTRY_TFS", ("15T", "5T", "1T"))
+# Stop is STRUCTURAL — placed just beyond the IFVG gap edge (the side an internal
+# manipulation would sweep), NOT a flat FIXED_STOP_PIPS cap. Short → above the gap
+# high; long → below the gap low; + MM_STOP_BUF_PIPS. This is the R-negativity fix:
+# the old flat 10-pip stop ignored the gap and sat where the internal AMD manipulation
+# sweeps it. MM_MAX_STOP_PIPS is a generous safety ceiling (the H4/H1/M30 gaps run
+# ~10-20 pips; >10 is riskier but the structural stop above the last high is correct).
+MM_STOP_BUF_PIPS    = float(_os.environ.get("MM_STOP_BUF_PIPS", "1.5"))
+MM_MAX_STOP_PIPS    = float(_os.environ.get("MM_MAX_STOP_PIPS", "25"))
 MM_IFVG_SCAN_BARS   = 120                 # bars per TF fed to the FVG scan
 MM_MIN_FAVOUR_PIPS  = float(_os.environ.get("MM_MIN_FAVOUR_PIPS", "3"))
 # Cap MM re-entry adds per position (0 = unlimited). The raw validation showed the

@@ -1100,6 +1100,12 @@ class LiveTrader(Backtester):
         head = f"  MM {model.upper()} model - IFVG watch (D1/H4/H1)"
         head += "  [AUTO-ARMED]:" if armed else ":"
         lines = [head]
+        try:
+            _smt_ok = self._htf_pair_smt(pair, model_dir, now)
+        except Exception:
+            _smt_ok = False
+        lines.append("    SMT: " + ("✅ H1 EU/GU confirms reversal" if _smt_ok
+                                    else "⚠️ unconfirmed (no H1 EU/GU divergence yet)"))
         if not zones:
             lines.append("    (no qualifying inversion FVGs yet)")
             return lines
@@ -1151,13 +1157,24 @@ class LiveTrader(Backtester):
                 pair, {"arm_price": price, "reached": set(), "broke": set()})
             model_dir = 1 if model == "buy" else -1
             zones = self._mm_zones(pair, model_dir)   # compute once; reuse for auto-entry
+            # H1 EU/GU SMT read for this model direction — the reversal confirmation
+            # that STARTS the MM distribution (one pair sweeps, the other fails to
+            # confirm). Computed once per pair per scan; surfaced in the alerts.
+            try:
+                _smt_ok = self._htf_pair_smt(pair, model_dir, now)
+            except Exception:
+                _smt_ok = False
+            _smt_line = ("✅ H1 EU/GU SMT confirms the reversal"
+                         if _smt_ok else
+                         "⚠️ no H1 EU/GU SMT yet — reversal unconfirmed")
             for z in zones:
                 lo, hi = z["lo"], z["hi"]
                 key = f"{z['tf']}:{round(z['mid'], 5)}"
                 if lo <= price <= hi and key not in st["reached"]:
                     st["reached"].add(key)
                     _notify(f"MM {model.upper()} {pair}\nprice REACHED {z['tf']} IFVG "
-                            f"{lo:.5f}-{hi:.5f}\nWatch for a swing-formation retracement entry.")
+                            f"{lo:.5f}-{hi:.5f}\n{_smt_line}\n"
+                            f"Watch for a swing-formation retracement entry.")
                 bars = self.bars_up_to(pair, z["tf_key"], now, max_bars=2)
                 if bars:
                     c = bars[-1]

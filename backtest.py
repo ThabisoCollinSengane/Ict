@@ -3481,29 +3481,49 @@ class Backtester:
         Only levels on the retracement side of cur_price qualify (a genuine limit).
         """
         _, zlo, zhi = zone
+        _lbl = {"15T": "m15", "5T": "m5", "1T": "m1"}
+        _lb = {"15T": 8, "5T": 24, "1T": 30}
 
-        def _retrace_ok(el):
-            # short (d<0): limit SELL at/above price; long: limit BUY at/below price
+        def _ok(r):
+            # the PD array must sit INSIDE the IFVG gap AND be a retracement limit
+            # (short: at/above price; long: at/below). Entries live inside the gap.
+            if r is None:
+                return False
+            el = r[0]
+            if not (zlo <= el <= zhi):
+                return False
             return (el >= cur_price) if direction < 0 else (el <= cur_price)
 
-        for etf in config.MM_ENTRY_TFS:              # ("5T", "1T")
+        for etf in config.MM_ENTRY_TFS:              # ("15T", "5T", "1T")
             bars = self.bars_up_to(pair, etf, t,
                                    max_bars=(120 if etf == "1T" else None))
             if not bars:
                 continue
-            lbl = "m5" if etf == "5T" else "m1"
-            lookback = 24 if etf == "5T" else 30
-            fvg = self._find_fvg_entry(bars, pair, direction, lookback=lookback)
-            # (a) normal FVG overlapping the IFVG zone — the preferred entry
-            if fvg is not None and zlo <= fvg[0] <= zhi and _retrace_ok(fvg[0]):
+            lbl = _lbl.get(etf, etf)
+            fvg = self._find_fvg_entry(bars, pair, direction, lookback=_lb.get(etf, 24))
+            # a NORMAL FVG inside the IFVG is the preferred trigger; OB / breaker
+            # inside the gap are the fallback (all must be inside the gap).
+            if _ok(fvg):
                 return (fvg[0], fvg[1], f"fvg_{lbl}", etf)
-            # (b) OB / breaker fallback, then a non-overlapping FVG on this TF
             for r, tag in ((self._find_ob_entry(bars, pair, direction), f"ob_{lbl}"),
-                           (self._find_breaker_entry(bars, pair, direction), f"breaker_{lbl}"),
-                           (fvg, f"fvg_{lbl}")):
-                if r is not None and _retrace_ok(r[0]):
+                           (self._find_breaker_entry(bars, pair, direction), f"breaker_{lbl}")):
+                if _ok(r):
                     return (r[0], r[1], tag, etf)
         return None
+
+    def _mm_structural_stop(self, zone, direction, entry, pip):
+        """Stop just beyond the IFVG gap EDGE (the side an internal manipulation would
+        sweep) — structural, not a flat FIXED_STOP cap. Short → above the gap high;
+        long → below the gap low; + MM_STOP_BUF_PIPS. Clamped to MM_MAX_STOP_PIPS."""
+        _, zlo, zhi = zone
+        buf = config.MM_STOP_BUF_PIPS * pip
+        stop = (zhi + buf) if direction < 0 else (zlo - buf)
+        if (stop - entry) * direction >= 0:          # degenerate (entry beyond edge)
+            return entry - config.MM_STOP_BUF_PIPS * pip * direction
+        cap = config.MM_MAX_STOP_PIPS * pip
+        if abs(entry - stop) > cap:
+            stop = entry - cap * direction
+        return stop
 
     def _opposing_liquidity(self, pair, direction, price, t):
         """Nearest UNSWEPT opposing-liquidity pool (ITH/ITL on H4/D/W) beyond the
@@ -3674,10 +3694,7 @@ class Backtester:
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = el + d * _fric
-        _max_stop = config.FIXED_STOP_PIPS * pip
-        stop = pat_stop
-        if stop is None or abs(entry - stop) > _max_stop or (stop - entry) * d >= 0:
-            stop = entry - _max_stop * d
+        stop = self._mm_structural_stop(zone, d, entry, pip)   # beyond the gap edge
         # DRAW = INTERNAL liquidity (the point of the ERL/IRL model): after the
         # external sweep + reversal, price delivers back INTO the range. Target the
         # nearest qualifying draw, but clamp so it never overshoots the OPPOSITE
@@ -3796,12 +3813,7 @@ class Backtester:
         _spread_p = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         _fric = (_spread_p / 2 + config.SLIPPAGE_PIPS) * pip
         entry = el + d * _fric                       # fill at the FVG level
-        _max_stop = config.FIXED_STOP_PIPS * pip
-        stop = pat_stop
-        # true structural stop kept as-is when tighter than the cap; cap only bounds
-        # a pathological wide stop (rare now that entry sits at the array, not market).
-        if stop is None or abs(entry - stop) > _max_stop or (stop - entry) * d >= 0:
-            stop = entry - _max_stop * d
+        stop = self._mm_structural_stop(zone, d, entry, pip)   # beyond the gap edge
         reward_pips = abs(st["target"] - entry) / pip
         if reward_pips < self._min_pips_target():
             g["mm_blocked_min_target"] = g.get("mm_blocked_min_target", 0) + 1
