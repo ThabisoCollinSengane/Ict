@@ -514,6 +514,13 @@ MM_STANDALONE_TARGET_OPPOSING = bool(int(_os.environ.get("MM_STANDALONE_TARGET_O
 # down is nearly free and drops DD roughly proportionally. Applied to the risk-based
 # size, floored at the min lot.
 MM_STANDALONE_SIZE_MULT = float(_os.environ.get("MM_STANDALONE_SIZE_MULT", "1.0"))
+# De-correlate: EURUSD/GBPUSD/NZDUSD are all X/USD, so a single daily DOLLAR sweep
+# opens the SAME direction on all of them — one dollar bet at 2-3x risk, the main
+# driver of the clustered -23% DD (breakers + size throttle can't touch it; in the
+# IS phase entries are already at min lot). When on (default 1), a standalone entry is
+# blocked if a same-direction standalone position is already open on any pair — caps
+# concurrent same-direction dollar exposure to one position. Works at min lot.
+MM_STANDALONE_ONE_PER_DIR = bool(int(_os.environ.get("MM_STANDALONE_ONE_PER_DIR", 1)))
 MM_STRUCTURE_MAX_AGE = 4                  # retracement swing must be this fresh (bars of its TF)
 # Escalate the position target to the opposing liquidity pool so the trade rides the
 # full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so

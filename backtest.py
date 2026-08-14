@@ -3623,6 +3623,15 @@ class Backtester:
             g["mm_std_consec_halt"] = g.get("mm_std_consec_halt", 0) + 1
             return
         daykey = (pair, now.date())
+        # De-correlate: block if a same-direction standalone is already open on any
+        # pair (EU/GU/NZD are all dollar bets — don't stack the same USD risk).
+        if config.MM_STANDALONE_ONE_PER_DIR:
+            _dm = self._mm_day_model(pair, t)
+            if _dm != 0 and any(
+                    op.get("entry_model") == "mm_standalone" and op["direction"] == _dm
+                    for op in self.active.values()):
+                g["mm_std_corr_block"] = g.get("mm_std_corr_block", 0) + 1
+                return
         if self._mm_day_count.get(daykey, 0) >= config.MM_STANDALONE_MAX_PER_DAY:
             return
         d = self._mm_day_model(pair, t)
