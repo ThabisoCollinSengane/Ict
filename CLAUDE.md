@@ -1540,9 +1540,30 @@ draws beat fib-target adds (WR 60% vs 44%, PF 6.24 vs 2.71) — the distribution
 not the nearer fib. `scripts/mm_analysis.py` reports avg stops (win/loss), good cascades (H4 the only
 robust one), sessions, pairs, fib alignment; auto-pushes its report.
 
+**STANDALONE RESULT (RAN 2026-08-13) — real money edge, unfilterable DD, NOT shipped autonomous.**
+The standalone daily-sweep entry SOLVED the frequency (1091–1158 opens/4yr ≈ 5.5/week vs the add path's
+14) and is genuinely profitable: full-4yr money-PF 2.98, equity +105–354% (R567M→R1.16B at de-corr+0.6×
+throttle, R2.86B at full size), consistent IS/OOS. The base gates WERE strangling a real daily edge.
+**But its drawdown is intrinsic and cannot be brought under the −15% breaker by any autonomous lever:**
+- MaxDD −23.4% full size → −21.2% (de-corr + 0.6× throttle). **Full-4yr MaxDD = IS MaxDD exactly** — the
+  worst DD is in the 2022-23 small-account phase, AT THE MIN LOT, so the size throttle floors out there
+  (can't size below 0.01 on a real broker). Circuit breakers (added — were bypassed) moved it only 0.5pp.
+- De-correlation (`MM_STANDALONE_ONE_PER_DIR`, default ON) lifted PF 2.47→2.98 by blocking concurrent
+  same-direction dollar risk (EU/GU/NZD are one dollar bet) — a clean improvement, KEPT ON.
+- The winner profiler (`mm_analysis.py`, standalone dump) is decisive: **"Good timeframe cascades (PF>1
+  BOTH splits): None."** WR 21% is UNIFORM across every tag (cascade TF, pattern, pair, half) — no robust
+  subset to filter to. The edge is **pip-positive (+1.19/leg) but R-negative (−0.45R, R-PF 0.46)**: 845
+  losers at tight −4-pip stops, 230 winners at wide 15-pip stops, fat tail to +114 pips. It makes money
+  the risk-inefficient way (rare lottery winners), and the winners are UNPREDICTABLE in advance.
+**Verdict:** `MM_STANDALONE_ENABLED=0` (default). A real, validated, money-making setup whose autonomous
+FILTERING fails — the fat-tail winners need a human to pick them, which is exactly the live `/mm` watcher's
+job (discretionary). Not a null like P39/P40 — the setups are profitable; the autonomous risk profile is
+what doesn't fit a compounding-from-R500 account. Full build retained behind the default-off flags.
+
 **Status: built + helper-unit-tested (IFVG zone containment, M1 structure confirm, H1 EU/GU SMT
-direction mapping, sweep-direction detection, dict-key wiring all verified on fixtures), continuation
-arms run on real data (RED — real but neutral edge), STANDALONE arm NOT run yet.** Validate with
+direction mapping, sweep-direction detection, dealing-range external-sweep + range-clamp, de-correlation
+gate all verified on fixtures); continuation arms RED (real but neutral); standalone arm RED (real money
+edge, unfilterable DD — discretionary, not autonomous).** Validate with
 `python run_mm_validation.py` (3 arms — baseline / adds-only / adds+opposing-target — × full 4yr + IS/OOS;
 `--smt` to also require H1 SMT). Ships only if an arm lifts full-4yr equity with MaxDD held and both
 splits stay positive. **NOT wired into `live/run_live.py`'s auto-loop** — the live port follows a GREEN
