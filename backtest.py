@@ -3607,6 +3607,21 @@ class Backtester:
             return
         if self.news.nearest_impact(now) in ("Medium", "Critical"):
             return
+        # Circuit breakers — READ-ONLY (state is maintained by _maybe_open, which runs
+        # first in the loop, and the close path). The standalone entries were bypassing
+        # these, firing straight through drawdowns that halt the base strategy — a
+        # major driver of the -23.9% MaxDD.
+        _dk = now.date()
+        if self._drawdown_halt_until is not None and _dk < self._drawdown_halt_until:
+            g["mm_std_dd_halt"] = g.get("mm_std_dd_halt", 0) + 1
+            return
+        _day_open = self._day_open_eq.get(_dk)
+        if _day_open and (_day_open - self.equity) / _day_open * 100 >= config.MAX_DAILY_LOSS_PCT:
+            g["mm_std_daily_halt"] = g.get("mm_std_daily_halt", 0) + 1
+            return
+        if self._consec_losses >= config.MAX_CONSECUTIVE_LOSSES:
+            g["mm_std_consec_halt"] = g.get("mm_std_consec_halt", 0) + 1
+            return
         daykey = (pair, now.date())
         if self._mm_day_count.get(daykey, 0) >= config.MM_STANDALONE_MAX_PER_DAY:
             return
@@ -3679,6 +3694,8 @@ class Backtester:
             return
         equity_usd = self.equity / config.USD_ZAR
         units = int(position_size(equity_usd, entry, stop, pair))
+        if config.MM_STANDALONE_SIZE_MULT != 1.0:
+            units = int(units * config.MM_STANDALONE_SIZE_MULT)
         min_units = int(self._pyramid_lots()[0] * self._contract_units(pair))
         units = max(units, min_units)
         self._mm_open_position(pair, d, entry, stop, target, target_type,

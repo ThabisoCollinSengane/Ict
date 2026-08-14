@@ -509,6 +509,11 @@ MM_STANDALONE_MAX_PER_DAY = int(_os.environ.get("MM_STANDALONE_MAX_PER_DAY", "2"
 MM_SWEEP_LOOKBACK   = 96          # M5 bars scanned for the day's sweep (~8h session)
 MM_SWEEP_MIN_PIPS   = 2.0         # wick must exceed the reference by this to count
 MM_STANDALONE_TARGET_OPPOSING = bool(int(_os.environ.get("MM_STANDALONE_TARGET_OPPOSING", 0)))
+# Size throttle for standalone MM entries (1.0 = full risk). The standalone edge is
+# real but high-DD (MaxDD -23.9% at full size); with +354% equity headroom, sizing
+# down is nearly free and drops DD roughly proportionally. Applied to the risk-based
+# size, floored at the min lot.
+MM_STANDALONE_SIZE_MULT = float(_os.environ.get("MM_STANDALONE_SIZE_MULT", "1.0"))
 MM_STRUCTURE_MAX_AGE = 4                  # retracement swing must be this fresh (bars of its TF)
 # Escalate the position target to the opposing liquidity pool so the trade rides the
 # full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so
