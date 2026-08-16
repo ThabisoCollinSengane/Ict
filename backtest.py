@@ -715,7 +715,13 @@ class Backtester:
         keep_level keeps the account small and un-blowuppable — the point of an income
         model. No-op when withdrawals are OFF (returns raw equity → byte-identical)."""
         if config.WITHDRAW_SCHEDULE or config.WITHDRAW_AT > 0:
-            return max(0.0, min(self.equity, self._keep_level))
+            # Cap at the FIXED initial base (WITHDRAW_KEEP), NOT the growing keep_level:
+            # the reinvest-30% compounds keep_level, and tying sizing to it re-created
+            # the equity-proportional feedback that blows the account up. A fixed base
+            # keeps positions small forever; the account climbs in BANKED profit, not
+            # position size. Scales DOWN in a drawdown (min with live equity).
+            base = config.WITHDRAW_KEEP or config.STARTING_CASH
+            return max(0.0, min(self.equity, base))
         return self.equity
 
     def _pyramid_lots(self):
