@@ -721,7 +721,11 @@ class Backtester:
     def _pyramid_lots(self):
         """Return (leg1, leg2, leg3) lot sizes for the current equity tier. Uses
         _size_equity() so the tier reflects WORKING capital under the income model
-        (byte-identical to raw equity when withdrawals are off)."""
+        (byte-identical to raw equity when withdrawals are off). LOT_OVERRIDE>0 forces
+        a fixed base lot past the tier (the max-risk-per-trade guard still applies)."""
+        if config.LOT_OVERRIDE > 0:
+            lo = config.LOT_OVERRIDE
+            return (lo, lo, lo)
         eq = self._size_equity()
         for min_eq, lots in config.EQUITY_TIERS:
             if eq >= min_eq:

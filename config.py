@@ -68,6 +68,10 @@ RISK_PER_TRADE_PCT = 1.0           # % of equity risked per leg (used when above
 # any setup whose floor-lot risk exceeds this % of current equity — the cap self-lifts
 # as the account grows. Set to a high value (e.g. 100) to disable.
 MAX_RISK_PER_TRADE_PCT = 8.0
+# Force a fixed base lot past the equity-tier schedule (0 = off, use tiers). The
+# max-risk-per-trade guard above STILL applies, so an over-large forced lot on a small
+# account will skip wide-stop setups. Env-overridable — for testing e.g. LOT_OVERRIDE=0.05.
+LOT_OVERRIDE = _envf("LOT_OVERRIDE", 0)
 MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Standard-account lot sizing ---
