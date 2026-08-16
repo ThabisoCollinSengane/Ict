@@ -72,6 +72,14 @@ MAX_RISK_PER_TRADE_PCT = 8.0
 # max-risk-per-trade guard above STILL applies, so an over-large forced lot on a small
 # account will skip wide-stop setups. Env-overridable — for testing e.g. LOT_OVERRIDE=0.05.
 LOT_OVERRIDE = _envf("LOT_OVERRIDE", 0)
+# Instead of SKIPPING a trade whose risk exceeds MAX_RISK_PER_TRADE_PCT, HALVE the lot
+# (iteratively, down to the broker min) until it fits — so wide-stop setups are TAKEN
+# at a smaller size rather than rejected. Default off (=skip, byte-identical).
+RISK_CAP_HALVE = bool(int(_os.environ.get("RISK_CAP_HALVE", 0)))
+# Drawdown de-risk: when equity drops below DERISK_BELOW_ZAR, cap the base lot at
+# DERISK_LOT (protective step-down during a losing stretch). 0 = off.
+DERISK_BELOW_ZAR = _envf("DERISK_BELOW_ZAR", 0)
+DERISK_LOT       = _envf("DERISK_LOT", 0.02)
 MAX_LEGS = 3                       # pyramiding cap (initial + 2 adds)
 
 # --- Standard-account lot sizing ---

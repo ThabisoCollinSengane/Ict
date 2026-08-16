@@ -723,6 +723,10 @@ class Backtester:
         _size_equity() so the tier reflects WORKING capital under the income model
         (byte-identical to raw equity when withdrawals are off). LOT_OVERRIDE>0 forces
         a fixed base lot past the tier (the max-risk-per-trade guard still applies)."""
+        # drawdown de-risk: below the floor, cap the base lot (protective step-down)
+        if config.DERISK_BELOW_ZAR > 0 and self._size_equity() < config.DERISK_BELOW_ZAR:
+            dl = config.DERISK_LOT
+            return (dl, dl, dl)
         if config.LOT_OVERRIDE > 0:
             lo = config.LOT_OVERRIDE
             return (lo, lo, lo)
@@ -3272,11 +3276,20 @@ class Backtester:
         # stop would cost more than MAX_RISK_PER_TRADE_PCT of equity, the account is
         # too small to trade this stop width safely — skip it. Prevents the 10%+
         # single-trade losses that build the early-account drawdown.
+        _risk_cap = self.equity * (config.MAX_RISK_PER_TRADE_PCT / 100.0)
         trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
-        if trade_risk_zar > self.equity * (config.MAX_RISK_PER_TRADE_PCT / 100.0):
-            g["risk_cap_skip"] = g.get("risk_cap_skip", 0) + 1
-            self._log_reject(t, pair, direction, "risk > max-per-trade cap (stop too wide for equity)")
-            return
+        if trade_risk_zar > _risk_cap:
+            if config.RISK_CAP_HALVE:
+                # size DOWN (halve to the broker min) so the setup is TAKEN, not skipped
+                _floor = max(1, int(config.MIN_LOT_SIZE * self._contract_units(pair)))
+                while units > _floor and units * abs(entry - stop) * config.USD_ZAR > _risk_cap:
+                    units = max(_floor, units // 2)
+                trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
+                g["risk_cap_halved"] = g.get("risk_cap_halved", 0) + 1
+            else:
+                g["risk_cap_skip"] = g.get("risk_cap_skip", 0) + 1
+                self._log_reject(t, pair, direction, "risk > max-per-trade cap (stop too wide for equity)")
+                return
         g["risk_cap_ok"] = g.get("risk_cap_ok", 0) + 1
 
         # High-impact news = distribution catalyst: upgrade to full pyramid regardless

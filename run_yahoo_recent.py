@@ -22,8 +22,8 @@ sys.path.insert(0, _ROOT)
 
 FUNNEL = ["checks", "in_killzone", "drawdown_halt", "nfp_fomc_ok", "news_clear",
           "consolidation_found", "mss_h1_m15_m5_ok", "breakout_confirmed",
-          "target_found", "units_nonzero", "risk_cap_ok", "risk_cap_skip",
-          "entry_opened"]
+          "target_found", "units_nonzero", "risk_cap_halved", "risk_cap_ok",
+          "risk_cap_skip", "entry_opened"]
 
 LOOSE = {"AMD_MIN_RANGE_BARS": 4, "AMD_MAX_RANGE_PIPS": 50.0, "AMD_MIN_TOUCHES": 1}
 
