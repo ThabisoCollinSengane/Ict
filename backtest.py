@@ -656,18 +656,21 @@ class Backtester:
         return 0
 
     def _dxy_bias(self, tf, t, lookback: int = None):
-        """Synthetic DXY BOS on the given timeframe."""
+        """Synthetic DXY BOS on the given timeframe. Robust to a constituent the
+        broker doesn't carry (e.g. USDSEK on Exness): drops empty rolls so one
+        unavailable constituent can't zero the series and flat-line the DXY gate."""
         rolls = {s: self.bars_up_to(s, tf, t) for s in config.DXY_CONSTITUENTS}
+        rolls = {s: v for s, v in rolls.items() if v}      # drop unavailable
         lb = lookback if lookback is not None else config.SWING_LOOKBACK
         n = min((len(v) for v in rolls.values()), default=0)
-        if n < lb + 2:
+        if n < lb + 2 or "EURUSD" not in rolls:
             return 0
         series = []
         for i in range(-n, 0):
-            close_px = {s: rolls[s][i].Close for s in config.DXY_CONSTITUENTS}
-            high_px = {s: rolls[s][i].High for s in config.DXY_CONSTITUENTS}
-            low_px = {s: rolls[s][i].Low for s in config.DXY_CONSTITUENTS}
-            open_px = {s: rolls[s][i].Open for s in config.DXY_CONSTITUENTS}
+            close_px = {s: rolls[s][i].Close for s in rolls}
+            high_px = {s: rolls[s][i].High for s in rolls}
+            low_px = {s: rolls[s][i].Low for s in rolls}
+            open_px = {s: rolls[s][i].Open for s in rolls}
             c = compute_dxy(close_px)
             o = compute_dxy(open_px)
             h, l = compute_dxy_range(high_px, low_px)
@@ -682,17 +685,19 @@ class Backtester:
         return self._dxy_bias("60T", t, lookback=lookback)
 
     def _dxy_bars(self, tf, t):
-        """Synthetic DXY bar series for the given timeframe (list of SynBar)."""
+        """Synthetic DXY bar series for the given timeframe (list of SynBar). Robust
+        to an unavailable constituent (drops empty rolls) — same as _dxy_bias."""
         rolls = {s: self.bars_up_to(s, tf, t) for s in config.DXY_CONSTITUENTS}
+        rolls = {s: v for s, v in rolls.items() if v}      # drop unavailable
         n = min((len(v) for v in rolls.values()), default=0)
-        if n < 2:
+        if n < 2 or "EURUSD" not in rolls:
             return []
         series = []
         for i in range(-n, 0):
-            close_px = {s: rolls[s][i].Close for s in config.DXY_CONSTITUENTS}
-            high_px  = {s: rolls[s][i].High  for s in config.DXY_CONSTITUENTS}
-            low_px   = {s: rolls[s][i].Low   for s in config.DXY_CONSTITUENTS}
-            open_px  = {s: rolls[s][i].Open  for s in config.DXY_CONSTITUENTS}
+            close_px = {s: rolls[s][i].Close for s in rolls}
+            high_px  = {s: rolls[s][i].High  for s in rolls}
+            low_px   = {s: rolls[s][i].Low   for s in rolls}
+            open_px  = {s: rolls[s][i].Open  for s in rolls}
             c = compute_dxy(close_px)
             o = compute_dxy(open_px)
             h, l = compute_dxy_range(high_px, low_px)
