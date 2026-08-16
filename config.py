@@ -566,6 +566,26 @@ MM_HTF_SMT_TF       = "60T"
 MM_HTF_SMT_LOOKBACK = 20
 MM_HTF_SMT_REQUIRED = bool(int(_os.environ.get("MM_HTF_SMT_REQUIRED", 0)))
 
+# --- MM standalone WR refinement (chart-validated, 12 Aug EU/GU example) ---
+# The two filters every winning MM reversal in the examples shares — the P43
+# standalone run had them off/too-loose (WR ~21%). Both default ON for the
+# standalone entry (no-op while MM_STANDALONE_ENABLED=0, so base run is byte-identical).
+#
+# 1) H1 EU/GU SMT REQUIRED — the reversal trigger. Crucially it must be on the
+#    BIGGER timeframe (the trader's words): restrict the SMT read to H1/H4/D only,
+#    NOT the M5/M1 rungs in MM_SMT_TFS (an M1 "divergence" is noise). The winners'
+#    SMT is always visible on H1.
+MM_STANDALONE_REQUIRE_SMT = bool(int(_os.environ.get("MM_STANDALONE_REQUIRE_SMT", 1)))
+MM_SMT_HTF_TFS      = _mm_tf_tuple("MM_SMT_HTF_TFS", ("D", "240T", "60T"))
+# 2) MSS confirmation before the IFVG entry — the charts show structure SHIFTS
+#    (first lower-low for a short / higher-high for a long, on M5) AFTER the sweep and
+#    BEFORE the re-entries. Entering the raw sweep/retrace without this is what leaked
+#    WR. When on, require a closed-bar MSS on MM_MSS_TF in the trade direction, formed
+#    after the sweep, before any standalone entry.
+MM_REQUIRE_MSS      = bool(int(_os.environ.get("MM_REQUIRE_MSS", 1)))
+MM_MSS_TF           = _os.environ.get("MM_MSS_TF", "5T")
+MM_MSS_LOOKBACK     = int(_os.environ.get("MM_MSS_LOOKBACK", "40"))
+
 # --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
 # US Treasury yields lead the dollar (higher yields -> USD bid). scripts/
 # bonds_analysis.py measures whether a yield-structure confirmation of the trade's
