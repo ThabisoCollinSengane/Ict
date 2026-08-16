@@ -638,10 +638,10 @@ NY_CONTINUATION_GATE_EXEMPT = False
 # AMD_RANGE_END_LOOKBACK controls how far back the range end can be (separate
 # from AMD_SWEEP_LOOKBACK); Asia consolidation ends hours before London/NY
 # manipulation so these two windows must be independently configurable.
-AMD_MIN_RANGE_BARS = 8             # ~2 hours on M15
-AMD_MAX_RANGE_BARS = 96            # ~24 hours on M15
-AMD_MAX_RANGE_PIPS = 35            # tight-enough coil to qualify as accumulation
-AMD_MIN_TOUCHES = 2                # the high and low each tagged at least twice
+AMD_MIN_RANGE_BARS = _envi("AMD_MIN_RANGE_BARS", 8)   # ~2 hours on M15 (env-overridable)
+AMD_MAX_RANGE_BARS = _envi("AMD_MAX_RANGE_BARS", 96)  # ~24 hours on M15
+AMD_MAX_RANGE_PIPS = _envf("AMD_MAX_RANGE_PIPS", 35)  # tight-enough coil to qualify
+AMD_MIN_TOUCHES    = _envi("AMD_MIN_TOUCHES", 2)      # high and low each tagged ≥ this
 AMD_RANGE_END_LOOKBACK = 96        # range can have ended up to 24 H ago (Asia → London)
 AMD_SWEEP_LOOKBACK = 48            # sweep must be within last 48 M15 bars (12 H) from now
 
