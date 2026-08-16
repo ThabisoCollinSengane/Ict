@@ -537,6 +537,9 @@ MM_STANDALONE_SIZE_MULT = float(_os.environ.get("MM_STANDALONE_SIZE_MULT", "1.0"
 # blocked if a same-direction standalone position is already open on any pair — caps
 # concurrent same-direction dollar exposure to one position. Works at min lot.
 MM_STANDALONE_ONE_PER_DIR = bool(int(_os.environ.get("MM_STANDALONE_ONE_PER_DIR", 1)))
+# Live semi-auto /mm: minutes between consecutive MM entries/adds on a pair (stops
+# same-bar spam while the model is armed and persistently hunting the distribution).
+MM_LIVE_COOLDOWN_MIN = _envi("MM_LIVE_COOLDOWN_MIN", 15)
 MM_STRUCTURE_MAX_AGE = 4                  # retracement swing must be this fresh (bars of its TF)
 # Escalate the position target to the opposing liquidity pool so the trade rides the
 # full distribution (the "until reached" part). Kept a SEPARATE flag (default OFF) so
