@@ -93,8 +93,35 @@ def _trades_block(trades):
             "```", df[cols].to_string(index=False), "```"]
 
 
+def _entry_breakdown(trades):
+    """Group trades by model family (base judas/breakout vs MM) with count+P&L."""
+    fam = {}
+    for t in trades:
+        et = str(t.get("entry_type", ""))
+        em = str(t.get("entry_model", ""))
+        if em == "mm_standalone" or et.startswith(("mm_", "mmstd_")):
+            key = "MM standalone/adds"
+        else:
+            key = f"base {em or '?'}"
+        d = fam.setdefault(key, {"n": 0, "w": 0, "pnl": 0.0})
+        d["n"] += 1
+        d["w"] += 1 if t.get("pnl", 0) > 0 else 0
+        d["pnl"] += t.get("pnl", 0)
+    L = ["| model | trades | wins | net ZAR |", "|---|---|---|---|"]
+    for k, d in sorted(fam.items()):
+        L.append(f"| {k} | {d['n']} | {d['w']} | {d['pnl']:+.1f} |")
+    return L
+
+
 def main():
-    period = sys.argv[1] if len(sys.argv) > 1 else "7d"
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("period", nargs="?", default="7d")
+    ap.add_argument("--full", action="store_true",
+                    help="single run of the WHOLE algo as configured by env (base + "
+                         "MM if MM_*_ENABLED set), instead of the consolidation A/B")
+    a = ap.parse_args()
+    period = a.period
     import backtest as bt
     import config
 
@@ -103,6 +130,37 @@ def main():
     if "EURUSD" not in data or "GBPUSD" not in data:
         print("ERROR: primary pairs missing from Yahoo (rate-limited? retry).")
         return 1
+
+    if a.full:
+        gate, trades = _run_once(bt, config, data, "full algo (base + MM)")
+        span = ""
+        try:
+            idx = data["EURUSD"].index
+            span = f"{idx.min()} → {idx.max()} ({len(idx)} 5m bars)"
+        except Exception:
+            pass
+        wd = getattr(config, "WITHDRAW_SCHEDULE", False) or getattr(config, "WITHDRAW_AT", 0)
+        flags = (f"STARTING_CASH={config.STARTING_CASH} · "
+                 f"MM_standalone={int(config.MM_STANDALONE_ENABLED)} · "
+                 f"MM_continuation={int(config.MM_CONTINUATION_ENABLED)} · "
+                 f"SMT_req={int(config.MM_HTF_SMT_REQUIRED)} · withdraw={int(bool(wd))}")
+        L = [f"# Yahoo replay — WHOLE algo (base + MM), last {period}", "",
+             f"_data span: {span}_", f"_{flags}_", "",
+             "## Trades by model", ""] + _entry_breakdown(trades)
+        L += ["", "## Gate funnel", ""] + _funnel_block(gate)
+        # MM-specific counters
+        mm = sorted(((k, v) for k, v in gate.items()
+                     if k.startswith("mm_") and v), key=lambda kv: kv[1], reverse=True)
+        if mm:
+            L += ["", "## MM counters", "", "```"] + [f"{k:26s} {v}" for k, v in mm] + ["```"]
+        L += ["", "## All trades", ""] + _trades_block(trades)
+        text = "\n".join(L) + "\n"
+        out = os.path.join(_ROOT, "data", "yahoo_recent_report.md")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        open(out, "w").write(text)
+        print(text)
+        _publish(out, f"Yahoo full-algo replay ({period}, cash={config.STARTING_CASH})")
+        return 0
 
     # arm 1: shipped consolidation gate
     gate_cur, tr_cur = _run_once(bt, config, data, "current gate")
