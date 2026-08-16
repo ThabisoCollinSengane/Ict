@@ -2,7 +2,7 @@
 
 Arm 1 baseline (MM off) · Arm 2 IFVG re-entries only · Arm 3 re-entries + opposing-liquidity target. `adds` = MM legs added, `esc` = targets escalated to the opposing pool. **H1 EU/GU SMT required.**
 
-_run commit: `cce71b8`_
+_run commit: `bf03d9c`_
 _**TRUE 4yr** — 2025 M1 present._
 
 ## Full 4yr
