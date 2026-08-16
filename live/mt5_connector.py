@@ -69,13 +69,17 @@ ALL_SYMBOLS = tuple(dict.fromkeys(TRADEABLE + INTERMARKET + DXY_CONSTITUENTS))
 _TF_NAMES = {
     "1T": "TIMEFRAME_M1",
     "5T": "TIMEFRAME_M5",
+    "10T": "TIMEFRAME_M10",     # MM cascade rungs (MT5 has these natively)
     "15T": "TIMEFRAME_M15",
+    "20T": "TIMEFRAME_M20",
+    "30T": "TIMEFRAME_M30",
     "60T": "TIMEFRAME_H1",
     "240T": "TIMEFRAME_H4",
     "D": "TIMEFRAME_D1",
     "W": "TIMEFRAME_W1",
     # friendly aliases
-    "M1": "TIMEFRAME_M1", "M5": "TIMEFRAME_M5", "M15": "TIMEFRAME_M15",
+    "M1": "TIMEFRAME_M1", "M5": "TIMEFRAME_M5", "M10": "TIMEFRAME_M10",
+    "M15": "TIMEFRAME_M15", "M20": "TIMEFRAME_M20", "M30": "TIMEFRAME_M30",
     "H1": "TIMEFRAME_H1", "H4": "TIMEFRAME_H4", "D1": "TIMEFRAME_D1",
     "W1": "TIMEFRAME_W1",
 }
@@ -194,11 +198,13 @@ def resolve_all(symbols=ALL_SYMBOLS) -> dict[str, str]:
 
 
 def _tf(code: str):
-    """Translate a backtest TF code to the MT5 timeframe constant."""
+    """Translate a backtest TF code to the MT5 timeframe constant, or None if this
+    MT5 build doesn't expose it (e.g. an exotic M20/M10) — callers treat None as
+    'no data for this TF' and skip it rather than crashing the cascade."""
     name = _TF_NAMES.get(code)
     if name is None:
-        raise ValueError(f"Unknown timeframe code: {code!r}")
-    return getattr(_mt5(), name)
+        return None
+    return getattr(_mt5(), name, None)
 
 
 # ── Market data ───────────────────────────────────────────────────────────────
@@ -211,9 +217,12 @@ def get_bars(base: str, tf: str, count: int) -> list[Bar]:
     name = resolve_symbol(base)
     if name is None:
         return []
+    tf_const = _tf(tf)
+    if tf_const is None:
+        return []               # timeframe not available on this MT5 build → skip
     mt5 = _mt5()
     # fetch one extra and drop the forming bar (position 0 is the current bar)
-    rates = mt5.copy_rates_from_pos(name, _tf(tf), 0, count + 1)
+    rates = mt5.copy_rates_from_pos(name, tf_const, 0, count + 1)
     if rates is None or len(rates) == 0:
         log.warning("No rates for %s %s: %s", base, tf, mt5.last_error())
         return []

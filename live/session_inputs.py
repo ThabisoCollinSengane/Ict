@@ -107,11 +107,15 @@ class SessionInputs:
             self._p(pair)["mm_auto"] = bool(auto)
             self.save()
             if auto:
-                return (f"{pair}: Market Maker {model.upper()} model — AUTO-ENTER ARMED.\n"
-                        f"It will place ONE {model} trade when price retraces into a D1/H4/H1 "
-                        f"IFVG AND a swing confirms. Then it disarms. /mm {pair} off to cancel.")
-            return (f"{pair}: Market Maker {model.upper()} model — WATCH (alerts only). "
-                    f"Add 'auto' to permit an entry: /mm {pair} {model} auto")
+                return (f"{pair}: Market Maker {model.upper()} model — AUTO-HUNT ARMED.\n"
+                        f"It hunts {model} entries on the M30→M1 IFVG cascade (PD array "
+                        f"inside the gap + internal AMD + structure), stop beyond the "
+                        f"internal manipulation, targeting liquidity. PERSISTENT — takes "
+                        f"the first entry then adds down the distribution, and re-enters "
+                        f"after a close. Bypasses the autonomous gates (you gave the bias). "
+                        f"/mm {pair} off to stop.")
+            return (f"{pair}: Market Maker {model.upper()} model — WATCH (alerts only, "
+                    f"with SMT read). Add 'auto' to let it hunt+execute: /mm {pair} {model} auto")
         return "usage: /mm EURUSD buy|sell [auto] | off"
 
     def mm(self, pair: str):

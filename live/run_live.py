@@ -123,6 +123,7 @@ class LiveTrader(Backtester):
         self._templated = set()         # _pyramid_lots knows which pair it sizes
         self._manual_halt = False       # /halt: pause new entries + pyramid adds
         self._mm_state = {}             # Market Maker model: per-pair IFVG alert state
+        self._mm_last_entry = {}        # per-pair timestamp of last MM semi-auto entry
         self._fast_state = {}           # fast-read: last sweep side per pair (alert dedup)
 
         # Circuit-breaker state
@@ -1225,99 +1226,117 @@ class LiveTrader(Backtester):
         return (price + 2 * stop_dist * d, "fixed 2R (fallback)")
 
     def _mm_auto_entry(self, pair, model, zones, price, now):
-        """Auto-enter the armed Market Maker model on an IFVG retracement.
+        """Auto-enter/hunt the armed Market Maker model using the VALIDATED engine.
 
-        Fires ONLY when the trader pre-permitted it (`/mm PAIR buy|sell auto`).
-        One shot: the permission is consumed on entry (or on a pyramid add to a
-        winner), leaving the WATCH layer on. Two conditions, both required:
-          (1) retracement — price is inside a D1/H4/H1 IFVG in the model
-              direction (the HTF Judas zone that repels price toward the draw);
-          (2) reversal — a freshly-confirmed, still-intact LTF fractal swing in
-              the model direction (_structure_entry_confirmed) — the swing
-              formation the trader looks for by hand.
-        Uses the bot's own structural stop and nearest-liquidity target."""
+        When the trader arms `/mm PAIR buy|sell auto`, they've supplied the top-down
+        bias — so this BYPASSES the autonomous bias-gates (MSS/draw-cascade/DXY/
+        intermarket) and just executes the entry mechanics in the armed direction:
+          1. price retraced INTO an M30->M1 IFVG (the intraday cascade, not just HTF);
+          2. the retracement swing on the IFVG-proportional TF confirms;
+          3. a PD array (FVG/OB/breaker) INSIDE the gap triggers the fill;
+          4. stop just beyond the internal mini-AMD manipulation (tight, structural);
+          5. target = the trader's /levels draw, else nearest liquidity.
+        PERSISTENT: stays armed until `/mm PAIR off` — takes the first entry, then
+        adds down the distribution (up to MAX_LEGS), and re-enters after a close.
+        A per-pair cooldown prevents same-bar spam. Full risk mgmt + circuit breakers.
+        """
         if self._manual_halt:
             return
         d = 1 if model == "buy" else -1
+        pip = pip_size(pair)
 
-        # (1) retracement: price must be inside one of the armed IFVG zones.
-        in_zone = next((z for z in zones if z["lo"] <= price <= z["hi"]), None)
-        if in_zone is None:
+        # cooldown: don't fire again within MM_LIVE_COOLDOWN_MIN of the last MM entry
+        cd = getattr(config, "MM_LIVE_COOLDOWN_MIN", 15)
+        last = self._mm_last_entry.get(pair)
+        if last is not None and (now - last).total_seconds() < cd * 60:
             return
 
-        # (2) reversal: a fresh, still-intact LTF swing in the model direction.
+        # (1) intraday IFVG the price is retraced into, in the armed direction
         try:
-            if not self._structure_entry_confirmed(pair, d, now):
+            zone = self._mm_ifvg_zone(pair, d, price, now)
+        except Exception:
+            log.exception("MM _mm_ifvg_zone failed %s", pair); return
+        if zone is None:
+            return
+        # (2) retracement swing on the IFVG-proportional TF
+        try:
+            if not self._mm_structure_confirm(pair, d, zone[0], now):
                 return
         except Exception:
             return
+        # (3) PD array inside the gap (FVG/OB/breaker), M15->M5->M1
+        try:
+            pat = self._mm_entry_pattern(pair, d, zone, price, now)
+        except Exception:
+            return
+        if pat is None:
+            return
+        el, _pat_stop, pat_tag, _etf = pat
+        # (4) structural stop beyond the internal mini-AMD manipulation
+        try:
+            stop = self._mm_structural_stop(zone, d, el, pip, t=now, pair=pair)
+        except Exception:
+            stop = None
+        if stop is None:
+            return                         # wide gap, no internal manipulation -> skip
+        stop_dist = abs(el - stop)
+        smt_ok = False
+        try:
+            smt_ok = self._htf_pair_smt(pair, d, now)
+        except Exception:
+            pass
 
-        pip = pip_size(pair)
-
-        # If a position is already open: same direction + winning → pyramid the
-        # add; opposite direction → never fight it (skip, keep armed).
+        # position management: fresh entry, or add down the distribution
         st_open = self.active.get(pair)
         if st_open is not None:
             if st_open["direction"] != d:
-                return
+                return                     # never fight an open opposite position
             u = sum(l["units"] for l in st_open["legs"]) or 1
             avg = sum(l["entry"] * l["units"] for l in st_open["legs"]) / u
-            if (price - avg) * d > 0:
-                msg = self.manual_pyramid(pair)
-                self.inputs.clear_mm_auto(pair)     # one-shot
-                _notify(f"MM {model.upper()} AUTO-ADD {pair} "
-                        f"({in_zone['tf']} IFVG retrace + swing)\n{msg}")
+            if len(st_open["legs"]) >= config.MAX_LEGS or (price - avg) * d <= 0:
+                return
+            msg = self.manual_pyramid(pair)
+            self._mm_last_entry[pair] = now
+            _notify(f"MM {model.upper()} ADD {pair} ({zone[0]} IFVG {pat_tag}"
+                    f"{' +SMT' if smt_ok else ''})\n{msg}")
             return
 
-        # Fresh entry. Structural stop (fractal ITL/ITH, capped ~10 pips), else 10-pip.
-        stop = None
-        stop_reason = "structural swing (intact ITL/ITH)"
-        try:
-            stop = self._structure_stop(pair, d, price, pip, now)
-        except Exception:
-            stop = None
-        if not stop or abs(price - stop) < pip:
-            stop = price - 10 * pip * d
-            stop_reason = "fixed 10-pip (default)"
-        stop_dist = abs(price - stop)
-
-        target, target_type = self._mm_target(pair, d, price, stop_dist, now)
-
-        lots = self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
-        lots = max(round(float(lots), 2), config.MIN_LOT_SIZE)
-
+        target, target_type = self._mm_target(pair, d, el, stop_dist, now)
+        lots = max(round(float(self.inputs.day_lot(pair) or config.MIN_LOT_SIZE), 2),
+                   config.MIN_LOT_SIZE)
         res = mt.market_order(pair, lots, d, sl=stop, tp=target, comment="ict_mm")
         if not (res and res.get("ok")):
-            _notify(f"MM {model.upper()} AUTO-ENTRY FAILED {pair}: {res}")
+            _notify(f"MM {model.upper()} ENTRY FAILED {pair}: {res}")
             return
         ticket = res.get("ticket") or self._recover_ticket(pair)
         st = {
             "direction": d, "target": target,
-            "legs": [{"entry": price, "stop": stop,
+            "legs": [{"entry": el, "stop": stop,
                       "units": int(lots * config.LOT_UNITS),
                       "ticket": ticket, "leg_idx": 0}],
             "entry_model": f"mm_{model}", "im_scenario": "MM", "draw_score": 0,
-            "target_type": target_type, "stop_reason": stop_reason,
+            "target_type": target_type, "stop_reason": f"mm_internal_amd ({zone[0]} IFVG)",
         }
         self.active[pair] = st
+        self._mm_last_entry[pair] = now
         try:
             self.log.upsert_position(pair, st)
         except Exception:
             pass
         self._save_pos_meta()
-        self.inputs.clear_mm_auto(pair)             # one-shot: disarm after entry
+        # PERSISTENT: stay armed (do NOT clear mm_auto) — keep hunting the distribution.
         dstr = "LONG" if d > 0 else "SHORT"
-        tgt_pips = abs(target - price) / pip
-        log.warning("MM AUTO-ENTRY %s %s %.2f lots (%s IFVG retrace)",
-                    dstr, pair, lots, in_zone["tf"])
+        tgt_pips = abs(target - el) / pip
+        log.warning("MM ENTRY %s %s %.2f lots (%s IFVG %s)", dstr, pair, lots,
+                    zone[0], pat_tag)
         _notify(
-            f"MM {model.upper()} AUTO-ENTRY {pair} {dstr}\n"
-            f"Retrace into {in_zone['tf']} IFVG {in_zone['lo']:.5f}-{in_zone['hi']:.5f}"
-            f" + swing confirmed.\n"
-            f"Entry:  {price:.5f}   {lots} lots\n"
-            f"Stop:   {stop:.5f}  ({stop_dist / pip:.1f} pips) <- {stop_reason}\n"
+            f"MM {model.upper()} ENTRY {pair} {dstr}"
+            f"{'  ✅SMT' if smt_ok else '  ⚠️no-SMT'}\n"
+            f"{zone[0]} IFVG {zone[1]:.5f}-{zone[2]:.5f}  entry via {pat_tag}\n"
+            f"Entry:  {el:.5f}   {lots} lots\n"
+            f"Stop:   {stop:.5f}  ({stop_dist / pip:.1f} pips) <- internal AMD\n"
             f"Target: {target:.5f}  ({tgt_pips:.1f} pips) <- {target_type}\n"
-            f"Auto-entry DISARMED (one shot). Now managed live — it trails and /close works."
+            f"Still ARMED — hunting the distribution. /mm {pair} off to stop."
         )
 
     def _pair_lean(self, s, dxy_dir):
@@ -2136,12 +2155,34 @@ class LiveTrader(Backtester):
                     if can_open_new_trade(now, pair):
                         self._maybe_open(pair, now)
 
-        # Periodic gate summary every 100 bars.
-        total_checks = self.gate.get("checks", 0)
-        if total_checks > 0 and total_checks % 100 == 0:
-            placed = total_checks - self.gate.get("low_conviction", 0)
-            log.info("Gate summary: %d checks / %d trades  equity=%.2f ZAR",
-                     total_checks, len(self.trades), self.equity)
+        # Gate-funnel HEARTBEAT — once per calendar day, log the FULL funnel so a
+        # quiet stretch self-explains: is the loop even evaluating (checks climbing)?
+        # which gate is the bottleneck (where the count collapses)? A Telegram line
+        # goes out too so "why no trades" is answerable without SSH-ing the VPS.
+        hb_key = now.date()
+        if getattr(self, "_last_heartbeat_day", None) != hb_key:
+            self._last_heartbeat_day = hb_key
+            g = self.gate
+            checks = g.get("checks", 0)
+            # funnel in pipeline order, most-passed first; the drop-off = the blocker
+            order = ["checks", "in_killzone", "nfp_fomc_ok", "news_clear",
+                     "consolidation_found", "mss_h1_m15_m5_ok", "draw_cascade_ok",
+                     "target_found", "units_nonzero", "risk_cap_ok", "entry_opened"]
+            funnel = [f"{k}={g.get(k, 0)}" for k in order if k in g]
+            extra = sorted(((k, v) for k, v in g.items() if k not in order),
+                           key=lambda kv: kv[1], reverse=True)[:6]
+            line = (f"💓 heartbeat {hb_key} — {checks} checks / {len(self.trades)} "
+                    f"trades / equity R{self.equity:.0f}\n" + " → ".join(funnel))
+            if extra:
+                line += "\n gates: " + ", ".join(f"{k}={v}" for k, v in extra)
+            if checks == 0:
+                line += ("\n⚠️ 0 evaluations today — NOT in a killzone yet, or the "
+                         "feed is stale (check FEED STALE alerts).")
+            log.info(line.replace("\n", " | "))
+            try:
+                _notify(line)
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------
