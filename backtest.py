@@ -701,10 +701,25 @@ class Backtester:
             series.append(SynBar(o, h, l, c))
         return series
 
+    def _size_equity(self):
+        """Equity used for POSITION SIZING. Under the withdrawal (income) model, cap at
+        the working base (keep_level) so positions scale with WORKING capital — not the
+        un-withdrawn profit sitting in the account. When the account is rarely flat,
+        withdrawals fire seldom and raw equity compounds huge; sizing on that produces
+        enormous positions that blow the account negative on a single loss. Capping at
+        keep_level keeps the account small and un-blowuppable — the point of an income
+        model. No-op when withdrawals are OFF (returns raw equity → byte-identical)."""
+        if config.WITHDRAW_SCHEDULE or config.WITHDRAW_AT > 0:
+            return max(0.0, min(self.equity, self._keep_level))
+        return self.equity
+
     def _pyramid_lots(self):
-        """Return (leg1, leg2, leg3) lot sizes for the current equity tier."""
+        """Return (leg1, leg2, leg3) lot sizes for the current equity tier. Uses
+        _size_equity() so the tier reflects WORKING capital under the income model
+        (byte-identical to raw equity when withdrawals are off)."""
+        eq = self._size_equity()
         for min_eq, lots in config.EQUITY_TIERS:
-            if self.equity >= min_eq:
+            if eq >= min_eq:
                 return lots
         return config.EQUITY_TIERS[-1][1]
 
@@ -3150,7 +3165,7 @@ class Backtester:
         g["rr_ok"] += 1
 
         # ZAR equity → USD for position sizing; floor at leg-1 lot for current tier.
-        equity_usd = self.equity / config.USD_ZAR
+        equity_usd = self._size_equity() / config.USD_ZAR
         risk_units = int(position_size(equity_usd, entry, stop, pair))
         tier_lots  = self._pyramid_lots()
         min_units  = int(tier_lots[0] * self._contract_units(pair))
@@ -3768,7 +3783,7 @@ class Backtester:
         if target is None or abs(target - entry) / pip < self._min_pips_target():
             g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
             return
-        equity_usd = self.equity / config.USD_ZAR
+        equity_usd = self._size_equity() / config.USD_ZAR
         units = int(position_size(equity_usd, entry, stop, pair))
         if config.MM_STANDALONE_SIZE_MULT != 1.0:
             units = int(units * config.MM_STANDALONE_SIZE_MULT)
