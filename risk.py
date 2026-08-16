@@ -24,6 +24,8 @@ def position_size(equity: float, entry: float, stop: float, symbol: str) -> floa
     pairs) ≈ |entry - stop|. For JPY-quoted pairs divide by price for USD conversion,
     but for GBPUSD/EURUSD/EURGBP this simplification is fine since both legs are USD/GBP.
     """
+    if equity <= 0:
+        return 0.0                       # never size on a non-positive balance
     risk_amt = equity * (config.RISK_PER_TRADE_PCT / 100.0)
     per_unit = abs(entry - stop)
     if per_unit <= 0:

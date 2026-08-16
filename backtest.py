@@ -716,6 +716,10 @@ class Backtester:
         cadence can climb). Called once per calendar day from run()."""
         if not config.WITHDRAW_SCHEDULE:
             return
+        if self.active:
+            return   # only bank realized profit when FLAT (see _maybe_withdraw) —
+                     # resetting equity under an open position sized on the larger
+                     # pre-reset equity causes a negative blow-up when it closes.
         d = t.date() if hasattr(t, "date") else t
         if self._last_withdraw_date is None:
             self._last_withdraw_date = d
@@ -765,6 +769,10 @@ class Backtester:
             return   # scheduled (calendar) mode owns withdrawals
         if config.WITHDRAW_AT <= 0:
             return
+        if self.active:
+            return   # only bank realized profit when FLAT — resetting equity while a
+                     # position sized on the pre-reset (larger) equity is open makes its
+                     # eventual loss dwarf the reset balance → negative blow-up.
         if self.equity >= self._ceiling and self.equity > self._keep_level:
             excess   = self.equity - self._keep_level
             withdraw = excess * config.WITHDRAW_FRACTION
