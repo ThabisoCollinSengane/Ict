@@ -723,6 +723,49 @@ def main():
         print("\nNo trades generated.")
         print("Check the gate funnel to see which filter is the bottleneck.")
 
+    # ── Auto-push a results report so Claude sees it without a manual git dance ──
+    if os.environ.get("NO_PUSH") != "1":
+        try:
+            _publish_backtest_report(results, backtester, requested_years)
+        except Exception as _e:
+            print(f"[report push skipped: {_e}]")
+
+
+def _publish_backtest_report(results, backtester, years):
+    """Write data/backtest_report.md (summary + gate funnel + withdrawals) and
+    force-add/commit/pull/push it (data/ is gitignored). NO_PUSH=1 disables."""
+    import subprocess
+    root = os.path.dirname(os.path.abspath(__file__))
+    span = "–".join([years[0], years[-1]])
+    L = [f"# HistData backtest — {span} ({len(years)} yr)", "",
+         "## Results", "", "```"]
+    L += [f"{k:26s} {v}" for k, v in results.items()]
+    L.append("```")
+    g = getattr(backtester, "gate", {})
+    if g:
+        L += ["", "## Gate funnel", "", "```"]
+        L += [f"{k:30s} {v}" for k, v in g.items()]
+        L.append("```")
+    ev = getattr(backtester, "withdrawal_events", [])
+    if ev:
+        tot = sum(a for _t, a, _k in ev)
+        L += ["", f"_income: R{tot:,.0f} across {len(ev)} withdrawals · working "
+              f"balance R{getattr(backtester, 'equity', 0):,.0f}_"]
+    out = os.path.join(root, "data", "backtest_report.md")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    open(out, "w").write("\n".join(L) + "\n")
+
+    def _git(*a):
+        return subprocess.run(["git", *a], cwd=root, capture_output=True, text=True)
+    sha = _git("rev-parse", "--short", "HEAD").stdout.strip() or "unknown"
+    _git("add", "-f", out)
+    _git("commit", "-q", "-m", f"HistData backtest {span} results (auto, {sha})")
+    _git("pull", "-q", "--no-rebase", "--no-edit", "origin", "HEAD")
+    if _git("push", "origin", "HEAD").returncode == 0:
+        print(f"\nRESULTS PUSHED — Claude can read data/backtest_report.md")
+    else:
+        print("\n(auto-push failed — paste the === Results === block to Claude)")
+
 
 if __name__ == "__main__":
     main()
