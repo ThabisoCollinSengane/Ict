@@ -7,59 +7,55 @@ _STARTING_CASH=1000 · MM_standalone=1 · MM_continuation=1 · SMT_req=1 · with
 
 | model | trades | wins | net ZAR |
 |---|---|---|---|
-| MM standalone/adds | 1 | 0 | -49.9 |
-| base breakout | 5 | 2 | +198.1 |
+| base breakout | 3 | 2 | +607.5 |
 
 ## Gate funnel
 
 ```
-checks                    387
-in_killzone               387  (+0)
-drawdown_halt               0  (-387)
-nfp_fomc_ok               387  (+387)
-news_clear                387  (+0)
-consolidation_found         3  (-384)
-mss_h1_m15_m5_ok            7  (+4)
-breakout_confirmed          8  (+1)
-target_found                5  (-3)
-units_nonzero               5  (+0)
-risk_cap_ok                 5  (+0)
-entry_opened                5  (+0)
+checks                    413
+in_killzone               413  (+0)
+drawdown_halt               0  (-413)
+nfp_fomc_ok               413  (+413)
+news_clear                413  (+0)
+consolidation_found         7  (-406)
+mss_h1_m15_m5_ok           12  (+5)
+breakout_confirmed         13  (+1)
+target_found               10  (-3)
+units_nonzero              10  (+0)
+risk_cap_ok                 3  (-7)
+risk_cap_skip               7  (+4)
+entry_opened                3  (-4)
 ```
 
 ## MM counters
 
 ```
-mm_checks                  252
-mm_std_no_sweep            115
-mm_std_wrong_half          105
-mm_std_not_filled          52
-mm_blocked_no_ifvg         36
-mm_std_no_smt              35
-mm_blocked_favour          33
-mm_std_no_structure        33
+mm_checks                  184
+mm_std_wrong_half          120
+mm_std_no_sweep            116
+mm_std_not_filled          53
+mm_std_no_smt              41
+mm_std_no_structure        35
+mm_blocked_no_ifvg         33
 mm_blocked_no_structure    30
 mm_blocked_no_smt          16
+mm_std_no_ifvg             15
 mm_std_no_target           15
-mm_std_no_ifvg             12
+mm_blocked_favour          14
 mm_std_no_entry            11
 mm_blocked_no_entry        8
 mm_std_wide_gap            4
-mm_blocked_not_filled      4
-mm_added                   1
 mm_blocked_min_target      1
+mm_blocked_not_filled      1
 ```
 
 ## All trades
 
-_6 trades, 2 wins, net +148.2 ZAR_
+_3 trades, 2 wins, net +607.5 ZAR_
 
 ```
                 opened_at   pair  direction    entry     exit        pnl entry_model reason
-2026-08-11 07:30:00+00:00 EURUSD         -1 1.153978 1.154475 -18.368012    breakout   stop
-2026-08-12 12:30:00+00:00 EURUSD          1 1.155492 1.155452  -1.480000    breakout   stop
-2026-08-12 12:45:00+00:00 EURUSD          1 1.155758 1.154411 -49.853799    breakout   stop
-2026-08-13 12:45:00+00:00 EURUSD          1 1.154291 1.153251 -38.480000    breakout   stop
-2026-08-14 08:00:00+00:00 GBPUSD          1 1.351707 1.355424 137.508062    breakout target
-2026-08-14 07:00:00+00:00 EURUSD          1 1.154958 1.158172 118.915772    breakout target
+2026-08-11 07:30:00+00:00 EURUSD         -1 1.153978 1.154475 -45.920030    breakout   stop
+2026-08-14 08:00:00+00:00 GBPUSD          1 1.351707 1.355424 343.770154    breakout target
+2026-08-14 07:05:00+00:00 EURUSD          1 1.154824 1.158172 309.628485    breakout target
 ```
