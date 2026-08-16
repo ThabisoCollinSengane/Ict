@@ -1,10 +1,16 @@
-# Yahoo replay — consolidation gate A/B (last 7d)
+# Yahoo replay — WHOLE algo (base + MM), last 7d
 
 _data span: 2026-08-05 23:00:00+00:00 → 2026-08-14 21:25:00+00:00 (1980 5m bars)_
+_STARTING_CASH=1000 · MM_standalone=1 · MM_continuation=1 · SMT_req=1 · withdraw=0_
 
-Same live gate stack, run twice: shipped gate vs loosened (MIN_RANGE_BARS 8→4, MAX_RANGE_PIPS 35→50, MIN_TOUCHES 2→1). More `consolidation_found` = more Judas-reversal opportunities.
+## Trades by model
 
-## Current (shipped) gate
+| model | trades | wins | net ZAR |
+|---|---|---|---|
+| MM standalone/adds | 1 | 0 | -49.9 |
+| base breakout | 5 | 2 | +198.1 |
+
+## Gate funnel
 
 ```
 checks                    387
@@ -21,44 +27,39 @@ risk_cap_ok                 5  (+0)
 entry_opened                5  (+0)
 ```
 
-_5 trades, 2 wins, net +80.5 ZAR_
+## MM counters
+
+```
+mm_checks                  252
+mm_std_no_sweep            115
+mm_std_wrong_half          105
+mm_std_not_filled          52
+mm_blocked_no_ifvg         36
+mm_std_no_smt              35
+mm_blocked_favour          33
+mm_std_no_structure        33
+mm_blocked_no_structure    30
+mm_blocked_no_smt          16
+mm_std_no_target           15
+mm_std_no_ifvg             12
+mm_std_no_entry            11
+mm_blocked_no_entry        8
+mm_std_wide_gap            4
+mm_blocked_not_filled      4
+mm_added                   1
+mm_blocked_min_target      1
+```
+
+## All trades
+
+_6 trades, 2 wins, net +148.2 ZAR_
 
 ```
                 opened_at   pair  direction    entry     exit        pnl entry_model reason
-2026-08-11 07:30:00+00:00 EURUSD         -1 1.153978 1.154475  -9.184006    breakout   stop
-2026-08-12 12:30:00+00:00 EURUSD          1 1.155492 1.154452 -19.240000    breakout   stop
-2026-08-13 12:45:00+00:00 EURUSD          1 1.154291 1.153251 -19.240000    breakout   stop
-2026-08-14 08:00:00+00:00 GBPUSD          1 1.351707 1.355424  68.754031    breakout target
-2026-08-14 07:00:00+00:00 EURUSD          1 1.154958 1.158172  59.457886    breakout target
+2026-08-11 07:30:00+00:00 EURUSD         -1 1.153978 1.154475 -18.368012    breakout   stop
+2026-08-12 12:30:00+00:00 EURUSD          1 1.155492 1.155452  -1.480000    breakout   stop
+2026-08-12 12:45:00+00:00 EURUSD          1 1.155758 1.154411 -49.853799    breakout   stop
+2026-08-13 12:45:00+00:00 EURUSD          1 1.154291 1.153251 -38.480000    breakout   stop
+2026-08-14 08:00:00+00:00 GBPUSD          1 1.351707 1.355424 137.508062    breakout target
+2026-08-14 07:00:00+00:00 EURUSD          1 1.154958 1.158172 118.915772    breakout target
 ```
-
-## Loosened consolidation gate
-
-```
-checks                    412
-in_killzone               412  (+0)
-drawdown_halt               0  (-412)
-nfp_fomc_ok               412  (+412)
-news_clear                412  (+0)
-consolidation_found         0  (-412)
-mss_h1_m15_m5_ok           14  (+14)
-breakout_confirmed          5  (-9)
-target_found                3  (-2)
-units_nonzero               3  (+0)
-risk_cap_ok                 3  (+0)
-entry_opened                3  (+0)
-```
-
-_3 trades, 2 wins, net +109.0 ZAR_
-
-```
-                opened_at   pair  direction    entry     exit        pnl entry_model reason
-2026-08-12 12:30:00+00:00 EURUSD          1 1.155492 1.154452 -19.240000    breakout   stop
-2026-08-14 08:00:00+00:00 GBPUSD          1 1.351707 1.355424  68.754031    breakout target
-2026-08-14 07:00:00+00:00 EURUSD          1 1.154958 1.158172  59.457886       judas target
-```
-
-## Read
-
-- consolidation_found: **3 → 0**  (entries: 5 → 3)
-- More entries with comparable win-quality = loosen it live. More entries but the new ones lose = the tight coil was doing real work.
