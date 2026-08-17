@@ -1281,8 +1281,13 @@ class LiveTrader(Backtester):
             return                         # wide gap, no internal manipulation -> skip
         stop_dist = abs(el - stop)
         smt_ok = False
-        try:
-            smt_ok = self._htf_pair_smt(pair, d, now)
+        try:                                   # HTF SMT on the bigger timeframe (H1/H4/D)
+            smt_ok = self._htf_pair_smt(pair, d, now, tfs=config.MM_SMT_HTF_TFS)
+        except Exception:
+            pass
+        mss_ok = False
+        try:                                   # M5 structure shift (advisory here)
+            mss_ok = self._mm_mss_confirm(pair, d, now)
         except Exception:
             pass
 
@@ -1331,7 +1336,8 @@ class LiveTrader(Backtester):
                     zone[0], pat_tag)
         _notify(
             f"MM {model.upper()} ENTRY {pair} {dstr}"
-            f"{'  ✅SMT' if smt_ok else '  ⚠️no-SMT'}\n"
+            f"{'  ✅SMT' if smt_ok else '  ⚠️no-SMT'}"
+            f"{'  ✅MSS' if mss_ok else '  ⚠️no-MSS'}\n"
             f"{zone[0]} IFVG {zone[1]:.5f}-{zone[2]:.5f}  entry via {pat_tag}\n"
             f"Entry:  {el:.5f}   {lots} lots\n"
             f"Stop:   {stop:.5f}  ({stop_dist / pip:.1f} pips) <- internal AMD\n"

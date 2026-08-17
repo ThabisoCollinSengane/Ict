@@ -3435,24 +3435,27 @@ class Backtester:
         else:
             self._day_pair[(day_key, pair)]    = day_pair + 1
 
-    def _htf_pair_smt(self, pair, direction, t):
+    def _htf_pair_smt(self, pair, direction, t, tfs=None):
         """H1 EURUSD↔GBPUSD SMT divergence in the trade direction.
 
         The two pairs are positively correlated (both X/USD). SMT = one sweeps a
         directional extreme the other FAILS to confirm — the reversal tell that
         starts the Market Maker distribution. Only meaningful for EUR/GBP; returns
         False for NZDUSD (no correlated partner in the book).
+
+        `tfs` overrides the cascade — the refined standalone passes MM_SMT_HTF_TFS
+        (H1/H4/D only) so the SMT read is on the BIGGER timeframe, not M5/M1 noise.
         """
         partner = {"EURUSD": "GBPUSD", "GBPUSD": "EURUSD"}.get(pair)
         if partner is None:
             return False
         from ict.smt import smt_divergence
         lb = config.MM_HTF_SMT_LOOKBACK
-        # Walk the SMT cascade (D1→M1); fire if divergence shows on ANY rung.
+        # Walk the SMT cascade; fire if divergence shows on ANY rung.
         # direction is the TRADE direction (short = -1). smt_divergence's `direction`
         # is the sweep direction: a short fades a buy-side sweep (higher high) = -1.
         # positive correlation → inverse=False. Either pair may be the primary.
-        for tf in config.MM_SMT_TFS:
+        for tf in (tfs if tfs is not None else config.MM_SMT_TFS):
             p = self.bars_up_to(pair, tf, t, max_bars=lb + 5)
             r = self.bars_up_to(partner, tf, t, max_bars=lb + 5)
             if len(p) < lb or len(r) < lb:
@@ -3689,6 +3692,27 @@ class Backtester:
             self._mm_day_range[(pair, now.date())] = (dr.high, dr.low, dr.equilibrium)
         return d
 
+    def _mm_mss_confirm(self, pair, direction, t):
+        """Market-structure shift on MM_MSS_TF (M5) in the trade direction — the
+        confirmation the chart examples show BEFORE the IFVG re-entries. The reversal
+        is only tradeable once the opposing short-term swing is BROKEN: for a short a
+        recent short-term LOW is taken out (a lower low = downside MSS); for a long a
+        recent short-term HIGH is taken out (higher high). Distinct from
+        _mm_structure_confirm, which finds the swing to enter AT — this proves the
+        reversal actually happened. Returns True when the shift is confirmed."""
+        bars = self.bars_up_to(pair, config.MM_MSS_TF, t, max_bars=config.MM_MSS_LOOKBACK)
+        if len(bars) < 6:
+            return False
+        res = mstruct.classify(bars)
+        # short → the opposing tier is the short-term LOW (STL); long → STH.
+        swings = res.get("stl" if direction < 0 else "sth", [])
+        if not swings:
+            return False
+        last = swings[-1]
+        age = (len(bars) - 1) - last.bar_index
+        # a fresh, already-swept opposing swing = structure just shifted our way.
+        return bool(last.swept) and age <= config.MM_MSS_LOOKBACK
+
     def _mm_open_position(self, pair, direction, entry, stop, target, target_type,
                           tag, units, t):
         """Open a standalone MM position (mirrors the base open's essential fields;
@@ -3769,7 +3793,14 @@ class Backtester:
         if not self._mm_structure_confirm(pair, d, zone[0], t):
             g["mm_std_no_structure"] = g.get("mm_std_no_structure", 0) + 1
             return
-        if config.MM_HTF_SMT_REQUIRED and not self._htf_pair_smt(pair, d, t):
+        # WR filter 1 — MSS confirmation on M5 (structure shifted before we enter).
+        if config.MM_REQUIRE_MSS and not self._mm_mss_confirm(pair, d, t):
+            g["mm_std_no_mss"] = g.get("mm_std_no_mss", 0) + 1
+            return
+        # WR filter 2 — H1 EU/GU SMT on the BIGGER timeframe (H1/H4/D only). The
+        # standalone requirement is independent of the continuation-add flag.
+        if ((config.MM_STANDALONE_REQUIRE_SMT or config.MM_HTF_SMT_REQUIRED)
+                and not self._htf_pair_smt(pair, d, t, tfs=config.MM_SMT_HTF_TFS)):
             g["mm_std_no_smt"] = g.get("mm_std_no_smt", 0) + 1
             return
         pat = self._mm_entry_pattern(pair, d, zone, cur_price, t)
@@ -3798,16 +3829,25 @@ class Backtester:
             target = self._opposing_liquidity(pair, d, entry, t)
             target_type = "opposing_external"
         else:
-            _tgt = self._find_target(pair, d, t, entry, stop=stop)
-            if _tgt is None:
-                g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
-                return
-            target, target_type = _tgt[0], _tgt[1]
-            if dr is not None and target is not None:
-                dr_hi, dr_lo, dr_eq = dr
-                overshoot = (d < 0 and target < dr_lo) or (d > 0 and target > dr_hi)
-                if overshoot:                          # don't reach past external → use eq
-                    target, target_type = dr_eq, "range_equilibrium"
+            target = target_type = None
+            # Session draw map: prefer the previous session block's opposing pool
+            # (London→Asia H/L, NY→London H/L) as the distribution's draw.
+            if config.MM_SESSION_DRAW:
+                sd = self._prev_session_hl(pair, t, d)
+                if sd is not None and (sd - entry) * d >= self._min_pips_target() * pip:
+                    if dr is None or not ((d < 0 and sd < dr[1]) or (d > 0 and sd > dr[0])):
+                        target, target_type = sd, "session_draw"
+            if target is None:
+                _tgt = self._find_target(pair, d, t, entry, stop=stop)
+                if _tgt is None:
+                    g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
+                    return
+                target, target_type = _tgt[0], _tgt[1]
+                if dr is not None and target is not None:
+                    dr_hi, dr_lo, dr_eq = dr
+                    overshoot = (d < 0 and target < dr_lo) or (d > 0 and target > dr_hi)
+                    if overshoot:                      # don't reach past external → use eq
+                        target, target_type = dr_eq, "range_equilibrium"
         if target is None or abs(target - entry) / pip < self._min_pips_target():
             g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
             return
