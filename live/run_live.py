@@ -1158,23 +1158,42 @@ class LiveTrader(Backtester):
                 pair, {"arm_price": price, "reached": set(), "broke": set()})
             model_dir = 1 if model == "buy" else -1
             zones = self._mm_zones(pair, model_dir)   # compute once; reuse for auto-entry
-            # H1 EU/GU SMT read for this model direction — the reversal confirmation
-            # that STARTS the MM distribution (one pair sweeps, the other fails to
-            # confirm). Computed once per pair per scan; surfaced in the alerts.
+            # Reversal confirmations (WR-refined, chart-validated): H1 EU/GU SMT on the
+            # BIGGER timeframe only (MM_SMT_HTF_TFS — H1/H4/D, not M5/M1 noise) and the
+            # M5 structure shift (MSS). Computed once per pair per scan; surfaced in the
+            # alerts so a manual/semi-auto placement has the same confirmations the
+            # refined backtest requires before it would take the trade.
             try:
-                _smt_ok = self._htf_pair_smt(pair, model_dir, now)
+                _smt_ok = self._htf_pair_smt(pair, model_dir, now, tfs=config.MM_SMT_HTF_TFS)
             except Exception:
                 _smt_ok = False
+            try:
+                _mss_ok = self._mm_mss_confirm(pair, model_dir, now)
+            except Exception:
+                _mss_ok = False
             _smt_line = ("✅ H1 EU/GU SMT confirms the reversal"
                          if _smt_ok else
                          "⚠️ no H1 EU/GU SMT yet — reversal unconfirmed")
+            _mss_line = ("✅ M5 MSS — structure has shifted"
+                         if _mss_ok else
+                         "⚠️ no M5 MSS yet — structure hasn't shifted")
+            # Session-draw target (MMXM time rule): London -> Asia H/L, NY -> London
+            # H/L. Shown so a manual placement uses the same draw the refined model
+            # prefers; falls back to _mm_target's own preference order when unavailable.
+            _sd_line = ""
+            try:
+                _sd = self._prev_session_hl(pair, now, model_dir)
+                if _sd is not None:
+                    _sd_line = f"\nSession draw target: {_sd:.5f} (prev session H/L)"
+            except Exception:
+                pass
             for z in zones:
                 lo, hi = z["lo"], z["hi"]
                 key = f"{z['tf']}:{round(z['mid'], 5)}"
                 if lo <= price <= hi and key not in st["reached"]:
                     st["reached"].add(key)
                     _notify(f"MM {model.upper()} {pair}\nprice REACHED {z['tf']} IFVG "
-                            f"{lo:.5f}-{hi:.5f}\n{_smt_line}\n"
+                            f"{lo:.5f}-{hi:.5f}\n{_smt_line}\n{_mss_line}{_sd_line}\n"
                             f"Watch for a swing-formation retracement entry.")
                 bars = self.bars_up_to(pair, z["tf_key"], now, max_bars=2)
                 if bars:
@@ -1198,9 +1217,11 @@ class LiveTrader(Backtester):
         """Target for an MM auto-entry, in preference order:
           (a) the trader's own /levels opposite-side liquidity (buy model targets
               the buy-side above; sell model targets the sell-side below);
-          (b) the nearest H4 ITH (buy) / ITL (sell) liquidity draw beyond the RR
+          (b) the session draw (MMXM time rule): London -> Asia H/L, NY -> London
+              H/L — the opposing pool of the PREVIOUS session block;
+          (c) the nearest H4 ITH (buy) / ITL (sell) liquidity draw beyond the RR
               floor — the same institutional draw the bot targets normally;
-          (c) a 2R fallback off the structural stop.
+          (d) a 2R fallback off the structural stop.
         All candidates must clear max(MIN_PIPS_TARGET, stop_dist * MIN_RR)."""
         pip = pip_size(pair)
         floor = max(self._min_pips_target() * pip, stop_dist * config.MIN_RR)
@@ -1211,7 +1232,15 @@ class LiveTrader(Backtester):
             if cand:
                 return (min(cand, key=lambda lv: abs(lv - price)),
                         "manual level (opposite-side liquidity)")
-        # (b) nearest H4 ITH/ITL institutional draw beyond the RR floor
+        # (b) session draw — previous session block's opposing H/L
+        if config.MM_SESSION_DRAW:
+            try:
+                sd = self._prev_session_hl(pair, now, d)
+            except Exception:
+                sd = None
+            if sd is not None and (sd - price) * d >= floor:
+                return (sd, "session draw (prev session H/L)")
+        # (c) nearest H4 ITH/ITL institutional draw beyond the RR floor
         try:
             bars = self.bars_up_to(pair, "240T", now,
                                    max_bars=(config.ITHL_TARGET_MAX_BARS or None))
