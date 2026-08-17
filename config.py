@@ -593,6 +593,13 @@ MM_MSS_LOOKBACK     = int(_os.environ.get("MM_MSS_LOOKBACK", "40"))
 #    external); else fall back to the nearest qualifying draw. Default ON for the MM
 #    path (no-op while MM_STANDALONE_ENABLED=0).
 MM_SESSION_DRAW     = bool(int(_os.environ.get("MM_SESSION_DRAW", 1)))
+# 4) Time of Interest (TOI) — the deck's "macro" window: institutional algos are
+#    documented to execute the reversal/delivery in the 30 minutes straddling each
+#    hour, XX:45-XX:15. Tagged as analytics (mm_toi column) on every standalone entry;
+#    measurement-first (matches this codebase's discipline for new signals — gate only
+#    after IS/OOS validates it, same as P9/P15/P16/P19/P41). MM_TOI_REQUIRED gates entry
+#    to the window when explicitly turned on; default OFF so behaviour is unchanged.
+MM_TOI_REQUIRED     = bool(int(_os.environ.get("MM_TOI_REQUIRED", 0)))
 
 # --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
 # US Treasury yields lead the dollar (higher yields -> USD bid). scripts/

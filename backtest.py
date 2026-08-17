@@ -3756,6 +3756,13 @@ class Backtester:
         if self._consec_losses >= config.MAX_CONSECUTIVE_LOSSES:
             g["mm_std_consec_halt"] = g.get("mm_std_consec_halt", 0) + 1
             return
+        # Time of Interest (TOI): the deck's hourly macro window, XX:45-XX:15 — the
+        # institutional delivery window. Tagged for analytics always; gates entry only
+        # when MM_TOI_REQUIRED is explicitly on.
+        _toi = now.minute >= 45 or now.minute < 15
+        if config.MM_TOI_REQUIRED and not _toi:
+            g["mm_std_no_toi"] = g.get("mm_std_no_toi", 0) + 1
+            return
         daykey = (pair, now.date())
         # De-correlate: block if a same-direction standalone is already open on any
         # pair (EU/GU/NZD are all dollar bets — don't stack the same USD risk).
@@ -3858,7 +3865,8 @@ class Backtester:
         min_units = int(self._pyramid_lots()[0] * self._contract_units(pair))
         units = max(units, min_units)
         self._mm_open_position(pair, d, entry, stop, target, target_type,
-                               f"mmstd_{pat_tag}_ifvg{zone[0]}", units, t)
+                               f"mmstd_{pat_tag}_ifvg{zone[0]}{'_toi' if _toi else ''}",
+                               units, t)
         self._mm_day_count[daykey] = self._mm_day_count.get(daykey, 0) + 1
 
     def _mm_continuation(self, pair, t):
