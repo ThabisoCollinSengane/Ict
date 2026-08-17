@@ -585,6 +585,14 @@ MM_SMT_HTF_TFS      = _mm_tf_tuple("MM_SMT_HTF_TFS", ("D", "240T", "60T"))
 MM_REQUIRE_MSS      = bool(int(_os.environ.get("MM_REQUIRE_MSS", 1)))
 MM_MSS_TF           = _os.environ.get("MM_MSS_TF", "5T")
 MM_MSS_LOOKBACK     = int(_os.environ.get("MM_MSS_LOOKBACK", "40"))
+# 3) Session draw map (MMXM time rule): the distribution's draw is the OPPOSING
+#    liquidity of the PREVIOUS session block — London delivers to the Asia H/L, NY
+#    to the London H/L. _prev_session_hl already returns exactly that (each block's
+#    prior block is the right pool). Preferred as the MM target when it's a valid
+#    draw ahead of entry (>= min-target, not past the dealing-range opposite
+#    external); else fall back to the nearest qualifying draw. Default ON for the MM
+#    path (no-op while MM_STANDALONE_ENABLED=0).
+MM_SESSION_DRAW     = bool(int(_os.environ.get("MM_SESSION_DRAW", 1)))
 
 # --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
 # US Treasury yields lead the dollar (higher yields -> USD bid). scripts/

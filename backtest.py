@@ -3829,16 +3829,25 @@ class Backtester:
             target = self._opposing_liquidity(pair, d, entry, t)
             target_type = "opposing_external"
         else:
-            _tgt = self._find_target(pair, d, t, entry, stop=stop)
-            if _tgt is None:
-                g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
-                return
-            target, target_type = _tgt[0], _tgt[1]
-            if dr is not None and target is not None:
-                dr_hi, dr_lo, dr_eq = dr
-                overshoot = (d < 0 and target < dr_lo) or (d > 0 and target > dr_hi)
-                if overshoot:                          # don't reach past external → use eq
-                    target, target_type = dr_eq, "range_equilibrium"
+            target = target_type = None
+            # Session draw map: prefer the previous session block's opposing pool
+            # (London→Asia H/L, NY→London H/L) as the distribution's draw.
+            if config.MM_SESSION_DRAW:
+                sd = self._prev_session_hl(pair, t, d)
+                if sd is not None and (sd - entry) * d >= self._min_pips_target() * pip:
+                    if dr is None or not ((d < 0 and sd < dr[1]) or (d > 0 and sd > dr[0])):
+                        target, target_type = sd, "session_draw"
+            if target is None:
+                _tgt = self._find_target(pair, d, t, entry, stop=stop)
+                if _tgt is None:
+                    g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
+                    return
+                target, target_type = _tgt[0], _tgt[1]
+                if dr is not None and target is not None:
+                    dr_hi, dr_lo, dr_eq = dr
+                    overshoot = (d < 0 and target < dr_lo) or (d > 0 and target > dr_hi)
+                    if overshoot:                      # don't reach past external → use eq
+                        target, target_type = dr_eq, "range_equilibrium"
         if target is None or abs(target - entry) / pip < self._min_pips_target():
             g["mm_std_no_target"] = g.get("mm_std_no_target", 0) + 1
             return
