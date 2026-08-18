@@ -37,4 +37,8 @@ Write-Host "`n=== running pair x bias x entry x session analysis ===" -Foregroun
 python scripts\pair_bias_analysis.py
 if ($LASTEXITCODE -ne 0) { Write-Host "ANALYSIS FAILED (exit $LASTEXITCODE) - stopping." -ForegroundColor Red; exit 1 }
 
-Write-Host "`n=== DONE - check the RESULTS PUSHED lines above for both reports ===" -ForegroundColor Cyan
+Write-Host "`n=== running AMD range & sweep analysis ===" -ForegroundColor Yellow
+python scripts\amd_range_analysis.py
+if ($LASTEXITCODE -ne 0) { Write-Host "AMD ANALYSIS FAILED (exit $LASTEXITCODE) - stopping." -ForegroundColor Red; exit 1 }
+
+Write-Host "`n=== DONE - check the RESULTS PUSHED lines above for all reports ===" -ForegroundColor Cyan
