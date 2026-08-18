@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """AMD range & sweep analysis: what are the typical consolidation ranges,
-Judas sweep depths, and breakout distances — per pair, per session, winners
+Judas sweep depths, and breakout distances -per pair, per session, winners
 vs losers. Reads the trade dump from the last backtest run.
 
 Usage:
@@ -43,7 +43,7 @@ def _mean(xs):
 
 
 def _fmt(v):
-    return f"{v:.1f}" if v is not None else "—"
+    return f"{v:.1f}" if v is not None else "-"
 
 
 def _bucket_stats(values):
@@ -90,13 +90,13 @@ def build_report(rows):
     range_bars = [int(float(r["amd_range_bars"])) for r in base
                   if r.get("amd_range_bars") and str(r["amd_range_bars"]) not in ("", "nan", "None")]
 
-    L = ["# AMD Range & Sweep Analysis — your live price action reference",
+    L = ["# AMD Range & Sweep Analysis -your live price action reference",
          "",
          f"_{len(base)} base-algo trades analysed. All values in pips._",
          ""]
 
     # ── 1. Overall consolidation range ──
-    L += ["## 1. Consolidation range (accumulation) — how wide is the coil?", "",
+    L += ["## 1. Consolidation range (accumulation) -how wide is the coil?", "",
           "This is the M15 range the algo detected before the Judas sweep.", "",
           _table_header()]
     L.append(_table_row("ALL trades", _bucket_stats(range_vals)))
@@ -131,7 +131,7 @@ def build_report(rows):
     L.append("")
 
     # ── 2. Judas sweep depth ──
-    L += ["## 2. Judas sweep depth — how far does the stop-hunt go?", "",
+    L += ["## 2. Judas sweep depth -how far does the stop-hunt go?", "",
           "Pips beyond the range extreme that the manipulation wick reaches.", "",
           _table_header()]
     L.append(_table_row("ALL trades", _bucket_stats(sweep_vals)))
@@ -163,7 +163,7 @@ def build_report(rows):
     L.append("")
 
     # ── 3. Range duration ──
-    L += ["## 3. Range duration (M15 bars) — how long does accumulation last?", "",
+    L += ["## 3. Range duration (M15 bars) -how long does accumulation last?", "",
           _table_header()]
     L.append(_table_row("ALL trades", _bucket_stats(range_bars)))
     L.append("")
@@ -177,7 +177,7 @@ def build_report(rows):
     L.append("")
 
     # ── 4. Judas vs Breakout comparison ──
-    L += ["## 4. Judas reversal vs Breakout — range & sweep comparison", "",
+    L += ["## 4. Judas reversal vs Breakout -range & sweep comparison", "",
           "The Judas sweep closes BACK inside (fake). The breakout closes BEYOND and holds (real).",
           ""]
 
@@ -188,12 +188,12 @@ def build_report(rows):
         ms = [float(r["amd_sweep_depth"]) for r in model_rows
               if r.get("amd_sweep_depth") and str(r["amd_sweep_depth"]) not in ("", "nan", "None")]
         L += [f"### {model.title()} model", "", _table_header()]
-        L.append(_table_row(f"{model} — range", _bucket_stats(mr)))
-        L.append(_table_row(f"{model} — sweep", _bucket_stats(ms)))
+        L.append(_table_row(f"{model} -range", _bucket_stats(mr)))
+        L.append(_table_row(f"{model} -sweep", _bucket_stats(ms)))
         L.append("")
 
     # ── 5. Pair x Session x Model cross-tab ──
-    L += ["## 5. Pair x Session detail — your quick-reference card", ""]
+    L += ["## 5. Pair x Session detail -your quick-reference card", ""]
     for pair in sorted(set(r.get("pair", "?") for r in base)):
         L += [f"### {pair}", "", _table_header()]
         for sess in ("london", "ny"):
@@ -217,13 +217,13 @@ def build_report(rows):
 
     if range_med is not None:
         L.append(f"- **Typical consolidation**: {_fmt(range_med)} pips (median), "
-                 f"most are {_fmt(_pct(range_vals, 25))}–{_fmt(range_p75)} pips")
-        L.append(f"- If range > {_fmt(range_p90)} pips → unusually wide, "
+                 f"most are {_fmt(_pct(range_vals, 25))}-{_fmt(range_p75)} pips")
+        L.append(f"- If range > {_fmt(range_p90)} pips -> unusually wide, "
                  f"expect a bigger move or skip (extended)")
     if sweep_med is not None:
         L.append(f"- **Typical Judas sweep**: {_fmt(sweep_med)} pips beyond the range")
-        L.append(f"- Most sweeps are {_fmt(_pct(sweep_vals, 25))}–{_fmt(sweep_p75)} pips deep")
-        L.append(f"- If price goes > {_fmt(_pct(sweep_vals, 90))} pips beyond the range → "
+        L.append(f"- Most sweeps are {_fmt(_pct(sweep_vals, 25))}-{_fmt(sweep_p75)} pips deep")
+        L.append(f"- If price goes > {_fmt(_pct(sweep_vals, 90))} pips beyond the range -> "
                  f"likely a BREAKOUT, not a Judas fake")
 
     breakout_rows = [r for r in base if r.get("entry_model") == "breakout"]
@@ -241,18 +241,18 @@ def build_report(rows):
         if diff > 0:
             L.append(f"- **The gap**: breakouts travel ~{_fmt(diff)} pips MORE than Judas fakes")
             L.append(f"- Rule of thumb: if price holds > {_fmt(_pct(ju_sweeps, 90))} pips "
-                     f"beyond the range → it's probably a breakout, not a sweep")
+                     f"beyond the range -> it's probably a breakout, not a sweep")
 
     L.append("")
     L += ["## 7. How to use this live", "",
-          "1. **Mark the M15 consolidation range** — expect it to be ~" +
+          "1. **Mark the M15 consolidation range** -expect it to be ~" +
           _fmt(range_med) + " pips wide",
-          "2. **Wait for the sweep** — price pokes " + _fmt(sweep_med) +
+          "2. **Wait for the sweep** -price pokes " + _fmt(sweep_med) +
           " pips beyond one side",
-          "3. **If it closes back inside** → Judas fake, fade it (your best setup)",
+          "3. **If it closes back inside** -> Judas fake, fade it (your best setup)",
           "4. **If it holds beyond " + _fmt(_pct(ju_sweeps, 90) if ju_sweeps else None) +
-          " pips** → breakout, follow it (need triple confirmation: EU+GU+DXY)",
-          "5. **Stop goes beyond the sweep extreme** — the M1 ITH/ITL one tier up",
+          " pips** -> breakout, follow it (need triple confirmation: EU+GU+DXY)",
+          "5. **Stop goes beyond the sweep extreme** -the M1 ITH/ITL one tier up",
           ""]
 
     return "\n".join(L) + "\n"
@@ -265,9 +265,9 @@ def _publish():
     _git("commit", "-q", "-m", "AMD range & sweep analysis (auto)")
     _git("pull", "-q", "--no-rebase", "--no-edit", "origin", "HEAD")
     if _git("push", "origin", "HEAD").returncode == 0:
-        print("\nRESULTS PUSHED — read data/amd_range_report.md")
+        print("\nRESULTS PUSHED -read data/amd_range_report.md")
     else:
-        print("\n(auto-push failed — read the report above)")
+        print("\n(auto-push failed -read the report above)")
 
 
 def _selftest():
@@ -311,7 +311,7 @@ def main():
     rows = df.to_dict("records")
     text = build_report(rows)
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    open(REPORT, "w").write(text)
+    open(REPORT, "w", encoding="utf-8").write(text)
     print(text)
     _publish()
     return 0
