@@ -1502,6 +1502,160 @@ class LiveTrader(Backtester):
             pass
         return "\n".join(lines)
 
+    def read_session_handover(self) -> str:
+        """Human-readable handover: what happened in the last session in plain
+        language — accumulation, manipulation, distribution — per pair on M15."""
+        import pytz, pandas as pd
+        NY = pytz.timezone("America/New_York")
+        SAST = pytz.timezone("Africa/Johannesburg")
+        now = datetime.now(timezone.utc)
+        ny = now.astimezone(NY)
+        sa = now.astimezone(SAST)
+
+        sessions = [
+            ("London", "03:00", "05:00"),
+            ("NY AM", "07:00", "10:00"),
+            ("NY PM", "13:30", "16:00"),
+        ]
+
+        def _et(hhmm):
+            h, m = map(int, hhmm.split(":"))
+            return ny.replace(hour=h, minute=m, second=0, microsecond=0)
+
+        last_done = None
+        for nm, s, e in reversed(sessions):
+            en = _et(e)
+            if now.astimezone(NY) >= en:
+                last_done = (nm, s, e)
+                break
+
+        if last_done is None:
+            return ("SESSION HANDOVER\n"
+                    f"Time: {sa:%H:%M} SAST / {ny:%H:%M} ET\n\n"
+                    "No session has completed today yet.\n"
+                    "Wait for London (03:00 ET) to finish.")
+
+        nm, s_str, e_str = last_done
+        st_et = _et(s_str)
+        en_et = _et(e_str)
+        st_utc = st_et.astimezone(pytz.utc)
+        en_utc = en_et.astimezone(pytz.utc)
+
+        lines = [f"SESSION HANDOVER — what {nm} did",
+                 f"Time: {sa:%H:%M} SAST / {ny:%H:%M} ET", ""]
+
+        for pair in config.PAIRS:
+            ts_15 = self.tf_index.get((pair, "15T"))
+            bars_15 = self.tf_bars.get((pair, "15T"))
+            ts_5 = self.tf_index.get((pair, "5T"))
+            bars_5 = self.tf_bars.get((pair, "5T"))
+            if ts_15 is None or bars_15 is None or len(bars_15) == 0:
+                lines.append(f"{pair}: no data")
+                continue
+
+            i0 = int(ts_15.searchsorted(pd.Timestamp(st_utc)))
+            i1 = int(ts_15.searchsorted(pd.Timestamp(en_utc)))
+            seg = bars_15[i0:i1]
+            if not seg:
+                lines.append(f"{pair}: no bars in {nm}")
+                continue
+
+            pip = pip_size(pair)
+            sess_open = seg[0].Open
+            sess_close = seg[-1].Close
+            sess_hi = max(b.High for b in seg)
+            sess_lo = min(b.Low for b in seg)
+            rng_pips = (sess_hi - sess_lo) / pip
+
+            hi_idx = next(i for i, b in enumerate(seg) if b.High == sess_hi)
+            lo_idx = next(i for i, b in enumerate(seg) if b.Low == sess_lo)
+
+            up_move = sess_close > sess_open
+            direction = "bullish" if up_move else "bearish"
+
+            half = len(seg) // 2
+            first_half = seg[:max(half, 1)]
+            second_half = seg[max(half, 1):]
+
+            first_rng = max(b.High for b in first_half) - min(b.Low for b in first_half)
+            second_rng = (max(b.High for b in second_half) - min(b.Low for b in second_half)) if second_half else 0
+
+            swept_hi = any(b.High >= sess_hi and b.Close < sess_hi for b in seg)
+            swept_lo = any(b.Low <= sess_lo and b.Close > sess_lo for b in seg)
+
+            if up_move:
+                if lo_idx < hi_idx and swept_lo:
+                    phase = "Manipulation DOWN then Distribution UP"
+                    story = (f"Price swept the low ({sess_lo:.5f}), then reversed "
+                             f"and delivered up to {sess_hi:.5f}.")
+                elif first_rng < second_rng * 0.6:
+                    phase = "Accumulation then Distribution UP"
+                    story = (f"Price consolidated in a tight range early on, "
+                             f"then broke out and delivered up to {sess_hi:.5f}.")
+                else:
+                    phase = "Distribution UP"
+                    story = f"Price moved up from {sess_open:.5f} to {sess_close:.5f}."
+            else:
+                if hi_idx < lo_idx and swept_hi:
+                    phase = "Manipulation UP then Distribution DOWN"
+                    story = (f"Price swept the high ({sess_hi:.5f}), then reversed "
+                             f"and delivered down to {sess_lo:.5f}.")
+                elif first_rng < second_rng * 0.6:
+                    phase = "Accumulation then Distribution DOWN"
+                    story = (f"Price consolidated early, then broke down "
+                             f"and delivered to {sess_lo:.5f}.")
+                else:
+                    phase = "Distribution DOWN"
+                    story = f"Price moved down from {sess_open:.5f} to {sess_close:.5f}."
+
+            judas = ""
+            if up_move and lo_idx <= 2 and swept_lo:
+                judas = " (Judas swing down — classic stop hunt below the open)"
+            elif not up_move and hi_idx <= 2 and swept_hi:
+                judas = " (Judas swing up — classic stop hunt above the open)"
+
+            lines.append(f"{pair} — {direction.upper()}")
+            lines.append(f"  Phase: {phase}{judas}")
+            lines.append(f"  {story}")
+            lines.append(f"  Range: {rng_pips:.0f} pips ({sess_lo:.5f} — {sess_hi:.5f})")
+            lines.append(f"  Open {sess_open:.5f} → Close {sess_close:.5f}")
+
+            if bars_5 and ts_5 is not None:
+                i5_end = int(ts_5.searchsorted(pd.Timestamp(en_utc)))
+                last_bars = bars_5[max(0, i5_end - 6):i5_end]
+                if last_bars:
+                    closing_dir = "up" if last_bars[-1].Close > last_bars[0].Open else "down"
+                    lines.append(f"  Closing momentum: finishing {closing_dir}")
+
+            q = mt.tick(pair)
+            if q:
+                cur = (q[0] + q[1]) / 2
+                from_hi = (sess_hi - cur) / pip
+                from_lo = (cur - sess_lo) / pip
+                lines.append(f"  Now {cur:.5f} — {from_hi:.0f}p from session high, "
+                             f"{from_lo:.0f}p from session low")
+            lines.append("")
+
+        next_sess = None
+        for snm, ss, se in sessions:
+            if now.astimezone(NY) < _et(ss):
+                next_sess = (snm, ss)
+                break
+
+        if next_sess:
+            mins = max(0, int((_et(next_sess[1]) - ny).total_seconds() // 60))
+            lines.append(f"Next up: {next_sess[0]} in {mins // 60}h{mins % 60:02d}m")
+            if nm == "London":
+                lines.append("NY should continue the London direction — "
+                             "watch for a pullback to the London range for re-entry.")
+            elif nm == "NY AM":
+                lines.append("NY PM is position-squaring — expect mean reversion, "
+                             "not fresh directional moves.")
+        else:
+            lines.append("Done for today. Review the daily candle close.")
+
+        return "\n".join(lines)
+
     def _session_recap(self, now):
         """What the completed sessions did today: range + delivery direction."""
         import pytz, pandas as pd

@@ -385,28 +385,30 @@ def test_mm_flag():
     p = config.PAIRS[0] if config.PAIRS else "EURUSD"
     tc.parse_command(f"/mm {p} buy", si)
     assert si.mm(p) == "buy"
-    assert si.mm_auto(p) is False            # watch-only by default
+    assert si.mm_auto(p) is True             # auto-hunt by default
+    tc.parse_command(f"/mm {p} buy watch", si)
+    assert si.mm_auto(p) is False            # 'watch' = alerts only
     tc.parse_command(f"/mm {p} off", si)
     assert si.mm(p) is None
     print("ok  /mm arm + off")
 
 
 def test_mm_auto_arm_and_consume():
-    """`/mm PAIR buy auto` pre-permits ONE entry; clear_mm_auto consumes it
-    (leaving the watch layer on); `/mm PAIR off` clears both."""
+    """`/mm PAIR sell` auto-hunts by default; `watch` disables auto;
+    clear_mm_auto consumes it (leaving watch on); `/mm PAIR off` clears both."""
     si = _fresh_inputs()
     import config
     p = config.PAIRS[0] if config.PAIRS else "EURUSD"
 
-    # watch → auto
+    # default = auto-hunt
     tc.parse_command(f"/mm {p} sell", si)
-    assert si.mm_auto(p) is False
-    tc.parse_command(f"/mm {p} sell auto", si)
     assert si.mm(p) == "sell" and si.mm_auto(p) is True
-    # synonyms all arm
-    for word in ("arm", "go", "on", "enter"):
-        tc.parse_command(f"/mm {p} sell {word}", si)
-        assert si.mm_auto(p) is True, word
+    # 'watch' disables auto
+    tc.parse_command(f"/mm {p} sell watch", si)
+    assert si.mm(p) == "sell" and si.mm_auto(p) is False
+    # re-arm (just say the direction again)
+    tc.parse_command(f"/mm {p} sell", si)
+    assert si.mm_auto(p) is True
 
     # one-shot consume: auto off, model still watched
     si.clear_mm_auto(p)

@@ -50,7 +50,7 @@ HELP = (
     "/markets  all pairs at a glance\n"
     "/positions  open trades + live P&L\n"
     "/account  equity / day P&L / drawdown\n"
-    "/dxy  dollar index   ·   /session  killzone\n"
+    "/dxy  dollar index   ·   /session  killzone  ·  /session handover\n"
     "/news  upcoming high-impact events\n"
     "\n"
     "PLAN (steer the bot):\n"
@@ -60,8 +60,8 @@ HELP = (
     "/hold EURUSD (run across sessions) · /release EURUSD\n"
     "/trail EURUSD m15|m5|m1 st|it [pips] | off  (trail stop behind the\n"
     "    latest intact swing: st=STH/STL, it=ITH/ITL; only tightens)\n"
-    "/mm EURUSD buy|sell [auto]|off  (MM model: watch D1/H4/H1 IFVGs;\n"
-    "    add 'auto' to pre-permit ONE entry on the IFVG retracement)\n"
+    "/mm EURUSD buy|sell [watch]|off  (MM model: hunts nearest IFVG+OB,\n"
+    "    fires immediately; add 'watch' for alerts only, no execution)\n"
     "\n"
     "CONTROL (act now):\n"
     "/test EURUSD long|short [lot]  (e.g. /test EURUSD long 0.05)\n"
@@ -200,6 +200,8 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
                 d = trader.read_dxy_value()
                 return f"DXY ~ {d:.3f}" if d else "DXY unavailable"
             if cmd == "session":
+                if args and args[0].lower() == "handover":
+                    return trader.read_session_handover()
                 return trader.read_session()
             if cmd == "brief":
                 return trader.read_brief()
@@ -253,11 +255,12 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
 
     if cmd == "mm":
         if len(args) < 2:
-            return "usage: /mm EURUSD buy|sell [auto] | off"
+            return "usage: /mm EURUSD buy|sell [watch] | off"
         p = _match_pair(args[0])
         if not p:
             return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
-        auto = len(args) >= 3 and args[2].lower() in ("auto", "arm", "go", "on", "enter")
+        watch = len(args) >= 3 and args[2].lower() in ("watch", "alert", "scan")
+        auto = not watch
         return inputs.set_mm(p, args[1], auto)
 
     if cmd in ("pyramid", "add"):
