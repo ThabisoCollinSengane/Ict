@@ -191,7 +191,11 @@ def write_report(bt, start_equity, days, start_date, end_date):
     lines = []
     w = lines.append
 
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    try:
+        from datetime import timezone
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    except Exception:
+        now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     w(f"# Recent Backtest Report - Last {days} Trading Days")
     w(f"")
     w(f"Generated: {now_str}")
@@ -404,7 +408,7 @@ def write_report(bt, start_equity, days, start_date, end_date):
 def push_report():
     """Git add, commit, push the report."""
     try:
-        subprocess.run(["git", "add", REPORT], cwd=_ROOT, check=True)
+        subprocess.run(["git", "add", "-f", REPORT], cwd=_ROOT, check=True)
         result = subprocess.run(
             ["git", "diff", "--cached", "--quiet"],
             cwd=_ROOT, capture_output=True,
