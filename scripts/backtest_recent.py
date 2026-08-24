@@ -2,7 +2,7 @@
 """Backtest the last N trading days using Yahoo Finance 5-minute data.
 
 Fetches EURUSD, GBPUSD, NZDUSD, EURGBP, AUDNZD + DXY components,
-resamples to all required timeframes, runs the full backtest engine,
+resamples to 5-min, feeds the FULL backtester (same as run_backtest_histdata.py),
 writes a detailed markdown report, and auto-pushes to the branch.
 
 Usage:
@@ -33,15 +33,6 @@ _YF_PAIRS = {
     "USDSEK": "USDSEK=X",
 }
 
-_RESAMPLE_MAP = {
-    "5T":  "5min",
-    "15T": "15min",
-    "60T": "1h",
-    "240T": "4h",
-    "D":   "1D",
-    "W":   "1W",
-}
-
 
 def fetch_yahoo(days=10):
     """Fetch 5-min OHLC for all required pairs from Yahoo Finance."""
@@ -65,7 +56,10 @@ def fetch_yahoo(days=10):
                 df = t.history(period=period, interval="5m")
                 if len(df) > 0:
                     df = df[["Open", "High", "Low", "Close"]].copy()
-                    df.index = df.index.tz_localize(None) if df.index.tz is None else df.index.tz_convert("UTC").tz_localize(None)
+                    if df.index.tz is not None:
+                        df.index = df.index.tz_convert("UTC")
+                    else:
+                        df.index = df.index.tz_localize("UTC")
                     all_data[pair] = df
                     print(f"{len(df)} bars")
                     break
@@ -77,9 +71,10 @@ def fetch_yahoo(days=10):
 
     if "EURUSD" not in all_data or "GBPUSD" not in all_data:
         print("\nERROR: Could not fetch EURUSD and/or GBPUSD - cannot run backtest.")
-        return None
+        return None, None
 
-    # Build synthetic DXY
+    # Build synthetic DXY from components
+    dxy_5m = None
     if all(p in all_data for p in ("USDJPY", "USDCHF", "USDCAD")):
         import numpy as np
         eu = all_data["EURUSD"]["Close"]
@@ -102,117 +97,92 @@ def fetch_yahoo(days=10):
         dxy = 50.14348112 * (eu ** -0.576) * (uj ** 0.136) * (gu ** -0.119) * \
               (uc ** 0.091) * (us ** 0.042) * (uch ** 0.036)
 
-        dxy_df = pd.DataFrame({
+        dxy_5m = pd.DataFrame({
             "Open": dxy, "High": dxy, "Low": dxy, "Close": dxy
         }, index=idx)
-        all_data["UDXUSD"] = dxy_df
-        print(f"  Synthetic DXY: {len(dxy_df)} bars")
+        print(f"  Synthetic DXY: {len(dxy_5m)} bars")
     else:
-        print("  WARNING: Missing DXY components - DXY gate will be approximated")
+        print("  WARNING: Missing DXY components - DXY gate will use fallback")
 
-    return all_data
+    # Separate tradeable/intermarket pairs from DXY components
+    # Only pass pairs the backtester knows about (not the raw DXY components)
+    data_5m = {}
+    backtester_pairs = {"EURUSD", "GBPUSD", "NZDUSD", "EURGBP", "AUDNZD", "AUDUSD"}
+    for pair, df in all_data.items():
+        if pair in backtester_pairs:
+            data_5m[pair] = df
 
-
-def resample_data(all_data):
-    """Resample 5-min data to all required timeframes."""
-    import pandas as pd
-    from collections import namedtuple
-    Bar = namedtuple("Bar", "Open High Low Close")
-
-    tf_bars = {}
-    tf_index = {}
-
-    for pair, df5 in all_data.items():
-        for tf_key, rule in _RESAMPLE_MAP.items():
-            if tf_key == "5T":
-                resampled = df5
-            else:
-                resampled = df5.resample(rule).agg({
-                    "Open": "first", "High": "max", "Low": "min", "Close": "last"
-                }).dropna()
-
-            bars = [Bar(r.Open, r.High, r.Low, r.Close) for _, r in resampled.iterrows()]
-            tf_bars[(pair, tf_key)] = bars
-            tf_index[(pair, tf_key)] = pd.DatetimeIndex(resampled.index)
-
-    return tf_bars, tf_index
+    return data_5m, dxy_5m
 
 
-def run_backtest(all_data, start_equity=1000, days=10):
-    """Run the full backtest engine on the fetched data."""
+def run_backtest(data_5m, dxy_5m, start_equity=1000, days=10):
+    """Run the FULL backtest engine -- same as run_backtest_histdata.py."""
     import pandas as pd
     import config
 
-    orig_equity = getattr(config, "STARTING_EQUITY", 500)
+    # Override starting equity
+    config.STARTING_CASH = start_equity
     config.STARTING_EQUITY = start_equity
 
-    tf_bars, tf_index = resample_data(all_data)
+    # Import the same HistdataBacktester used by run_backtest_histdata.py
+    from run_backtest_histdata import HistdataBacktester
 
-    from backtest import HistdataBacktester
+    if dxy_5m is None:
+        # No DXY data -- create a flat series so the backtester doesn't crash
+        idx = data_5m["EURUSD"].index
+        dxy_5m = pd.DataFrame({
+            "Open": 104.0, "High": 104.0, "Low": 104.0, "Close": 104.0
+        }, index=idx)
+        print("  WARNING: Using flat DXY (no synthetic available)")
 
-    bt = HistdataBacktester.__new__(HistdataBacktester)
+    print(f"\nInitializing full backtester...")
+    print(f"  Starting equity: R{start_equity:,.0f}")
+    print(f"  Pairs: {', '.join(sorted(data_5m.keys()))}")
 
-    bt.equity = start_equity
-    bt._peak_equity = start_equity
-    bt.active = {}
-    bt.closed = []
-    bt.tf_bars = tf_bars
-    bt.tf_index = tf_index
-    bt._init_state()
+    bt = HistdataBacktester(data_5m, dxy_5m)
 
-    eu_idx = tf_index[("EURUSD", "5T")]
+    eu_idx = bt.tf_index[("EURUSD", "5T")] if ("EURUSD", "5T") in bt.tf_index else data_5m["EURUSD"].index
     start_date = eu_idx[0]
     end_date = eu_idx[-1]
 
-    cutoff = end_date - timedelta(days=days + 3)
+    print(f"  Data range: {start_date} to {end_date}")
+    print(f"\nRunning full backtest (all gates, intermarket, AMD, MSS, sizing)...")
 
-    print(f"\nBacktest period: {start_date:%Y-%m-%d} to {end_date:%Y-%m-%d}")
-    print(f"Starting equity: R{start_equity:,.0f}")
-    print(f"Pairs: {', '.join(p for p in ('EURUSD', 'GBPUSD', 'NZDUSD') if p in all_data)}")
-    print()
-
-    trade_pairs = [p for p in config.PAIRS if p in all_data]
-    eu_bars = tf_bars[("EURUSD", "5T")]
-    total_bars = len(eu_bars)
-
-    for i in range(1, total_bars):
-        t = eu_idx[i]
-        if t < cutoff:
-            continue
-
-        for pair in all_data:
-            for tf_key in _RESAMPLE_MAP:
-                idx_arr = tf_index.get((pair, tf_key))
-                if idx_arr is not None:
-                    pos = int(idx_arr.searchsorted(pd.Timestamp(t), side="right"))
-                    bt._bar_pos = bt.__dict__.setdefault("_bar_pos", {})
-                    bt._bar_pos[(pair, tf_key)] = pos
-
-        for pair in trade_pairs:
-            try:
-                bt._maybe_open(pair, t)
-            except Exception:
-                pass
-            try:
-                bt._update_orders(pair, t)
-            except Exception:
-                pass
-            try:
-                bt._maybe_pyramid(pair, t)
-            except Exception:
-                pass
+    bt.run()
 
     return bt, start_date, end_date
 
 
 def _session_label(profile):
-    """Human-readable session name."""
     m = {"london": "London Open", "ny": "NY AM", "ny_pm": "NY PM"}
     return m.get(profile, profile or "?")
 
 
 def _result_tag(pnl):
     return "WIN" if pnl > 0 else "LOSS" if pnl < 0 else "BE"
+
+
+def _breakdown_table(trades, group_key, group_label):
+    """Build a markdown breakdown table grouped by a trade dict key."""
+    lines = []
+    lines.append(f"| {group_label} | Trades | Wins | Losses | WR | PF | P&L |")
+    lines.append("|---|---|---|---|---|---|---|")
+    groups = {}
+    for t in trades:
+        g = t.get(group_key, "?")
+        if callable(g):
+            continue
+        groups.setdefault(g, []).append(t)
+    for g, gtr in sorted(groups.items(), key=lambda x: str(x[0])):
+        tw = [t for t in gtr if t.get("pnl", 0) > 0]
+        tl = [t for t in gtr if t.get("pnl", 0) <= 0]
+        tpnl = sum(t.get("pnl", 0) for t in gtr)
+        tgp = sum(t.get("pnl", 0) for t in tw)
+        tgl = -sum(t.get("pnl", 0) for t in tl) if tl else 0
+        tpf = (tgp / tgl) if tgl > 0 else float("inf")
+        twr = len(tw) / len(gtr) * 100 if gtr else 0
+        lines.append(f"| {g} | {len(gtr)} | {len(tw)} | {len(tl)} | {twr:.0f}% | {tpf:.2f} | R{tpnl:,.2f} |")
+    return lines
 
 
 def write_report(bt, start_equity, days, start_date, end_date):
@@ -225,11 +195,13 @@ def write_report(bt, start_equity, days, start_date, end_date):
     w(f"# Recent Backtest Report - Last {days} Trading Days")
     w(f"")
     w(f"Generated: {now_str}")
-    w(f"Period: {start_date:%Y-%m-%d} to {end_date:%Y-%m-%d}")
+    w(f"Period: {start_date} to {end_date}")
     w(f"Starting equity: R{start_equity:,.0f}")
+    w(f"Full algo: DXY gate + EURGBP/AUDNZD intermarket + AMD + MSS + all sizing levers")
     w("")
 
-    closed = bt.closed
+    # The backtester stores trades in .trades (list of dicts with full detail)
+    closed = getattr(bt, "trades", [])
     n = len(closed)
 
     # --- Summary ---
@@ -237,6 +209,8 @@ def write_report(bt, start_equity, days, start_date, end_date):
     w("")
     if n == 0:
         w(f"**No trades taken** in the last {days} trading days.")
+        w("")
+        w(f"Equity unchanged: R{bt.equity:,.2f}")
         w("")
         w("This is normal - the algo is selective. It needs ALL of:")
         w("1. DXY H1 BOS direction (hard gate)")
@@ -248,18 +222,19 @@ def write_report(bt, start_equity, days, start_date, end_date):
         w("")
         w(f"Over 4 years the algo averages ~{810/208:.1f} trades/week.")
         w("Some weeks have 0 trades, some have 8-10.")
+        w("")
 
-        if bt.active:
+        # Show gate counters so you know WHERE the algo stopped
+        gate = getattr(bt, "gate", {})
+        interesting = {k: v for k, v in gate.items() if isinstance(v, (int, float)) and v > 0}
+        if interesting:
+            w("### Gate Funnel (what the algo checked)")
             w("")
-            w("## Still Open Positions")
+            w("| Gate | Count |")
+            w("|---|---|")
+            for k, v in sorted(interesting.items(), key=lambda x: -x[1])[:30]:
+                w(f"| {k} | {v} |")
             w("")
-            for pair, st in bt.active.items():
-                d = "LONG" if st["direction"] > 0 else "SHORT"
-                legs = st["legs"]
-                entry = legs[0]["entry"] if legs else 0
-                model = st.get("entry_model", "?")
-                profile = _session_label(st.get("profile", "?"))
-                w(f"- **{pair} {d}** entry {entry:.5f} ({model}, {profile})")
     else:
         wins = [t for t in closed if t.get("pnl", 0) > 0]
         losses = [t for t in closed if t.get("pnl", 0) <= 0]
@@ -278,8 +253,8 @@ def write_report(bt, start_equity, days, start_date, end_date):
         w(f"| Profit Factor | {pf:.2f} |")
         w(f"| Total P&L | R{total_pnl:,.2f} |")
         w(f"| Final Equity | R{bt.equity:,.2f} |")
-        dd = ((bt._peak_equity - bt.equity) / bt._peak_equity * 100) if bt._peak_equity > 0 else 0
-        w(f"| Max Drawdown | -{dd:.2f}% |")
+        dd = ((getattr(bt, '_peak_equity', bt.equity) - bt.equity) / max(getattr(bt, '_peak_equity', bt.equity), 1) * 100)
+        w(f"| Max Drawdown | -{abs(dd):.2f}% |")
         if wins:
             w(f"| Avg Win | R{gp/len(wins):,.2f} |")
         if losses:
@@ -317,110 +292,51 @@ def write_report(bt, start_equity, days, start_date, end_date):
 
         w("")
 
-        # --- By entry model ---
+        # --- Breakdowns ---
         w("## Breakdown by Entry Model")
         w("")
-        w("| Model | Trades | Wins | Losses | WR | PF | P&L |")
-        w("|---|---|---|---|---|---|---|")
-        models = {}
-        for t in closed:
-            m = t.get("entry_model", "?")
-            models.setdefault(m, []).append(t)
-        for m, trades in sorted(models.items()):
-            tw = [t for t in trades if t.get("pnl", 0) > 0]
-            tl = [t for t in trades if t.get("pnl", 0) <= 0]
-            tpnl = sum(t.get("pnl", 0) for t in trades)
-            tgp = sum(t.get("pnl", 0) for t in tw)
-            tgl = -sum(t.get("pnl", 0) for t in tl) if tl else 0
-            tpf = (tgp / tgl) if tgl > 0 else float("inf")
-            twr = len(tw) / len(trades) * 100 if trades else 0
-            w(f"| {m} | {len(trades)} | {len(tw)} | {len(tl)} | {twr:.0f}% | {tpf:.2f} | R{tpnl:,.2f} |")
+        lines.extend(_breakdown_table(closed, "entry_model", "Model"))
         w("")
 
-        # --- By session ---
         w("## Breakdown by Session")
         w("")
+        # Build session breakdown manually since profile needs mapping
         w("| Session | Trades | Wins | Losses | WR | PF | P&L |")
         w("|---|---|---|---|---|---|---|")
         sessions = {}
         for t in closed:
             s = _session_label(t.get("profile", "?"))
             sessions.setdefault(s, []).append(t)
-        for s, trades in sorted(sessions.items()):
-            tw = [t for t in trades if t.get("pnl", 0) > 0]
-            tl = [t for t in trades if t.get("pnl", 0) <= 0]
-            tpnl = sum(t.get("pnl", 0) for t in trades)
+        for s, gtr in sorted(sessions.items()):
+            tw = [t for t in gtr if t.get("pnl", 0) > 0]
+            tl = [t for t in gtr if t.get("pnl", 0) <= 0]
+            tpnl = sum(t.get("pnl", 0) for t in gtr)
             tgp = sum(t.get("pnl", 0) for t in tw)
             tgl = -sum(t.get("pnl", 0) for t in tl) if tl else 0
             tpf = (tgp / tgl) if tgl > 0 else float("inf")
-            twr = len(tw) / len(trades) * 100 if trades else 0
-            w(f"| {s} | {len(trades)} | {len(tw)} | {len(tl)} | {twr:.0f}% | {tpf:.2f} | R{tpnl:,.2f} |")
+            twr = len(tw) / len(gtr) * 100 if gtr else 0
+            w(f"| {s} | {len(gtr)} | {len(tw)} | {len(tl)} | {twr:.0f}% | {tpf:.2f} | R{tpnl:,.2f} |")
         w("")
 
-        # --- By pair ---
         w("## Breakdown by Pair")
         w("")
-        w("| Pair | Trades | Wins | Losses | WR | PF | P&L |")
-        w("|---|---|---|---|---|---|---|")
-        pairs = {}
-        for t in closed:
-            p = t.get("pair", "?")
-            pairs.setdefault(p, []).append(t)
-        for p, trades in sorted(pairs.items()):
-            tw = [t for t in trades if t.get("pnl", 0) > 0]
-            tl = [t for t in trades if t.get("pnl", 0) <= 0]
-            tpnl = sum(t.get("pnl", 0) for t in trades)
-            tgp = sum(t.get("pnl", 0) for t in tw)
-            tgl = -sum(t.get("pnl", 0) for t in tl) if tl else 0
-            tpf = (tgp / tgl) if tgl > 0 else float("inf")
-            twr = len(tw) / len(trades) * 100 if trades else 0
-            w(f"| {p} | {len(trades)} | {len(tw)} | {len(tl)} | {twr:.0f}% | {tpf:.2f} | R{tpnl:,.2f} |")
+        lines.extend(_breakdown_table(closed, "pair", "Pair"))
         w("")
 
-        # --- By scenario ---
         w("## Breakdown by Intermarket Scenario")
         w("")
-        w("| Scenario | Trades | WR | PF | P&L |")
-        w("|---|---|---|---|---|")
-        scenarios = {}
-        for t in closed:
-            sc = t.get("im_scenario", "?")
-            scenarios.setdefault(sc, []).append(t)
-        for sc, trades in sorted(scenarios.items()):
-            tw = [t for t in trades if t.get("pnl", 0) > 0]
-            tl = [t for t in trades if t.get("pnl", 0) <= 0]
-            tpnl = sum(t.get("pnl", 0) for t in trades)
-            tgp = sum(t.get("pnl", 0) for t in tw)
-            tgl = -sum(t.get("pnl", 0) for t in tl) if tl else 0
-            tpf = (tgp / tgl) if tgl > 0 else float("inf")
-            twr = len(tw) / len(trades) * 100 if trades else 0
-            w(f"| {sc} | {len(trades)} | {twr:.0f}% | {tpf:.2f} | R{tpnl:,.2f} |")
+        lines.extend(_breakdown_table(closed, "im_scenario", "Scenario"))
         w("")
 
-        # --- Session phase ---
         w("## Breakdown by Session Phase")
         w("")
-        w("| Phase | Trades | WR | PF | P&L |")
-        w("|---|---|---|---|---|")
-        phases = {}
-        for t in closed:
-            ph = t.get("session_phase", "?")
-            phases.setdefault(ph, []).append(t)
-        for ph, trades in sorted(phases.items()):
-            tw = [t for t in trades if t.get("pnl", 0) > 0]
-            tl = [t for t in trades if t.get("pnl", 0) <= 0]
-            tpnl = sum(t.get("pnl", 0) for t in trades)
-            tgp = sum(t.get("pnl", 0) for t in tw)
-            tgl = -sum(t.get("pnl", 0) for t in tl) if tl else 0
-            tpf = (tgp / tgl) if tgl > 0 else float("inf")
-            twr = len(tw) / len(trades) * 100 if trades else 0
-            w(f"| {ph} | {len(trades)} | {twr:.0f}% | {tpf:.2f} | R{tpnl:,.2f} |")
+        lines.extend(_breakdown_table(closed, "session_phase", "Phase"))
         w("")
 
-        # --- Confluence signals present ---
+        # --- Confluence signals ---
         w("## Confluence Signals on Trades")
         w("")
-        w("| Trade | Pair | HTF FVG | CRT Sweep | SOJ | Draw Score | Target Type | Confluence |")
+        w("| # | Pair | HTF FVG | CRT Sweep | SOJ | Draw Score | Target Type | Confluence |")
         w("|---|---|---|---|---|---|---|---|")
         for i, t in enumerate(closed, 1):
             pair = t.get("pair", "?")
@@ -433,7 +349,7 @@ def write_report(bt, start_equity, days, start_date, end_date):
             w(f"| {i} | {pair} | {htf_fvg} | {crt} | {soj} | {draw}/3 | {tgt_type} | {tgt_conf} |")
         w("")
 
-        # --- MM model if any ---
+        # --- MM model ---
         mm_trades = [t for t in closed if t.get("entry_model", "") in ("mm_standalone",) or t.get("mm_adds", 0) > 0]
         if mm_trades:
             w("## Market Maker Model Trades")
@@ -466,21 +382,17 @@ def write_report(bt, start_equity, days, start_date, end_date):
             w(f"| {pair} | {d} | {entry:.5f} | {model} | {profile} | {scenario} | {len(legs)} |")
         w("")
 
-    # --- Gate counters (what the algo checked but didn't trade) ---
+    # --- Gate counters ---
     gate = getattr(bt, "gate", {})
-    if gate:
-        interesting = {k: v for k, v in gate.items() if v and isinstance(v, (int, float)) and v > 0}
-        if interesting:
-            w("## Gate Counters (why trades were NOT taken)")
-            w("")
-            w("These show what the algo evaluated but rejected:")
-            w("")
-            w("| Gate | Count |")
-            w("|---|---|")
-            for k, v in sorted(interesting.items(), key=lambda x: -x[1])[:25]:
-                label = k.replace("_", " ").replace("blocked", "BLOCKED:").replace("no ", "no ")
-                w(f"| {label} | {v} |")
-            w("")
+    interesting = {k: v for k, v in gate.items() if isinstance(v, (int, float)) and v > 0}
+    if interesting:
+        w("## Gate Funnel (why trades were NOT taken)")
+        w("")
+        w("| Gate | Count |")
+        w("|---|---|")
+        for k, v in sorted(interesting.items(), key=lambda x: -x[1])[:30]:
+            w(f"| {k} | {v} |")
+        w("")
 
     with open(REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -493,23 +405,36 @@ def push_report():
     """Git add, commit, push the report."""
     try:
         subprocess.run(["git", "add", REPORT], cwd=_ROOT, check=True)
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            cwd=_ROOT, capture_output=True,
+        )
+        if result.returncode == 0:
+            print("No changes to commit (report unchanged).")
+            return True
+
         subprocess.run(
             ["git", "commit", "-m", "Recent backtest report (auto)"],
             cwd=_ROOT, check=True,
         )
         for attempt in range(4):
-            result = subprocess.run(
+            r = subprocess.run(
                 ["git", "push", "origin", "HEAD"],
                 cwd=_ROOT, capture_output=True, text=True,
             )
-            if result.returncode == 0:
+            if r.returncode == 0:
                 print("RESULTS PUSHED to branch.")
                 return True
             if attempt < 3:
                 wait = 2 ** (attempt + 1)
                 print(f"Push failed, retrying in {wait}s...")
+                # Pull first in case remote is ahead
+                subprocess.run(
+                    ["git", "pull", "origin", "HEAD", "--no-rebase", "--no-edit"],
+                    cwd=_ROOT, capture_output=True,
+                )
                 time.sleep(wait)
-        print(f"Push failed after retries: {result.stderr}")
+        print(f"Push failed after retries: {r.stderr}")
         return False
     except Exception as e:
         print(f"Git push error: {e}")
@@ -520,9 +445,11 @@ def _selftest():
     print("selftest: verifying imports and structure...")
     import config
     assert hasattr(config, "PAIRS")
-    assert hasattr(config, "STARTING_EQUITY")
-    for tf in ("5T", "15T", "60T", "240T", "D", "W"):
-        assert tf in _RESAMPLE_MAP, f"Missing TF {tf}"
+    assert hasattr(config, "STARTING_EQUITY") or hasattr(config, "STARTING_CASH")
+    from run_backtest_histdata import HistdataBacktester
+    print("  HistdataBacktester imported OK")
+    from backtest import Backtester
+    print("  Backtester imported OK")
     print("selftest OK")
 
 
@@ -539,11 +466,11 @@ def main():
         return 0
 
     print(f"Fetching last {a.days} trading days from Yahoo Finance...")
-    all_data = fetch_yahoo(days=a.days)
-    if all_data is None:
+    data_5m, dxy_5m = fetch_yahoo(days=a.days)
+    if data_5m is None:
         return 1
 
-    bt, start_date, end_date = run_backtest(all_data, start_equity=a.equity, days=a.days)
+    bt, start_date, end_date = run_backtest(data_5m, dxy_5m, start_equity=a.equity, days=a.days)
 
     write_report(bt, a.equity, a.days, start_date, end_date)
 
@@ -553,16 +480,18 @@ def main():
         print("Skipping push (--no-push)")
 
     # Console summary
-    n = len(bt.closed)
+    closed = getattr(bt, "trades", [])
+    n = len(closed)
     print(f"\n{'='*60}")
     print(f"RESULTS - Last {a.days} trading days")
     print(f"{'='*60}")
     if n == 0:
         print(f"No trades taken. Equity unchanged: R{bt.equity:,.2f}")
+        print("Check the gate funnel in the report to see where setups were blocked.")
     else:
-        wins = [t for t in bt.closed if t.get("pnl", 0) > 0]
-        losses = [t for t in bt.closed if t.get("pnl", 0) <= 0]
-        total_pnl = sum(t.get("pnl", 0) for t in bt.closed)
+        wins = [t for t in closed if t.get("pnl", 0) > 0]
+        losses = [t for t in closed if t.get("pnl", 0) <= 0]
+        total_pnl = sum(t.get("pnl", 0) for t in closed)
         gp = sum(t.get("pnl", 0) for t in wins)
         gl = -sum(t.get("pnl", 0) for t in losses) if losses else 0
         pf = (gp / gl) if gl > 0 else float("inf")
@@ -572,7 +501,7 @@ def main():
         print(f"Win Rate: {wr:.1f}% | PF: {pf:.2f}")
         print(f"P&L: R{total_pnl:,.2f} | Equity: R{bt.equity:,.2f}")
         print()
-        for t in bt.closed:
+        for t in closed:
             pair = t.get("pair", "?")
             d = "LONG" if t.get("direction", 0) > 0 else "SHORT"
             model = t.get("entry_model", "?")
@@ -581,7 +510,8 @@ def main():
             pip = 0.01 if "JPY" in pair else 0.0001
             pips = (t.get("exit", 0) - t.get("entry", 0)) * t.get("direction", 1) / pip
             session = _session_label(t.get("profile", "?"))
-            print(f"  {result:4} {pair:8} {d:6} {model:12} {session:12} {pips:+6.1f} pips  R{pnl:,.2f}")
+            scenario = t.get("im_scenario", "?")
+            print(f"  {result:4} {pair:8} {d:6} {model:12} {session:12} {scenario:8} {pips:+6.1f} pips  R{pnl:,.2f}")
 
     if bt.active:
         print(f"\nStill open: {', '.join(bt.active.keys())}")
