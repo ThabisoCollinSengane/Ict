@@ -601,6 +601,15 @@ MM_SESSION_DRAW     = bool(int(_os.environ.get("MM_SESSION_DRAW", 1)))
 #    to the window when explicitly turned on; default OFF so behaviour is unchanged.
 MM_TOI_REQUIRED     = bool(int(_os.environ.get("MM_TOI_REQUIRED", 0)))
 
+# Semi-auto MM: permanently armed directional preferences. The bot proactively
+# scans for these setups and alerts the trader; trader replies /go to execute.
+# No /mm arming required — these are always-on. {pair: direction} (+1=BUY, -1=SELL).
+MM_SEMI_AUTO_ENABLED = bool(int(_os.environ.get("MM_SEMI_AUTO_ENABLED", 0)))
+MM_SEMI_AUTO_PAIRS = {"GBPUSD": -1, "EURUSD": +1}  # SELL GU + BUY EU
+MM_SEMI_AUTO_MIN_CONFIRMS = int(_os.environ.get("MM_SEMI_AUTO_MIN_CONFIRMS", 2))
+MM_SEMI_AUTO_COOLDOWN_MIN = int(_os.environ.get("MM_SEMI_AUTO_COOLDOWN_MIN", 30))
+MM_SEMI_AUTO_MAX_PER_DAY = int(_os.environ.get("MM_SEMI_AUTO_MAX_PER_DAY", 3))
+
 # --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
 # US Treasury yields lead the dollar (higher yields -> USD bid). scripts/
 # bonds_analysis.py measures whether a yield-structure confirmation of the trade's

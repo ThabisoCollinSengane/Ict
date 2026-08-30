@@ -1374,6 +1374,232 @@ class LiveTrader(Backtester):
             f"Still ARMED — hunting the distribution. /mm {pair} off to stop."
         )
 
+    # ── Semi-auto MM scan (always-on preferred directions) ───────────────────
+
+    def _mm_semi_auto_scan(self):
+        """Proactively scan for MM setups in the trader's preferred directions.
+
+        Unlike _mm_scan (requires manual /mm arming), this runs continuously
+        when MM_SEMI_AUTO_ENABLED=1 and alerts the trader when a setup reaches
+        the confirmation threshold. The trader replies /go PAIR to execute.
+        No arming needed — SELL GBPUSD and BUY EURUSD are permanently watched.
+        """
+        if not getattr(config, "MM_SEMI_AUTO_ENABLED", False):
+            return
+        now = datetime.now(timezone.utc)
+        if not can_open_new_trade(now):
+            return
+        pip_fn = pip_size
+        prefs = getattr(config, "MM_SEMI_AUTO_PAIRS", {})
+        min_conf = getattr(config, "MM_SEMI_AUTO_MIN_CONFIRMS", 2)
+        cooldown = getattr(config, "MM_SEMI_AUTO_COOLDOWN_MIN", 30)
+        max_day = getattr(config, "MM_SEMI_AUTO_MAX_PER_DAY", 3)
+        day_key = now.strftime("%Y-%m-%d")
+
+        if not hasattr(self, "_mmsemi_state"):
+            self._mmsemi_state = {}
+        if not hasattr(self, "_mmsemi_alerts_today"):
+            self._mmsemi_alerts_today = {}
+        if not hasattr(self, "_mmsemi_pending"):
+            self._mmsemi_pending = {}
+
+        for pair, d in prefs.items():
+            if pair not in config.PAIRS:
+                continue
+            if pair in self.active:
+                continue
+            day_count = self._mmsemi_alerts_today.get((day_key, pair), 0)
+            if day_count >= max_day:
+                continue
+            last_alert = self._mmsemi_state.get(pair, {}).get("last_alert")
+            if last_alert and (now - last_alert).total_seconds() < cooldown * 60:
+                continue
+
+            try:
+                q = mt.tick(pair)
+                if not q:
+                    continue
+                price = (q[0] + q[1]) / 2
+            except Exception:
+                continue
+
+            pip = pip_fn(pair)
+            confirms = []
+            details = []
+            ifvg_tf = ""
+            ifvg_lo = ifvg_hi = 0.0
+
+            # (1) IFVG zone — price inside or approaching an inverted FVG
+            try:
+                zone = self._mm_ifvg_zone(pair, d, price, now)
+                if zone is not None:
+                    confirms.append("IFVG")
+                    ifvg_tf, ifvg_lo, ifvg_hi = zone[0], zone[1], zone[2]
+                    details.append(f"IFVG: {zone[0]} zone {zone[1]:.5f}-{zone[2]:.5f}")
+            except Exception:
+                pass
+
+            # (2) MSS — M5 market structure shift
+            try:
+                mss_ok = self._mm_mss_confirm(pair, d, now)
+                if mss_ok:
+                    confirms.append("MSS")
+                    details.append("MSS: M5 structure shifted in trade direction")
+            except Exception:
+                pass
+
+            # (3) SMT — EU/GU divergence on HTF
+            try:
+                smt_ok = self._htf_pair_smt(pair, d, now,
+                                            tfs=config.MM_SMT_HTF_TFS)
+                if smt_ok:
+                    confirms.append("SMT")
+                    details.append("SMT: EU/GU divergence confirms reversal")
+            except Exception:
+                pass
+
+            # (4) Full body close through IFVG (inversion confirmed)
+            if ifvg_tf:
+                try:
+                    from ict.ifvg import latest_inversion
+                    tf_key = {"D1": "D", "H4": "240T", "H1": "60T",
+                              "M30": "30T", "M15": "15T"}.get(ifvg_tf, ifvg_tf)
+                    bars = self.bars_up_to(pair, tf_key, now, max_bars=5)
+                    inv = latest_inversion(bars, ifvg_lo, ifvg_hi) if bars else 0
+                    if inv == d:
+                        confirms.append("FBC")
+                        details.append("FBC: full body close confirms inversion")
+                except Exception:
+                    pass
+
+            n_conf = len(confirms)
+            if n_conf < min_conf:
+                continue
+
+            # Build the signal strength label
+            if n_conf >= 3:
+                strength = "STRONG"
+            elif n_conf >= 2:
+                strength = "MODERATE"
+            else:
+                strength = "WATCH"
+
+            # Compute entry/stop/target for the alert
+            entry_price = price
+            stop_price = None
+            target_price = None
+            try:
+                pat = self._mm_entry_pattern(pair, d, (ifvg_tf, ifvg_lo, ifvg_hi),
+                                             price, now)
+                if pat:
+                    entry_price = pat[0]
+                    stop_price = pat[1] if pat[1] else None
+            except Exception:
+                pass
+            if stop_price is None:
+                stop_price = price - d * config.FIXED_STOP_PIPS * pip
+            stop_dist = abs(entry_price - stop_price)
+            try:
+                tgt, tgt_type = self._mm_target(pair, d, entry_price, stop_dist, now)
+                target_price = tgt
+            except Exception:
+                target_price = entry_price + d * 2 * stop_dist
+                tgt_type = "2R fallback"
+
+            # Store as pending (for /go command)
+            self._mmsemi_pending[pair] = {
+                "direction": d, "confirms": confirms, "strength": strength,
+                "entry": entry_price, "stop": stop_price, "target": target_price,
+                "target_type": tgt_type, "ifvg": (ifvg_tf, ifvg_lo, ifvg_hi),
+                "time": now,
+            }
+
+            dir_word = "LONG" if d > 0 else "SHORT"
+            conf_str = "  ".join(f"✅{c}" for c in confirms)
+            missing = [c for c in ("IFVG", "MSS", "SMT", "FBC")
+                       if c not in confirms]
+            miss_str = "  ".join(f"⚠️{c}" for c in missing) if missing else ""
+            stop_pips = stop_dist / pip
+            tgt_pips = abs(target_price - entry_price) / pip
+            rr = tgt_pips / stop_pips if stop_pips > 0 else 0
+
+            alert = (
+                f"MM {strength} — {dir_word} {pair}\n"
+                f"{conf_str}"
+                f"{'  ' + miss_str if miss_str else ''}\n"
+                f"\n"
+                f"Entry:  {entry_price:.5f}\n"
+                f"Stop:   {stop_price:.5f}  ({stop_pips:.1f} pips)\n"
+                f"Target: {target_price:.5f}  ({tgt_pips:.1f} pips, {rr:.1f}R)\n"
+                f"  <- {tgt_type}\n"
+            )
+            if details:
+                alert += "\n" + "\n".join(details) + "\n"
+            alert += f"\n/go {pair.lower()} to EXECUTE  |  ignore to PASS"
+
+            _notify(alert)
+            log.info("MM semi-auto alert: %s %s %s (%d confirms)",
+                     strength, dir_word, pair, n_conf)
+
+            self._mmsemi_state.setdefault(pair, {})["last_alert"] = now
+            self._mmsemi_alerts_today[(day_key, pair)] = day_count + 1
+
+    def mm_semi_auto_execute(self, pair):
+        """Execute a pending semi-auto MM setup (called from /go command)."""
+        pending = getattr(self, "_mmsemi_pending", {}).get(pair)
+        if not pending:
+            return f"No pending MM setup for {pair}. Wait for an alert."
+        age = (datetime.now(timezone.utc) - pending["time"]).total_seconds()
+        if age > 600:
+            del self._mmsemi_pending[pair]
+            return f"Setup expired ({age / 60:.0f} min old). Wait for a fresh alert."
+        if pair in self.active:
+            return f"{pair} already has an open position."
+        d = pending["direction"]
+        el = pending["entry"]
+        stop = pending["stop"]
+        target = pending["target"]
+        tgt_type = pending["target_type"]
+        pip = pip_size(pair)
+        lots = max(round(float(
+            self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
+        ) if self.inputs else config.MIN_LOT_SIZE, 2), config.MIN_LOT_SIZE)
+
+        res = mt.market_order(pair, lots, d, sl=stop, tp=target, comment="ict_mm_semi")
+        if not (res and res.get("ok")):
+            return f"MM ENTRY FAILED {pair}: {res}"
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st = {
+            "direction": d, "target": target,
+            "legs": [{"entry": el, "stop": stop,
+                      "units": int(lots * config.LOT_UNITS),
+                      "ticket": ticket, "leg_idx": 0}],
+            "entry_model": "mm_semi", "im_scenario": "MM-semi",
+            "draw_score": 0, "target_type": tgt_type,
+            "stop_reason": f"mm_semi ({pending['ifvg'][0]} IFVG)",
+        }
+        self.active[pair] = st
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        self._save_pos_meta()
+        del self._mmsemi_pending[pair]
+        dir_word = "LONG" if d > 0 else "SHORT"
+        stop_pips = abs(el - stop) / pip
+        tgt_pips = abs(target - el) / pip
+        _notify(
+            f"MM ENTRY {dir_word} {pair}  ({pending['strength']})\n"
+            f"  {' '.join('✅' + c for c in pending['confirms'])}\n"
+            f"Entry:  {el:.5f}   {lots} lots\n"
+            f"Stop:   {stop:.5f}  ({stop_pips:.1f} pips)\n"
+            f"Target: {target:.5f}  ({tgt_pips:.1f} pips) <- {tgt_type}\n"
+            f"Trade is LIVE — bot manages risk from here."
+        )
+        return (f"EXECUTED: {dir_word} {pair} {lots} lots\n"
+                f"Stop {stop:.5f} | Target {target:.5f}\n"
+                f"Bot manages trail + exit. /close {pair.lower()} to override.")
+
     def _pair_lean(self, s, dxy_dir):
         """A directional lean % for a pair from H4/H1/M15 structure + the dollar.
         USD-quote pairs move inverse to DXY, so DXY-up votes short."""
@@ -2323,6 +2549,12 @@ class LiveTrader(Backtester):
             self._mm_scan()
         except Exception:
             log.exception("mm_scan failed — continuing")
+
+        # Semi-auto MM: proactively scan preferred directions (SELL GU / BUY EU).
+        try:
+            self._mm_semi_auto_scan()
+        except Exception:
+            log.exception("mm_semi_auto_scan failed — continuing")
 
         # Fast read: alert when a currency sweeps its recent M15 high/low (advisory).
         try:

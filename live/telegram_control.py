@@ -62,6 +62,7 @@ HELP = (
     "    latest intact swing: st=STH/STL, it=ITH/ITL; only tightens)\n"
     "/mm EURUSD buy|sell [watch]|off  (MM model: hunts nearest IFVG+OB,\n"
     "    fires immediately; add 'watch' for alerts only, no execution)\n"
+    "/go EURUSD  (execute a pending MM semi-auto alert — reply to an alert)\n"
     "\n"
     "CONTROL (act now):\n"
     "/test EURUSD long|short [lot]  (e.g. /test EURUSD long 0.05)\n"
@@ -252,6 +253,16 @@ def parse_command(text: str, inputs, trader=None, role="full", sender=None) -> s
         if not p:
             return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
         return trader.manual_breakeven(p, args[1] if len(args) >= 2 else None)
+
+    if cmd == "go":
+        if trader is None:
+            return "go — (no live engine attached)"
+        if not args:
+            return "usage: /go EURUSD   (execute a pending MM semi-auto alert)"
+        p = _match_pair(args[0])
+        if not p:
+            return f"unknown pair '{args[0]}' (have: {', '.join(_pairs())})"
+        return trader.mm_semi_auto_execute(p)
 
     if cmd == "mm":
         if len(args) < 2:
