@@ -1569,6 +1569,31 @@ edge, unfilterable DD — discretionary, not autonomous).** Validate with
 splits stay positive. **NOT wired into `live/run_live.py`'s auto-loop** — the live port follows a GREEN
 validation (as P41 did); the manual `/mm ... auto` path is untouched.
 
+### Semi-auto MM decision (2026-08-30)
+**User decision:** trade the MM model semi-automatically, NOT fully autonomous. Autonomous standalone
+had genuine money edge (PF 2.98, R1.16B at 0.6× throttle) but unfilterable -21-23% MaxDD (breaches
+-15% breaker at the min lot). The winners are unpredictable in advance — but the USER can pick them
+discretionally. Setup:
+
+- **Dollar UP → SELL GBPUSD** (GBP is weaker than EUR in the user's intermarket read)
+- **Dollar DOWN → BUY EURUSD** (EUR is stronger than GBP)
+
+**Entry detectors (semi-auto alerts):**
+1. IFVG zone — price retraced into an inverted FVG (cascade H4→H1→M30→M15→M5)
+2. MSS — market structure shift on M5/M15 (opposing swing swept = structure shifted)
+3. SMT — EURUSD↔GBPUSD divergence on H1/H4 (one pair sweeps, the other fails to confirm)
+4. Full body close above/below IFVG — the inversion confirmation
+
+Signal strength: 3+ confirmations = STRONG, 2 = MODERATE, 1 = WATCH
+
+**Scripts:**
+- `scripts/mm_scanner.py` — real-time scanner (Yahoo data), outputs alerts to `data/mm_scan_alerts.md`
+  and auto-pushes. Run on the Windows VM: `python scripts/mm_scanner.py`
+- `scripts/mm_directional_study.py` — backtest study of SELL GU + BUY EU through MM standalone on
+  4-year histdata. Run locally: `python scripts/mm_directional_study.py --years 2022 2023 2024 2025`
+
+**News events CSV updated:** `data/news_events.csv` extended through December 2026 (was H1 only).
+
 ---
 
 ## 3-month live account scenarios (R500 start, discussed 2026-06-03)
