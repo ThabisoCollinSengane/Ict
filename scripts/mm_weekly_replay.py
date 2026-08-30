@@ -356,7 +356,7 @@ def replay_week(all_data, days=5):
     print(f"\nReplaying {len(trading_days)} trading days: {trading_days[0]} to {trading_days[-1]}")
 
     all_trades = []
-    session_taken = set()
+    session_counts = defaultdict(int)
 
     for day in trading_days:
         day_trades = []
@@ -369,9 +369,9 @@ def replay_week(all_data, days=5):
                 if pair not in all_data:
                     continue
 
-                # Max 1 alert per pair per killzone session
+                # Max 2 alerts per pair per killzone session
                 session_key = (pair, day, kz["name"])
-                if session_key in session_taken:
+                if session_counts[session_key] >= 2:
                     continue
 
                 df = all_data[pair]
@@ -386,7 +386,7 @@ def replay_week(all_data, days=5):
                 check_points = [kz_start_utc + (kz_end_utc - kz_start_utc) / 2, kz_end_utc]
 
                 for check_time in check_points:
-                    if session_key in session_taken:
+                    if session_counts[session_key] >= 2:
                         break
 
                     # Data up to this point (at least 2 hours of lookback)
@@ -418,7 +418,7 @@ def replay_week(all_data, days=5):
                     if "IFVG" not in setup["confirmations"]:
                         continue
 
-                    session_taken.add(session_key)
+                    session_counts[session_key] += 1
 
                     # Forward data for outcome simulation (next 8 hours)
                     fwd_end = check_time + timedelta(hours=8)

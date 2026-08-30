@@ -33,7 +33,7 @@ import sys
 import threading
 import time
 import urllib.request
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import datetime, timezone, timedelta
 
 # Add repo root to path so imports work when run as a module from the VPS.
@@ -1402,8 +1402,8 @@ class LiveTrader(Backtester):
             self._mmsemi_alerts_today = {}
         if not hasattr(self, "_mmsemi_pending"):
             self._mmsemi_pending = {}
-        if not hasattr(self, "_mmsemi_session_taken"):
-            self._mmsemi_session_taken = set()
+        if not hasattr(self, "_mmsemi_session_counts"):
+            self._mmsemi_session_counts = defaultdict(int)
 
         # Identify current killzone session for session-level dedup
         from ict.killzones import current_killzone
@@ -1419,9 +1419,9 @@ class LiveTrader(Backtester):
             day_count = self._mmsemi_alerts_today.get((day_key, pair), 0)
             if day_count >= max_day:
                 continue
-            # Max 1 alert per pair per killzone session (not time-based cooldown)
+            # Max 2 alerts per pair per killzone session
             session_key = (day_key, pair, kz_label)
-            if session_key in self._mmsemi_session_taken:
+            if self._mmsemi_session_counts[session_key] >= 2:
                 continue
 
             try:
@@ -1559,7 +1559,7 @@ class LiveTrader(Backtester):
             log.info("MM semi-auto alert: %s %s %s (%d confirms)",
                      strength, dir_word, pair, n_conf)
 
-            self._mmsemi_session_taken.add(session_key)
+            self._mmsemi_session_counts[session_key] += 1
             self._mmsemi_state.setdefault(pair, {})["last_alert"] = now
             self._mmsemi_alerts_today[(day_key, pair)] = day_count + 1
 
