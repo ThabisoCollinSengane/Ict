@@ -14,7 +14,7 @@ Requires histdata CSVs in data/histdata/.
 Writes report to data/mm_directional_report.md and auto-pushes.
 """
 from __future__ import annotations
-import argparse, glob as _glob, importlib, os, sys, time, subprocess
+import argparse, gc, glob as _glob, importlib, os, sys, time, subprocess
 
 import pandas as pd
 
@@ -116,6 +116,8 @@ def run_study(years):
     importlib.reload(config)
     bt_base = _run_backtest(data_5m, dxy_5m, data_m1)
     results["baseline"] = _extract(bt_base, "baseline")
+    del bt_base
+    gc.collect()
 
     # --- ARM 2: MM standalone ON, all directions ---
     print("\n=== ARM 2: MM standalone ON (all directions) ===")
