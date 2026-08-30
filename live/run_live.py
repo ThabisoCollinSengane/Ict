@@ -1402,6 +1402,14 @@ class LiveTrader(Backtester):
             self._mmsemi_alerts_today = {}
         if not hasattr(self, "_mmsemi_pending"):
             self._mmsemi_pending = {}
+        if not hasattr(self, "_mmsemi_session_taken"):
+            self._mmsemi_session_taken = set()
+
+        # Identify current killzone session for session-level dedup
+        from ict.killzones import current_killzone
+        kz_label = current_killzone(now)
+        if kz_label is None:
+            kz_label = "outside"
 
         for pair, d in prefs.items():
             if pair not in config.PAIRS:
@@ -1411,8 +1419,9 @@ class LiveTrader(Backtester):
             day_count = self._mmsemi_alerts_today.get((day_key, pair), 0)
             if day_count >= max_day:
                 continue
-            last_alert = self._mmsemi_state.get(pair, {}).get("last_alert")
-            if last_alert and (now - last_alert).total_seconds() < cooldown * 60:
+            # Max 1 alert per pair per killzone session (not time-based cooldown)
+            session_key = (day_key, pair, kz_label)
+            if session_key in self._mmsemi_session_taken:
                 continue
 
             try:
@@ -1475,6 +1484,15 @@ class LiveTrader(Backtester):
             n_conf = len(confirms)
             if n_conf < min_conf:
                 continue
+
+            # IFVG mandatory — pure MSS+FBC is noise
+            if "IFVG" not in confirms:
+                continue
+
+            # BUY EURUSD gate: require STRONG (3+) with IFVG
+            if pair == "EURUSD" and d > 0:
+                if n_conf < 3:
+                    continue
 
             # Build the signal strength label
             if n_conf >= 3:
@@ -1541,6 +1559,7 @@ class LiveTrader(Backtester):
             log.info("MM semi-auto alert: %s %s %s (%d confirms)",
                      strength, dir_word, pair, n_conf)
 
+            self._mmsemi_session_taken.add(session_key)
             self._mmsemi_state.setdefault(pair, {})["last_alert"] = now
             self._mmsemi_alerts_today[(day_key, pair)] = day_count + 1
 

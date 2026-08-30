@@ -534,6 +534,15 @@ def scan_mm_setups(all_data, pairs=None):
         else:
             setup["signal"] = "NO_SETUP"
 
+        # IFVG mandatory — pure MSS+FBC is noise
+        if "IFVG_ZONE" not in confirmations:
+            setup["signal"] = "WATCH" if confirmations else "NO_SETUP"
+
+        # BUY EURUSD gate: require STRONG (3+) with IFVG mandatory
+        if pair == "EURUSD" and pref_dir > 0:
+            if len(confirmations) < 3 or "IFVG_ZONE" not in confirmations:
+                setup["signal"] = "WATCH"
+
         setups.append(setup)
 
     return setups
@@ -768,7 +777,7 @@ def _selftest():
     print("  Bias module OK")
     from ict.dealing_range import detect_dealing_range, premium_discount
     print("  Dealing range OK")
-    from ict.fvg import find_fvg
+    from ict.fvg import detect_new_fvg
     print("  FVG module OK")
     from news_filter import NewsCalendar
     print("  News filter OK")

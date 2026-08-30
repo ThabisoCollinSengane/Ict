@@ -153,8 +153,9 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
         if len(df_tf) > 3:
             tfs[tf_key] = _df_to_bars(df_tf)
 
-    # 1. IFVG zone
+    # 1. IFVG zone — save the zone for FBC validation
     ifvg_found = False
+    ifvg_zones = []
     ifvg_cascade = ("60T", "30T", "15T", "5T")
     for tf in ifvg_cascade:
         bars = tfs.get(tf)
@@ -173,6 +174,7 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
                         idir = latest_inversion(lower_bars, lo, hi)
             if idir == pref_dir:
                 ifvg_found = True
+                ifvg_zones.append({"tf": tf, "lo": lo, "hi": hi})
                 break
         if ifvg_found:
             break
@@ -208,24 +210,18 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
                 smt_confirmed = True
                 break
 
-    # 4. FBC (full body close through any IFVG in the last few bars)
+    # 4. FBC — full body close through a confirmed IFVG zone only
     fbc_confirmed = False
-    for tf in ifvg_cascade:
-        bars = tfs.get(tf)
-        if not bars or len(bars) < 4:
-            continue
-        boxes = _fvgs(bars[:-1])
-        if not boxes:
+    for zone in ifvg_zones:
+        bars = tfs.get(zone["tf"])
+        if not bars or len(bars) < 2:
             continue
         last_bar = bars[-1]
-        for (bi, lo, hi) in reversed(boxes[-5:]):
-            if pref_dir > 0 and last_bar.Open > hi and last_bar.Close > hi:
-                fbc_confirmed = True
-                break
-            elif pref_dir < 0 and last_bar.Open < lo and last_bar.Close < lo:
-                fbc_confirmed = True
-                break
-        if fbc_confirmed:
+        if pref_dir > 0 and last_bar.Open > zone["hi"] and last_bar.Close > zone["hi"]:
+            fbc_confirmed = True
+            break
+        elif pref_dir < 0 and last_bar.Open < zone["lo"] and last_bar.Close < zone["lo"]:
+            fbc_confirmed = True
             break
 
     # Build confirmations
@@ -360,7 +356,7 @@ def replay_week(all_data, days=5):
     print(f"\nReplaying {len(trading_days)} trading days: {trading_days[0]} to {trading_days[-1]}")
 
     all_trades = []
-    cooldown = {}
+    session_taken = set()
 
     for day in trading_days:
         day_trades = []
@@ -373,6 +369,11 @@ def replay_week(all_data, days=5):
                 if pair not in all_data:
                     continue
 
+                # Max 1 alert per pair per killzone session
+                session_key = (pair, day, kz["name"])
+                if session_key in session_taken:
+                    continue
+
                 df = all_data[pair]
 
                 kz_end_et = ny.localize(datetime(day.year, day.month, day.day,
@@ -382,15 +383,11 @@ def replay_week(all_data, days=5):
                 kz_end_utc = kz_end_et.astimezone(pytz.utc)
                 kz_start_utc = kz_start_et.astimezone(pytz.utc)
 
-                # Also check mid-session (halfway through) for setups that form and resolve within the KZ
                 check_points = [kz_start_utc + (kz_end_utc - kz_start_utc) / 2, kz_end_utc]
 
                 for check_time in check_points:
-                    # Cooldown: skip if we already alerted this pair in the last 30 min
-                    cd_key = (pair, day)
-                    last_alert = cooldown.get(cd_key)
-                    if last_alert and (check_time - last_alert).total_seconds() < 1800:
-                        continue
+                    if session_key in session_taken:
+                        break
 
                     # Data up to this point (at least 2 hours of lookback)
                     lookback_start = check_time - timedelta(hours=6)
@@ -412,18 +409,16 @@ def replay_week(all_data, days=5):
                     if setup is None or setup["n_confirms"] < 2:
                         continue
 
-                    # Deduplicate: don't double-count if same setup fires at both checkpoints
-                    dupe = False
-                    for prev in day_trades:
-                        if (prev["pair"] == pair and
-                            abs((setup["time"] - prev["time"]).total_seconds()) < 3600 and
-                            prev["confirmations"] == setup["confirmations"]):
-                            dupe = True
-                            break
-                    if dupe:
+                    # BUY EURUSD gate: require STRONG (3+) with IFVG mandatory
+                    if pair == "EURUSD" and pref_dir > 0:
+                        if setup["n_confirms"] < 3 or "IFVG" not in setup["confirmations"]:
+                            continue
+
+                    # IFVG mandatory for all setups (pure MSS+FBC is noise)
+                    if "IFVG" not in setup["confirmations"]:
                         continue
 
-                    cooldown[cd_key] = check_time
+                    session_taken.add(session_key)
 
                     # Forward data for outcome simulation (next 8 hours)
                     fwd_end = check_time + timedelta(hours=8)
