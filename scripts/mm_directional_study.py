@@ -14,12 +14,15 @@ Requires histdata CSVs in data/histdata/.
 Writes report to data/mm_directional_report.md and auto-pushes.
 """
 from __future__ import annotations
-import argparse, os, sys, time, subprocess
+import argparse, glob as _glob, importlib, os, sys, time, subprocess
+
+import pandas as pd
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
 REPORT = os.path.join(_ROOT, "data", "mm_directional_report.md")
+DATA_DIR = os.path.join(_ROOT, "data", "histdata")
 
 PREFERRED = {
     "GBPUSD": -1,  # SELL only
@@ -27,13 +30,82 @@ PREFERRED = {
 }
 
 
+def _load_data(years):
+    """Load and resample histdata M1 CSVs — same logic as run_backtest_histdata.main()."""
+    import config
+    from run_backtest_histdata import load_m1, _resample, df_to_bars
+
+    core_syms = ["GBPUSD", "EURUSD", "EURGBP", "UDXUSD"]
+    optional_syms = ["AUDUSD", "NZDUSD", "AUDNZD"]
+
+    str_years = [str(y) for y in years]
+
+    def _year_has_data(sym, yr):
+        if os.path.exists(os.path.join(DATA_DIR, f"{sym}_{yr}.csv")):
+            return True
+        return bool(_glob.glob(os.path.join(DATA_DIR, f"{sym}_{yr}_*.csv")))
+
+    valid_years = [yr for yr in str_years if all(_year_has_data(s, yr) for s in core_syms)]
+    if not valid_years:
+        print(f"ERROR: no data found for core pairs in {str_years}")
+        print(f"  Data directory: {DATA_DIR}")
+        sys.exit(1)
+
+    available_optional = [
+        s for s in optional_syms
+        if all(_year_has_data(s, yr) for yr in valid_years)
+    ]
+    syms = core_syms + available_optional
+    print(f"  Pairs: {', '.join(syms)}  Years: {', '.join(valid_years)}")
+
+    data_5m = {}
+    data_m1 = {}
+    dxy_5m = None
+    _tradeable = set(config.PAIRS)
+
+    for sym in syms:
+        frames = []
+        for yr in valid_years:
+            annual = os.path.join(DATA_DIR, f"{sym}_{yr}.csv")
+            if os.path.exists(annual):
+                frames.append(load_m1(annual))
+            else:
+                monthly = sorted(_glob.glob(os.path.join(DATA_DIR, f"{sym}_{yr}_*.csv")))
+                for mp in monthly:
+                    frames.append(load_m1(mp))
+        if not frames:
+            continue
+        m1 = pd.concat(frames).sort_index()
+        m1 = m1[~m1.index.duplicated(keep='first')]
+        m5 = _resample(m1, "5min")
+        print(f"  {sym}: {len(m1):>7,} M1 → {len(m5):>6,} M5 bars")
+        if sym == "UDXUSD":
+            dxy_5m = m5
+        else:
+            data_5m[sym] = m5
+            if sym in _tradeable:
+                data_m1[sym] = m1
+
+    return data_5m, dxy_5m, data_m1
+
+
+def _run_backtest(data_5m, dxy_5m, data_m1):
+    """Create a fresh HistdataBacktester and run it."""
+    from run_backtest_histdata import HistdataBacktester
+    bt = HistdataBacktester(data_5m, dxy_5m, data_m1)
+    bt.run()
+    return bt
+
+
 def run_study(years):
     """Run 3 backtests: baseline (no MM), MM all-directions, MM filtered."""
     import config
 
-    # Save original config
     orig_mm_standalone = os.environ.get("MM_STANDALONE_ENABLED")
     orig_mm_cont = os.environ.get("MM_CONTINUATION_ENABLED")
+
+    print("\nLoading histdata...")
+    data_5m, dxy_5m, data_m1 = _load_data(years)
 
     results = {}
 
@@ -41,10 +113,8 @@ def run_study(years):
     print("\n=== ARM 1: Baseline (MM OFF) ===")
     os.environ["MM_STANDALONE_ENABLED"] = "0"
     os.environ["MM_CONTINUATION_ENABLED"] = "0"
-    import importlib
     importlib.reload(config)
-    from run_backtest_histdata import run as run_bt
-    bt_base = run_bt(years)
+    bt_base = _run_backtest(data_5m, dxy_5m, data_m1)
     results["baseline"] = _extract(bt_base, "baseline")
 
     # --- ARM 2: MM standalone ON, all directions ---
@@ -52,16 +122,13 @@ def run_study(years):
     os.environ["MM_STANDALONE_ENABLED"] = "1"
     os.environ["MM_CONTINUATION_ENABLED"] = "0"
     importlib.reload(config)
-    bt_all = run_bt(years)
+    bt_all = _run_backtest(data_5m, dxy_5m, data_m1)
     results["mm_all"] = _extract(bt_all, "mm_all")
 
-    # --- ARM 3: MM standalone ON, filtered to preferred directions ---
-    # We can't directly filter in the engine without modifying it,
-    # so we'll analyse the trades from ARM 2 post-hoc
+    # --- ARM 3: post-hoc filter of ARM 2 trades to preferred directions ---
     all_trades = getattr(bt_all, "trades", [])
     mm_trades = [t for t in all_trades if t.get("entry_model") == "mm_standalone"]
 
-    # Split into preferred vs non-preferred
     pref_trades = []
     nonpref_trades = []
     for t in mm_trades:
@@ -85,13 +152,7 @@ def run_study(years):
         k: _trade_stats(v, f"{k[1]} {k[0]}") for k, v in sorted(pair_dir.items())
     }
 
-    # Per-confirmation breakdown
-    confirm_buckets = {}
-    for t in mm_trades:
-        tag = t.get("entry_type", "")
-        confirm_buckets.setdefault(tag, []).append(t)
-
-    # Restore
+    # Restore env
     if orig_mm_standalone is not None:
         os.environ["MM_STANDALONE_ENABLED"] = orig_mm_standalone
     else:
