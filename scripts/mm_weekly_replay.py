@@ -59,7 +59,7 @@ def fetch_yahoo(days=8):
         import yfinance as yf
     import pandas as pd
 
-    period = f"{min(days + 3, 59)}d"
+    period = f"{min(int(days * 1.6) + 5, 59)}d"
     all_data = {}
 
     for pair, ticker in _YF_PAIRS.items():
@@ -148,15 +148,15 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
 
     tfs = {}
     tfs["5T"] = _df_to_bars(df_5m_slice)
-    for tf_str, tf_key in [("15min", "15T"), ("30min", "30T"), ("1h", "60T")]:
+    for tf_str, tf_key in [("15min", "15T"), ("30min", "30T"), ("1h", "60T"), ("4h", "240T")]:
         df_tf = _resample(df_5m_slice, tf_str)
         if len(df_tf) > 3:
             tfs[tf_key] = _df_to_bars(df_tf)
 
-    # 1. IFVG zone — save the zone for FBC validation
+    # 1. IFVG zone — top-down TF cascade (H4 → H1 → M30 → M15 → M5)
     ifvg_found = False
     ifvg_zones = []
-    ifvg_cascade = ("60T", "30T", "15T", "5T")
+    ifvg_cascade = ("240T", "60T", "30T", "15T", "5T")
     for tf in ifvg_cascade:
         bars = tfs.get(tf)
         if not bars or len(bars) < 3:
@@ -389,8 +389,8 @@ def replay_week(all_data, days=5):
                     if session_counts[session_key] >= 2:
                         break
 
-                    # Data up to this point (at least 2 hours of lookback)
-                    lookback_start = check_time - timedelta(hours=6)
+                    # Data up to this point (48h lookback for H4 IFVG detection)
+                    lookback_start = check_time - timedelta(hours=48)
                     mask = (df.index >= lookback_start) & (df.index <= check_time)
                     df_slice = df.loc[mask]
 
