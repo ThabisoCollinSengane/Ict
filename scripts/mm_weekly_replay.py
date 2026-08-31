@@ -438,22 +438,9 @@ def replay_week(all_data, days=5):
                 cascade = intermarket_cascade(cascade_slice, check_time=kz_start_utc)
                 cascade_log[(day, kz["name"])] = cascade
 
-            # Gate: skip killzone if dollar is flat (no directional signal)
-            if cascade and cascade["dollar_bias"] == 0:
-                continue
-
             for pair, pref_dir in PREFERRED_SETUPS.items():
                 if pair not in all_data:
                     continue
-
-                # Cascade directional gate:
-                # dollar_bias > 0 (USD bullish) → only SELL GBPUSD
-                # dollar_bias < 0 (USD bearish) → only BUY EURUSD
-                if cascade and cascade["dollar_bias"] != 0:
-                    if cascade["dollar_bias"] > 0 and pref_dir > 0:
-                        continue  # dollar UP → don't BUY
-                    if cascade["dollar_bias"] < 0 and pref_dir < 0:
-                        continue  # dollar DOWN → don't SELL
 
                 # Max 2 alerts per pair per killzone session
                 session_key = (pair, day, kz["name"])
@@ -506,15 +493,24 @@ def replay_week(all_data, days=5):
 
                     outcome = _simulate_outcome(setup, df_fwd)
 
-                    # Attach cascade info to trade
-                    c_info = {}
+                    # Attach cascade confirmation tag
+                    c_info = {"cascade_tag": "no_data", "cascade_summary": ""}
                     if cascade:
+                        db = cascade["dollar_bias"]
+                        if db == 0:
+                            tag = "flat"
+                        elif (db > 0 and pref_dir < 0) or (db < 0 and pref_dir > 0):
+                            tag = "confirmed"
+                        else:
+                            tag = "against"
                         c_info = {
-                            "dollar_bias": cascade["dollar_bias"],
+                            "dollar_bias": db,
                             "dollar_source": cascade["dollar_source"],
+                            "bonds_dxy_agreement": cascade.get("bonds_dxy_agreement", False),
                             "bonds_dxy_smt": cascade.get("bonds_dxy_smt", False),
                             "entry_smt": cascade.get("entry_smt", False),
                             "cascade_summary": cascade.get("summary", ""),
+                            "cascade_tag": tag,
                         }
 
                     trade = {
@@ -554,7 +550,7 @@ def write_report(trades, trading_days):
     w("")
     w(f"Generated: {now_str}")
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
-    w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
+    w(f"Cascade: Bonds/Yields (^TNX) → DXY → EURGBP → pair confirmation")
     w(f"Detectors: IFVG zone + MSS + SMT + Full Body Close")
     w(f"Min confirmations: 2 (MODERATE+)")
     w(f"Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
@@ -630,23 +626,25 @@ def write_report(trades, trading_days):
 
         w(f"### {day_str} — {len(day_trades)} setups ({day_prof}P/{day_losses}L, {day_pips:+.1f} pips)")
         w("")
-        w("| # | Time (ET) | Pair | Dir | Signal | Confirms | Entry | Stop | Target | Result | Pips |")
-        w("|---|---|---|---|---|---|---|---|---|---|---|")
+        w("| # | Time (ET) | Pair | Dir | Signal | Confirms | Cascade | Result | Pips |")
+        w("|---|---|---|---|---|---|---|---|---|")
 
         for i, t in enumerate(sorted(day_trades, key=lambda x: x["time"]), 1):
             et_str = _to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else str(t["time"])[-8:-3]
             confirms = "+".join(t["confirmations"])
-            result = t["outcome"]
-            if result == "WIN":
-                result_str = "WIN"
-            elif result == "LOSS":
-                result_str = "LOSS"
+            ctag = t.get("cascade_tag", "—")
+            if ctag == "confirmed":
+                ctag_str = "Y"
+            elif ctag == "against":
+                ctag_str = "X"
+            elif ctag == "flat":
+                ctag_str = "—"
             else:
-                result_str = "OPEN"
+                ctag_str = "?"
 
             w(f"| {i} | {et_str} | {t['pair']} | {t['dir_label']} | {t['signal']} | "
-              f"{confirms} | {t['price']:.5f} | {t['stop']:.5f} | {t['target']:.5f} | "
-              f"**{result_str}** | {t['pips']:+.1f} |")
+              f"{confirms} | {ctag_str} | "
+              f"**{t['outcome']}** | {t['pips']:+.1f} |")
         w("")
 
     # Session breakdown
@@ -702,9 +700,29 @@ def write_report(trades, trading_days):
         w(f"| {oc_label} | {len(oc_list)} | {oc_pips:+.1f} | {oc_avg:+.1f} |")
     w("")
 
+    # Cascade confirmation breakdown
+    w("## Intermarket Cascade (Bonds/DXY)")
+    w("")
+    w("| Cascade | Trades | Prof | L | WR | Pips | Avg |")
+    w("|---|---|---|---|---|---|---|")
+    for tag_label, tag_key in [("Confirmed (bonds+DXY agree)", "confirmed"),
+                                ("Flat (no dollar signal)", "flat"),
+                                ("Against (dollar opposes)", "against"),
+                                ("No data", "no_data")]:
+        ct = [t for t in trades if t.get("cascade_tag") == tag_key]
+        if not ct:
+            continue
+        cp = [t for t in ct if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
+        cl = [t for t in ct if t["outcome"] == "LOSS"]
+        c_pips = sum(t["pips"] for t in ct)
+        c_avg = c_pips / len(ct) if ct else 0
+        c_wr = len(cp) / len(ct) * 100 if ct else 0
+        w(f"| {tag_label} | {len(ct)} | {len(cp)} | {len(cl)} | {c_wr:.0f}% | {c_pips:+.1f} | {c_avg:+.1f} |")
+    w("")
+
     w("---")
     w("")
-    w("*Intermarket gate: Bonds/Yields (^TNX) → DXY → EURGBP cascade.*")
+    w("*Intermarket cascade: Bonds/Yields (^TNX) → DXY → EURGBP (confirmation tag, not hard gate).*")
     w("*Simulation: structural M5 stop (capped 10 pips), trail BE at +10, lock +10 at +20, target 30 pips.*")
     w("*Session-end close resolves all trades — no \"OPEN\" status.*")
     w("")

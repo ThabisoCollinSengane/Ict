@@ -249,15 +249,6 @@ def scan_mm_setups(all_data, pairs=None):
         if pref_dir is None:
             continue
 
-        # Cascade directional gate
-        if cascade and cascade["dollar_bias"] == 0:
-            continue
-        if cascade and cascade["dollar_bias"] != 0:
-            if cascade["dollar_bias"] > 0 and pref_dir > 0:
-                continue  # dollar UP → don't BUY
-            if cascade["dollar_bias"] < 0 and pref_dir < 0:
-                continue  # dollar DOWN → don't SELL
-
         df_5m = all_data[pair]
         pip = _pip(pair)
         cur_price = df_5m["Close"].iloc[-1]
