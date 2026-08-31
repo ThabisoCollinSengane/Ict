@@ -1,11 +1,19 @@
 """Intermarket cascade — top-down analysis from bonds through DXY to pair selection.
 
 Reusable module for the MM scanner and weekly replay tools.  Implements the
-three-layer ICT intermarket model:
+four-layer ICT intermarket model:
 
-  Layer 1: Bonds/Yields (^TNX) vs DXY
-    Yields are POSITIVELY correlated with the dollar.  Agreement = continuation;
-    divergence (SMT) = reversal signal.  Yields lead the dollar.
+  Layer 0: Yield Curve Structure (T5 vs T10 vs T30)
+    Compare 5Y (^FVX), 10Y (^TNX), 30Y (^TYX) yields against each other.
+    All three trending same direction = strong signal.  SMT divergence
+    between maturities = yield curve stress / reversal tell.
+    Yields are POSITIVELY correlated with each other (all rise/fall together
+    in normal conditions).
+
+  Layer 1: Combined Yields vs DXY
+    The combined yield bias from Layer 0 compared to the dollar.
+    Yields POSITIVELY correlate with USD (higher yields = capital inflow = USD bid).
+    Agreement = continuation; divergence (SMT) = reversal signal.
 
   Layer 2: DXY vs EURGBP
     Dollar direction from Layer 1 + EURGBP relative strength selects the
@@ -22,9 +30,6 @@ from __future__ import annotations
 import os, sys
 from collections import namedtuple
 
-# ---------------------------------------------------------------------------
-# Path setup — allow import from the repo root
-# ---------------------------------------------------------------------------
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
@@ -33,79 +38,176 @@ from ict.bias import htf_bias
 from ict.smt import smt_divergence
 from intermarket import resolve_pair_direction
 
-# ---------------------------------------------------------------------------
-# Bar type — same namedtuple used by mm_scanner / mm_weekly_replay
-# ---------------------------------------------------------------------------
 Bar = namedtuple("Bar", ["Open", "High", "Low", "Close"])
 
+# Yahoo Finance tickers for the three maturities
+YIELD_TICKERS = {
+    "T5":  "^FVX",   # 5-Year Treasury Yield
+    "T10": "^TNX",   # 10-Year Treasury Yield
+    "T30": "^TYX",   # 30-Year Treasury Yield
+}
 
-# ---------------------------------------------------------------------------
-# Helpers (local — no import from scanner)
-# ---------------------------------------------------------------------------
 
 def _resample(df_5m, tf_str):
-    """Resample a 5-min OHLC DataFrame to a higher timeframe."""
-    import pandas as pd  # noqa: F811 — deferred so the module loads without pandas
+    import pandas as pd
     return df_5m.resample(tf_str).agg({
         "Open": "first", "High": "max", "Low": "min", "Close": "last",
     }).dropna()
 
 
 def _df_to_bars(df):
-    """Convert DataFrame rows to a list of Bar namedtuples."""
     return [Bar(r.Open, r.High, r.Low, r.Close) for _, r in df.iterrows()]
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 _H1_TF = "1h"
-_BIAS_LOOKBACK = 10      # bars for htf_bias (H1)
-_SMT_LOOKBACK = 20       # bars for smt_divergence
+_BIAS_LOOKBACK = 10
+_SMT_LOOKBACK = 20
+_MIN_BARS = 36  # ~3 trading days of US-hours H1 bars (relaxed for yields)
 
 
 # ---------------------------------------------------------------------------
-# Layer 1 — Bonds/Yields vs DXY
+# Layer 0 — Yield Curve Structure (T5 vs T10 vs T30)
 # ---------------------------------------------------------------------------
 
-def _layer1_bonds_dxy(tnx_h1_bars, dxy_h1_bars):
-    """Determine dollar bias from the yields-vs-DXY relationship.
+def _layer0_yield_curve(t5_bars, t10_bars, t30_bars):
+    """Analyze yield curve structure across three maturities.
+
+    Returns dict with:
+        yield_bias : int (+1 rising, -1 falling, 0 mixed/flat)
+        t5_bias, t10_bias, t30_bias : int (individual readings)
+        agreement : int (count of maturities agreeing with majority)
+        curve_smt : bool (SMT divergence between any two maturities)
+        curve_stress : str (description of yield curve state)
+        detail : str
+    """
+    t5b = htf_bias(t5_bars, lookback=_BIAS_LOOKBACK) if len(t5_bars) >= _BIAS_LOOKBACK else 0
+    t10b = htf_bias(t10_bars, lookback=_BIAS_LOOKBACK) if len(t10_bars) >= _BIAS_LOOKBACK else 0
+    t30b = htf_bias(t30_bars, lookback=_BIAS_LOOKBACK) if len(t30_bars) >= _BIAS_LOOKBACK else 0
+
+    biases = [t5b, t10b, t30b]
+    labels = ["T5", "T10", "T30"]
+    non_zero = [b for b in biases if b != 0]
+
+    # SMT between maturity pairs (positively correlated → inverse=False)
+    pairs_to_check = [
+        (t5_bars, t10_bars, "T5/T10"),
+        (t10_bars, t30_bars, "T10/T30"),
+        (t5_bars, t30_bars, "T5/T30"),
+    ]
+    smt_pairs = []
+    for a_bars, b_bars, label in pairs_to_check:
+        if len(a_bars) < _SMT_LOOKBACK or len(b_bars) < _SMT_LOOKBACK:
+            continue
+        for d in (+1, -1):
+            if smt_divergence(a_bars, b_bars, direction=d, inverse=False, lookback=_SMT_LOOKBACK):
+                smt_pairs.append(label)
+                break
+
+    curve_smt = len(smt_pairs) > 0
+
+    # Determine majority bias
+    bull_count = sum(1 for b in biases if b > 0)
+    bear_count = sum(1 for b in biases if b < 0)
+    flat_count = sum(1 for b in biases if b == 0)
+
+    if bull_count >= 2:
+        yield_bias = +1
+        agreement = bull_count
+    elif bear_count >= 2:
+        yield_bias = -1
+        agreement = bear_count
+    elif len(non_zero) == 1:
+        yield_bias = non_zero[0]
+        agreement = 1
+    else:
+        yield_bias = 0
+        agreement = 0
+
+    # Curve stress description
+    if bull_count == 3:
+        curve_stress = "all yields rising"
+    elif bear_count == 3:
+        curve_stress = "all yields falling"
+    elif bull_count == 2 and bear_count == 1:
+        odd = labels[biases.index(-1)]
+        curve_stress = f"2 rising, {odd} falling (divergence)"
+    elif bear_count == 2 and bull_count == 1:
+        odd = labels[biases.index(+1)]
+        curve_stress = f"2 falling, {odd} rising (divergence)"
+    elif flat_count == 3:
+        curve_stress = "all flat"
+    else:
+        parts = [f"{labels[i]}={_dir(biases[i])}" for i in range(3)]
+        curve_stress = " / ".join(parts)
+
+    detail_parts = [f"T5={_dir(t5b)}", f"T10={_dir(t10b)}", f"T30={_dir(t30b)}"]
+    if smt_pairs:
+        detail_parts.append(f"SMT: {', '.join(smt_pairs)}")
+    detail = " | ".join(detail_parts)
+
+    return {
+        "yield_bias": yield_bias,
+        "t5_bias": t5b,
+        "t10_bias": t10b,
+        "t30_bias": t30b,
+        "agreement": agreement,
+        "curve_smt": curve_smt,
+        "smt_pairs": smt_pairs,
+        "curve_stress": curve_stress,
+        "detail": detail,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Layer 1 — Combined Yields vs DXY
+# ---------------------------------------------------------------------------
+
+def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_bars):
+    """Compare the combined yield signal to the dollar.
+
+    Uses 10Y as the representative series for SMT checks against DXY
+    (most liquid, benchmark maturity).
 
     Returns (dollar_bias, source_str, agreement, smt_detected).
     """
-    yields_bias = htf_bias(tnx_h1_bars, lookback=_BIAS_LOOKBACK)
+    yb = yield_curve["yield_bias"]
     dxy_bias = htf_bias(dxy_h1_bars, lookback=_BIAS_LOOKBACK)
 
-    # SMT check: test both long and short directions.
-    # Yields are POSITIVELY correlated with DXY → inverse=False.
-    # SMT fires when DXY sweeps an extreme that yields fail to confirm.
-    smt_bull = smt_divergence(dxy_h1_bars, tnx_h1_bars,
-                              direction=+1, inverse=False,
-                              lookback=_SMT_LOOKBACK)
-    smt_bear = smt_divergence(dxy_h1_bars, tnx_h1_bars,
-                              direction=-1, inverse=False,
-                              lookback=_SMT_LOOKBACK)
-    smt_detected = smt_bull or smt_bear
+    # SMT: DXY vs 10Y (positively correlated → inverse=False)
+    smt_detected = False
+    if len(t10_bars) >= _SMT_LOOKBACK and len(dxy_h1_bars) >= _SMT_LOOKBACK:
+        for d in (+1, -1):
+            if smt_divergence(dxy_h1_bars, t10_bars, direction=d,
+                              inverse=False, lookback=_SMT_LOOKBACK):
+                smt_detected = True
+                break
+
+    ya = yield_curve["agreement"]
+    curve_desc = yield_curve["curve_stress"]
 
     # Decision tree
-    if yields_bias == dxy_bias and dxy_bias != 0:
-        # Agreement — continuation
-        return dxy_bias, f"yields {_dir(yields_bias)} + DXY {_dir(dxy_bias)} agree", True, smt_detected
+    if yb == dxy_bias and dxy_bias != 0:
+        strength = "strong" if ya == 3 else "moderate"
+        return (dxy_bias,
+                f"yields {_dir(yb)} ({ya}/3 agree, {curve_desc}) + DXY {_dir(dxy_bias)} = {strength} confirmation",
+                True, smt_detected)
 
-    if yields_bias != 0 and dxy_bias == 0:
-        # Yields lead, DXY flat
-        return yields_bias, f"yields LEAD {_dir(yields_bias)}, DXY flat", False, smt_detected
+    if yb != 0 and dxy_bias == 0:
+        return (yb,
+                f"yields LEAD {_dir(yb)} ({ya}/3, {curve_desc}), DXY flat",
+                False, smt_detected)
 
-    if yields_bias != 0 and dxy_bias != 0 and yields_bias != dxy_bias:
-        # SMT divergence — yields lead, DXY should follow
-        return yields_bias, f"SMT divergence: yields {_dir(yields_bias)} vs DXY {_dir(dxy_bias)}", False, True
+    if yb != 0 and dxy_bias != 0 and yb != dxy_bias:
+        return (yb,
+                f"SMT: yields {_dir(yb)} ({ya}/3, {curve_desc}) vs DXY {_dir(dxy_bias)} — yields lead",
+                False, True)
 
-    if yields_bias == 0 and dxy_bias != 0:
-        # Yields flat, DXY has direction — use DXY alone
-        return dxy_bias, f"DXY {_dir(dxy_bias)} alone (yields flat)", False, smt_detected
+    if yb == 0 and dxy_bias != 0:
+        return (dxy_bias,
+                f"DXY {_dir(dxy_bias)} alone (yields mixed: {curve_desc})",
+                False, smt_detected)
 
-    # Both flat
-    return 0, "both yields and DXY flat", False, smt_detected
+    return (0, f"both flat (yields: {curve_desc}, DXY flat)", False, smt_detected)
 
 
 # ---------------------------------------------------------------------------
@@ -113,11 +215,6 @@ def _layer1_bonds_dxy(tnx_h1_bars, dxy_h1_bars):
 # ---------------------------------------------------------------------------
 
 def _layer2_pair_selection(dollar_bias, eurgbp_h1_bars):
-    """Select preferred pair and direction from dollar bias + EURGBP.
-
-    Returns (preferred_pair, preferred_direction, pair_source, eurgbp_bias,
-             eu_score, gu_score).
-    """
     eurgbp_bias = htf_bias(eurgbp_h1_bars, lookback=_BIAS_LOOKBACK)
 
     eu_dir, eu_score = resolve_pair_direction(dollar_bias, eurgbp_bias,
@@ -128,15 +225,11 @@ def _layer2_pair_selection(dollar_bias, eurgbp_h1_bars):
     if dollar_bias == 0:
         return None, None, "no dollar bias — no pair selection", eurgbp_bias, 0.0, 0.0
 
-    # Pick the pair with the higher im_score
     if eu_score >= gu_score:
-        pair = "EURUSD"
-        direction = eu_dir
+        pair, direction = "EURUSD", eu_dir
     else:
-        pair = "GBPUSD"
-        direction = gu_dir
+        pair, direction = "GBPUSD", gu_dir
 
-    # Build source description
     if eurgbp_bias > 0:
         cross_desc = "EURGBP bullish (EUR > GBP)"
     elif eurgbp_bias < 0:
@@ -153,14 +246,9 @@ def _layer2_pair_selection(dollar_bias, eurgbp_h1_bars):
 # ---------------------------------------------------------------------------
 
 def _layer3_entry_smt(eu_h1_bars, gu_h1_bars, preferred_direction):
-    """Check EURUSD vs GBPUSD SMT divergence in the preferred direction.
-
-    EURUSD and GBPUSD are positively correlated (both X/USD), so
-    inverse=False.
-
-    Returns bool.
-    """
     if preferred_direction is None or preferred_direction == 0:
+        return False
+    if len(eu_h1_bars) < _SMT_LOOKBACK or len(gu_h1_bars) < _SMT_LOOKBACK:
         return False
     return smt_divergence(eu_h1_bars, gu_h1_bars,
                           direction=preferred_direction,
@@ -168,12 +256,7 @@ def _layer3_entry_smt(eu_h1_bars, gu_h1_bars, preferred_direction):
                           lookback=_SMT_LOOKBACK)
 
 
-# ---------------------------------------------------------------------------
-# Direction label helper
-# ---------------------------------------------------------------------------
-
 def _dir(bias):
-    """Human-readable direction label."""
     if bias > 0:
         return "bullish"
     if bias < 0:
@@ -182,7 +265,6 @@ def _dir(bias):
 
 
 def _dir_action(direction):
-    """Trade action label."""
     if direction is None:
         return "—"
     return "BUY" if direction > 0 else "SELL"
@@ -193,80 +275,120 @@ def _dir_action(direction):
 # ---------------------------------------------------------------------------
 
 def intermarket_cascade(all_data, check_time=None):
-    """Run the full three-layer intermarket cascade.
+    """Run the full four-layer intermarket cascade.
 
     Parameters
     ----------
     all_data : dict[str, DataFrame]
-        Mapping of pair/ticker name to a DataFrame with OHLC 5-min bars
-        (UTC DatetimeIndex).  Must include keys:
-        ``"TNX"`` (10Y yield), ``"DXY"``, ``"EURGBP"``, ``"EURUSD"``,
-        ``"GBPUSD"``.
+        Mapping of ticker name to 5-min OHLC DataFrame (UTC DatetimeIndex).
+        Yield keys: ``"T5"`` (5Y), ``"T10"`` (10Y), ``"T30"`` (30Y).
+        Also accepts legacy ``"TNX"`` as fallback for ``"T10"``.
+        Other keys: ``"DXY"``, ``"EURGBP"``, ``"EURUSD"``, ``"GBPUSD"``.
+
     check_time : datetime or Timestamp, optional
-        UTC timestamp to slice data up to (for replay mode).  If *None*,
-        all available data is used.
+        UTC timestamp to slice data up to (for replay mode).
 
     Returns
     -------
-    dict
-        dollar_bias : int (+1 bullish, -1 bearish, 0 unclear)
-        dollar_source : str
-        bonds_dxy_agreement : bool
-        bonds_dxy_smt : bool
-        preferred_pair : str or None
-        preferred_direction : int or None (+1 BUY, -1 SELL)
-        pair_source : str
-        eurgbp_bias : int
-        eu_score : float
-        gu_score : float
-        entry_smt : bool
-        summary : str
+    dict  (see code for full key set)
     """
-    required = ("TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD")
-    missing = [k for k in required if k not in all_data]
-    if missing:
-        return _empty_result(f"missing data: {', '.join(missing)}")
+    # Accept legacy "TNX" key as T10 fallback
+    data = dict(all_data)
+    if "TNX" in data and "T10" not in data:
+        data["T10"] = data["TNX"]
 
-    # Slice to check_time if provided (replay mode)
+    # Determine which yield maturities are available
+    yield_keys = [k for k in ("T5", "T10", "T30") if k in data]
+    other_required = [k for k in ("DXY", "EURGBP", "EURUSD", "GBPUSD") if k in data]
+
+    if len(yield_keys) == 0:
+        return _empty_result("no yield data (need T5/T10/T30)")
+    if "DXY" not in data:
+        return _empty_result("missing DXY data")
+
+    # Slice to check_time
     sliced = {}
-    for key in required:
-        df = all_data[key]
+    all_keys = yield_keys + ["DXY", "EURGBP", "EURUSD", "GBPUSD"]
+    for key in all_keys:
+        if key not in data:
+            continue
+        df = data[key]
         if check_time is not None:
             df = df.loc[:check_time]
         sliced[key] = df
 
-    # Verify we have enough data after slicing
-    for key in required:
-        if len(sliced[key]) < (_BIAS_LOOKBACK + 2) * 12:
-            # Need at least ~12 5-min bars per H1 bar, times lookback+2
-            return _empty_result(f"insufficient data for {key} ({len(sliced[key])} bars)")
+    # Resample to H1 (only for keys with enough data)
+    h1 = {}
+    for key in all_keys:
+        if key not in sliced or len(sliced[key]) < _MIN_BARS:
+            continue
+        resampled = _resample(sliced[key], _H1_TF)
+        if len(resampled) >= _BIAS_LOOKBACK:
+            h1[key] = _df_to_bars(resampled)
 
-    # Resample to H1
-    tnx_h1 = _df_to_bars(_resample(sliced["TNX"], _H1_TF))
-    dxy_h1 = _df_to_bars(_resample(sliced["DXY"], _H1_TF))
-    eurgbp_h1 = _df_to_bars(_resample(sliced["EURGBP"], _H1_TF))
-    eu_h1 = _df_to_bars(_resample(sliced["EURUSD"], _H1_TF))
-    gu_h1 = _df_to_bars(_resample(sliced["GBPUSD"], _H1_TF))
+    # Layer 0 — Yield Curve Structure
+    avail_yields = [k for k in ("T5", "T10", "T30") if k in h1]
+    if len(avail_yields) >= 2:
+        t5_bars = h1.get("T5", h1.get(avail_yields[0]))
+        t10_bars = h1.get("T10", h1.get(avail_yields[min(1, len(avail_yields)-1)]))
+        t30_bars = h1.get("T30", h1.get(avail_yields[-1]))
+        yield_curve = _layer0_yield_curve(t5_bars, t10_bars, t30_bars)
+    elif len(avail_yields) == 1:
+        solo = h1[avail_yields[0]]
+        b = htf_bias(solo, lookback=_BIAS_LOOKBACK)
+        yield_curve = {
+            "yield_bias": b, "t5_bias": 0, "t10_bias": 0, "t30_bias": 0,
+            "agreement": 1 if b != 0 else 0,
+            "curve_smt": False, "smt_pairs": [],
+            "curve_stress": f"{avail_yields[0]} only: {_dir(b)}",
+            "detail": f"{avail_yields[0]}={_dir(b)} (only maturity available)",
+        }
+        # Fill the correct bias slot
+        if avail_yields[0] == "T5":
+            yield_curve["t5_bias"] = b
+        elif avail_yields[0] == "T10":
+            yield_curve["t10_bias"] = b
+        elif avail_yields[0] == "T30":
+            yield_curve["t30_bias"] = b
+    else:
+        return _empty_result(f"insufficient yield data after resample (have: {list(h1.keys())})")
 
-    # Layer 1 — Bonds/Yields vs DXY
-    dollar_bias, dollar_source, agreement, smt = _layer1_bonds_dxy(tnx_h1, dxy_h1)
+    # Layer 1 — Yields vs DXY
+    if "DXY" not in h1:
+        return _empty_result("insufficient DXY data after resample")
+
+    ref_yield_bars = h1.get("T10", h1.get(avail_yields[0]))
+    dollar_bias, dollar_source, agreement, yields_dxy_smt = \
+        _layer1_yields_vs_dxy(yield_curve, h1["DXY"], ref_yield_bars)
 
     # Layer 2 — DXY vs EURGBP → pair selection
-    pair, direction, pair_source, eurgbp_bias, eu_score, gu_score = \
-        _layer2_pair_selection(dollar_bias, eurgbp_h1)
+    if "EURGBP" in h1:
+        pair, direction, pair_source, eurgbp_bias, eu_score, gu_score = \
+            _layer2_pair_selection(dollar_bias, h1["EURGBP"])
+    else:
+        pair, direction, pair_source = None, None, "EURGBP data unavailable"
+        eurgbp_bias, eu_score, gu_score = 0, 0.0, 0.0
+        if dollar_bias > 0:
+            pair, direction = "GBPUSD", -1
+            pair_source = "dollar bullish, no EURGBP → default SELL GBPUSD"
+        elif dollar_bias < 0:
+            pair, direction = "EURUSD", +1
+            pair_source = "dollar bearish, no EURGBP → default BUY EURUSD"
 
     # Layer 3 — EURUSD vs GBPUSD SMT entry confirmation
-    entry_smt = _layer3_entry_smt(eu_h1, gu_h1, direction)
+    entry_smt = False
+    if "EURUSD" in h1 and "GBPUSD" in h1:
+        entry_smt = _layer3_entry_smt(h1["EURUSD"], h1["GBPUSD"], direction)
 
-    # Build one-line summary
     summary = _build_summary(dollar_bias, dollar_source, pair, direction,
-                             entry_smt, agreement, smt)
+                             entry_smt, agreement, yields_dxy_smt, yield_curve)
 
     return {
         "dollar_bias": dollar_bias,
         "dollar_source": dollar_source,
         "bonds_dxy_agreement": agreement,
-        "bonds_dxy_smt": smt,
+        "bonds_dxy_smt": yields_dxy_smt,
+        "yield_curve": yield_curve,
         "preferred_pair": pair,
         "preferred_direction": direction,
         "pair_source": pair_source,
@@ -279,12 +401,12 @@ def intermarket_cascade(all_data, check_time=None):
 
 
 def _empty_result(reason):
-    """Return a result dict indicating no analysis was possible."""
     return {
         "dollar_bias": 0,
         "dollar_source": reason,
         "bonds_dxy_agreement": False,
         "bonds_dxy_smt": False,
+        "yield_curve": None,
         "preferred_pair": None,
         "preferred_direction": None,
         "pair_source": reason,
@@ -297,15 +419,20 @@ def _empty_result(reason):
 
 
 def _build_summary(dollar_bias, dollar_source, pair, direction,
-                   entry_smt, agreement, smt):
-    """Compose a one-line summary of the cascade result."""
+                   entry_smt, agreement, smt, yield_curve):
     if dollar_bias == 0:
         return "Dollar unclear — no trade signal"
 
     parts = [f"USD {_dir(dollar_bias)}"]
 
+    if yield_curve:
+        ya = yield_curve["agreement"]
+        parts.append(f"({ya}/3 yields agree)")
+        if yield_curve["curve_smt"]:
+            parts.append(f"[curve SMT: {', '.join(yield_curve['smt_pairs'])}]")
+
     if agreement:
-        parts.append("(yields+DXY agree)")
+        parts.append("(yields+DXY confirm)")
     elif smt:
         parts.append("(yields/DXY SMT)")
 
@@ -315,7 +442,7 @@ def _build_summary(dollar_bias, dollar_source, pair, direction,
         parts.append("-> no preferred pair")
 
     if entry_smt:
-        parts.append("[EU/GU SMT confirms]")
+        parts.append("[EU/GU SMT]")
 
     return " ".join(parts)
 
@@ -325,33 +452,35 @@ def _build_summary(dollar_bias, dollar_source, pair, direction,
 # ---------------------------------------------------------------------------
 
 def selftest():
-    """Verify that all imports resolve and the cascade function is callable."""
     print("intermarket_cascade: imports OK")
 
-    # Verify the three ICT module functions are callable
-    assert callable(htf_bias), "htf_bias not callable"
-    assert callable(smt_divergence), "smt_divergence not callable"
-    assert callable(resolve_pair_direction), "resolve_pair_direction not callable"
+    assert callable(htf_bias)
+    assert callable(smt_divergence)
+    assert callable(resolve_pair_direction)
+    assert callable(intermarket_cascade)
+    assert callable(_layer0_yield_curve)
+    assert callable(_layer1_yields_vs_dxy)
+    assert callable(_layer2_pair_selection)
+    assert callable(_layer3_entry_smt)
 
-    # Verify intermarket_cascade itself
-    assert callable(intermarket_cascade), "intermarket_cascade not callable"
-
-    # Verify _layer helpers
-    assert callable(_layer1_bonds_dxy), "_layer1_bonds_dxy not callable"
-    assert callable(_layer2_pair_selection), "_layer2_pair_selection not callable"
-    assert callable(_layer3_entry_smt), "_layer3_entry_smt not callable"
-
-    # Quick smoke test with synthetic bars to confirm no crashes
+    # Smoke test with synthetic bars
     bars = [Bar(1.0, 1.1, 0.9, 1.05)] * 30
     b = htf_bias(bars, lookback=10)
-    assert b in (+1, -1, 0), f"htf_bias returned unexpected value: {b}"
+    assert b in (+1, -1, 0)
 
     d = smt_divergence(bars, bars, direction=+1, inverse=False, lookback=20)
-    assert isinstance(d, bool), f"smt_divergence returned non-bool: {d}"
+    assert isinstance(d, bool)
 
     dir_, score = resolve_pair_direction(+1, -1, "EURUSD", "EURUSD")
-    assert dir_ is not None, "resolve_pair_direction returned None direction"
-    assert isinstance(score, float), "resolve_pair_direction returned non-float score"
+    assert dir_ is not None
+    assert isinstance(score, float)
+
+    # Test layer0 with synthetic bars
+    yc = _layer0_yield_curve(bars, bars, bars)
+    assert "yield_bias" in yc
+    assert "agreement" in yc
+    assert "curve_smt" in yc
+    assert "curve_stress" in yc
 
     print("intermarket_cascade: selftest PASSED")
     return True

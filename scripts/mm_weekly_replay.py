@@ -47,7 +47,9 @@ _YF_PAIRS = {
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
     "EURGBP": "EURGBP=X",
-    "TNX":    "^TNX",
+    "T5":     "^FVX",
+    "T10":    "^TNX",
+    "T30":    "^TYX",
     "DXY":    "DX-Y.NYB",
 }
 
@@ -306,6 +308,178 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
     }
 
 
+def _detect_amd_at_point(df_5m_slice, pair, pref_dir, partner_slice=None, dxy_slice=None):
+    """Run the base algorithm's AMD detection (Judas reversal + breakout).
+
+    Uses ict/amd.py detect_amd_setup (Judas reversal) and detect_breakout
+    (continuation). These are the 'normal' algorithm entries — the M15
+    consolidation range + sweep that the backtester uses.
+
+    Returns a setup dict or None.
+    """
+    from ict.amd import detect_amd_setup, detect_breakout
+    from ict import market_structure as mstruct
+    from ict.smt import smt_divergence
+
+    if df_5m_slice is None or len(df_5m_slice) < 30:
+        return None
+
+    pip = _pip(pair)
+    cur_price = df_5m_slice["Close"].iloc[-1]
+    cur_time = df_5m_slice.index[-1]
+
+    # Resample to M15 for range detection
+    df_15m = _resample(df_5m_slice, "15min")
+    if len(df_15m) < 12:
+        return None
+    m15_bars = _df_to_bars(df_15m)
+    m5_bars = _df_to_bars(df_5m_slice)
+
+    # Try Judas reversal first, then breakout
+    entry_model = None
+    amd_dir = None
+
+    result = detect_amd_setup(m15_bars, pair)
+    if result is not None:
+        _rng, amd_dir = result
+        entry_model = "judas"
+
+    if entry_model is None:
+        result = detect_breakout(m15_bars, pair)
+        if result is not None:
+            _rng, amd_dir = result
+            entry_model = "breakout"
+
+    if entry_model is None:
+        return None
+
+    # Direction must match preferred direction
+    if amd_dir != pref_dir:
+        return None
+
+    # 2-of-3 MSS check: pair + partner + DXY inverse
+    mss_count = 0
+    confirmations = []
+
+    # Check pair structure
+    res_pair = mstruct.classify(m5_bars[-90:] if len(m5_bars) > 90 else m5_bars)
+    if pref_dir > 0:
+        swings = res_pair.get("stl", [])
+    else:
+        swings = res_pair.get("sth", [])
+    if swings and swings[-1].swept:
+        mss_count += 1
+
+    # Check partner structure
+    if partner_slice is not None and len(partner_slice) >= 30:
+        p_m5 = _df_to_bars(partner_slice)
+        res_p = mstruct.classify(p_m5[-90:] if len(p_m5) > 90 else p_m5)
+        if pref_dir > 0:
+            p_sw = res_p.get("stl", [])
+        else:
+            p_sw = res_p.get("sth", [])
+        if p_sw and p_sw[-1].swept:
+            mss_count += 1
+
+    # Check DXY inverse (dollar down = pair up for BUY, dollar up = pair down for SELL)
+    if dxy_slice is not None and len(dxy_slice) >= 30:
+        d_m5 = _df_to_bars(dxy_slice)
+        res_d = mstruct.classify(d_m5[-90:] if len(d_m5) > 90 else d_m5)
+        dxy_dir = -pref_dir  # inverse
+        if dxy_dir > 0:
+            d_sw = res_d.get("stl", [])
+        else:
+            d_sw = res_d.get("sth", [])
+        if d_sw and d_sw[-1].swept:
+            mss_count += 1
+
+    if entry_model == "judas":
+        confirmations.append("JUDAS")
+    else:
+        confirmations.append("BREAKOUT")
+
+    if mss_count >= 2:
+        confirmations.append("MSS-2/3")
+    elif mss_count >= 1:
+        confirmations.append("MSS-1/3")
+
+    # SMT between pair and partner
+    smt_confirmed = False
+    if partner_slice is not None and len(partner_slice) >= 20:
+        p_h1 = _df_to_bars(_resample(partner_slice, "1h"))
+        pair_h1 = _df_to_bars(_resample(df_5m_slice, "1h"))
+        if len(p_h1) >= 20 and len(pair_h1) >= 20:
+            if (smt_divergence(pair_h1, p_h1, pref_dir, inverse=False, lookback=20) or
+                    smt_divergence(p_h1, pair_h1, pref_dir, inverse=False, lookback=20)):
+                smt_confirmed = True
+                confirmations.append("SMT")
+
+    # Need at least the AMD detection + one confirmation
+    if len(confirmations) < 2:
+        return None
+
+    # Stop — structural M5
+    stop = None
+    if len(m5_bars) >= 5:
+        res = mstruct.classify(m5_bars[-90:] if len(m5_bars) > 90 else m5_bars)
+        if pref_dir > 0:
+            itls = [s for s in res.get("itl", []) if not s.swept]
+            if itls:
+                stop = itls[-1].price - 1.5 * pip
+            else:
+                stls = [s for s in res.get("stl", []) if not s.swept]
+                if stls:
+                    stop = stls[-1].price - 1.5 * pip
+        else:
+            iths = [s for s in res.get("ith", []) if not s.swept]
+            if iths:
+                stop = iths[-1].price + 1.5 * pip
+            else:
+                sths = [s for s in res.get("sth", []) if not s.swept]
+                if sths:
+                    stop = sths[-1].price + 1.5 * pip
+
+    if stop is not None:
+        stop_pips = abs(cur_price - stop) / pip
+        if stop_pips > 10:
+            stop = cur_price - pref_dir * 10 * pip
+            stop_pips = 10
+        elif stop_pips < 3:
+            stop = cur_price - pref_dir * 3 * pip
+            stop_pips = 3
+    else:
+        stop_pips = 10
+        stop = cur_price - pref_dir * 10 * pip
+
+    target = cur_price + pref_dir * 30 * pip
+    target_pips = 30
+
+    n = len(confirmations)
+    if n >= 3:
+        signal = "STRONG"
+    elif n >= 2:
+        signal = "MODERATE"
+    else:
+        signal = "WATCH"
+
+    return {
+        "pair": pair,
+        "direction": pref_dir,
+        "dir_label": "BUY" if pref_dir > 0 else "SELL",
+        "price": cur_price,
+        "time": cur_time,
+        "confirmations": confirmations,
+        "n_confirms": n,
+        "signal": signal,
+        "stop": stop,
+        "stop_pips": stop_pips,
+        "target": target,
+        "target_pips": target_pips,
+        "entry_model": entry_model,
+        "model": "AMD",
+    }
+
+
 def _simulate_outcome(setup, df_5m_after):
     """Walk forward from entry with trailing BE + session-end close.
 
@@ -427,12 +601,12 @@ def replay_week(all_data, days=5):
             kz_end_utc = kz_end_et.astimezone(pytz.utc)
             kz_start_utc = kz_start_et.astimezone(pytz.utc)
 
-            # --- Intermarket cascade gate (bonds → DXY → EURGBP → pairs) ---
+            # --- Intermarket cascade (yields → DXY → EURGBP → pairs) ---
             cascade = None
-            has_cascade_data = all(k in all_data for k in ("TNX", "DXY"))
-            if has_cascade_data:
+            has_yield = any(k in all_data for k in ("T5", "T10", "T30", "TNX"))
+            if has_yield and "DXY" in all_data:
                 cascade_slice = {}
-                for key in ("TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD"):
+                for key in ("T5", "T10", "T30", "TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD"):
                     if key in all_data:
                         cascade_slice[key] = all_data[key].loc[:kz_start_utc]
                 cascade = intermarket_cascade(cascade_slice, check_time=kz_start_utc)
@@ -503,6 +677,7 @@ def replay_week(all_data, days=5):
                             tag = "confirmed"
                         else:
                             tag = "against"
+                        yc = cascade.get("yield_curve") or {}
                         c_info = {
                             "dollar_bias": db,
                             "dollar_source": cascade["dollar_source"],
@@ -511,13 +686,87 @@ def replay_week(all_data, days=5):
                             "entry_smt": cascade.get("entry_smt", False),
                             "cascade_summary": cascade.get("summary", ""),
                             "cascade_tag": tag,
+                            "yield_agreement": yc.get("agreement", 0),
+                            "curve_stress": yc.get("curve_stress", ""),
                         }
 
                     trade = {
                         **setup,
+                        "model": "MM",
                         "date": day,
                         "session": kz["name"],
                         "time_et": _to_et(setup["time"]),
+                        **outcome,
+                        **c_info,
+                    }
+                    day_trades.append(trade)
+
+            # --- AMD / Judas / Breakout detection (base algorithm) ---
+            for pair, pref_dir in PREFERRED_SETUPS.items():
+                if pair not in all_data:
+                    continue
+
+                amd_key = ("AMD", pair, day, kz["name"])
+                if session_counts.get(amd_key, 0) >= 2:
+                    continue
+
+                df = all_data[pair]
+                check_points = [kz_start_utc + (kz_end_utc - kz_start_utc) / 2, kz_end_utc]
+
+                for check_time in check_points:
+                    if session_counts.get(amd_key, 0) >= 2:
+                        break
+
+                    lookback_start = check_time - timedelta(hours=48)
+                    mask = (df.index >= lookback_start) & (df.index <= check_time)
+                    df_slice = df.loc[mask]
+
+                    if len(df_slice) < 30:
+                        continue
+
+                    partner = {"EURUSD": "GBPUSD", "GBPUSD": "EURUSD"}.get(pair)
+                    partner_slice = None
+                    if partner and partner in all_data:
+                        pdf = all_data[partner]
+                        partner_slice = pdf.loc[(pdf.index >= lookback_start) & (pdf.index <= check_time)]
+
+                    dxy_slice = None
+                    if "DXY" in all_data:
+                        ddf = all_data["DXY"]
+                        dxy_slice = ddf.loc[(ddf.index >= lookback_start) & (ddf.index <= check_time)]
+
+                    try:
+                        amd_setup = _detect_amd_at_point(df_slice, pair, pref_dir, partner_slice, dxy_slice)
+                    except Exception:
+                        amd_setup = None
+
+                    if amd_setup is None:
+                        continue
+
+                    session_counts[amd_key] = session_counts.get(amd_key, 0) + 1
+
+                    fwd_end = check_time + timedelta(hours=8)
+                    fwd_mask = (df.index > check_time) & (df.index <= fwd_end)
+                    df_fwd = df.loc[fwd_mask]
+
+                    outcome = _simulate_outcome(amd_setup, df_fwd)
+
+                    c_info = {"cascade_tag": "no_data", "cascade_summary": ""}
+                    if cascade:
+                        db = cascade["dollar_bias"]
+                        if db == 0:
+                            tag = "flat"
+                        elif (db > 0 and pref_dir < 0) or (db < 0 and pref_dir > 0):
+                            tag = "confirmed"
+                        else:
+                            tag = "against"
+                        c_info = {"cascade_tag": tag, "cascade_summary": cascade.get("summary", "")}
+
+                    trade = {
+                        **amd_setup,
+                        "date": day,
+                        "session": kz["name"],
+                        "time_et": _to_et(amd_setup["time"]),
                         **outcome,
                         **c_info,
                     }
@@ -546,12 +795,12 @@ def write_report(trades, trading_days):
 
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    w("# MM Weekly Replay — Day-by-Day Breakdown")
+    w("# Weekly Replay — Day-by-Day Breakdown")
     w("")
     w(f"Generated: {now_str}")
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
-    w(f"Cascade: Bonds/Yields (^TNX) → DXY → EURGBP → pair confirmation")
-    w(f"Detectors: IFVG zone + MSS + SMT + Full Body Close")
+    w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
+    w(f"Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)")
     w(f"Min confirmations: 2 (MODERATE+)")
     w(f"Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
     w("")
@@ -616,7 +865,7 @@ def write_report(trades, trading_days):
         if not day_trades:
             w(f"### {day_str} — No setups")
             w("")
-            w("No MM setups met the 2-confirmation threshold during any killzone.")
+            w("No setups (MM or AMD) met the 2-confirmation threshold during any killzone.")
             w("")
             continue
 
@@ -626,8 +875,8 @@ def write_report(trades, trading_days):
 
         w(f"### {day_str} — {len(day_trades)} setups ({day_prof}P/{day_losses}L, {day_pips:+.1f} pips)")
         w("")
-        w("| # | Time (ET) | Pair | Dir | Signal | Confirms | Cascade | Result | Pips |")
-        w("|---|---|---|---|---|---|---|---|---|")
+        w("| # | Time (ET) | Model | Pair | Dir | Signal | Confirms | Cascade | Result | Pips |")
+        w("|---|---|---|---|---|---|---|---|---|---|")
 
         for i, t in enumerate(sorted(day_trades, key=lambda x: x["time"]), 1):
             et_str = _to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else str(t["time"])[-8:-3]
@@ -642,7 +891,8 @@ def write_report(trades, trading_days):
             else:
                 ctag_str = "?"
 
-            w(f"| {i} | {et_str} | {t['pair']} | {t['dir_label']} | {t['signal']} | "
+            model_label = t.get("model", "MM")
+            w(f"| {i} | {et_str} | {model_label} | {t['pair']} | {t['dir_label']} | {t['signal']} | "
               f"{confirms} | {ctag_str} | "
               f"**{t['outcome']}** | {t['pips']:+.1f} |")
         w("")
@@ -682,7 +932,8 @@ def write_report(trades, trading_days):
         day_str = t["date"].strftime("%a %d")
         et_str = _to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else ""
         result = t["outcome"]
-        w(f"{i}. **{result}** {t['dir_label']} {t['pair']} — {day_str} {et_str} ET "
+        model_label = t.get("model", "MM")
+        w(f"{i}. **{result}** [{model_label}] {t['dir_label']} {t['pair']} — {day_str} {et_str} ET "
           f"({t['session']}) — {t['signal']} [{'+'.join(t['confirmations'])}] — "
           f"Entry {t['price']:.5f}, Stop {t['stop']:.5f}, Target {t['target']:.5f} — "
           f"**{t['pips']:+.1f} pips**")
@@ -698,6 +949,82 @@ def write_report(trades, trading_days):
         oc_pips = sum(t["pips"] for t in oc_list)
         oc_avg = oc_pips / len(oc_list) if oc_list else 0
         w(f"| {oc_label} | {len(oc_list)} | {oc_pips:+.1f} | {oc_avg:+.1f} |")
+    w("")
+
+    # Model breakdown (MM vs AMD)
+    w("## Model Breakdown (MM vs AMD)")
+    w("")
+    w("| Model | Trades | Prof | L | WR | Pips | Avg |")
+    w("|---|---|---|---|---|---|---|")
+    for model_name in ("MM", "AMD"):
+        mt = [t for t in trades if t.get("model", "MM") == model_name]
+        if not mt:
+            continue
+        mp = [t for t in mt if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
+        ml = [t for t in mt if t["outcome"] == "LOSS"]
+        m_pips = sum(t["pips"] for t in mt)
+        m_avg = m_pips / len(mt) if mt else 0
+        m_wr = len(mp) / len(mt) * 100 if mt else 0
+        sub = ""
+        if model_name == "AMD":
+            judas = [t for t in mt if t.get("entry_model") == "judas"]
+            brk = [t for t in mt if t.get("entry_model") == "breakout"]
+            if judas or brk:
+                sub = f" (J:{len(judas)} B:{len(brk)})"
+        w(f"| {model_name}{sub} | {len(mt)} | {len(mp)} | {len(ml)} | {m_wr:.0f}% | {m_pips:+.1f} | {m_avg:+.1f} |")
+    w("")
+
+    # Winner vs Loser analysis
+    w("## Winner / Loser Analysis")
+    w("")
+    w("### By Session")
+    w("")
+    w("| Session | Trades | Prof | L | WR | Pips |")
+    w("|---|---|---|---|---|---|")
+    for kz in KILLZONES_ET:
+        st = [t for t in trades if t["session"] == kz["name"]]
+        if not st:
+            continue
+        sw = [t for t in st if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
+        sl = [t for t in st if t["outcome"] == "LOSS"]
+        sp = sum(t["pips"] for t in st)
+        swr = len(sw) / len(st) * 100 if st else 0
+        w(f"| {kz['name']} | {len(st)} | {len(sw)} | {len(sl)} | {swr:.0f}% | {sp:+.1f} |")
+    w("")
+
+    w("### By Confirmation Combo")
+    w("")
+    w("| Confirmations | Trades | Prof | L | WR | Pips |")
+    w("|---|---|---|---|---|---|")
+    combo_set = sorted(set("+".join(t["confirmations"]) for t in trades))
+    for combo in combo_set:
+        ct = [t for t in trades if "+".join(t["confirmations"]) == combo]
+        if not ct:
+            continue
+        cp = [t for t in ct if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
+        cl = [t for t in ct if t["outcome"] == "LOSS"]
+        c_pips = sum(t["pips"] for t in ct)
+        c_wr = len(cp) / len(ct) * 100 if ct else 0
+        w(f"| {combo} | {len(ct)} | {len(cp)} | {len(cl)} | {c_wr:.0f}% | {c_pips:+.1f} |")
+    w("")
+
+    w("### By Time of Day (ET)")
+    w("")
+    w("| Time | Trades | Prof | L | WR | Pips |")
+    w("|---|---|---|---|---|---|")
+    time_set = sorted(set(
+        (_to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else "")
+        for t in trades
+    ))
+    for tm in time_set:
+        tt = [t for t in trades if (_to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else "") == tm]
+        if not tt:
+            continue
+        tw = [t for t in tt if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
+        tl = [t for t in tt if t["outcome"] == "LOSS"]
+        t_pips = sum(t["pips"] for t in tt)
+        t_wr = len(tw) / len(tt) * 100 if tt else 0
+        w(f"| {tm} | {len(tt)} | {len(tw)} | {len(tl)} | {t_wr:.0f}% | {t_pips:+.1f} |")
     w("")
 
     # Cascade confirmation breakdown
@@ -722,7 +1049,7 @@ def write_report(trades, trading_days):
 
     w("---")
     w("")
-    w("*Intermarket cascade: Bonds/Yields (^TNX) → DXY → EURGBP (confirmation tag, not hard gate).*")
+    w("*Intermarket cascade: Bonds/Yields (T5/T10/T30) → DXY → EURGBP → pair selection.*")
     w("*Simulation: structural M5 stop (capped 10 pips), trail BE at +10, lock +10 at +20, target 30 pips.*")
     w("*Session-end close resolves all trades — no \"OPEN\" status.*")
     w("")

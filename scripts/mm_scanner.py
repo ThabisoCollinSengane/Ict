@@ -71,7 +71,9 @@ _YF_PAIRS = {
     "USDCHF": "USDCHF=X",
     "USDCAD": "USDCAD=X",
     "USDSEK": "USDSEK=X",
-    "TNX":    "^TNX",
+    "T5":     "^FVX",
+    "T10":    "^TNX",
+    "T30":    "^TYX",
     "DXY":    "DX-Y.NYB",
 }
 
@@ -226,14 +228,17 @@ def scan_mm_setups(all_data, pairs=None):
     cascade = None
     try:
         from intermarket_cascade import intermarket_cascade
-        has_cascade = all(k in all_data for k in ("TNX", "DXY"))
-        if has_cascade:
+        has_yield = any(k in all_data for k in ("T5", "T10", "T30", "TNX"))
+        if has_yield and "DXY" in all_data:
             cascade = intermarket_cascade(all_data)
             print(f"\n  Intermarket cascade: {cascade.get('summary', 'N/A')}")
+            yc = cascade.get("yield_curve")
+            if yc:
+                print(f"  Yield curve: {yc.get('curve_stress', '')} ({yc.get('agreement', 0)}/3 agree)")
             if cascade["dollar_bias"] == 0:
                 print("  ** Dollar flat — no directional signal, all pairs skipped **")
         else:
-            missing = [k for k in ("TNX", "DXY") if k not in all_data]
+            missing = [k for k in ("T5", "T10", "T30", "DXY") if k not in all_data]
             print(f"\n  Intermarket cascade: skipped (missing {', '.join(missing)})")
     except ImportError as e:
         print(f"\n  Intermarket cascade: import failed ({e})")
@@ -586,23 +591,39 @@ def write_report(setups, all_data):
     w("")
     w(f"Generated: {now_str}")
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
-    w(f"Gate: Bonds/Yields (^TNX) → DXY → EURGBP → pair selection (intermarket cascade)")
+    w(f"Gate: Yields (T5/T10/T30) → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Detectors: IFVG zone + MSS + SMT + Full Body Close + London→NY Breakout")
     w(f"Sessions: London Open | London→NY Overlap | NY AM | NY PM (all killzones)")
 
     # Cascade summary at the top
     if setups and setups[0].get("cascade"):
         c = setups[0]["cascade"]
+        yc = c.get("yield_curve") or {}
         w("")
         w("## Intermarket Cascade")
         w("")
+        w("### Layer 0 — Yield Curve Structure")
+        w("")
+        _bias_label = lambda b: "Bullish" if b > 0 else "Bearish" if b < 0 else "Flat"
+        w(f"| Maturity | Bias |")
+        w(f"|---|---|")
+        w(f"| T5 (5Y) | {_bias_label(yc.get('t5_bias', 0))} |")
+        w(f"| T10 (10Y) | {_bias_label(yc.get('t10_bias', 0))} |")
+        w(f"| T30 (30Y) | {_bias_label(yc.get('t30_bias', 0))} |")
+        w(f"| **Agreement** | **{yc.get('agreement', 0)}/3** |")
+        w(f"| Curve stress | {yc.get('curve_stress', 'N/A')} |")
+        if yc.get('curve_smt'):
+            w(f"| Curve SMT | {', '.join(yc.get('smt_pairs', []))} |")
+        w("")
+        w("### Layers 1–3 — Dollar → Pair Selection")
+        w("")
         w(f"| Layer | Reading |")
         w(f"|---|---|")
-        w(f"| Dollar bias | **{'Bullish' if c['dollar_bias'] > 0 else 'Bearish' if c['dollar_bias'] < 0 else 'Flat'}** |")
-        w(f"| Source | {c.get('dollar_source', 'N/A')} |")
-        w(f"| Bonds/DXY agreement | {'Yes' if c.get('bonds_dxy_agreement') else 'No'} |")
-        w(f"| Bonds/DXY SMT | {'Yes' if c.get('bonds_dxy_smt') else 'No'} |")
-        w(f"| EURGBP bias | {'Bullish' if c.get('eurgbp_bias', 0) > 0 else 'Bearish' if c.get('eurgbp_bias', 0) < 0 else 'Flat'} |")
+        w(f"| Combined yield bias | **{_bias_label(yc.get('yield_bias', 0))}** |")
+        w(f"| Dollar bias | **{_bias_label(c['dollar_bias'])}** |")
+        w(f"| Yields/DXY agreement | {'Yes' if c.get('bonds_dxy_agreement') else 'No'} |")
+        w(f"| Yields/DXY SMT | {'Yes' if c.get('bonds_dxy_smt') else 'No'} |")
+        w(f"| EURGBP bias | {_bias_label(c.get('eurgbp_bias', 0))} |")
         w(f"| EU/GU entry SMT | {'Yes' if c.get('entry_smt') else 'No'} |")
         w(f"| Summary | {c.get('summary', 'N/A')} |")
     w("")
