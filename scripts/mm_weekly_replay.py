@@ -34,6 +34,8 @@ PREFERRED_SETUPS = {
     "EURUSD": +1,
 }
 
+MAX_TRADES_PER_DAY = 2
+
 KILLZONES_ET = [
     {"name": "London Open",       "start_h": 3,  "start_m": 0,  "end_h": 5,  "end_m": 0},
     {"name": "London→NY Overlap", "start_h": 5,  "start_m": 0,  "end_h": 7,  "end_m": 0},
@@ -582,8 +584,6 @@ def replay_week(all_data, days=5):
         trading_days = trading_days[-days:]
 
     print(f"\nReplaying {len(trading_days)} trading days: {trading_days[0]} to {trading_days[-1]}")
-
-    MAX_TRADES_PER_DAY = 2
 
     all_trades = []
     session_counts = defaultdict(int)
