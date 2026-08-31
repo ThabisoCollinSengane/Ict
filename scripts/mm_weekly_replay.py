@@ -47,7 +47,9 @@ _YF_PAIRS = {
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
     "EURGBP": "EURGBP=X",
-    "TNX":    "^TNX",
+    "T5":     "^FVX",
+    "T10":    "^TNX",
+    "T30":    "^TYX",
     "DXY":    "DX-Y.NYB",
 }
 
@@ -427,12 +429,12 @@ def replay_week(all_data, days=5):
             kz_end_utc = kz_end_et.astimezone(pytz.utc)
             kz_start_utc = kz_start_et.astimezone(pytz.utc)
 
-            # --- Intermarket cascade gate (bonds → DXY → EURGBP → pairs) ---
+            # --- Intermarket cascade (yields → DXY → EURGBP → pairs) ---
             cascade = None
-            has_cascade_data = all(k in all_data for k in ("TNX", "DXY"))
-            if has_cascade_data:
+            has_yield = any(k in all_data for k in ("T5", "T10", "T30", "TNX"))
+            if has_yield and "DXY" in all_data:
                 cascade_slice = {}
-                for key in ("TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD"):
+                for key in ("T5", "T10", "T30", "TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD"):
                     if key in all_data:
                         cascade_slice[key] = all_data[key].loc[:kz_start_utc]
                 cascade = intermarket_cascade(cascade_slice, check_time=kz_start_utc)
@@ -503,6 +505,7 @@ def replay_week(all_data, days=5):
                             tag = "confirmed"
                         else:
                             tag = "against"
+                            yc = cascade.get("yield_curve") or {}
                         c_info = {
                             "dollar_bias": db,
                             "dollar_source": cascade["dollar_source"],
@@ -511,6 +514,8 @@ def replay_week(all_data, days=5):
                             "entry_smt": cascade.get("entry_smt", False),
                             "cascade_summary": cascade.get("summary", ""),
                             "cascade_tag": tag,
+                            "yield_agreement": yc.get("agreement", 0),
+                            "curve_stress": yc.get("curve_stress", ""),
                         }
 
                     trade = {
@@ -550,7 +555,7 @@ def write_report(trades, trading_days):
     w("")
     w(f"Generated: {now_str}")
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
-    w(f"Cascade: Bonds/Yields (^TNX) → DXY → EURGBP → pair confirmation")
+    w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Detectors: IFVG zone + MSS + SMT + Full Body Close")
     w(f"Min confirmations: 2 (MODERATE+)")
     w(f"Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
@@ -722,7 +727,7 @@ def write_report(trades, trading_days):
 
     w("---")
     w("")
-    w("*Intermarket cascade: Bonds/Yields (^TNX) → DXY → EURGBP (confirmation tag, not hard gate).*")
+    w("*Intermarket cascade: Bonds/Yields (T5/T10/T30) → DXY → EURGBP → pair selection.*")
     w("*Simulation: structural M5 stop (capped 10 pips), trail BE at +10, lock +10 at +20, target 30 pips.*")
     w("*Session-end close resolves all trades — no \"OPEN\" status.*")
     w("")
