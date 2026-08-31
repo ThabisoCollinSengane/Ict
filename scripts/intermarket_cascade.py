@@ -62,6 +62,7 @@ def _df_to_bars(df):
 _H1_TF = "1h"
 _D1_TF = "1D"
 _BIAS_LOOKBACK = 10
+_DXY_DAILY_BIAS_LOOKBACK = 5  # 5 daily bars = 1 trading week of DXY trend
 _YIELD_BIAS_LOOKBACK = 10   # 10 daily bars = 2 weeks of yield trend
 _SMT_LOOKBACK = 20
 _YIELD_SMT_LOOKBACK = 10    # 10 daily bars for yield-vs-yield and yield-vs-DXY SMT
@@ -175,13 +176,19 @@ def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_daily_bars,
     Yields add conviction but NEVER override DXY direction — yields lead
     the dollar on weekly/monthly scale, not intraday where we trade.
 
-    DXY bias uses H1 bars (intraday structure).
+    DXY bias uses DAILY bars (lookback=5, ~1 week) — H1 lookback=10
+    reads flat at London open because DXY rarely breaks a 10-hour range
+    in the first 2 hours of a session (stale overnight bars).
     SMT between T10 and DXY uses daily bars (both must be on the same TF).
 
     Returns (dollar_bias, source_str, agreement, smt_detected).
     """
     yb = yield_curve["yield_bias"]
-    dxy_bias = htf_bias(dxy_h1_bars, lookback=_BIAS_LOOKBACK)
+    # Use daily bars for DXY bias (same fix as yields — H1 reads flat 100%)
+    if dxy_daily_bars and len(dxy_daily_bars) >= _DXY_DAILY_BIAS_LOOKBACK + 2:
+        dxy_bias = htf_bias(dxy_daily_bars, lookback=_DXY_DAILY_BIAS_LOOKBACK)
+    else:
+        dxy_bias = htf_bias(dxy_h1_bars, lookback=_BIAS_LOOKBACK)
 
     # SMT: DXY vs 10Y on DAILY bars (positively correlated → inverse=False)
     smt_detected = False
