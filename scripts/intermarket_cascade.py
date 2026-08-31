@@ -60,9 +60,13 @@ def _df_to_bars(df):
 
 
 _H1_TF = "1h"
+_D1_TF = "1D"
 _BIAS_LOOKBACK = 10
+_YIELD_BIAS_LOOKBACK = 10   # 10 daily bars = 2 weeks of yield trend
 _SMT_LOOKBACK = 20
-_MIN_BARS = 36  # ~3 trading days of US-hours H1 bars (relaxed for yields)
+_YIELD_SMT_LOOKBACK = 10    # 10 daily bars for yield-vs-yield and yield-vs-DXY SMT
+_MIN_BARS = 36              # ~3 trading days of US-hours H1 bars
+_MIN_YIELD_5M_BARS = 200    # ~1.5 trading days of 5m bars → enough for daily resample
 
 
 # ---------------------------------------------------------------------------
@@ -80,15 +84,16 @@ def _layer0_yield_curve(t5_bars, t10_bars, t30_bars):
         curve_stress : str (description of yield curve state)
         detail : str
     """
-    t5b = htf_bias(t5_bars, lookback=_BIAS_LOOKBACK) if len(t5_bars) >= _BIAS_LOOKBACK else 0
-    t10b = htf_bias(t10_bars, lookback=_BIAS_LOOKBACK) if len(t10_bars) >= _BIAS_LOOKBACK else 0
-    t30b = htf_bias(t30_bars, lookback=_BIAS_LOOKBACK) if len(t30_bars) >= _BIAS_LOOKBACK else 0
+    t5b = htf_bias(t5_bars, lookback=_YIELD_BIAS_LOOKBACK) if len(t5_bars) >= _YIELD_BIAS_LOOKBACK else 0
+    t10b = htf_bias(t10_bars, lookback=_YIELD_BIAS_LOOKBACK) if len(t10_bars) >= _YIELD_BIAS_LOOKBACK else 0
+    t30b = htf_bias(t30_bars, lookback=_YIELD_BIAS_LOOKBACK) if len(t30_bars) >= _YIELD_BIAS_LOOKBACK else 0
 
     biases = [t5b, t10b, t30b]
     labels = ["T5", "T10", "T30"]
     non_zero = [b for b in biases if b != 0]
 
     # SMT between maturity pairs (positively correlated → inverse=False)
+    # Uses daily bars → daily SMT lookback
     pairs_to_check = [
         (t5_bars, t10_bars, "T5/T10"),
         (t10_bars, t30_bars, "T10/T30"),
@@ -96,10 +101,10 @@ def _layer0_yield_curve(t5_bars, t10_bars, t30_bars):
     ]
     smt_pairs = []
     for a_bars, b_bars, label in pairs_to_check:
-        if len(a_bars) < _SMT_LOOKBACK or len(b_bars) < _SMT_LOOKBACK:
+        if len(a_bars) < _YIELD_SMT_LOOKBACK or len(b_bars) < _YIELD_SMT_LOOKBACK:
             continue
         for d in (+1, -1):
-            if smt_divergence(a_bars, b_bars, direction=d, inverse=False, lookback=_SMT_LOOKBACK):
+            if smt_divergence(a_bars, b_bars, direction=d, inverse=False, lookback=_YIELD_SMT_LOOKBACK):
                 smt_pairs.append(label)
                 break
 
@@ -162,23 +167,26 @@ def _layer0_yield_curve(t5_bars, t10_bars, t30_bars):
 # Layer 1 — Combined Yields vs DXY
 # ---------------------------------------------------------------------------
 
-def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_bars):
+def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_daily_bars,
+                          dxy_daily_bars=None):
     """Compare the combined yield signal to the dollar.
 
-    Uses 10Y as the representative series for SMT checks against DXY
-    (most liquid, benchmark maturity).
+    DXY bias uses H1 bars (intraday structure).
+    SMT between T10 and DXY uses daily bars (both must be on the same TF).
 
     Returns (dollar_bias, source_str, agreement, smt_detected).
     """
     yb = yield_curve["yield_bias"]
     dxy_bias = htf_bias(dxy_h1_bars, lookback=_BIAS_LOOKBACK)
 
-    # SMT: DXY vs 10Y (positively correlated → inverse=False)
+    # SMT: DXY vs 10Y on DAILY bars (positively correlated → inverse=False)
     smt_detected = False
-    if len(t10_bars) >= _SMT_LOOKBACK and len(dxy_h1_bars) >= _SMT_LOOKBACK:
+    dxy_smt_bars = dxy_daily_bars if dxy_daily_bars is not None else dxy_h1_bars
+    smt_lb = _YIELD_SMT_LOOKBACK if dxy_daily_bars is not None else _SMT_LOOKBACK
+    if len(t10_daily_bars) >= smt_lb and len(dxy_smt_bars) >= smt_lb:
         for d in (+1, -1):
-            if smt_divergence(dxy_h1_bars, t10_bars, direction=d,
-                              inverse=False, lookback=_SMT_LOOKBACK):
+            if smt_divergence(dxy_smt_bars, t10_daily_bars, direction=d,
+                              inverse=False, lookback=smt_lb):
                 smt_detected = True
                 break
 
@@ -317,25 +325,42 @@ def intermarket_cascade(all_data, check_time=None):
             df = df.loc[:check_time]
         sliced[key] = df
 
-    # Resample to H1 (only for keys with enough data)
+    # Resample yields to DAILY bars (macro timeframe — yields show clear
+    # daily trends, not intraday BOS on H1 which reads flat 97% of the time)
+    daily_yields = {}
+    for key in yield_keys:
+        if key not in sliced or len(sliced[key]) < _MIN_YIELD_5M_BARS:
+            continue
+        resampled = _resample(sliced[key], _D1_TF)
+        if len(resampled) >= _YIELD_BIAS_LOOKBACK:
+            daily_yields[key] = _df_to_bars(resampled)
+
+    # Resample DXY/EURGBP/EURUSD/GBPUSD to H1 (intraday structure)
     h1 = {}
-    for key in all_keys:
+    for key in ("DXY", "EURGBP", "EURUSD", "GBPUSD"):
         if key not in sliced or len(sliced[key]) < _MIN_BARS:
             continue
         resampled = _resample(sliced[key], _H1_TF)
         if len(resampled) >= _BIAS_LOOKBACK:
             h1[key] = _df_to_bars(resampled)
 
-    # Layer 0 — Yield Curve Structure
-    avail_yields = [k for k in ("T5", "T10", "T30") if k in h1]
+    # DXY daily bars for SMT comparison with yields (must be same TF)
+    dxy_daily_bars = None
+    if "DXY" in sliced and len(sliced["DXY"]) >= _MIN_YIELD_5M_BARS:
+        dxy_d = _resample(sliced["DXY"], _D1_TF)
+        if len(dxy_d) >= _YIELD_SMT_LOOKBACK:
+            dxy_daily_bars = _df_to_bars(dxy_d)
+
+    # Layer 0 — Yield Curve Structure (daily bars)
+    avail_yields = [k for k in ("T5", "T10", "T30") if k in daily_yields]
     if len(avail_yields) >= 2:
-        t5_bars = h1.get("T5", h1.get(avail_yields[0]))
-        t10_bars = h1.get("T10", h1.get(avail_yields[min(1, len(avail_yields)-1)]))
-        t30_bars = h1.get("T30", h1.get(avail_yields[-1]))
+        t5_bars = daily_yields.get("T5", daily_yields.get(avail_yields[0]))
+        t10_bars = daily_yields.get("T10", daily_yields.get(avail_yields[min(1, len(avail_yields)-1)]))
+        t30_bars = daily_yields.get("T30", daily_yields.get(avail_yields[-1]))
         yield_curve = _layer0_yield_curve(t5_bars, t10_bars, t30_bars)
     elif len(avail_yields) == 1:
-        solo = h1[avail_yields[0]]
-        b = htf_bias(solo, lookback=_BIAS_LOOKBACK)
+        solo = daily_yields[avail_yields[0]]
+        b = htf_bias(solo, lookback=_YIELD_BIAS_LOOKBACK)
         yield_curve = {
             "yield_bias": b, "t5_bias": 0, "t10_bias": 0, "t30_bias": 0,
             "agreement": 1 if b != 0 else 0,
@@ -343,7 +368,6 @@ def intermarket_cascade(all_data, check_time=None):
             "curve_stress": f"{avail_yields[0]} only: {_dir(b)}",
             "detail": f"{avail_yields[0]}={_dir(b)} (only maturity available)",
         }
-        # Fill the correct bias slot
         if avail_yields[0] == "T5":
             yield_curve["t5_bias"] = b
         elif avail_yields[0] == "T10":
@@ -351,15 +375,16 @@ def intermarket_cascade(all_data, check_time=None):
         elif avail_yields[0] == "T30":
             yield_curve["t30_bias"] = b
     else:
-        return _empty_result(f"insufficient yield data after resample (have: {list(h1.keys())})")
+        return _empty_result(f"insufficient yield data after resample (have: {list(daily_yields.keys())})")
 
-    # Layer 1 — Yields vs DXY
+    # Layer 1 — Yields (daily) vs DXY (H1 for bias, daily for SMT)
     if "DXY" not in h1:
         return _empty_result("insufficient DXY data after resample")
 
-    ref_yield_bars = h1.get("T10", h1.get(avail_yields[0]))
+    ref_yield_bars = daily_yields.get("T10", daily_yields.get(avail_yields[0]))
     dollar_bias, dollar_source, agreement, yields_dxy_smt = \
-        _layer1_yields_vs_dxy(yield_curve, h1["DXY"], ref_yield_bars)
+        _layer1_yields_vs_dxy(yield_curve, h1["DXY"], ref_yield_bars,
+                              dxy_daily_bars=dxy_daily_bars)
 
     # Layer 2 — DXY vs EURGBP → pair selection
     if "EURGBP" in h1:
