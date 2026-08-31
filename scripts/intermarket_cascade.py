@@ -171,6 +171,10 @@ def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_daily_bars,
                           dxy_daily_bars=None):
     """Compare the combined yield signal to the dollar.
 
+    DXY is ALWAYS the primary dollar signal (it moves the forex pairs).
+    Yields add conviction but NEVER override DXY direction — yields lead
+    the dollar on weekly/monthly scale, not intraday where we trade.
+
     DXY bias uses H1 bars (intraday structure).
     SMT between T10 and DXY uses daily bars (both must be on the same TF).
 
@@ -193,26 +197,32 @@ def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_daily_bars,
     ya = yield_curve["agreement"]
     curve_desc = yield_curve["curve_stress"]
 
-    # Decision tree
-    if yb == dxy_bias and dxy_bias != 0:
+    # Decision tree — DXY is ALWAYS primary
+    if dxy_bias != 0 and yb == dxy_bias:
+        # Best case: DXY and yields agree
         strength = "strong" if ya == 3 else "moderate"
         return (dxy_bias,
-                f"yields {_dir(yb)} ({ya}/3 agree, {curve_desc}) + DXY {_dir(dxy_bias)} = {strength} confirmation",
+                f"DXY {_dir(dxy_bias)} + yields {_dir(yb)} ({ya}/3 agree, {curve_desc}) = {strength} confirmation",
                 True, smt_detected)
 
-    if yb != 0 and dxy_bias == 0:
-        return (yb,
-                f"yields LEAD {_dir(yb)} ({ya}/3, {curve_desc}), DXY flat",
+    if dxy_bias != 0 and yb == 0:
+        # DXY has direction, yields are flat — use DXY
+        return (dxy_bias,
+                f"DXY {_dir(dxy_bias)} (yields mixed: {curve_desc})",
                 False, smt_detected)
 
-    if yb != 0 and dxy_bias != 0 and yb != dxy_bias:
-        return (yb,
-                f"SMT: yields {_dir(yb)} ({ya}/3, {curve_desc}) vs DXY {_dir(dxy_bias)} — yields lead",
+    if dxy_bias != 0 and yb != 0 and yb != dxy_bias:
+        # DXY and yields DISAGREE — DXY is the actionable signal for forex,
+        # but flag SMT (yields diverging = warning, not a reversal signal)
+        return (dxy_bias,
+                f"DXY {_dir(dxy_bias)} vs yields {_dir(yb)} ({ya}/3, {curve_desc}) — DXY leads, yields diverge (caution)",
                 False, True)
 
-    if yb == 0 and dxy_bias != 0:
-        return (dxy_bias,
-                f"DXY {_dir(dxy_bias)} alone (yields mixed: {curve_desc})",
+    if dxy_bias == 0 and yb != 0:
+        # DXY flat, yields have direction — yields HINT but not confirmed
+        # Return 0 (flat) because the dollar hasn't moved yet
+        return (0,
+                f"DXY flat, yields {_dir(yb)} ({ya}/3, {curve_desc}) — waiting for DXY confirmation",
                 False, smt_detected)
 
     return (0, f"both flat (yields: {curve_desc}, DXY flat)", False, smt_detected)
