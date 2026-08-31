@@ -1,6 +1,6 @@
 # Replay Backtest (30 Jun - 31 Aug 2026)
 
-Generated: 2026-08-31 17:50 UTC
+Generated: 2026-08-31 17:56 UTC
 Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)
 Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)
 Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)
@@ -20,7 +20,7 @@ Max trades/day: 2 | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock
 | Session-end close (negative) | 3 |
 | Losses (stop hit) | **21** |
 | Profitable trades | **27** (47%) |
-| Total pips | **+212.9** |
+| Total pips | **+210.1** |
 | Avg pips/trade | 3.7 |
 
 ## Per-Pair Summary
@@ -28,7 +28,7 @@ Max trades/day: 2 | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock
 | Pair | Direction | Trades | Prof | L | WR | Pips |
 |---|---|---|---|---|---|---|
 | GBPUSD | SELL | 25 | 15 | 6 | 60% | +81.6 |
-| EURUSD | BUY | 32 | 12 | 15 | 38% | +131.3 |
+| EURUSD | BUY | 32 | 12 | 15 | 38% | +128.5 |
 
 ## Day-by-Day Breakdown
 
@@ -298,28 +298,28 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 | 1 | 04:00 | AMD | GBPUSD | SELL | MODERATE | JUDAS+MSS-2/3 | Y | **TRAIL** | +10.0 |
 | 2 | 05:00 | AMD | GBPUSD | SELL | MODERATE | JUDAS+MSS-2/3 | Y | **TRAIL** | +10.0 |
 
-### Monday 31 Aug 2026 — 2 setups (2P/0L, +40.5 pips)
+### Monday 31 Aug 2026 — 2 setups (2P/0L, +37.7 pips)
 
 | # | Time (ET) | Model | Pair | Dir | Signal | Confirms | Cascade | Result | Pips |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | 07:00 | MM | EURUSD | BUY | STRONG | IFVG+MSS+SMT | Y | **CLOSE** | +21.6 |
-| 2 | 10:00 | AMD | EURUSD | BUY | MODERATE | JUDAS+MSS-2/3 | Y | **CLOSE** | +18.9 |
+| 1 | 07:00 | MM | EURUSD | BUY | STRONG | IFVG+MSS+SMT | Y | **CLOSE** | +20.2 |
+| 2 | 10:00 | AMD | EURUSD | BUY | MODERATE | JUDAS+MSS-2/3 | Y | **CLOSE** | +17.5 |
 
 ## Session Breakdown
 
 | Session | Trades | Prof | L | WR | Pips |
 |---|---|---|---|---|---|
 | London Open | 18 | 8 | 8 | 44% | +7.4 |
-| London→NY Overlap | 15 | 5 | 9 | 33% | +50.5 |
-| NY AM | 9 | 5 | 2 | 56% | +120.5 |
+| London→NY Overlap | 15 | 5 | 9 | 33% | +49.1 |
+| NY AM | 9 | 5 | 2 | 56% | +119.1 |
 | NY PM | 15 | 9 | 2 | 60% | +34.5 |
 
 ## Signal Strength
 
 | Strength | Trades | Prof | L | WR | Pips |
 |---|---|---|---|---|---|
-| STRONG (>=3 confirms) | 30 | 15 | 9 | 50% | +163.1 |
-| MODERATE (>=2 confirms) | 27 | 12 | 12 | 44% | +49.8 |
+| STRONG (>=3 confirms) | 30 | 15 | 9 | 50% | +161.7 |
+| MODERATE (>=2 confirms) | 27 | 12 | 12 | 44% | +48.4 |
 
 ## All Trades (detailed)
 
@@ -378,8 +378,8 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 53. **TRAIL** [AMD] SELL GBPUSD — Thu 27 04:00 ET (London Open) — STRONG [BREAKOUT+MSS-2/3+SMT] — Entry 1.35927, Stop 1.35979, Target 1.35627 — **+10.0 pips**
 54. **TRAIL** [AMD] SELL GBPUSD — Fri 28 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.35877, Stop 1.35977, Target 1.35577 — **+10.0 pips**
 55. **TRAIL** [AMD] SELL GBPUSD — Fri 28 05:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.35827, Stop 1.35925, Target 1.35527 — **+10.0 pips**
-56. **CLOSE** [MM] BUY EURUSD — Mon 31 07:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15996, Stop 1.15896, Target 1.16296 — **+21.6 pips**
-57. **CLOSE** [AMD] BUY EURUSD — Mon 31 10:00 ET (NY AM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.16023, Stop 1.15940, Target 1.16323 — **+18.9 pips**
+56. **CLOSE** [MM] BUY EURUSD — Mon 31 07:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15996, Stop 1.15896, Target 1.16296 — **+20.2 pips**
+57. **CLOSE** [AMD] BUY EURUSD — Mon 31 10:00 ET (NY AM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.16023, Stop 1.15940, Target 1.16323 — **+17.5 pips**
 
 ## Outcome Breakdown
 
@@ -387,7 +387,7 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 |---|---|---|---|
 | WIN (target hit) | 7 | +210.0 | +30.0 |
 | TRAIL (+10 lock) | 7 | +70.0 | +10.0 |
-| CLOSE (session end +) | 13 | +117.2 | +9.0 |
+| CLOSE (session end +) | 13 | +114.4 | +8.8 |
 | BE (breakeven) | 6 | +0.0 | +0.0 |
 | CLOSE (session end -) | 3 | -6.0 | -2.0 |
 | LOSS (stop hit) | 21 | -178.3 | -8.5 |
@@ -396,8 +396,8 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 
 | Model | Trades | Prof | L | WR | Pips | Avg |
 |---|---|---|---|---|---|---|
-| MM | 24 | 13 | 8 | 54% | +155.9 | +6.5 |
-| AMD (J:27 B:6) | 33 | 14 | 13 | 42% | +57.0 | +1.7 |
+| MM | 24 | 13 | 8 | 54% | +154.5 | +6.4 |
+| AMD (J:27 B:6) | 33 | 14 | 13 | 42% | +55.6 | +1.7 |
 
 ## Winner / Loser Analysis
 
@@ -406,8 +406,8 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 | Session | Trades | Prof | L | WR | Pips |
 |---|---|---|---|---|---|
 | London Open | 18 | 8 | 8 | 44% | +7.4 |
-| London→NY Overlap | 15 | 5 | 9 | 33% | +50.5 |
-| NY AM | 9 | 5 | 2 | 56% | +120.5 |
+| London→NY Overlap | 15 | 5 | 9 | 33% | +49.1 |
+| NY AM | 9 | 5 | 2 | 56% | +119.1 |
 | NY PM | 15 | 9 | 2 | 60% | +34.5 |
 
 ### By Confirmation Combo
@@ -416,8 +416,8 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 |---|---|---|---|---|---|
 | BREAKOUT+MSS-2/3 | 5 | 1 | 3 | 20% | -13.7 |
 | BREAKOUT+MSS-2/3+SMT | 1 | 1 | 0 | 100% | +10.0 |
-| IFVG+MSS+SMT | 24 | 13 | 8 | 54% | +155.9 |
-| JUDAS+MSS-2/3 | 22 | 11 | 9 | 50% | +63.5 |
+| IFVG+MSS+SMT | 24 | 13 | 8 | 54% | +154.5 |
+| JUDAS+MSS-2/3 | 22 | 11 | 9 | 50% | +62.1 |
 | JUDAS+MSS-2/3+SMT | 5 | 1 | 1 | 20% | -2.8 |
 
 ### By Time of Day (ET)
@@ -427,9 +427,9 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 | 04:00 | 11 | 6 | 5 | 55% | +17.4 |
 | 05:00 | 7 | 2 | 3 | 29% | -10.0 |
 | 06:00 | 8 | 2 | 6 | 25% | +11.3 |
-| 07:00 | 7 | 3 | 3 | 43% | +39.2 |
+| 07:00 | 7 | 3 | 3 | 43% | +37.8 |
 | 08:30 | 5 | 3 | 1 | 60% | +81.6 |
-| 10:00 | 4 | 2 | 1 | 50% | +38.9 |
+| 10:00 | 4 | 2 | 1 | 50% | +37.5 |
 | 14:30 | 6 | 2 | 1 | 33% | +3.5 |
 | 16:00 | 9 | 7 | 1 | 78% | +31.0 |
 
@@ -437,18 +437,18 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 
 | Cascade | Trades | Prof | L | WR | Pips | Avg |
 |---|---|---|---|---|---|---|
-| Confirmed (bonds+DXY agree) | 42 | 15 | 18 | 36% | +68.4 | +1.6 |
+| Confirmed (bonds+DXY agree) | 42 | 15 | 18 | 36% | +65.6 | +1.6 |
 | Flat (no dollar signal) | 15 | 12 | 3 | 80% | +144.5 | +9.6 |
 
 ## Cascade Gate Impact
 
 | Scenario | Trades | WR | Losses | Pips | Avg |
 |---|---|---|---|---|---|
-| WITHOUT gate (all) | 86 | 37% | 38 | +142.3 | +1.7 |
-| **WITH gate (shipped)** | **57** | **47%** | **21** | **+212.9** | **+3.7** |
+| WITHOUT gate (all) | 86 | 37% | 38 | +139.5 | +1.6 |
+| **WITH gate (shipped)** | **57** | **47%** | **21** | **+210.1** | **+3.7** |
 | Gated out (against) | 29 | 17% | 17 | -70.6 | -2.4 |
 
-**Gate effect:** WR 37% -> 47% (+10pp), avg pips/trade +1.7 -> +3.7
+**Gate effect:** WR 37% -> 47% (+10pp), avg pips/trade +1.6 -> +3.7
 
 ### Gated Trades (skipped — dollar opposed direction)
 
