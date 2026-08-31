@@ -583,14 +583,20 @@ def replay_week(all_data, days=5):
 
     print(f"\nReplaying {len(trading_days)} trading days: {trading_days[0]} to {trading_days[-1]}")
 
+    MAX_TRADES_PER_DAY = 2
+
     all_trades = []
     session_counts = defaultdict(int)
     cascade_log = {}
 
     for day in trading_days:
         day_trades = []
+        day_trade_count = 0
 
         for kz in KILLZONES_ET:
+            if day_trade_count >= MAX_TRADES_PER_DAY:
+                break
+
             kz_end_h, kz_end_m = kz["end_h"], kz["end_m"]
             kz_start_h, kz_start_m = kz["start_h"], kz["start_m"]
 
@@ -613,6 +619,8 @@ def replay_week(all_data, days=5):
                 cascade_log[(day, kz["name"])] = cascade
 
             for pair, pref_dir in PREFERRED_SETUPS.items():
+                if day_trade_count >= MAX_TRADES_PER_DAY:
+                    break
                 if pair not in all_data:
                     continue
 
@@ -626,6 +634,8 @@ def replay_week(all_data, days=5):
                 check_points = [kz_start_utc + (kz_end_utc - kz_start_utc) / 2, kz_end_utc]
 
                 for check_time in check_points:
+                    if day_trade_count >= MAX_TRADES_PER_DAY:
+                        break
                     if session_counts[session_key] >= 2:
                         break
 
@@ -700,9 +710,14 @@ def replay_week(all_data, days=5):
                         **c_info,
                     }
                     day_trades.append(trade)
+                    day_trade_count += 1
 
             # --- AMD / Judas / Breakout detection (base algorithm) ---
+            if day_trade_count >= MAX_TRADES_PER_DAY:
+                continue
             for pair, pref_dir in PREFERRED_SETUPS.items():
+                if day_trade_count >= MAX_TRADES_PER_DAY:
+                    break
                 if pair not in all_data:
                     continue
 
@@ -714,6 +729,8 @@ def replay_week(all_data, days=5):
                 check_points = [kz_start_utc + (kz_end_utc - kz_start_utc) / 2, kz_end_utc]
 
                 for check_time in check_points:
+                    if day_trade_count >= MAX_TRADES_PER_DAY:
+                        break
                     if session_counts.get(amd_key, 0) >= 2:
                         break
 
@@ -771,6 +788,7 @@ def replay_week(all_data, days=5):
                         **c_info,
                     }
                     day_trades.append(trade)
+                    day_trade_count += 1
 
         all_trades.extend(day_trades)
         n = len(day_trades)
@@ -802,7 +820,7 @@ def write_report(trades, trading_days):
     w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)")
     w(f"Min confirmations: 2 (MODERATE+)")
-    w(f"Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
+    w(f"Max trades/day: {MAX_TRADES_PER_DAY} | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
     w("")
 
     # Overall summary
