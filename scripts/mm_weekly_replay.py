@@ -20,7 +20,12 @@ from datetime import datetime, timedelta, timezone
 from collections import namedtuple, defaultdict
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _ROOT)
+if _SCRIPTS not in sys.path:
+    sys.path.insert(0, _SCRIPTS)
+
+from intermarket_cascade import intermarket_cascade
 
 REPORT = os.path.join(_ROOT, "data", "mm_weekly_replay.md")
 
@@ -42,6 +47,8 @@ _YF_PAIRS = {
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
     "EURGBP": "EURGBP=X",
+    "TNX":    "^TNX",
+    "DXY":    "DX-Y.NYB",
 }
 
 
@@ -300,38 +307,85 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
 
 
 def _simulate_outcome(setup, df_5m_after):
-    """Walk forward from entry to see if target or stop was hit first.
+    """Walk forward from entry with trailing BE + session-end close.
 
-    Returns dict with outcome, exit_price, exit_time, pips.
+    Exit logic:
+    - Stop hit (original or trailed) → LOSS / BE / TRAIL
+    - Target hit (30 pips) → WIN
+    - At +10 pips MFE: stop moves to breakeven (entry price)
+    - At +20 pips MFE: stop locks to entry + 10 pips
+    - Session end (8h window): close at last price → CLOSE
+
+    No more "OPEN" — every trade resolves.
     """
     pip = _pip(setup["pair"])
     entry = setup["price"]
-    stop = setup["stop"]
+    orig_stop = setup["stop"]
     target = setup["target"]
     d = setup["direction"]
 
     if df_5m_after is None or len(df_5m_after) == 0:
-        return {"outcome": "OPEN", "pips": 0, "exit_price": entry, "exit_time": setup["time"]}
+        return {"outcome": "CLOSE", "pips": 0, "exit_price": entry, "exit_time": setup["time"]}
+
+    current_stop = orig_stop
+    mfe = 0.0
 
     for ts, row in df_5m_after.iterrows():
+        # Track max favorable excursion
         if d > 0:
-            if row["Low"] <= stop:
-                return {"outcome": "LOSS", "pips": -(entry - stop) / pip,
-                        "exit_price": stop, "exit_time": ts}
+            excursion = (row["High"] - entry) / pip
+        else:
+            excursion = (entry - row["Low"]) / pip
+        if excursion > mfe:
+            mfe = excursion
+
+        # Trail stop based on MFE
+        if mfe >= 20:
+            new_stop = entry + d * 10 * pip
+            if d > 0 and new_stop > current_stop:
+                current_stop = new_stop
+            elif d < 0 and new_stop < current_stop:
+                current_stop = new_stop
+        elif mfe >= 10:
+            if d > 0 and entry > current_stop:
+                current_stop = entry
+            elif d < 0 and entry < current_stop:
+                current_stop = entry
+
+        # Check stop hit
+        if d > 0:
+            if row["Low"] <= current_stop:
+                pips = (current_stop - entry) / pip
+                if abs(pips) < 0.5:
+                    outcome = "BE"
+                elif pips > 0:
+                    outcome = "TRAIL"
+                else:
+                    outcome = "LOSS"
+                return {"outcome": outcome, "pips": round(pips, 1),
+                        "exit_price": current_stop, "exit_time": ts}
             if row["High"] >= target:
-                return {"outcome": "WIN", "pips": (target - entry) / pip,
+                return {"outcome": "WIN", "pips": round((target - entry) / pip, 1),
                         "exit_price": target, "exit_time": ts}
         else:
-            if row["High"] >= stop:
-                return {"outcome": "LOSS", "pips": -(stop - entry) / pip,
-                        "exit_price": stop, "exit_time": ts}
+            if row["High"] >= current_stop:
+                pips = (entry - current_stop) / pip
+                if abs(pips) < 0.5:
+                    outcome = "BE"
+                elif pips > 0:
+                    outcome = "TRAIL"
+                else:
+                    outcome = "LOSS"
+                return {"outcome": outcome, "pips": round(pips, 1),
+                        "exit_price": current_stop, "exit_time": ts}
             if row["Low"] <= target:
-                return {"outcome": "WIN", "pips": (entry - target) / pip,
+                return {"outcome": "WIN", "pips": round((entry - target) / pip, 1),
                         "exit_price": target, "exit_time": ts}
 
+    # Session end — close at last available price
     last_price = df_5m_after["Close"].iloc[-1]
-    unrealized = (last_price - entry) * d / pip
-    return {"outcome": "OPEN", "pips": unrealized, "exit_price": last_price,
+    pips = round((last_price - entry) * d / pip, 1)
+    return {"outcome": "CLOSE", "pips": pips, "exit_price": last_price,
             "exit_time": df_5m_after.index[-1]}
 
 
@@ -357,6 +411,7 @@ def replay_week(all_data, days=5):
 
     all_trades = []
     session_counts = defaultdict(int)
+    cascade_log = {}
 
     for day in trading_days:
         day_trades = []
@@ -365,9 +420,40 @@ def replay_week(all_data, days=5):
             kz_end_h, kz_end_m = kz["end_h"], kz["end_m"]
             kz_start_h, kz_start_m = kz["start_h"], kz["start_m"]
 
+            kz_end_et = ny.localize(datetime(day.year, day.month, day.day,
+                                              kz_end_h, kz_end_m))
+            kz_start_et = ny.localize(datetime(day.year, day.month, day.day,
+                                                kz_start_h, kz_start_m))
+            kz_end_utc = kz_end_et.astimezone(pytz.utc)
+            kz_start_utc = kz_start_et.astimezone(pytz.utc)
+
+            # --- Intermarket cascade gate (bonds → DXY → EURGBP → pairs) ---
+            cascade = None
+            has_cascade_data = all(k in all_data for k in ("TNX", "DXY"))
+            if has_cascade_data:
+                cascade_slice = {}
+                for key in ("TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD"):
+                    if key in all_data:
+                        cascade_slice[key] = all_data[key].loc[:kz_start_utc]
+                cascade = intermarket_cascade(cascade_slice, check_time=kz_start_utc)
+                cascade_log[(day, kz["name"])] = cascade
+
+            # Gate: skip killzone if dollar is flat (no directional signal)
+            if cascade and cascade["dollar_bias"] == 0:
+                continue
+
             for pair, pref_dir in PREFERRED_SETUPS.items():
                 if pair not in all_data:
                     continue
+
+                # Cascade directional gate:
+                # dollar_bias > 0 (USD bullish) → only SELL GBPUSD
+                # dollar_bias < 0 (USD bearish) → only BUY EURUSD
+                if cascade and cascade["dollar_bias"] != 0:
+                    if cascade["dollar_bias"] > 0 and pref_dir > 0:
+                        continue  # dollar UP → don't BUY
+                    if cascade["dollar_bias"] < 0 and pref_dir < 0:
+                        continue  # dollar DOWN → don't SELL
 
                 # Max 2 alerts per pair per killzone session
                 session_key = (pair, day, kz["name"])
@@ -375,13 +461,6 @@ def replay_week(all_data, days=5):
                     continue
 
                 df = all_data[pair]
-
-                kz_end_et = ny.localize(datetime(day.year, day.month, day.day,
-                                                  kz_end_h, kz_end_m))
-                kz_start_et = ny.localize(datetime(day.year, day.month, day.day,
-                                                    kz_start_h, kz_start_m))
-                kz_end_utc = kz_end_et.astimezone(pytz.utc)
-                kz_start_utc = kz_start_et.astimezone(pytz.utc)
 
                 check_points = [kz_start_utc + (kz_end_utc - kz_start_utc) / 2, kz_end_utc]
 
@@ -427,24 +506,36 @@ def replay_week(all_data, days=5):
 
                     outcome = _simulate_outcome(setup, df_fwd)
 
+                    # Attach cascade info to trade
+                    c_info = {}
+                    if cascade:
+                        c_info = {
+                            "dollar_bias": cascade["dollar_bias"],
+                            "dollar_source": cascade["dollar_source"],
+                            "bonds_dxy_smt": cascade.get("bonds_dxy_smt", False),
+                            "entry_smt": cascade.get("entry_smt", False),
+                            "cascade_summary": cascade.get("summary", ""),
+                        }
+
                     trade = {
                         **setup,
                         "date": day,
                         "session": kz["name"],
                         "time_et": _to_et(setup["time"]),
                         **outcome,
+                        **c_info,
                     }
                     day_trades.append(trade)
 
         all_trades.extend(day_trades)
         n = len(day_trades)
-        wins = sum(1 for t in day_trades if t["outcome"] == "WIN")
-        losses = sum(1 for t in day_trades if t["outcome"] == "LOSS")
-        opens = sum(1 for t in day_trades if t["outcome"] == "OPEN")
+        d_prof = sum(1 for t in day_trades if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
+        d_loss = sum(1 for t in day_trades if t["outcome"] == "LOSS")
+        d_be = sum(1 for t in day_trades if t["outcome"] == "BE")
         pips = sum(t["pips"] for t in day_trades)
         day_str = day.strftime("%a %d %b")
         if n > 0:
-            print(f"  {day_str}: {n} setups — {wins}W / {losses}L / {opens}O — {pips:+.1f} pips")
+            print(f"  {day_str}: {n} setups — {d_prof}P / {d_loss}L / {d_be}BE — {pips:+.1f} pips")
         else:
             print(f"  {day_str}: no setups")
 
@@ -463,28 +554,37 @@ def write_report(trades, trading_days):
     w("")
     w(f"Generated: {now_str}")
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
+    w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Detectors: IFVG zone + MSS + SMT + Full Body Close")
     w(f"Min confirmations: 2 (MODERATE+)")
-    w(f"Stop: structural M5, capped 10 pips | Target: 30 pips")
+    w(f"Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
     w("")
 
     # Overall summary
     total = len(trades)
     wins = [t for t in trades if t["outcome"] == "WIN"]
     losses = [t for t in trades if t["outcome"] == "LOSS"]
-    opens = [t for t in trades if t["outcome"] == "OPEN"]
+    be_trades = [t for t in trades if t["outcome"] == "BE"]
+    trail_trades = [t for t in trades if t["outcome"] == "TRAIL"]
+    closes = [t for t in trades if t["outcome"] == "CLOSE"]
+    close_pos = [t for t in closes if t["pips"] > 0]
+    close_neg = [t for t in closes if t["pips"] <= 0]
+    profitable = len(wins) + len(trail_trades) + len(close_pos)
     total_pips = sum(t["pips"] for t in trades)
-    wr = len(wins) / total * 100 if total > 0 else 0
+    wr = profitable / total * 100 if total > 0 else 0
 
     w("## Weekly Summary")
     w("")
     w(f"| Metric | Value |")
     w(f"|---|---|")
     w(f"| Total setups | **{total}** |")
-    w(f"| Wins | **{len(wins)}** |")
-    w(f"| Losses | **{len(losses)}** |")
-    w(f"| Still open | {len(opens)} |")
-    w(f"| Win rate | **{wr:.0f}%** |")
+    w(f"| Wins (hit 30-pip target) | **{len(wins)}** |")
+    w(f"| Trail exits (+10 lock) | {len(trail_trades)} |")
+    w(f"| Session-end close (positive) | {len(close_pos)} |")
+    w(f"| Breakeven | {len(be_trades)} |")
+    w(f"| Session-end close (negative) | {len(close_neg)} |")
+    w(f"| Losses (stop hit) | **{len(losses)}** |")
+    w(f"| Profitable trades | **{profitable}** ({wr:.0f}%) |")
     w(f"| Total pips | **{total_pips:+.1f}** |")
     w(f"| Avg pips/trade | {total_pips/total:.1f} |" if total > 0 else "| Avg pips/trade | — |")
     w("")
@@ -492,16 +592,17 @@ def write_report(trades, trading_days):
     # Per-pair summary
     w("## Per-Pair Summary")
     w("")
-    w("| Pair | Direction | Trades | W | L | WR | Pips |")
+    w("| Pair | Direction | Trades | Prof | L | WR | Pips |")
     w("|---|---|---|---|---|---|---|")
     for pair in ("GBPUSD", "EURUSD"):
         pt = [t for t in trades if t["pair"] == pair]
         pw = [t for t in pt if t["outcome"] == "WIN"]
         pl = [t for t in pt if t["outcome"] == "LOSS"]
+        p_prof = [t for t in pt if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
         pp = sum(t["pips"] for t in pt)
-        pwr = len(pw) / len(pt) * 100 if pt else 0
+        pwr = len(p_prof) / len(pt) * 100 if pt else 0
         d = "SELL" if PREFERRED_SETUPS.get(pair, 0) < 0 else "BUY"
-        w(f"| {pair} | {d} | {len(pt)} | {len(pw)} | {len(pl)} | {pwr:.0f}% | {pp:+.1f} |")
+        w(f"| {pair} | {d} | {len(pt)} | {len(p_prof)} | {len(pl)} | {pwr:.0f}% | {pp:+.1f} |")
     w("")
 
     # Day-by-day breakdown
@@ -523,12 +624,11 @@ def write_report(trades, trading_days):
             w("")
             continue
 
-        day_wins = sum(1 for t in day_trades if t["outcome"] == "WIN")
+        day_prof = sum(1 for t in day_trades if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
         day_losses = sum(1 for t in day_trades if t["outcome"] == "LOSS")
         day_pips = sum(t["pips"] for t in day_trades)
-        day_emoji = "+" if day_pips > 0 else "-" if day_pips < 0 else "~"
 
-        w(f"### {day_str} — {len(day_trades)} setups ({day_wins}W/{day_losses}L, {day_pips:+.1f} pips)")
+        w(f"### {day_str} — {len(day_trades)} setups ({day_prof}P/{day_losses}L, {day_pips:+.1f} pips)")
         w("")
         w("| # | Time (ET) | Pair | Dir | Signal | Confirms | Entry | Stop | Target | Result | Pips |")
         w("|---|---|---|---|---|---|---|---|---|---|---|")
@@ -552,11 +652,11 @@ def write_report(trades, trading_days):
     # Session breakdown
     w("## Session Breakdown")
     w("")
-    w("| Session | Trades | W | L | WR | Pips |")
+    w("| Session | Trades | Prof | L | WR | Pips |")
     w("|---|---|---|---|---|---|")
     for kz in KILLZONES_ET:
         st = [t for t in trades if t["session"] == kz["name"]]
-        sw = [t for t in st if t["outcome"] == "WIN"]
+        sw = [t for t in st if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
         sl = [t for t in st if t["outcome"] == "LOSS"]
         sp = sum(t["pips"] for t in st)
         swr = len(sw) / len(st) * 100 if st else 0
@@ -566,11 +666,11 @@ def write_report(trades, trading_days):
     # Signal strength breakdown
     w("## Signal Strength")
     w("")
-    w("| Strength | Trades | W | L | WR | Pips |")
+    w("| Strength | Trades | Prof | L | WR | Pips |")
     w("|---|---|---|---|---|---|")
     for sig in ("STRONG", "MODERATE"):
         st = [t for t in trades if t["signal"] == sig]
-        sw = [t for t in st if t["outcome"] == "WIN"]
+        sw = [t for t in st if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
         sl = [t for t in st if t["outcome"] == "LOSS"]
         sp = sum(t["pips"] for t in st)
         swr = len(sw) / len(st) * 100 if st else 0
@@ -590,10 +690,23 @@ def write_report(trades, trading_days):
           f"**{t['pips']:+.1f} pips**")
     w("")
 
+    w("## Outcome Breakdown")
+    w("")
+    w("| Outcome | Count | Total Pips | Avg Pips |")
+    w("|---|---|---|---|")
+    for oc_label, oc_list in [("WIN (target hit)", wins), ("TRAIL (+10 lock)", trail_trades),
+                               ("CLOSE (session end +)", close_pos), ("BE (breakeven)", be_trades),
+                               ("CLOSE (session end -)", close_neg), ("LOSS (stop hit)", losses)]:
+        oc_pips = sum(t["pips"] for t in oc_list)
+        oc_avg = oc_pips / len(oc_list) if oc_list else 0
+        w(f"| {oc_label} | {len(oc_list)} | {oc_pips:+.1f} | {oc_avg:+.1f} |")
+    w("")
+
     w("---")
     w("")
-    w("*Simulated outcomes use 10-pip structural stop + 30-pip target on Yahoo 5-min data.*")
-    w("*Real entries would use the live bot's structural stop + nearest qualifying fib/liquidity target.*")
+    w("*Intermarket gate: Bonds/Yields (^TNX) → DXY → EURGBP cascade.*")
+    w("*Simulation: structural M5 stop (capped 10 pips), trail BE at +10, lock +10 at +20, target 30 pips.*")
+    w("*Session-end close resolves all trades — no \"OPEN\" status.*")
     w("")
 
     with open(REPORT, "w", encoding="utf-8") as f:
@@ -651,7 +764,10 @@ def _selftest():
     print("  SMT OK")
     from ict.bias import htf_bias
     print("  Bias OK")
-    print("selftest OK — all detectors available")
+    from intermarket_cascade import intermarket_cascade as _ic
+    print("  Intermarket cascade OK")
+    assert callable(_ic), "intermarket_cascade not callable"
+    print("selftest OK — all detectors + cascade available")
 
 
 def main():
@@ -687,16 +803,25 @@ def main():
     # Console summary
     total = len(trades)
     wins = sum(1 for t in trades if t["outcome"] == "WIN")
+    trails = sum(1 for t in trades if t["outcome"] == "TRAIL")
+    be_c = sum(1 for t in trades if t["outcome"] == "BE")
+    close_p = sum(1 for t in trades if t["outcome"] == "CLOSE" and t["pips"] > 0)
+    close_n = sum(1 for t in trades if t["outcome"] == "CLOSE" and t["pips"] <= 0)
     losses = sum(1 for t in trades if t["outcome"] == "LOSS")
+    profitable = wins + trails + close_p
     total_pips = sum(t["pips"] for t in trades)
 
     print(f"\n{'='*60}")
     print("MM WEEKLY REPLAY SUMMARY")
     print(f"{'='*60}")
     print(f"  Total setups:  {total}")
-    print(f"  Wins:          {wins}")
-    print(f"  Losses:        {losses}")
-    print(f"  Win rate:      {wins/total*100:.0f}%" if total > 0 else "  Win rate:      —")
+    print(f"  Wins (target): {wins}")
+    print(f"  Trail exits:   {trails}")
+    print(f"  Close (+):     {close_p}")
+    print(f"  Breakeven:     {be_c}")
+    print(f"  Close (-):     {close_n}")
+    print(f"  Losses (stop): {losses}")
+    print(f"  Profitable:    {profitable} ({profitable/total*100:.0f}%)" if total > 0 else "  Profitable:    —")
     print(f"  Total pips:    {total_pips:+.1f}")
     print(f"\n  Day-by-day:")
     by_day = defaultdict(list)
@@ -704,12 +829,12 @@ def main():
         by_day[t["date"]].append(t)
     for day in trading_days:
         dt = by_day.get(day, [])
-        dw = sum(1 for t in dt if t["outcome"] == "WIN")
+        dp_c = sum(1 for t in dt if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
         dl = sum(1 for t in dt if t["outcome"] == "LOSS")
         dp = sum(t["pips"] for t in dt)
         day_str = day.strftime("%a %d %b")
         if dt:
-            print(f"    {day_str}: {len(dt)} trades — {dw}W/{dl}L — {dp:+.1f} pips")
+            print(f"    {day_str}: {len(dt)} trades — {dp_c}P/{dl}L — {dp:+.1f} pips")
         else:
             print(f"    {day_str}: no setups")
 

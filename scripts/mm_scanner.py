@@ -23,7 +23,10 @@ from datetime import datetime, timedelta
 from collections import namedtuple
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _ROOT)
+if _SCRIPTS not in sys.path:
+    sys.path.insert(0, _SCRIPTS)
 
 REPORT = os.path.join(_ROOT, "data", "mm_scan_alerts.md")
 
@@ -68,6 +71,8 @@ _YF_PAIRS = {
     "USDCHF": "USDCHF=X",
     "USDCAD": "USDCAD=X",
     "USDSEK": "USDSEK=X",
+    "TNX":    "^TNX",
+    "DXY":    "DX-Y.NYB",
 }
 
 
@@ -217,6 +222,22 @@ def scan_mm_setups(all_data, pairs=None):
     if pairs is None:
         pairs = list(PREFERRED_SETUPS.keys())
 
+    # --- Intermarket cascade gate (bonds → DXY → EURGBP → pairs) ---
+    cascade = None
+    try:
+        from intermarket_cascade import intermarket_cascade
+        has_cascade = all(k in all_data for k in ("TNX", "DXY"))
+        if has_cascade:
+            cascade = intermarket_cascade(all_data)
+            print(f"\n  Intermarket cascade: {cascade.get('summary', 'N/A')}")
+            if cascade["dollar_bias"] == 0:
+                print("  ** Dollar flat — no directional signal, all pairs skipped **")
+        else:
+            missing = [k for k in ("TNX", "DXY") if k not in all_data]
+            print(f"\n  Intermarket cascade: skipped (missing {', '.join(missing)})")
+    except ImportError as e:
+        print(f"\n  Intermarket cascade: import failed ({e})")
+
     setups = []
 
     for pair in pairs:
@@ -227,6 +248,15 @@ def scan_mm_setups(all_data, pairs=None):
         pref_dir = PREFERRED_SETUPS.get(pair)
         if pref_dir is None:
             continue
+
+        # Cascade directional gate
+        if cascade and cascade["dollar_bias"] == 0:
+            continue
+        if cascade and cascade["dollar_bias"] != 0:
+            if cascade["dollar_bias"] > 0 and pref_dir > 0:
+                continue  # dollar UP → don't BUY
+            if cascade["dollar_bias"] < 0 and pref_dir < 0:
+                continue  # dollar DOWN → don't SELL
 
         df_5m = all_data[pair]
         pip = _pip(pair)
@@ -522,6 +552,7 @@ def scan_mm_setups(all_data, pairs=None):
             "stop_pips": stop_pips,
             "target": target,
             "target_type": target_type,
+            "cascade": cascade,
         }
 
         # Signal strength
@@ -564,8 +595,25 @@ def write_report(setups, all_data):
     w("")
     w(f"Generated: {now_str}")
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
+    w(f"Gate: Bonds/Yields (^TNX) → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Detectors: IFVG zone + MSS + SMT + Full Body Close + London→NY Breakout")
     w(f"Sessions: London Open | London→NY Overlap | NY AM | NY PM (all killzones)")
+
+    # Cascade summary at the top
+    if setups and setups[0].get("cascade"):
+        c = setups[0]["cascade"]
+        w("")
+        w("## Intermarket Cascade")
+        w("")
+        w(f"| Layer | Reading |")
+        w(f"|---|---|")
+        w(f"| Dollar bias | **{'Bullish' if c['dollar_bias'] > 0 else 'Bearish' if c['dollar_bias'] < 0 else 'Flat'}** |")
+        w(f"| Source | {c.get('dollar_source', 'N/A')} |")
+        w(f"| Bonds/DXY agreement | {'Yes' if c.get('bonds_dxy_agreement') else 'No'} |")
+        w(f"| Bonds/DXY SMT | {'Yes' if c.get('bonds_dxy_smt') else 'No'} |")
+        w(f"| EURGBP bias | {'Bullish' if c.get('eurgbp_bias', 0) > 0 else 'Bearish' if c.get('eurgbp_bias', 0) < 0 else 'Flat'} |")
+        w(f"| EU/GU entry SMT | {'Yes' if c.get('entry_smt') else 'No'} |")
+        w(f"| Summary | {c.get('summary', 'N/A')} |")
     w("")
 
     # Quick summary
@@ -781,7 +829,10 @@ def _selftest():
     print("  FVG module OK")
     from news_filter import NewsCalendar
     print("  News filter OK")
-    print("selftest OK — all detectors available")
+    from intermarket_cascade import intermarket_cascade as _ic
+    print("  Intermarket cascade OK")
+    assert callable(_ic), "intermarket_cascade not callable"
+    print("selftest OK — all detectors + cascade available")
 
 
 def main():
