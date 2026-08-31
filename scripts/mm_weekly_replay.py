@@ -572,6 +572,26 @@ def _simulate_outcome(setup, df_5m_after):
             "exit_time": df_5m_after.index[-1]}
 
 
+def _compute_cascade(all_data, check_time, has_yield, cache):
+    """Compute the intermarket cascade at a specific time, with caching.
+
+    Called at each check_time where an entry fires — NOT at the killzone
+    start — so the DXY daily-open read is fresh at the actual entry moment.
+    Cache avoids redundant computation when multiple pairs check the same time.
+    """
+    if check_time in cache:
+        return cache[check_time]
+    cascade = None
+    if has_yield and "DXY" in all_data:
+        cascade_slice = {}
+        for key in ("T5", "T10", "T30", "TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD"):
+            if key in all_data:
+                cascade_slice[key] = all_data[key].loc[:check_time]
+        cascade = intermarket_cascade(cascade_slice, check_time=check_time)
+    cache[check_time] = cascade
+    return cascade
+
+
 def replay_week(all_data, days=5, cascade_gate=True):
     """Replay MM setups day by day through each killzone.
 
@@ -620,16 +640,10 @@ def replay_week(all_data, days=5, cascade_gate=True):
             kz_end_utc = kz_end_et.astimezone(pytz.utc)
             kz_start_utc = kz_start_et.astimezone(pytz.utc)
 
-            # --- Intermarket cascade (yields → DXY → EURGBP → pairs) ---
-            cascade = None
+            # Cascade computed per check_time (not per KZ start) so the
+            # DXY daily-open read is fresh at the actual entry moment.
             has_yield = any(k in all_data for k in ("T5", "T10", "T30", "TNX"))
-            if has_yield and "DXY" in all_data:
-                cascade_slice = {}
-                for key in ("T5", "T10", "T30", "TNX", "DXY", "EURGBP", "EURUSD", "GBPUSD"):
-                    if key in all_data:
-                        cascade_slice[key] = all_data[key].loc[:kz_start_utc]
-                cascade = intermarket_cascade(cascade_slice, check_time=kz_start_utc)
-                cascade_log[(day, kz["name"])] = cascade
+            cascade_at = {}  # check_time -> cascade (cached)
 
             for pair, pref_dir in PREFERRED_SETUPS.items():
                 if day_trade_count >= MAX_TRADES_PER_DAY:
@@ -690,7 +704,9 @@ def replay_week(all_data, days=5, cascade_gate=True):
 
                     outcome = _simulate_outcome(setup, df_fwd)
 
-                    # Attach cascade confirmation tag
+                    # Cascade at THIS check_time (not KZ start)
+                    cascade = _compute_cascade(all_data, check_time, has_yield, cascade_at)
+
                     c_info = {"cascade_tag": "no_data", "cascade_summary": ""}
                     if cascade:
                         db = cascade["dollar_bias"]
@@ -790,6 +806,9 @@ def replay_week(all_data, days=5, cascade_gate=True):
                     df_fwd = df.loc[fwd_mask]
 
                     outcome = _simulate_outcome(amd_setup, df_fwd)
+
+                    # Cascade at THIS check_time (not KZ start)
+                    cascade = _compute_cascade(all_data, check_time, has_yield, cascade_at)
 
                     c_info = {"cascade_tag": "no_data", "cascade_summary": ""}
                     if cascade:
