@@ -147,7 +147,7 @@ def _get_trading_days(all_data):
     return sorted(dates)
 
 
-def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
+def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None, target_pips=30):
     """Run MM detection on a slice of data ending at a specific point.
 
     Returns a setup dict with confirmations, or None if no data.
@@ -290,8 +290,7 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
         stop_pips = 10
         stop = cur_price - pref_dir * 10 * pip
 
-    target = cur_price + pref_dir * 30 * pip
-    target_pips = 30
+    target = cur_price + pref_dir * target_pips * pip
 
     n = len(confirmations)
     if n >= 3:
@@ -317,7 +316,7 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None):
     }
 
 
-def _detect_amd_at_point(df_5m_slice, pair, pref_dir, partner_slice=None, dxy_slice=None):
+def _detect_amd_at_point(df_5m_slice, pair, pref_dir, partner_slice=None, dxy_slice=None, target_pips=30):
     """Run the base algorithm's AMD detection (Judas reversal + breakout).
 
     Uses ict/amd.py detect_amd_setup (Judas reversal) and detect_breakout
@@ -460,8 +459,7 @@ def _detect_amd_at_point(df_5m_slice, pair, pref_dir, partner_slice=None, dxy_sl
         stop_pips = 10
         stop = cur_price - pref_dir * 10 * pip
 
-    target = cur_price + pref_dir * 30 * pip
-    target_pips = 30
+    target = cur_price + pref_dir * target_pips * pip
 
     n = len(confirmations)
     if n >= 3:
@@ -592,7 +590,7 @@ def _compute_cascade(all_data, check_time, has_yield, cache):
     return cascade
 
 
-def replay_week(all_data, days=5, cascade_gate=True):
+def replay_week(all_data, days=5, cascade_gate=True, target_pips=30):
     """Replay MM setups day by day through each killzone.
 
     For each trading day, at the end of each killzone, runs the detection
@@ -681,7 +679,7 @@ def replay_week(all_data, days=5, cascade_gate=True):
                         pdf = all_data[partner]
                         partner_slice = pdf.loc[(pdf.index >= lookback_start) & (pdf.index <= check_time)]
 
-                    setup = _detect_setup_at_point(df_slice, pair, pref_dir, partner_slice)
+                    setup = _detect_setup_at_point(df_slice, pair, pref_dir, partner_slice, target_pips=target_pips)
 
                     if setup is None or setup["n_confirms"] < 2:
                         continue
@@ -788,7 +786,7 @@ def replay_week(all_data, days=5, cascade_gate=True):
                         dxy_slice = ddf.loc[(ddf.index >= lookback_start) & (ddf.index <= check_time)]
 
                     try:
-                        amd_setup = _detect_amd_at_point(df_slice, pair, pref_dir, partner_slice, dxy_slice)
+                        amd_setup = _detect_amd_at_point(df_slice, pair, pref_dir, partner_slice, dxy_slice, target_pips=target_pips)
                     except Exception:
                         amd_setup = None
 
@@ -856,7 +854,7 @@ def replay_week(all_data, days=5, cascade_gate=True):
     return all_trades, gated_trades
 
 
-def write_report(trades, trading_days, gated_trades=None):
+def write_report(trades, trading_days, gated_trades=None, target_pips=30):
     """Write the weekly replay report."""
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     lines = []
@@ -876,7 +874,7 @@ def write_report(trades, trading_days, gated_trades=None):
     w(f"MM gate: IFVG+MSS+SMT (full triple) | AMD gate: MSS-2/3 minimum")
     gate_str = "ON (skip trades where dollar opposes direction)" if gated_trades is not None else "OFF"
     w(f"Cascade gate: **{gate_str}**")
-    w(f"Max trades/day: {MAX_TRADES_PER_DAY} | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
+    w(f"Max trades/day: {MAX_TRADES_PER_DAY} | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: {target_pips} pips")
     w("")
 
     # Overall summary
@@ -897,7 +895,7 @@ def write_report(trades, trading_days, gated_trades=None):
     w(f"| Metric | Value |")
     w(f"|---|---|")
     w(f"| Total setups | **{total}** |")
-    w(f"| Wins (hit 30-pip target) | **{len(wins)}** |")
+    w(f"| Wins (hit {target_pips}-pip target) | **{len(wins)}** |")
     w(f"| Trail exits (+10 lock) | {len(trail_trades)} |")
     w(f"| Session-end close (positive) | {len(close_pos)} |")
     w(f"| Breakeven | {len(be_trades)} |")
@@ -1170,7 +1168,7 @@ def write_report(trades, trading_days, gated_trades=None):
     w("---")
     w("")
     w("*Intermarket cascade: Bonds/Yields (T5/T10/T30) -> DXY -> EURGBP -> pair selection.*")
-    w("*Simulation: structural M5 stop (capped 10 pips), trail BE at +10, lock +10 at +20, target 30 pips.*")
+    w(f"*Simulation: structural M5 stop (capped 10 pips), trail BE at +10, lock +10 at +20, target {target_pips} pips.*")
     w("*Session-end close resolves all trades -- no \"OPEN\" status.*")
     w("")
 
@@ -1241,6 +1239,7 @@ def main():
     ap.add_argument("--start", type=str, help="Start date YYYY-MM-DD (overrides --days; Yahoo 5m limited to ~60 days)")
     ap.add_argument("--no-push", action="store_true", help="Skip git push")
     ap.add_argument("--no-gate", action="store_true", help="Disable cascade gate (show all trades)")
+    ap.add_argument("--target", type=int, default=30, help="Target in pips (default 30; test 20 for comparison)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
 
@@ -1249,6 +1248,7 @@ def main():
         return 0
 
     cascade_gate = not a.no_gate
+    target_pips = a.target
     replay_days = a.days
 
     if a.start:
@@ -1273,9 +1273,9 @@ def main():
         trading_days = trading_days[-a.days:]
 
     print(f"\nReplaying setups through {len(trading_days)} trading days...")
-    trades, gated_trades = replay_week(all_data, days=replay_days, cascade_gate=cascade_gate)
+    trades, gated_trades = replay_week(all_data, days=replay_days, cascade_gate=cascade_gate, target_pips=target_pips)
 
-    write_report(trades, trading_days, gated_trades=gated_trades if cascade_gate else None)
+    write_report(trades, trading_days, gated_trades=gated_trades if cascade_gate else None, target_pips=target_pips)
 
     if not a.no_push:
         push_report()
