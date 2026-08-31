@@ -659,13 +659,13 @@ def replay_week(all_data, days=5):
                     if setup is None or setup["n_confirms"] < 2:
                         continue
 
-                    # BUY EURUSD gate: require STRONG (3+) with IFVG mandatory
-                    if pair == "EURUSD" and pref_dir > 0:
-                        if setup["n_confirms"] < 3 or "IFVG" not in setup["confirmations"]:
-                            continue
-
-                    # IFVG mandatory for all setups (pure MSS+FBC is noise)
-                    if "IFVG" not in setup["confirmations"]:
+                    # MM quality filter: require IFVG + MSS + SMT (the full triple)
+                    # IFVG+SMT alone = 9% WR; IFVG+MSS alone = 0% WR
+                    # IFVG+MSS+SMT = 75% WR — the only profitable MM combo
+                    mm_has_ifvg = "IFVG" in setup["confirmations"]
+                    mm_has_mss = "MSS" in setup["confirmations"]
+                    mm_has_smt = "SMT" in setup["confirmations"]
+                    if not (mm_has_ifvg and mm_has_mss and mm_has_smt):
                         continue
 
                     session_counts[session_key] += 1
@@ -760,6 +760,10 @@ def replay_week(all_data, days=5):
                     if amd_setup is None:
                         continue
 
+                    # AMD quality filter: require MSS-2/3 (MSS-1/3 = 0% WR, -24.5 pips)
+                    if "MSS-2/3" not in amd_setup["confirmations"]:
+                        continue
+
                     session_counts[amd_key] = session_counts.get(amd_key, 0) + 1
 
                     fwd_end = check_time + timedelta(hours=8)
@@ -819,7 +823,7 @@ def write_report(trades, trading_days):
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
     w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)")
-    w(f"Min confirmations: 2 (MODERATE+)")
+    w(f"MM gate: IFVG+MSS+SMT (full triple) | AMD gate: MSS-2/3 minimum")
     w(f"Max trades/day: {MAX_TRADES_PER_DAY} | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
     w("")
 
