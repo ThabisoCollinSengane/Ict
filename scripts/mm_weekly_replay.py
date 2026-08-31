@@ -60,8 +60,11 @@ def _pip(pair):
     return 0.01 if "JPY" in pair else 0.0001
 
 
-def fetch_yahoo(days=8):
-    """Fetch 5-min OHLC for required pairs."""
+def fetch_yahoo(days=8, start_date=None):
+    """Fetch 5-min OHLC for required pairs.
+
+    Note: Yahoo limits 5m data to ~60 calendar days.
+    """
     try:
         import yfinance as yf
     except ImportError:
@@ -78,7 +81,11 @@ def fetch_yahoo(days=8):
         for attempt in range(3):
             try:
                 t = yf.Ticker(ticker)
-                df = t.history(period=period, interval="5m")
+                if start_date:
+                    end_dt = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+                    df = t.history(start=start_date, end=end_dt, interval="5m")
+                else:
+                    df = t.history(period=period, interval="5m")
                 if len(df) > 0:
                     df = df[["Open", "High", "Low", "Close"]].copy()
                     if df.index.tz is not None:
@@ -565,14 +572,17 @@ def _simulate_outcome(setup, df_5m_after):
             "exit_time": df_5m_after.index[-1]}
 
 
-def replay_week(all_data, days=5):
+def replay_week(all_data, days=5, cascade_gate=True):
     """Replay MM setups day by day through each killzone.
 
     For each trading day, at the end of each killzone, runs the detection
     pipeline on data up to that point. If a setup fires (>= 2 confirmations),
     simulates the outcome using subsequent bars.
 
-    Returns list of trade dicts with full details.
+    When cascade_gate=True, trades tagged 'against' (dollar opposes trade
+    direction) are gated out and tracked separately.
+
+    Returns (trades, gated_trades) tuple.
     """
     import pytz
     import pandas as pd
@@ -584,8 +594,11 @@ def replay_week(all_data, days=5):
         trading_days = trading_days[-days:]
 
     print(f"\nReplaying {len(trading_days)} trading days: {trading_days[0]} to {trading_days[-1]}")
+    if cascade_gate:
+        print("  CASCADE GATE: ON -- skipping trades where dollar opposes direction")
 
     all_trades = []
+    gated_trades = []
     session_counts = defaultdict(int)
     cascade_log = {}
 
@@ -709,6 +722,12 @@ def replay_week(all_data, days=5):
                         **outcome,
                         **c_info,
                     }
+
+                    if cascade_gate and trade.get("cascade_tag") == "against":
+                        trade["gated"] = True
+                        gated_trades.append(trade)
+                        continue
+
                     day_trades.append(trade)
                     day_trade_count += 1
 
@@ -791,6 +810,12 @@ def replay_week(all_data, days=5):
                         **outcome,
                         **c_info,
                     }
+
+                    if cascade_gate and trade.get("cascade_tag") == "against":
+                        trade["gated"] = True
+                        gated_trades.append(trade)
+                        continue
+
                     day_trades.append(trade)
                     day_trade_count += 1
 
@@ -802,14 +827,17 @@ def replay_week(all_data, days=5):
         pips = sum(t["pips"] for t in day_trades)
         day_str = day.strftime("%a %d %b")
         if n > 0:
-            print(f"  {day_str}: {n} setups — {d_prof}P / {d_loss}L / {d_be}BE — {pips:+.1f} pips")
+            print(f"  {day_str}: {n} setups -- {d_prof}P / {d_loss}L / {d_be}BE -- {pips:+.1f} pips")
         else:
             print(f"  {day_str}: no setups")
 
-    return all_trades
+    if cascade_gate and gated_trades:
+        print(f"  CASCADE GATE: {len(gated_trades)} trades gated out (dollar opposed direction)")
+
+    return all_trades, gated_trades
 
 
-def write_report(trades, trading_days):
+def write_report(trades, trading_days, gated_trades=None):
     """Write the weekly replay report."""
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     lines = []
@@ -817,13 +845,18 @@ def write_report(trades, trading_days):
 
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    w("# Weekly Replay — Day-by-Day Breakdown")
+    date_range = ""
+    if trading_days:
+        date_range = f" ({trading_days[0].strftime('%d %b')} - {trading_days[-1].strftime('%d %b %Y')})"
+    w(f"# Replay Backtest{date_range}")
     w("")
     w(f"Generated: {now_str}")
     w(f"Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)")
     w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)")
     w(f"MM gate: IFVG+MSS+SMT (full triple) | AMD gate: MSS-2/3 minimum")
+    gate_str = "ON (skip trades where dollar opposes direction)" if gated_trades is not None else "OFF"
+    w(f"Cascade gate: **{gate_str}**")
     w(f"Max trades/day: {MAX_TRADES_PER_DAY} | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: 30 pips")
     w("")
 
@@ -1069,11 +1102,57 @@ def write_report(trades, trading_days):
         w(f"| {tag_label} | {len(ct)} | {len(cp)} | {len(cl)} | {c_wr:.0f}% | {c_pips:+.1f} | {c_avg:+.1f} |")
     w("")
 
+    # Cascade gate analysis — before/after comparison
+    if gated_trades:
+        w("## Cascade Gate Impact")
+        w("")
+        all_combined = trades + gated_trades
+        total_ungated = len(all_combined)
+        ungated_prof = sum(1 for t in all_combined if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
+        ungated_pips = sum(t["pips"] for t in all_combined)
+        ungated_wr = ungated_prof / total_ungated * 100 if total_ungated > 0 else 0
+        ungated_avg = ungated_pips / total_ungated if total_ungated > 0 else 0
+        ungated_losses = sum(1 for t in all_combined if t["outcome"] == "LOSS")
+
+        gated_prof = sum(1 for t in gated_trades if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
+        gated_pips = sum(t["pips"] for t in gated_trades)
+        gated_n = len(gated_trades)
+        gated_wr = gated_prof / gated_n * 100 if gated_n > 0 else 0
+        gated_avg = gated_pips / gated_n if gated_n > 0 else 0
+        gated_loss = sum(1 for t in gated_trades if t["outcome"] == "LOSS")
+
+        kept_avg = total_pips / total if total > 0 else 0
+        pips_saved = total_pips - ungated_pips
+
+        w("| Scenario | Trades | WR | Losses | Pips | Avg |")
+        w("|---|---|---|---|---|---|")
+        w(f"| WITHOUT gate (all) | {total_ungated} | {ungated_wr:.0f}% | {ungated_losses} | {ungated_pips:+.1f} | {ungated_avg:+.1f} |")
+        w(f"| **WITH gate (shipped)** | **{total}** | **{wr:.0f}%** | **{len(losses)}** | **{total_pips:+.1f}** | **{kept_avg:+.1f}** |")
+        w(f"| Gated out (against) | {gated_n} | {gated_wr:.0f}% | {gated_loss} | {gated_pips:+.1f} | {gated_avg:+.1f} |")
+        w("")
+        wr_delta = wr - ungated_wr
+        w(f"**Gate effect:** WR {ungated_wr:.0f}% -> {wr:.0f}% ({wr_delta:+.0f}pp), "
+          f"avg pips/trade {ungated_avg:+.1f} -> {kept_avg:+.1f}")
+        w("")
+
+        # List gated trades
+        w("### Gated Trades (skipped — dollar opposed direction)")
+        w("")
+        w("| # | Date | Time (ET) | Model | Pair | Dir | Would-be Result | Pips |")
+        w("|---|---|---|---|---|---|---|---|")
+        for i, t in enumerate(sorted(gated_trades, key=lambda x: x["time"]), 1):
+            day_str = t["date"].strftime("%a %d %b")
+            et_str = _to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else ""
+            model_label = t.get("model", "MM")
+            w(f"| {i} | {day_str} | {et_str} | {model_label} | {t['pair']} | {t['dir_label']} | "
+              f"{t['outcome']} | {t['pips']:+.1f} |")
+        w("")
+
     w("---")
     w("")
-    w("*Intermarket cascade: Bonds/Yields (T5/T10/T30) → DXY → EURGBP → pair selection.*")
+    w("*Intermarket cascade: Bonds/Yields (T5/T10/T30) -> DXY -> EURGBP -> pair selection.*")
     w("*Simulation: structural M5 stop (capped 10 pips), trail BE at +10, lock +10 at +20, target 30 pips.*")
-    w("*Session-end close resolves all trades — no \"OPEN\" status.*")
+    w("*Session-end close resolves all trades -- no \"OPEN\" status.*")
     w("")
 
     with open(REPORT, "w", encoding="utf-8") as f:
@@ -1140,7 +1219,9 @@ def _selftest():
 def main():
     ap = argparse.ArgumentParser(description="MM weekly historical replay")
     ap.add_argument("--days", type=int, default=5, help="Trading days to replay (default 5)")
+    ap.add_argument("--start", type=str, help="Start date YYYY-MM-DD (overrides --days; Yahoo 5m limited to ~60 days)")
     ap.add_argument("--no-push", action="store_true", help="Skip git push")
+    ap.add_argument("--no-gate", action="store_true", help="Disable cascade gate (show all trades)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
 
@@ -1148,21 +1229,34 @@ def main():
         _selftest()
         return 0
 
-    print(f"Fetching {a.days + 3} days of Yahoo data for historical replay...")
-    all_data = fetch_yahoo(days=a.days + 3)
+    cascade_gate = not a.no_gate
+    replay_days = a.days
+
+    if a.start:
+        from datetime import date as date_cls
+        start_dt = datetime.strptime(a.start, "%Y-%m-%d").date()
+        today = date_cls.today()
+        cal_days = (today - start_dt).days
+        replay_days = int(cal_days * 5 / 7) + 2
+        print(f"Date range: {a.start} to today ({cal_days} calendar days, ~{replay_days} trading days)")
+        print("Note: Yahoo 5-min data limited to ~60 calendar days -- will return what's available")
+        all_data = fetch_yahoo(days=cal_days, start_date=a.start)
+    else:
+        print(f"Fetching {a.days + 3} days of Yahoo data for historical replay...")
+        all_data = fetch_yahoo(days=a.days + 3)
 
     if "EURUSD" not in all_data or "GBPUSD" not in all_data:
         print("ERROR: Could not fetch EURUSD and/or GBPUSD")
         return 1
 
     trading_days = _get_trading_days(all_data)
-    if len(trading_days) > a.days:
+    if not a.start and len(trading_days) > a.days:
         trading_days = trading_days[-a.days:]
 
-    print(f"\nReplaying MM setups through {len(trading_days)} trading days...")
-    trades = replay_week(all_data, days=a.days)
+    print(f"\nReplaying setups through {len(trading_days)} trading days...")
+    trades, gated_trades = replay_week(all_data, days=replay_days, cascade_gate=cascade_gate)
 
-    write_report(trades, trading_days)
+    write_report(trades, trading_days, gated_trades=gated_trades if cascade_gate else None)
 
     if not a.no_push:
         push_report()
@@ -1179,7 +1273,8 @@ def main():
     total_pips = sum(t["pips"] for t in trades)
 
     print(f"\n{'='*60}")
-    print("MM WEEKLY REPLAY SUMMARY")
+    gate_label = " (cascade gate ON)" if cascade_gate else ""
+    print(f"REPLAY BACKTEST SUMMARY{gate_label}")
     print(f"{'='*60}")
     print(f"  Total setups:  {total}")
     print(f"  Wins (target): {wins}")
@@ -1188,7 +1283,7 @@ def main():
     print(f"  Breakeven:     {be_c}")
     print(f"  Close (-):     {close_n}")
     print(f"  Losses (stop): {losses}")
-    print(f"  Profitable:    {profitable} ({profitable/total*100:.0f}%)" if total > 0 else "  Profitable:    —")
+    print(f"  Profitable:    {profitable} ({profitable/total*100:.0f}%)" if total > 0 else "  Profitable:    --")
     print(f"  Total pips:    {total_pips:+.1f}")
     print(f"\n  Day-by-day:")
     by_day = defaultdict(list)
@@ -1201,9 +1296,18 @@ def main():
         dp = sum(t["pips"] for t in dt)
         day_str = day.strftime("%a %d %b")
         if dt:
-            print(f"    {day_str}: {len(dt)} trades — {dp_c}P/{dl}L — {dp:+.1f} pips")
+            print(f"    {day_str}: {len(dt)} trades -- {dp_c}P/{dl}L -- {dp:+.1f} pips")
         else:
             print(f"    {day_str}: no setups")
+
+    if cascade_gate and gated_trades:
+        g_pips = sum(t["pips"] for t in gated_trades)
+        g_prof = sum(1 for t in gated_trades if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
+        g_loss = sum(1 for t in gated_trades if t["outcome"] == "LOSS")
+        g_wr = g_prof / len(gated_trades) * 100 if gated_trades else 0
+        print(f"\n  Cascade gate:")
+        print(f"    Gated out:  {len(gated_trades)} trades ({g_wr:.0f}% WR, {g_pips:+.1f} pips)")
+        print(f"    Without gate would be: {total + len(gated_trades)} trades, {total_pips + g_pips:+.1f} pips")
 
     return 0
 
