@@ -62,12 +62,12 @@ def _df_to_bars(df):
 _H1_TF = "1h"
 _D1_TF = "1D"
 _BIAS_LOOKBACK = 10
-_DXY_DAILY_BIAS_LOOKBACK = 5  # 5 daily bars = 1 trading week of DXY trend
 _YIELD_BIAS_LOOKBACK = 10   # 10 daily bars = 2 weeks of yield trend
 _SMT_LOOKBACK = 20
 _YIELD_SMT_LOOKBACK = 10    # 10 daily bars for yield-vs-yield and yield-vs-DXY SMT
 _MIN_BARS = 36              # ~3 trading days of US-hours H1 bars
 _MIN_YIELD_5M_BARS = 200    # ~1.5 trading days of 5m bars → enough for daily resample
+_DXY_OPEN_THRESHOLD = 0.02  # DXY points above/below daily open to count as bid/offer
 
 
 # ---------------------------------------------------------------------------
@@ -168,27 +168,60 @@ def _layer0_yield_curve(t5_bars, t10_bars, t30_bars):
 # Layer 1 — Combined Yields vs DXY
 # ---------------------------------------------------------------------------
 
+def _dxy_vs_daily_open(dxy_5m_df):
+    """DXY direction from current price vs today's daily open.
+
+    ICT institutional reference: if DXY is above its daily open the dollar
+    is BID for the session; below it the dollar is OFFERED. This is a
+    real-time read — no stale breakout from yesterday.
+
+    BOS (htf_bias) fired only 3 of 45 days (7%) in the diagnostic and was
+    WRONG on its one call. The daily-open comparison fires 60-70% of days
+    and aligns with the session's actual dollar direction.
+
+    Returns +1 (bid), -1 (offer), 0 (flat/no data).
+    """
+    if dxy_5m_df is None or len(dxy_5m_df) < 2:
+        return 0, None, None
+    import pandas as pd
+    today = dxy_5m_df.index[-1].normalize()
+    today_bars = dxy_5m_df.loc[today:]
+    if len(today_bars) == 0:
+        return 0, None, None
+    daily_open = today_bars.iloc[0].Open
+    current = dxy_5m_df.iloc[-1].Close
+    diff = current - daily_open
+    if diff > _DXY_OPEN_THRESHOLD:
+        return +1, daily_open, current
+    if diff < -_DXY_OPEN_THRESHOLD:
+        return -1, daily_open, current
+    return 0, daily_open, current
+
+
 def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_daily_bars,
-                          dxy_daily_bars=None):
+                          dxy_daily_bars=None, dxy_5m_df=None):
     """Compare the combined yield signal to the dollar.
 
     DXY is ALWAYS the primary dollar signal (it moves the forex pairs).
     Yields add conviction but NEVER override DXY direction — yields lead
     the dollar on weekly/monthly scale, not intraday where we trade.
 
-    DXY bias uses DAILY bars (lookback=5, ~1 week) — H1 lookback=10
-    reads flat at London open because DXY rarely breaks a 10-hour range
-    in the first 2 hours of a session (stale overnight bars).
+    DXY direction uses current price vs daily open (ICT institutional
+    reference). BOS on any timeframe fires <10% of days on DXY and is
+    stale when it does fire. The daily-open comparison is real-time and
+    fires 60-70% of days.
+
     SMT between T10 and DXY uses daily bars (both must be on the same TF).
 
     Returns (dollar_bias, source_str, agreement, smt_detected).
     """
     yb = yield_curve["yield_bias"]
-    # Use daily bars for DXY bias (same fix as yields — H1 reads flat 100%)
-    if dxy_daily_bars and len(dxy_daily_bars) >= _DXY_DAILY_BIAS_LOOKBACK + 2:
-        dxy_bias = htf_bias(dxy_daily_bars, lookback=_DXY_DAILY_BIAS_LOOKBACK)
+    # DXY vs daily open — real-time institutional read
+    dxy_bias, dxy_open, dxy_current = _dxy_vs_daily_open(dxy_5m_df)
+    if dxy_bias != 0 and dxy_open is not None:
+        open_desc = f"DXY {dxy_current:.3f} vs open {dxy_open:.3f}"
     else:
-        dxy_bias = htf_bias(dxy_h1_bars, lookback=_BIAS_LOOKBACK)
+        open_desc = "DXY near daily open"
 
     # SMT: DXY vs 10Y on DAILY bars (positively correlated → inverse=False)
     smt_detected = False
@@ -204,35 +237,29 @@ def _layer1_yields_vs_dxy(yield_curve, dxy_h1_bars, t10_daily_bars,
     ya = yield_curve["agreement"]
     curve_desc = yield_curve["curve_stress"]
 
-    # Decision tree — DXY is ALWAYS primary
+    # Decision tree — DXY vs daily open is ALWAYS primary
     if dxy_bias != 0 and yb == dxy_bias:
-        # Best case: DXY and yields agree
         strength = "strong" if ya == 3 else "moderate"
         return (dxy_bias,
-                f"DXY {_dir(dxy_bias)} + yields {_dir(yb)} ({ya}/3 agree, {curve_desc}) = {strength} confirmation",
+                f"{open_desc} = {_dir(dxy_bias)} + yields {_dir(yb)} ({ya}/3 agree, {curve_desc}) = {strength}",
                 True, smt_detected)
 
     if dxy_bias != 0 and yb == 0:
-        # DXY has direction, yields are flat — use DXY
         return (dxy_bias,
-                f"DXY {_dir(dxy_bias)} (yields mixed: {curve_desc})",
+                f"{open_desc} = {_dir(dxy_bias)} (yields mixed: {curve_desc})",
                 False, smt_detected)
 
     if dxy_bias != 0 and yb != 0 and yb != dxy_bias:
-        # DXY and yields DISAGREE — DXY is the actionable signal for forex,
-        # but flag SMT (yields diverging = warning, not a reversal signal)
         return (dxy_bias,
-                f"DXY {_dir(dxy_bias)} vs yields {_dir(yb)} ({ya}/3, {curve_desc}) — DXY leads, yields diverge (caution)",
+                f"{open_desc} = {_dir(dxy_bias)} vs yields {_dir(yb)} ({ya}/3, {curve_desc}) — DXY leads, yields diverge",
                 False, True)
 
     if dxy_bias == 0 and yb != 0:
-        # DXY flat, yields have direction — yields HINT but not confirmed
-        # Return 0 (flat) because the dollar hasn't moved yet
         return (0,
-                f"DXY flat, yields {_dir(yb)} ({ya}/3, {curve_desc}) — waiting for DXY confirmation",
+                f"{open_desc} = flat, yields {_dir(yb)} ({ya}/3, {curve_desc}) — waiting for DXY to leave open",
                 False, smt_detected)
 
-    return (0, f"both flat (yields: {curve_desc}, DXY flat)", False, smt_detected)
+    return (0, f"{open_desc} = flat (yields: {curve_desc})", False, smt_detected)
 
 
 # ---------------------------------------------------------------------------
@@ -394,14 +421,18 @@ def intermarket_cascade(all_data, check_time=None):
     else:
         return _empty_result(f"insufficient yield data after resample (have: {list(daily_yields.keys())})")
 
-    # Layer 1 — Yields (daily) vs DXY (H1 for bias, daily for SMT)
-    if "DXY" not in h1:
+    # Layer 1 — Yields vs DXY (daily-open for bias, daily bars for SMT)
+    if "DXY" not in h1 and "DXY" not in sliced:
         return _empty_result("insufficient DXY data after resample")
 
     ref_yield_bars = daily_yields.get("T10", daily_yields.get(avail_yields[0]))
+    dxy_5m_slice = sliced.get("DXY")
     dollar_bias, dollar_source, agreement, yields_dxy_smt = \
-        _layer1_yields_vs_dxy(yield_curve, h1["DXY"], ref_yield_bars,
-                              dxy_daily_bars=dxy_daily_bars)
+        _layer1_yields_vs_dxy(yield_curve,
+                              h1.get("DXY", []),
+                              ref_yield_bars,
+                              dxy_daily_bars=dxy_daily_bars,
+                              dxy_5m_df=dxy_5m_slice)
 
     # Layer 2 — DXY vs EURGBP → pair selection
     if "EURGBP" in h1:

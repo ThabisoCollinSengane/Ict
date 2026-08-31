@@ -212,7 +212,7 @@ def main():
     print("  D1 WRONG  = D1 bias predicted pairs DOWN but they went UP, or vice versa")
     print("  D1 right  = D1 bias prediction matched pair movement")
     print()
-    print("If D1 is mostly WRONG → daily BOS is stale (yesterday's breakout = today's reversion)")
+    print("If D1 is mostly WRONG -> daily BOS is stale (yesterday's breakout = today's reversion)")
     print("Compare vs DOpen/WOpen columns to see if open-relative reads are more accurate")
 
 
