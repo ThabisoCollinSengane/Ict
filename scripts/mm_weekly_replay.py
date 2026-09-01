@@ -498,6 +498,7 @@ def _simulate_outcome(setup, df_5m_after):
     - Session end (8h window): close at last price → CLOSE
 
     No more "OPEN" — every trade resolves.
+    Returns mfe_pips (max favorable excursion) and hit_20 (reached +20 pips).
     """
     pip = _pip(setup["pair"])
     entry = setup["price"]
@@ -506,7 +507,8 @@ def _simulate_outcome(setup, df_5m_after):
     d = setup["direction"]
 
     if df_5m_after is None or len(df_5m_after) == 0:
-        return {"outcome": "CLOSE", "pips": 0, "exit_price": entry, "exit_time": setup["time"]}
+        return {"outcome": "CLOSE", "pips": 0, "exit_price": entry,
+                "exit_time": setup["time"], "mfe_pips": 0.0, "hit_20": False}
 
     current_stop = orig_stop
     mfe = 0.0
@@ -544,10 +546,12 @@ def _simulate_outcome(setup, df_5m_after):
                 else:
                     outcome = "LOSS"
                 return {"outcome": outcome, "pips": round(pips, 1),
-                        "exit_price": current_stop, "exit_time": ts}
+                        "exit_price": current_stop, "exit_time": ts,
+                        "mfe_pips": round(mfe, 1), "hit_20": mfe >= 20}
             if row["High"] >= target:
                 return {"outcome": "WIN", "pips": round((target - entry) / pip, 1),
-                        "exit_price": target, "exit_time": ts}
+                        "exit_price": target, "exit_time": ts,
+                        "mfe_pips": round(mfe, 1), "hit_20": mfe >= 20}
         else:
             if row["High"] >= current_stop:
                 pips = (entry - current_stop) / pip
@@ -558,16 +562,19 @@ def _simulate_outcome(setup, df_5m_after):
                 else:
                     outcome = "LOSS"
                 return {"outcome": outcome, "pips": round(pips, 1),
-                        "exit_price": current_stop, "exit_time": ts}
+                        "exit_price": current_stop, "exit_time": ts,
+                        "mfe_pips": round(mfe, 1), "hit_20": mfe >= 20}
             if row["Low"] <= target:
                 return {"outcome": "WIN", "pips": round((entry - target) / pip, 1),
-                        "exit_price": target, "exit_time": ts}
+                        "exit_price": target, "exit_time": ts,
+                        "mfe_pips": round(mfe, 1), "hit_20": mfe >= 20}
 
     # Session end — close at last available price
     last_price = df_5m_after["Close"].iloc[-1]
     pips = round((last_price - entry) * d / pip, 1)
     return {"outcome": "CLOSE", "pips": pips, "exit_price": last_price,
-            "exit_time": df_5m_after.index[-1]}
+            "exit_time": df_5m_after.index[-1],
+            "mfe_pips": round(mfe, 1), "hit_20": mfe >= 20}
 
 
 def _compute_cascade(all_data, check_time, has_yield, cache):
@@ -1061,10 +1068,12 @@ def write_report(trades, trading_days, gated_trades=None, target_pips=30, skip_o
         et_str = _to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else ""
         result = t["outcome"]
         model_label = t.get("model", "MM")
+        mfe_str = f" MFE +{t['mfe_pips']:.0f}" if t.get("mfe_pips", 0) > 0 else ""
+        m20 = " ★20" if t.get("hit_20") else ""
         w(f"{i}. **{result}** [{model_label}] {t['dir_label']} {t['pair']} — {day_str} {et_str} ET "
           f"({t['session']}) — {t['signal']} [{'+'.join(t['confirmations'])}] — "
           f"Entry {t['price']:.5f}, Stop {t['stop']:.5f}, Target {t['target']:.5f} — "
-          f"**{t['pips']:+.1f} pips**")
+          f"**{t['pips']:+.1f} pips**{mfe_str}{m20}")
     w("")
 
     w("## Outcome Breakdown")
@@ -1078,6 +1087,41 @@ def write_report(trades, trading_days, gated_trades=None, target_pips=30, skip_o
         oc_avg = oc_pips / len(oc_list) if oc_list else 0
         w(f"| {oc_label} | {len(oc_list)} | {oc_pips:+.1f} | {oc_avg:+.1f} |")
     w("")
+
+    # 20-pip milestone analysis
+    hit_20_trades = [t for t in trades if t.get("hit_20")]
+    missed_20 = [t for t in trades if not t.get("hit_20")]
+    if hit_20_trades:
+        w("## 20-Pip Milestone (notification point)")
+        w("")
+        w(f"**{len(hit_20_trades)} of {total} trades reached +20 pips** — these would trigger a notification.")
+        w("")
+        h20_prof = sum(1 for t in hit_20_trades if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
+        h20_pips = sum(t["pips"] for t in hit_20_trades)
+        h20_wr = h20_prof / len(hit_20_trades) * 100 if hit_20_trades else 0
+        h20_avg = h20_pips / len(hit_20_trades) if hit_20_trades else 0
+        m_prof = sum(1 for t in missed_20 if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
+        m_pips = sum(t["pips"] for t in missed_20)
+        m_wr = m_prof / len(missed_20) * 100 if missed_20 else 0
+        m_avg = m_pips / len(missed_20) if missed_20 else 0
+        w("| Group | Trades | WR | Pips | Avg | Avg MFE |")
+        w("|---|---|---|---|---|---|")
+        h20_mfe = sum(t.get("mfe_pips", 0) for t in hit_20_trades) / len(hit_20_trades) if hit_20_trades else 0
+        m_mfe = sum(t.get("mfe_pips", 0) for t in missed_20) / len(missed_20) if missed_20 else 0
+        w(f"| Reached +20 (★20) | {len(hit_20_trades)} | {h20_wr:.0f}% | {h20_pips:+.1f} | {h20_avg:+.1f} | +{h20_mfe:.0f} |")
+        w(f"| Never reached +20 | {len(missed_20)} | {m_wr:.0f}% | {m_pips:+.1f} | {m_avg:+.1f} | +{m_mfe:.0f} |")
+        w("")
+        # Trades that reached 20 but ended below 20 (would-have-been-better closing at 20)
+        reached_but_lost = [t for t in hit_20_trades if t["pips"] < 20]
+        if reached_but_lost:
+            rbl_pips = sum(t["pips"] for t in reached_but_lost)
+            saved = len(reached_but_lost) * 20 - rbl_pips
+            w(f"**{len(reached_but_lost)} trades reached +20 but exited below +20** (trail/close/loss after reversal).")
+            w(f"Closing at +20 would have gained **{saved:+.0f} extra pips** on those trades.")
+            w("")
+        w("*★20 = trade reached +20 pips MFE (notification would fire). "
+          "Use `--close-at-20` to simulate closing all trades at 20 pips.*")
+        w("")
 
     # Model breakdown (MM vs AMD)
     w("## Model Breakdown (MM vs AMD)")
@@ -1377,6 +1421,7 @@ def main():
     ap.add_argument("--flat-only", action="store_true", help="Only take trades with no dollar signal (flat cascade)")
     ap.add_argument("--skip-overlap", action="store_true", help="Skip 05:00-07:00 ET entries (London-NY overlap dead zone)")
     ap.add_argument("--target", type=int, default=30, help="Target in pips (default 30; test 20 for comparison)")
+    ap.add_argument("--close-at-20", action="store_true", help="Close trades at 20 pips instead of 30 (shortcut for --target 20)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
 
@@ -1387,7 +1432,7 @@ def main():
     cascade_gate = not a.no_gate
     flat_only = a.flat_only
     skip_overlap = a.skip_overlap
-    target_pips = a.target
+    target_pips = 20 if a.close_at_20 else a.target
     replay_days = a.days
 
     if a.start:
