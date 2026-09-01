@@ -590,7 +590,7 @@ def _compute_cascade(all_data, check_time, has_yield, cache):
     return cascade
 
 
-def replay_week(all_data, days=5, cascade_gate=True, target_pips=30):
+def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=False):
     """Replay MM setups day by day through each killzone.
 
     For each trading day, at the end of each killzone, runs the detection
@@ -599,6 +599,9 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30):
 
     When cascade_gate=True, trades tagged 'against' (dollar opposes trade
     direction) are gated out and tracked separately.
+
+    When flat_only=True (implies cascade_gate), ONLY trades with no dollar
+    signal pass -- both 'confirmed' and 'against' are gated out.
 
     Returns (trades, gated_trades) tuple.
     """
@@ -612,7 +615,9 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30):
         trading_days = trading_days[-days:]
 
     print(f"\nReplaying {len(trading_days)} trading days: {trading_days[0]} to {trading_days[-1]}")
-    if cascade_gate:
+    if flat_only:
+        print("  FLAT-ONLY MODE: ON -- only trades with NO dollar signal pass")
+    elif cascade_gate:
         print("  CASCADE GATE: ON -- skipping trades where dollar opposes direction")
 
     all_trades = []
@@ -737,7 +742,12 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30):
                         **c_info,
                     }
 
-                    if cascade_gate and trade.get("cascade_tag") == "against":
+                    ctag = trade.get("cascade_tag")
+                    if flat_only and ctag in ("against", "confirmed"):
+                        trade["gated"] = True
+                        gated_trades.append(trade)
+                        continue
+                    elif cascade_gate and ctag == "against":
                         trade["gated"] = True
                         gated_trades.append(trade)
                         continue
@@ -828,7 +838,12 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30):
                         **c_info,
                     }
 
-                    if cascade_gate and trade.get("cascade_tag") == "against":
+                    ctag = trade.get("cascade_tag")
+                    if flat_only and ctag in ("against", "confirmed"):
+                        trade["gated"] = True
+                        gated_trades.append(trade)
+                        continue
+                    elif cascade_gate and ctag == "against":
                         trade["gated"] = True
                         gated_trades.append(trade)
                         continue
@@ -848,8 +863,11 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30):
         else:
             print(f"  {day_str}: no setups")
 
-    if cascade_gate and gated_trades:
-        print(f"  CASCADE GATE: {len(gated_trades)} trades gated out (dollar opposed direction)")
+    if gated_trades:
+        if flat_only:
+            print(f"  FLAT-ONLY: {len(gated_trades)} trades gated out (had a dollar signal)")
+        elif cascade_gate:
+            print(f"  CASCADE GATE: {len(gated_trades)} trades gated out (dollar opposed direction)")
 
     return all_trades, gated_trades
 
@@ -872,7 +890,12 @@ def write_report(trades, trading_days, gated_trades=None, target_pips=30):
     w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)")
     w(f"MM gate: IFVG+MSS+SMT (full triple) | AMD gate: MSS-2/3 minimum")
-    gate_str = "ON (skip trades where dollar opposes direction)" if gated_trades is not None else "OFF"
+    if gated_trades is not None and any(t.get("cascade_tag") == "confirmed" for t in (gated_trades or [])):
+        gate_str = "FLAT-ONLY (only trades with no dollar signal)"
+    elif gated_trades is not None:
+        gate_str = "ON (skip trades where dollar opposes direction)"
+    else:
+        gate_str = "OFF"
     w(f"Cascade gate: **{gate_str}**")
     w(f"Max trades/day: {MAX_TRADES_PER_DAY} | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: {target_pips} pips")
     w("")
@@ -1239,6 +1262,7 @@ def main():
     ap.add_argument("--start", type=str, help="Start date YYYY-MM-DD (overrides --days; Yahoo 5m limited to ~60 days)")
     ap.add_argument("--no-push", action="store_true", help="Skip git push")
     ap.add_argument("--no-gate", action="store_true", help="Disable cascade gate (show all trades)")
+    ap.add_argument("--flat-only", action="store_true", help="Only take trades with no dollar signal (flat cascade)")
     ap.add_argument("--target", type=int, default=30, help="Target in pips (default 30; test 20 for comparison)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -1248,6 +1272,7 @@ def main():
         return 0
 
     cascade_gate = not a.no_gate
+    flat_only = a.flat_only
     target_pips = a.target
     replay_days = a.days
 
@@ -1273,9 +1298,9 @@ def main():
         trading_days = trading_days[-a.days:]
 
     print(f"\nReplaying setups through {len(trading_days)} trading days...")
-    trades, gated_trades = replay_week(all_data, days=replay_days, cascade_gate=cascade_gate, target_pips=target_pips)
+    trades, gated_trades = replay_week(all_data, days=replay_days, cascade_gate=cascade_gate, target_pips=target_pips, flat_only=flat_only)
 
-    write_report(trades, trading_days, gated_trades=gated_trades if cascade_gate else None, target_pips=target_pips)
+    write_report(trades, trading_days, gated_trades=gated_trades if (cascade_gate or flat_only) else None, target_pips=target_pips)
 
     if not a.no_push:
         push_report()
@@ -1292,7 +1317,7 @@ def main():
     total_pips = sum(t["pips"] for t in trades)
 
     print(f"\n{'='*60}")
-    gate_label = " (cascade gate ON)" if cascade_gate else ""
+    gate_label = " (FLAT-ONLY mode)" if flat_only else (" (cascade gate ON)" if cascade_gate else "")
     print(f"REPLAY BACKTEST SUMMARY{gate_label}")
     print(f"{'='*60}")
     print(f"  Total setups:  {total}")
@@ -1319,7 +1344,7 @@ def main():
         else:
             print(f"    {day_str}: no setups")
 
-    if cascade_gate and gated_trades:
+    if (cascade_gate or flat_only) and gated_trades:
         g_pips = sum(t["pips"] for t in gated_trades)
         g_prof = sum(1 for t in gated_trades if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
         g_loss = sum(1 for t in gated_trades if t["outcome"] == "LOSS")
