@@ -590,7 +590,7 @@ def _compute_cascade(all_data, check_time, has_yield, cache):
     return cascade
 
 
-def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=False):
+def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=False, skip_overlap=False):
     """Replay MM setups day by day through each killzone.
 
     For each trading day, at the end of each killzone, runs the detection
@@ -730,6 +730,7 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=F
                             "cascade_tag": tag,
                             "yield_agreement": yc.get("agreement", 0),
                             "curve_stress": yc.get("curve_stress", ""),
+                            "eurgbp_bias": cascade.get("eurgbp_bias", 0),
                         }
 
                     trade = {
@@ -745,10 +746,19 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=F
                     ctag = trade.get("cascade_tag")
                     if flat_only and ctag in ("against", "confirmed"):
                         trade["gated"] = True
+                        trade["gate_reason"] = "flat_only"
                         gated_trades.append(trade)
                         continue
                     elif cascade_gate and ctag == "against":
                         trade["gated"] = True
+                        trade["gate_reason"] = "against"
+                        gated_trades.append(trade)
+                        continue
+
+                    et_time = _to_et(setup["time"])
+                    if skip_overlap and 5 <= et_time.hour < 7:
+                        trade["gated"] = True
+                        trade["gate_reason"] = "overlap"
                         gated_trades.append(trade)
                         continue
 
@@ -827,7 +837,19 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=F
                             tag = "confirmed"
                         else:
                             tag = "against"
-                        c_info = {"cascade_tag": tag, "cascade_summary": cascade.get("summary", "")}
+                        yc = cascade.get("yield_curve") or {}
+                        c_info = {
+                            "dollar_bias": db,
+                            "dollar_source": cascade["dollar_source"],
+                            "bonds_dxy_agreement": cascade.get("bonds_dxy_agreement", False),
+                            "bonds_dxy_smt": cascade.get("bonds_dxy_smt", False),
+                            "entry_smt": cascade.get("entry_smt", False),
+                            "cascade_summary": cascade.get("summary", ""),
+                            "cascade_tag": tag,
+                            "yield_agreement": yc.get("agreement", 0),
+                            "curve_stress": yc.get("curve_stress", ""),
+                            "eurgbp_bias": cascade.get("eurgbp_bias", 0),
+                        }
 
                     trade = {
                         **amd_setup,
@@ -841,10 +863,19 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=F
                     ctag = trade.get("cascade_tag")
                     if flat_only and ctag in ("against", "confirmed"):
                         trade["gated"] = True
+                        trade["gate_reason"] = "flat_only"
                         gated_trades.append(trade)
                         continue
                     elif cascade_gate and ctag == "against":
                         trade["gated"] = True
+                        trade["gate_reason"] = "against"
+                        gated_trades.append(trade)
+                        continue
+
+                    et_time = _to_et(amd_setup["time"])
+                    if skip_overlap and 5 <= et_time.hour < 7:
+                        trade["gated"] = True
+                        trade["gate_reason"] = "overlap"
                         gated_trades.append(trade)
                         continue
 
@@ -864,15 +895,16 @@ def replay_week(all_data, days=5, cascade_gate=True, target_pips=30, flat_only=F
             print(f"  {day_str}: no setups")
 
     if gated_trades:
-        if flat_only:
-            print(f"  FLAT-ONLY: {len(gated_trades)} trades gated out (had a dollar signal)")
-        elif cascade_gate:
-            print(f"  CASCADE GATE: {len(gated_trades)} trades gated out (dollar opposed direction)")
+        reasons = defaultdict(int)
+        for t in gated_trades:
+            reasons[t.get("gate_reason", "against")] += 1
+        parts = [f"{v} {k}" for k, v in sorted(reasons.items())]
+        print(f"  GATED: {len(gated_trades)} trades removed ({', '.join(parts)})")
 
     return all_trades, gated_trades
 
 
-def write_report(trades, trading_days, gated_trades=None, target_pips=30):
+def write_report(trades, trading_days, gated_trades=None, target_pips=30, skip_overlap=False):
     """Write the weekly replay report."""
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     lines = []
@@ -890,13 +922,14 @@ def write_report(trades, trading_days, gated_trades=None, target_pips=30):
     w(f"Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)")
     w(f"Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)")
     w(f"MM gate: IFVG+MSS+SMT (full triple) | AMD gate: MSS-2/3 minimum")
-    if gated_trades is not None and any(t.get("cascade_tag") == "confirmed" for t in (gated_trades or [])):
+    if gated_trades is not None and any(t.get("gate_reason") == "flat_only" for t in (gated_trades or [])):
         gate_str = "FLAT-ONLY (only trades with no dollar signal)"
     elif gated_trades is not None:
         gate_str = "ON (skip trades where dollar opposes direction)"
     else:
         gate_str = "OFF"
-    w(f"Cascade gate: **{gate_str}**")
+    overlap_str = " + SKIP-OVERLAP (no 05:00-07:00 ET)" if skip_overlap else ""
+    w(f"Cascade gate: **{gate_str}{overlap_str}**")
     w(f"Max trades/day: {MAX_TRADES_PER_DAY} | Stop: structural M5, capped 10 pips | Trail: BE at +10, lock +10 at +20 | Target: {target_pips} pips")
     w("")
 
@@ -1142,6 +1175,74 @@ def write_report(trades, trading_days, gated_trades=None, target_pips=30):
         w(f"| {tag_label} | {len(ct)} | {len(cp)} | {len(cl)} | {c_wr:.0f}% | {c_pips:+.1f} | {c_avg:+.1f} |")
     w("")
 
+    # Per-layer cascade breakdown (needs enriched trade data)
+    has_layers = any(t.get("dollar_bias") is not None for t in trades)
+    if has_layers:
+        def _layer_table(w, trades, title, key_fn, labels):
+            w(f"### {title}")
+            w("")
+            w("| State | Trades | Prof | L | WR | Pips | Avg |")
+            w("|---|---|---|---|---|---|---|")
+            for label, filter_fn in labels:
+                ct = [t for t in trades if filter_fn(t)]
+                if not ct:
+                    continue
+                cp = [t for t in ct if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0)]
+                cl = [t for t in ct if t["outcome"] == "LOSS"]
+                c_pips = sum(t["pips"] for t in ct)
+                c_avg = c_pips / len(ct) if ct else 0
+                c_wr = len(cp) / len(ct) * 100 if ct else 0
+                w(f"| {label} | {len(ct)} | {len(cp)} | {len(cl)} | {c_wr:.0f}% | {c_pips:+.1f} | {c_avg:+.1f} |")
+            w("")
+
+        all_for_layers = trades + (gated_trades or [])
+
+        w("## Per-Layer Cascade Breakdown")
+        w("")
+        w("*All trades (kept + gated) for full picture of each layer's signal quality.*")
+        w("")
+
+        _layer_table(w, all_for_layers, "Layer 0 — Yield Curve (Bonds)", None, [
+            ("Yields agree (2-3/3)", lambda t: t.get("yield_agreement", 0) >= 2),
+            ("Yields partial (1/3)", lambda t: t.get("yield_agreement", 0) == 1),
+            ("Yields flat (0/3)", lambda t: t.get("yield_agreement", 0) == 0),
+        ])
+
+        _layer_table(w, all_for_layers, "Layer 1 — DXY vs Daily Open", None, [
+            ("DXY bid (+1)", lambda t: t.get("dollar_bias", 0) > 0),
+            ("DXY flat (0)", lambda t: t.get("dollar_bias", 0) == 0),
+            ("DXY offer (-1)", lambda t: t.get("dollar_bias", 0) < 0),
+        ])
+
+        _layer_table(w, all_for_layers, "Layer 1b — Bonds/DXY Agreement", None, [
+            ("Bonds+DXY agree", lambda t: t.get("bonds_dxy_agreement") is True),
+            ("Bonds+DXY disagree", lambda t: t.get("bonds_dxy_agreement") is False and t.get("dollar_bias", 0) != 0),
+            ("N/A (DXY flat)", lambda t: t.get("dollar_bias", 0) == 0),
+        ])
+
+        _layer_table(w, all_for_layers, "Layer 1c — Bonds/DXY SMT Divergence", None, [
+            ("SMT divergence", lambda t: t.get("bonds_dxy_smt") is True),
+            ("No SMT", lambda t: t.get("bonds_dxy_smt") is not True),
+        ])
+
+        _layer_table(w, all_for_layers, "Layer 2 — EURGBP Bias (pair selection)", None, [
+            ("EUR > GBP (+1)", lambda t: t.get("eurgbp_bias", 0) > 0),
+            ("Flat (0)", lambda t: t.get("eurgbp_bias", 0) == 0),
+            ("GBP > EUR (-1)", lambda t: t.get("eurgbp_bias", 0) < 0),
+        ])
+
+        _layer_table(w, all_for_layers, "Layer 3 — EU/GU Entry SMT", None, [
+            ("Entry SMT confirms", lambda t: t.get("entry_smt") is True),
+            ("No entry SMT", lambda t: t.get("entry_smt") is not True),
+        ])
+
+        _layer_table(w, all_for_layers, "Curve Stress", None, [
+            ("Steepening", lambda t: t.get("curve_stress", "") == "steepening"),
+            ("Flattening", lambda t: t.get("curve_stress", "") == "flattening"),
+            ("Inverting", lambda t: t.get("curve_stress", "") == "inverting"),
+            ("Normal", lambda t: t.get("curve_stress", "") in ("", "normal") or not t.get("curve_stress")),
+        ])
+
     # Cascade gate analysis — before/after comparison
     if gated_trades:
         w("## Cascade Gate Impact")
@@ -1168,7 +1269,17 @@ def write_report(trades, trading_days, gated_trades=None, target_pips=30):
         w("|---|---|---|---|---|---|")
         w(f"| WITHOUT gate (all) | {total_ungated} | {ungated_wr:.0f}% | {ungated_losses} | {ungated_pips:+.1f} | {ungated_avg:+.1f} |")
         w(f"| **WITH gate (shipped)** | **{total}** | **{wr:.0f}%** | **{len(losses)}** | **{total_pips:+.1f}** | **{kept_avg:+.1f}** |")
-        w(f"| Gated out (against) | {gated_n} | {gated_wr:.0f}% | {gated_loss} | {gated_pips:+.1f} | {gated_avg:+.1f} |")
+        w(f"| Gated out (all reasons) | {gated_n} | {gated_wr:.0f}% | {gated_loss} | {gated_pips:+.1f} | {gated_avg:+.1f} |")
+        for reason in sorted(set(t.get("gate_reason", "against") for t in gated_trades)):
+            rt = [t for t in gated_trades if t.get("gate_reason", "against") == reason]
+            if not rt:
+                continue
+            rp = sum(1 for t in rt if t["outcome"] in ("WIN", "TRAIL") or (t["outcome"] == "CLOSE" and t["pips"] > 0))
+            rl = sum(1 for t in rt if t["outcome"] == "LOSS")
+            r_pips = sum(t["pips"] for t in rt)
+            r_wr = rp / len(rt) * 100 if rt else 0
+            r_avg = r_pips / len(rt) if rt else 0
+            w(f"|   — {reason} | {len(rt)} | {r_wr:.0f}% | {rl} | {r_pips:+.1f} | {r_avg:+.1f} |")
         w("")
         wr_delta = wr - ungated_wr
         w(f"**Gate effect:** WR {ungated_wr:.0f}% -> {wr:.0f}% ({wr_delta:+.0f}pp), "
@@ -1176,16 +1287,17 @@ def write_report(trades, trading_days, gated_trades=None, target_pips=30):
         w("")
 
         # List gated trades
-        w("### Gated Trades (skipped — dollar opposed direction)")
+        w("### Gated Trades (skipped)")
         w("")
-        w("| # | Date | Time (ET) | Model | Pair | Dir | Would-be Result | Pips |")
-        w("|---|---|---|---|---|---|---|---|")
+        w("| # | Date | Time (ET) | Model | Pair | Dir | Gate | Would-be Result | Pips |")
+        w("|---|---|---|---|---|---|---|---|---|")
         for i, t in enumerate(sorted(gated_trades, key=lambda x: x["time"]), 1):
             day_str = t["date"].strftime("%a %d %b")
             et_str = _to_et(t["time"]).strftime("%H:%M") if hasattr(t["time"], "strftime") else ""
             model_label = t.get("model", "MM")
+            reason = t.get("gate_reason", "against")
             w(f"| {i} | {day_str} | {et_str} | {model_label} | {t['pair']} | {t['dir_label']} | "
-              f"{t['outcome']} | {t['pips']:+.1f} |")
+              f"{reason} | {t['outcome']} | {t['pips']:+.1f} |")
         w("")
 
     w("---")
@@ -1263,6 +1375,7 @@ def main():
     ap.add_argument("--no-push", action="store_true", help="Skip git push")
     ap.add_argument("--no-gate", action="store_true", help="Disable cascade gate (show all trades)")
     ap.add_argument("--flat-only", action="store_true", help="Only take trades with no dollar signal (flat cascade)")
+    ap.add_argument("--skip-overlap", action="store_true", help="Skip 05:00-07:00 ET entries (London-NY overlap dead zone)")
     ap.add_argument("--target", type=int, default=30, help="Target in pips (default 30; test 20 for comparison)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -1273,6 +1386,7 @@ def main():
 
     cascade_gate = not a.no_gate
     flat_only = a.flat_only
+    skip_overlap = a.skip_overlap
     target_pips = a.target
     replay_days = a.days
 
@@ -1298,9 +1412,9 @@ def main():
         trading_days = trading_days[-a.days:]
 
     print(f"\nReplaying setups through {len(trading_days)} trading days...")
-    trades, gated_trades = replay_week(all_data, days=replay_days, cascade_gate=cascade_gate, target_pips=target_pips, flat_only=flat_only)
+    trades, gated_trades = replay_week(all_data, days=replay_days, cascade_gate=cascade_gate, target_pips=target_pips, flat_only=flat_only, skip_overlap=skip_overlap)
 
-    write_report(trades, trading_days, gated_trades=gated_trades if (cascade_gate or flat_only) else None, target_pips=target_pips)
+    write_report(trades, trading_days, gated_trades=gated_trades if (cascade_gate or flat_only or skip_overlap) else None, target_pips=target_pips, skip_overlap=skip_overlap)
 
     if not a.no_push:
         push_report()
