@@ -894,14 +894,16 @@ def main():
     # ── Auto-push a results report so Claude sees it without a manual git dance ──
     if os.environ.get("NO_PUSH") != "1":
         try:
-            _publish_backtest_report(results, backtester, requested_years)
+            _publish_backtest_report(results, backtester, requested_years,
+                                       df if backtester.trades else None)
         except Exception as _e:
             print(f"[report push skipped: {_e}]")
 
 
-def _publish_backtest_report(results, backtester, years):
-    """Write data/backtest_report.md (summary + gate funnel + withdrawals) and
-    force-add/commit/pull/push it (data/ is gitignored). NO_PUSH=1 disables."""
+def _publish_backtest_report(results, backtester, years, df=None):
+    """Write data/backtest_report.md (summary + gate funnel + withdrawals +
+    key analytics tables) and force-add/commit/pull/push it (data/ is
+    gitignored). NO_PUSH=1 disables."""
     import subprocess
     root = os.path.dirname(os.path.abspath(__file__))
     span = "–".join([years[0], years[-1]])
@@ -919,6 +921,127 @@ def _publish_backtest_report(results, backtester, years):
         tot = sum(a for _t, a, _k in ev)
         L += ["", f"_income: R{tot:,.0f} across {len(ev)} withdrawals · working "
               f"balance R{getattr(backtester, 'equity', 0):,.0f}_"]
+
+    # ── Analytics tables (from the trade DataFrame) ──
+    if df is not None and len(df) > 0:
+        def _pf(grp):
+            gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+            gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+            return (gw / gl) if gl > 0 else float("inf")
+
+        # --- PD array setup type ---
+        def _parse_setup(et):
+            s = str(et).lower()
+            for arr in ("fvg", "ob", "breaker"):
+                if f"_{arr}_" in s or s.endswith(f"_{arr}"):
+                    for tf in ("m1", "m5", "m15", "h1"):
+                        if s.endswith(f"_{tf}"):
+                            return arr.upper(), tf.upper()
+                    return arr.upper(), "?"
+            return "other", "?"
+
+        df["_setup_type"] = df["entry_type"].apply(lambda x: _parse_setup(x)[0])
+        df["_setup_tf"]   = df["entry_type"].apply(lambda x: _parse_setup(x)[1])
+        L += ["", "## PD array setup type (FVG / OB / breaker)", "", "```"]
+        L.append(f"{'Setup':<10} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                 f"{'P&L ZAR':>12} {'PF':>6}")
+        L.append("-" * 50)
+        for stype in ["FVG", "OB", "BREAKER", "other"]:
+            grp = df[df["_setup_type"] == stype]
+            if grp.empty:
+                continue
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            L.append(f"{stype:<10} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                     f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+        L.append("")
+        L.append(f"{'Setup x TF':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'PF':>6}")
+        L.append("-" * 42)
+        for (stype, tf), grp in df.groupby(["_setup_type", "_setup_tf"]):
+            if grp.empty:
+                continue
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            L.append(f"{stype+' '+tf:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% {_pf(grp):>6.2f}")
+        L.append("")
+        L.append(f"{'Setup x pair':<20} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'PF':>6}")
+        L.append("-" * 46)
+        for (stype, pair), grp in df.groupby(["_setup_type", "pair"]):
+            if grp.empty:
+                continue
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            L.append(f"{stype+' '+pair:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% {_pf(grp):>6.2f}")
+        L.append("```")
+
+        # --- Entry-type breakdown ---
+        L += ["", "## Entry-type breakdown", "", "```"]
+        L.append(f"{'Entry type':<22} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                 f"{'Avg P&L':>10} {'PF':>6}")
+        L.append("-" * 60)
+        for etype, grp in df.groupby("entry_type"):
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            L.append(f"{etype:<22} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                     f"{grp.pnl.mean():>10.2f} {_pf(grp):>6.2f}")
+        L.append("```")
+
+        # --- Golden rule (P44) ---
+        if "golden_rule" in df.columns:
+            eurgbp = df[df.pair.isin(["EURUSD", "GBPUSD"])]
+            if len(eurgbp) > 0:
+                L += ["", "## Golden rule: SELL GBP / BUY EUR (P44)", "", "```"]
+                L.append(f"{'Rule':<12} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 50)
+                for gr in ["golden", "against"]:
+                    grp = eurgbp[eurgbp["golden_rule"] == gr]
+                    if grp.empty:
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    wr = 100 * w / len(grp)
+                    L.append(f"{gr:<12} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+                L.append("")
+                L.append(f"{'Pair x dir x rule':<30} {'Trades':>5} {'WR%':>6} {'PF':>6}")
+                L.append("-" * 50)
+                for pair in ["EURUSD", "GBPUSD"]:
+                    for d in [1, -1]:
+                        for gr in ["golden", "against"]:
+                            grp = eurgbp[(eurgbp.pair == pair) &
+                                         (eurgbp.direction == d) &
+                                         (eurgbp.golden_rule == gr)]
+                            if grp.empty:
+                                continue
+                            w = (grp.pnl > 0).sum()
+                            wr = 100 * w / len(grp)
+                            dlbl = "LONG" if d == 1 else "SHORT"
+                            L.append(f"{pair+' '+dlbl+' '+gr:<30} {len(grp):>5} "
+                                     f"{wr:>5.1f}% {_pf(grp):>6.2f}")
+                L.append("```")
+
+        # --- SMT pair preference (P44) ---
+        if "smt_pair_pref" in df.columns:
+            eurgbp = df[df.pair.isin(["EURUSD", "GBPUSD"])]
+            if len(eurgbp) > 0:
+                L += ["", "## Intraday SMT pair preference (P44)", "", "```"]
+                L.append(f"{'SMT pref':<14} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 52)
+                for sp in ["confirmed", "opposing", ""]:
+                    grp = eurgbp[eurgbp["smt_pair_pref"] == sp]
+                    if grp.empty:
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    wr = 100 * w / len(grp)
+                    lbl = sp if sp else "no divergence"
+                    L.append(f"{lbl:<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+                L.append("```")
+
+        # cleanup temp columns
+        df.drop(columns=["_setup_type", "_setup_tf"], inplace=True, errors="ignore")
+
     out = os.path.join(root, "data", "backtest_report.md")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     open(out, "w").write("\n".join(L) + "\n")
