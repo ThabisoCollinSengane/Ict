@@ -1,6 +1,6 @@
 # Replay Backtest (02 Jul - 02 Sep 2026)
 
-Generated: 2026-09-02 06:35 UTC
+Generated: 2026-09-02 06:43 UTC
 Strategy: SELL GBPUSD (dollar UP) | BUY EURUSD (dollar DOWN)
 Gate: Bonds/Yields → DXY → EURGBP → pair selection (intermarket cascade)
 Models: **MM** (IFVG zone + MSS + SMT + FBC) | **AMD** (Judas reversal + breakout)
@@ -314,56 +314,56 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 ## All Trades (detailed)
 
 1. **LOSS** [AMD] BUY EURUSD — Wed 08 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.14299, Stop 1.14199, Target 1.14599 — **-10.0 pips**
-2. **LOSS** [MM] BUY EURUSD — Wed 08 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.14299, Stop 1.14199, Target 1.14599 — **-10.0 pips**
-3. **LOSS** [AMD] BUY EURUSD — Thu 09 14:30 ET (NY PM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.14364, Stop 1.14310, Target 1.14664 — **-5.4 pips**
-4. **LOSS** [MM] BUY EURUSD — Fri 10 04:00 ET (London Open) — STRONG [IFVG+MSS+SMT] — Entry 1.14430, Stop 1.14375, Target 1.14730 — **-5.4 pips**
-5. **LOSS** [AMD] BUY EURUSD — Fri 10 05:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.14364, Stop 1.14264, Target 1.14664 — **-10.0 pips**
-6. **LOSS** [AMD] BUY EURUSD — Mon 13 05:00 ET (London Open) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.14390, Stop 1.14290, Target 1.14690 — **-10.0 pips**
-7. **WIN** [AMD] BUY EURUSD — Tue 14 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.13947, Stop 1.13880, Target 1.14247 — **+30.0 pips**
-8. **TRAIL** [AMD] SELL GBPUSD — Wed 15 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.34073, Stop 1.34173, Target 1.33773 — **+10.0 pips**
-9. **WIN** [MM] BUY EURUSD — Wed 15 08:30 ET (NY AM) — STRONG [IFVG+MSS+SMT] — Entry 1.14247, Stop 1.14147, Target 1.14547 — **+30.0 pips**
-10. **WIN** [MM] SELL GBPUSD — Thu 16 10:00 ET (NY AM) — STRONG [IFVG+MSS+SMT] — Entry 1.35108, Stop 1.35208, Target 1.34808 — **+30.0 pips**
-11. **CLOSE** [AMD] SELL GBPUSD — Thu 16 16:00 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.34760, Stop 1.34860, Target 1.34460 — **+11.1 pips**
-12. **LOSS** [AMD] BUY EURUSD — Fri 17 04:00 ET (London Open) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.14495, Stop 1.14454, Target 1.14795 — **-4.1 pips**
-13. **BE** [AMD] SELL GBPUSD — Fri 17 10:00 ET (NY AM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.34499, Stop 1.34599, Target 1.34199 — **+0.0 pips**
-14. **LOSS** [MM] BUY EURUSD — Mon 20 07:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.14351, Stop 1.14297, Target 1.14651 — **-5.4 pips**
-15. **BE** [MM] SELL GBPUSD — Mon 20 14:30 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.34344, Stop 1.34444, Target 1.34044 — **+0.0 pips**
+2. **LOSS** [MM] BUY EURUSD — Wed 08 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.14299, Stop 1.14199, Target 1.14599 — **-10.0 pips** MFE +1
+3. **LOSS** [AMD] BUY EURUSD — Thu 09 14:30 ET (NY PM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.14364, Stop 1.14310, Target 1.14664 — **-5.4 pips** MFE +1
+4. **LOSS** [MM] BUY EURUSD — Fri 10 04:00 ET (London Open) — STRONG [IFVG+MSS+SMT] — Entry 1.14430, Stop 1.14375, Target 1.14730 — **-5.4 pips** MFE +3
+5. **LOSS** [AMD] BUY EURUSD — Fri 10 05:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.14364, Stop 1.14264, Target 1.14664 — **-10.0 pips** MFE +4
+6. **LOSS** [AMD] BUY EURUSD — Mon 13 05:00 ET (London Open) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.14390, Stop 1.14290, Target 1.14690 — **-10.0 pips** MFE +1
+7. **WIN** [AMD] BUY EURUSD — Tue 14 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.13947, Stop 1.13880, Target 1.14247 — **+30.0 pips** MFE +68 ★20
+8. **TRAIL** [AMD] SELL GBPUSD — Wed 15 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.34073, Stop 1.34173, Target 1.33773 — **+10.0 pips** MFE +26 ★20
+9. **WIN** [MM] BUY EURUSD — Wed 15 08:30 ET (NY AM) — STRONG [IFVG+MSS+SMT] — Entry 1.14247, Stop 1.14147, Target 1.14547 — **+30.0 pips** MFE +30 ★20
+10. **WIN** [MM] SELL GBPUSD — Thu 16 10:00 ET (NY AM) — STRONG [IFVG+MSS+SMT] — Entry 1.35108, Stop 1.35208, Target 1.34808 — **+30.0 pips** MFE +32 ★20
+11. **CLOSE** [AMD] SELL GBPUSD — Thu 16 16:00 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.34760, Stop 1.34860, Target 1.34460 — **+11.1 pips** MFE +12
+12. **LOSS** [AMD] BUY EURUSD — Fri 17 04:00 ET (London Open) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.14495, Stop 1.14454, Target 1.14795 — **-4.1 pips** MFE +1
+13. **BE** [AMD] SELL GBPUSD — Fri 17 10:00 ET (NY AM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.34499, Stop 1.34599, Target 1.34199 — **+0.0 pips** MFE +11
+14. **LOSS** [MM] BUY EURUSD — Mon 20 07:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.14351, Stop 1.14297, Target 1.14651 — **-5.4 pips** MFE +8
+15. **BE** [MM] SELL GBPUSD — Mon 20 14:30 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.34344, Stop 1.34444, Target 1.34044 — **+0.0 pips** MFE +11
 16. **LOSS** [AMD] SELL GBPUSD — Tue 21 10:00 ET (NY AM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.33847, Stop 1.33947, Target 1.33547 — **-10.0 pips**
-17. **CLOSE** [MM] SELL GBPUSD — Tue 21 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.33803, Stop 1.33893, Target 1.33503 — **-3.0 pips**
-18. **CLOSE** [AMD] SELL GBPUSD — Thu 23 14:30 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.33188, Stop 1.33275, Target 1.32888 — **-3.0 pips**
-19. **CLOSE** [AMD] SELL GBPUSD — Thu 23 16:00 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.33189, Stop 1.33275, Target 1.32889 — **+4.4 pips**
-20. **LOSS** [AMD] BUY EURUSD — Fri 24 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.13908, Stop 1.13808, Target 1.14208 — **-10.0 pips**
-21. **CLOSE** [MM] SELL GBPUSD — Fri 24 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.33230, Stop 1.33281, Target 1.32930 — **+4.4 pips**
-22. **CLOSE** [AMD] BUY EURUSD — Tue 28 16:00 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.13908, Stop 1.13808, Target 1.14208 — **+10.4 pips**
+17. **CLOSE** [MM] SELL GBPUSD — Tue 21 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.33803, Stop 1.33893, Target 1.33503 — **-3.0 pips** MFE +9
+18. **CLOSE** [AMD] SELL GBPUSD — Thu 23 14:30 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.33188, Stop 1.33275, Target 1.32888 — **-3.0 pips** MFE +8
+19. **CLOSE** [AMD] SELL GBPUSD — Thu 23 16:00 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.33189, Stop 1.33275, Target 1.32889 — **+4.4 pips** MFE +9
+20. **LOSS** [AMD] BUY EURUSD — Fri 24 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.13908, Stop 1.13808, Target 1.14208 — **-10.0 pips** MFE +5
+21. **CLOSE** [MM] SELL GBPUSD — Fri 24 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.33230, Stop 1.33281, Target 1.32930 — **+4.4 pips** MFE +6
+22. **CLOSE** [AMD] BUY EURUSD — Tue 28 16:00 ET (NY PM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.13908, Stop 1.13808, Target 1.14208 — **+10.4 pips** MFE +13
 23. **LOSS** [MM] BUY EURUSD — Wed 29 05:00 ET (London Open) — STRONG [IFVG+MSS+SMT] — Entry 1.13999, Stop 1.13899, Target 1.14299 — **-10.0 pips**
-24. **LOSS** [AMD] BUY EURUSD — Wed 29 06:00 ET (London→NY Overlap) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.13947, Stop 1.13917, Target 1.14247 — **-3.0 pips**
-25. **WIN** [AMD] BUY EURUSD — Thu 30 08:30 ET (NY AM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.14771, Stop 1.14671, Target 1.15071 — **+30.0 pips**
-26. **TRAIL** [AMD] BUY EURUSD — Tue 04 05:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.15088, Stop 1.15058, Target 1.15388 — **+10.0 pips**
-27. **CLOSE** [AMD] BUY EURUSD — Tue 04 14:30 ET (NY PM) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.15287, Stop 1.15187, Target 1.15587 — **+9.3 pips**
-28. **CLOSE** [MM] BUY EURUSD — Wed 05 04:00 ET (London Open) — STRONG [IFVG+MSS+SMT] — Entry 1.15420, Stop 1.15339, Target 1.15720 — **+5.3 pips**
-29. **CLOSE** [MM] BUY EURUSD — Wed 05 14:30 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.15594, Stop 1.15494, Target 1.15894 — **+0.0 pips**
-30. **CLOSE** [MM] SELL GBPUSD — Thu 06 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.34553, Stop 1.34614, Target 1.34253 — **+2.7 pips**
-31. **WIN** [MM] BUY EURUSD — Fri 07 06:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15300, Stop 1.15206, Target 1.15600 — **+30.0 pips**
-32. **BE** [AMD] BUY EURUSD — Fri 07 10:00 ET (NY AM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.15567, Stop 1.15467, Target 1.15867 — **+0.0 pips**
-33. **CLOSE** [AMD] SELL GBPUSD — Mon 10 14:30 ET (NY PM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.35104, Stop 1.35204, Target 1.34804 — **+2.6 pips**
-34. **BE** [AMD] BUY EURUSD — Wed 12 08:30 ET (NY AM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.15540, Stop 1.15440, Target 1.15840 — **+0.0 pips**
-35. **BE** [AMD] BUY EURUSD — Thu 13 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.15380, Stop 1.15280, Target 1.15680 — **+0.0 pips**
+24. **LOSS** [AMD] BUY EURUSD — Wed 29 06:00 ET (London→NY Overlap) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.13947, Stop 1.13917, Target 1.14247 — **-3.0 pips** MFE +1
+25. **WIN** [AMD] BUY EURUSD — Thu 30 08:30 ET (NY AM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.14771, Stop 1.14671, Target 1.15071 — **+30.0 pips** MFE +33 ★20
+26. **TRAIL** [AMD] BUY EURUSD — Tue 04 05:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.15088, Stop 1.15058, Target 1.15388 — **+10.0 pips** MFE +25 ★20
+27. **CLOSE** [AMD] BUY EURUSD — Tue 04 14:30 ET (NY PM) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.15287, Stop 1.15187, Target 1.15587 — **+9.3 pips** MFE +9
+28. **CLOSE** [MM] BUY EURUSD — Wed 05 04:00 ET (London Open) — STRONG [IFVG+MSS+SMT] — Entry 1.15420, Stop 1.15339, Target 1.15720 — **+5.3 pips** MFE +17
+29. **CLOSE** [MM] BUY EURUSD — Wed 05 14:30 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.15594, Stop 1.15494, Target 1.15894 — **+0.0 pips** MFE +4
+30. **CLOSE** [MM] SELL GBPUSD — Thu 06 16:00 ET (NY PM) — STRONG [IFVG+MSS+SMT] — Entry 1.34553, Stop 1.34614, Target 1.34253 — **+2.7 pips** MFE +9
+31. **WIN** [MM] BUY EURUSD — Fri 07 06:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15300, Stop 1.15206, Target 1.15600 — **+30.0 pips** MFE +45 ★20
+32. **BE** [AMD] BUY EURUSD — Fri 07 10:00 ET (NY AM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.15567, Stop 1.15467, Target 1.15867 — **+0.0 pips** MFE +11
+33. **CLOSE** [AMD] SELL GBPUSD — Mon 10 14:30 ET (NY PM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.35104, Stop 1.35204, Target 1.34804 — **+2.6 pips** MFE +5
+34. **BE** [AMD] BUY EURUSD — Wed 12 08:30 ET (NY AM) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.15540, Stop 1.15440, Target 1.15840 — **+0.0 pips** MFE +11
+35. **BE** [AMD] BUY EURUSD — Thu 13 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.15380, Stop 1.15280, Target 1.15680 — **+0.0 pips** MFE +11
 36. **LOSS** [MM] SELL GBPUSD — Thu 13 08:30 ET (NY AM) — STRONG [IFVG+MSS+SMT] — Entry 1.34896, Stop 1.34981, Target 1.34596 — **-8.4 pips**
-37. **LOSS** [AMD] BUY EURUSD — Mon 17 04:00 ET (London Open) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.16077, Stop 1.15977, Target 1.16377 — **-10.0 pips**
-38. **LOSS** [MM] BUY EURUSD — Mon 17 06:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15982, Stop 1.15882, Target 1.16282 — **-10.0 pips**
-39. **LOSS** [MM] SELL GBPUSD — Tue 18 06:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.35300, Stop 1.35357, Target 1.35000 — **-5.7 pips**
-40. **BE** [AMD] BUY EURUSD — Wed 19 05:00 ET (London Open) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.16036, Stop 1.15936, Target 1.16336 — **+0.0 pips**
-41. **LOSS** [AMD] BUY EURUSD — Thu 20 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.16986, Stop 1.16917, Target 1.17286 — **-7.0 pips**
-42. **LOSS** [AMD] BUY EURUSD — Fri 21 06:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.17069, Stop 1.16969, Target 1.17369 — **-10.0 pips**
-43. **BE** [AMD] SELL GBPUSD — Tue 25 05:00 ET (London Open) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.36448, Stop 1.36548, Target 1.36148 — **+0.0 pips**
-44. **LOSS** [AMD] SELL GBPUSD — Wed 26 06:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.36251, Stop 1.36351, Target 1.35951 — **-10.0 pips**
-45. **LOSS** [AMD] SELL GBPUSD — Wed 26 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.36234, Stop 1.36334, Target 1.35934 — **-10.0 pips**
-46. **TRAIL** [MM] SELL GBPUSD — Thu 27 04:00 ET (London Open) — STRONG [IFVG+MSS+SMT] — Entry 1.35927, Stop 1.35979, Target 1.35627 — **+10.0 pips**
-47. **TRAIL** [AMD] SELL GBPUSD — Thu 27 04:00 ET (London Open) — STRONG [BREAKOUT+MSS-2/3+SMT] — Entry 1.35927, Stop 1.35979, Target 1.35627 — **+10.0 pips**
-48. **TRAIL** [AMD] SELL GBPUSD — Fri 28 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.35877, Stop 1.35977, Target 1.35577 — **+10.0 pips**
-49. **TRAIL** [AMD] SELL GBPUSD — Fri 28 05:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.35827, Stop 1.35925, Target 1.35527 — **+10.0 pips**
-50. **CLOSE** [MM] BUY EURUSD — Mon 31 07:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15996, Stop 1.15896, Target 1.16296 — **+20.2 pips**
-51. **CLOSE** [AMD] BUY EURUSD — Mon 31 10:00 ET (NY AM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.16023, Stop 1.15940, Target 1.16323 — **+18.9 pips**
+37. **LOSS** [AMD] BUY EURUSD — Mon 17 04:00 ET (London Open) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.16077, Stop 1.15977, Target 1.16377 — **-10.0 pips** MFE +9
+38. **LOSS** [MM] BUY EURUSD — Mon 17 06:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15982, Stop 1.15882, Target 1.16282 — **-10.0 pips** MFE +4
+39. **LOSS** [MM] SELL GBPUSD — Tue 18 06:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.35300, Stop 1.35357, Target 1.35000 — **-5.7 pips** MFE +9
+40. **BE** [AMD] BUY EURUSD — Wed 19 05:00 ET (London Open) — MODERATE [BREAKOUT+MSS-2/3] — Entry 1.16036, Stop 1.15936, Target 1.16336 — **+0.0 pips** MFE +12
+41. **LOSS** [AMD] BUY EURUSD — Thu 20 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.16986, Stop 1.16917, Target 1.17286 — **-7.0 pips** MFE +1
+42. **LOSS** [AMD] BUY EURUSD — Fri 21 06:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.17069, Stop 1.16969, Target 1.17369 — **-10.0 pips** MFE +7
+43. **BE** [AMD] SELL GBPUSD — Tue 25 05:00 ET (London Open) — STRONG [JUDAS+MSS-2/3+SMT] — Entry 1.36448, Stop 1.36548, Target 1.36148 — **+0.0 pips** MFE +18
+44. **LOSS** [AMD] SELL GBPUSD — Wed 26 06:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.36251, Stop 1.36351, Target 1.35951 — **-10.0 pips** MFE +7
+45. **LOSS** [AMD] SELL GBPUSD — Wed 26 07:00 ET (London→NY Overlap) — MODERATE [JUDAS+MSS-2/3] — Entry 1.36234, Stop 1.36334, Target 1.35934 — **-10.0 pips** MFE +1
+46. **TRAIL** [MM] SELL GBPUSD — Thu 27 04:00 ET (London Open) — STRONG [IFVG+MSS+SMT] — Entry 1.35927, Stop 1.35979, Target 1.35627 — **+10.0 pips** MFE +22 ★20
+47. **TRAIL** [AMD] SELL GBPUSD — Thu 27 04:00 ET (London Open) — STRONG [BREAKOUT+MSS-2/3+SMT] — Entry 1.35927, Stop 1.35979, Target 1.35627 — **+10.0 pips** MFE +22 ★20
+48. **TRAIL** [AMD] SELL GBPUSD — Fri 28 04:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.35877, Stop 1.35977, Target 1.35577 — **+10.0 pips** MFE +34 ★20
+49. **TRAIL** [AMD] SELL GBPUSD — Fri 28 05:00 ET (London Open) — MODERATE [JUDAS+MSS-2/3] — Entry 1.35827, Stop 1.35925, Target 1.35527 — **+10.0 pips** MFE +29 ★20
+50. **CLOSE** [MM] BUY EURUSD — Mon 31 07:00 ET (London→NY Overlap) — STRONG [IFVG+MSS+SMT] — Entry 1.15996, Stop 1.15896, Target 1.16296 — **+20.2 pips** MFE +24 ★20
+51. **CLOSE** [AMD] BUY EURUSD — Mon 31 10:00 ET (NY AM) — MODERATE [JUDAS+MSS-2/3] — Entry 1.16023, Stop 1.15940, Target 1.16323 — **+18.9 pips** MFE +22 ★20
 
 ## Outcome Breakdown
 
@@ -375,6 +375,20 @@ No setups (MM or AMD) met the 2-confirmation threshold during any killzone.
 | BE (breakeven) | 7 | +0.0 | +0.0 |
 | CLOSE (session end -) | 3 | -6.0 | -2.0 |
 | LOSS (stop hit) | 20 | -164.4 | -8.2 |
+
+## 20-Pip Milestone (notification point)
+
+**13 of 51 trades reached +20 pips** — these would trigger a notification.
+
+| Group | Trades | WR | Pips | Avg | Avg MFE |
+|---|---|---|---|---|---|
+| Reached +20 (★20) | 13 | 100% | +249.1 | +19.2 | +32 |
+| Never reached +20 | 38 | 21% | -120.2 | -3.2 | +7 |
+
+**7 trades reached +20 but exited below +20** (trail/close/loss after reversal).
+Closing at +20 would have gained **+61 extra pips** on those trades.
+
+*★20 = trade reached +20 pips MFE (notification would fire). Use `--close-at-20` to simulate closing all trades at 20 pips.*
 
 ## Model Breakdown (MM vs AMD)
 
