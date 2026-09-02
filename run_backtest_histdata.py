@@ -309,6 +309,63 @@ def main():
             wr = 100 * w / len(grp)
             print(f"  {etype:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% {grp.pnl.mean():>10.2f}")
 
+        # --- PD array setup type (FVG / OB / breaker) and timeframe ---
+        def _parse_setup(entry_type_str):
+            """Extract (pd_array, timeframe) from entry_type like 'amd_fvg_m5'."""
+            s = str(entry_type_str).lower()
+            for arr in ("fvg", "ob", "breaker"):
+                if f"_{arr}_" in s or s.endswith(f"_{arr}"):
+                    for tf in ("m1", "m5", "m15", "h1"):
+                        if s.endswith(f"_{tf}"):
+                            return arr.upper(), tf.upper()
+                    return arr.upper(), "?"
+            return "other", "?"
+
+        df["setup_type"] = df["entry_type"].apply(lambda x: _parse_setup(x)[0])
+        df["setup_tf"]   = df["entry_type"].apply(lambda x: _parse_setup(x)[1])
+
+        print("\n=== PD array setup type (FVG / OB / breaker) ===")
+        print(f"  {'Setup':<10} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+              f"{'P&L ZAR':>12} {'Avg P&L':>10} {'PF':>6}")
+        print("  " + "-" * 58)
+        for stype in ["FVG", "OB", "BREAKER", "other"]:
+            grp = df[df["setup_type"] == stype]
+            if grp.empty:
+                continue
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+            gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+            pf = (gw / gl) if gl > 0 else float("inf")
+            print(f"  {stype:<10} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                  f"{grp.pnl.sum():>12.2f} {grp.pnl.mean():>10.2f} {pf:>6.2f}")
+
+        print("\n  --- Setup type × timeframe ---")
+        print(f"  {'Setup × TF':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'PF':>6}")
+        print("  " + "-" * 42)
+        for (stype, tf), grp in df.groupby(["setup_type", "setup_tf"]):
+            if grp.empty:
+                continue
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+            gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+            pf = (gw / gl) if gl > 0 else float("inf")
+            print(f"  {stype+' '+tf:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% {pf:>6.2f}")
+
+        print("\n  --- Setup type × pair ---")
+        print(f"  {'Setup × pair':<20} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'PF':>6}")
+        print("  " + "-" * 46)
+        for (stype, pair), grp in df.groupby(["setup_type", "pair"]):
+            if grp.empty:
+                continue
+            w = (grp.pnl > 0).sum()
+            wr = 100 * w / len(grp)
+            gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+            gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+            pf = (gw / gl) if gl > 0 else float("inf")
+            print(f"  {stype+' '+pair:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% {pf:>6.2f}")
+
         if "draw_score" in df.columns:
             print("\n=== HTF Draw cascade (W→D→H4 agreement) — all trades ===")
             print("  draw_score = how many of Weekly/Daily/H4 agreed with trade direction")
