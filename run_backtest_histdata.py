@@ -664,6 +664,65 @@ def main():
                     print(f"    {dlabel:<10} {len(grp):>5} trades  WR {wr:>5.1f}%  PF {pf:>6.2f}  "
                           f"P&L {grp.pnl.sum():>12.2f}")
 
+        if "golden_rule" in df.columns:
+            eu_gu = df[df["pair"].isin(["EURUSD", "GBPUSD"])]
+            print("\n=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===")
+            print("  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts")
+            print("  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs")
+            print(f"  {'Rule':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6} {'Avg pips':>10}")
+            print("  " + "-" * 68)
+            for label in ("golden", "against"):
+                grp = eu_gu[eu_gu["golden_rule"] == label]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                avg_pips = grp["mfe_pips"].mean() if "mfe_pips" in grp.columns else 0
+                display = {"golden": "follows rule", "against": "against rule"}[label]
+                print(f"  {display:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f} {avg_pips:>10.1f}")
+            # Breakdown: what does each pair × direction look like?
+            print("\n  --- Pair × direction breakdown ---")
+            print(f"    {'Setup':<22} {'Trades':>5} {'WR%':>6} {'PF':>6} "
+                  f"{'P&L ZAR':>12} {'Rule':>10}")
+            print("    " + "-" * 64)
+            for p in ("EURUSD", "GBPUSD"):
+                for d, dlabel in [(1, "LONG"), (-1, "SHORT")]:
+                    grp = eu_gu[(eu_gu["pair"] == p) & (eu_gu["direction"] == d)]
+                    if len(grp) == 0:
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    wr = 100 * w / len(grp)
+                    gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                    gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                    pf = (gw / gl) if gl > 0 else float("inf")
+                    rule = grp.iloc[0]["golden_rule"] if len(grp) > 0 else ""
+                    rule_tag = "GOLDEN" if rule == "golden" else "against"
+                    print(f"    {p+' '+dlabel:<22} {len(grp):>5} {wr:>5.1f}% {pf:>6.2f} "
+                          f"{grp.pnl.sum():>12.2f} {rule_tag:>10}")
+            # Cross-tab: golden rule × SMT pair pref (if both exist)
+            if "smt_pair_pref" in eu_gu.columns:
+                print("\n  --- Golden rule × SMT pair pref (cross-tab) ---")
+                print(f"    {'Golden × SMT':<28} {'Trades':>5} {'WR%':>6} {'PF':>6}")
+                print("    " + "-" * 48)
+                for gr in ("golden", "against"):
+                    for sp in ("confirmed", "opposing", ""):
+                        grp = eu_gu[(eu_gu["golden_rule"] == gr) &
+                                    (eu_gu["smt_pair_pref"] == sp)]
+                        if len(grp) == 0:
+                            continue
+                        w = (grp.pnl > 0).sum()
+                        wr = 100 * w / len(grp)
+                        gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                        gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                        pf = (gw / gl) if gl > 0 else float("inf")
+                        sp_label = sp if sp else "no div"
+                        print(f"    {gr+' + '+sp_label:<28} {len(grp):>5} {wr:>5.1f}% {pf:>6.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "

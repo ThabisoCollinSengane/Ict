@@ -485,6 +485,7 @@ class Backtester:
             "bond_confirm": st.get("bond_confirm", False),
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
+            "golden_rule": st.get("golden_rule", ""),
             "mm_adds": st.get("mm_adds", 0),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
@@ -569,6 +570,7 @@ class Backtester:
             "bond_confirm": st.get("bond_confirm", False),
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
+            "golden_rule": st.get("golden_rule", ""),
             "mm_adds": st.get("mm_adds", 0),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
@@ -2848,6 +2850,24 @@ class Backtester:
             elif _smt_pref == "opposing":
                 g["smt_pair_opposing"] = g.get("smt_pair_opposing", 0) + 1
 
+        # P44 golden rule: GBP is structurally weaker (trends bearish), EUR is
+        # structurally stronger (trends bullish). The golden rule says:
+        #   SHORT → SELL GBPUSD (GBP distributes harder on the downside)
+        #   LONG  → BUY EURUSD  (EUR distributes harder on the upside)
+        # This is INDEPENDENT of the SMT — even when GBP makes higher highs
+        # (looks stronger going up), it still falls harder because GBP is
+        # inherently weaker. Tags: "golden" = trade follows the rule,
+        # "against" = trade goes against it, "" = NZDUSD.
+        _golden_rule = ""
+        if pair in ("EURUSD", "GBPUSD"):
+            if (pair == "GBPUSD" and direction == -1) or \
+               (pair == "EURUSD" and direction == 1):
+                _golden_rule = "golden"
+                g["golden_rule_yes"] = g.get("golden_rule_yes", 0) + 1
+            else:
+                _golden_rule = "against"
+                g["golden_rule_no"] = g.get("golden_rule_no", 0) + 1
+
         # NWOG (New Week Opening Gap): price delivering into the weekend gap's 50%
         # (consequent encroachment) aligned with the trade. The NWOG is an ICT HTF
         # PD array / draw on liquidity — a gap-up week supports longs, gap-down
@@ -3424,6 +3444,7 @@ class Backtester:
             "bond_confirm": _bond_confirm,
             "htf_smt": _htf_smt,
             "smt_pair_pref": _smt_pref,
+            "golden_rule": _golden_rule,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
