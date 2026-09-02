@@ -612,6 +612,58 @@ def main():
                 print(f"  {_crt_label.get(tf, tf):<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                       f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
 
+        if "smt_pair_pref" in df.columns:
+            eu_gu = df[df["pair"].isin(["EURUSD", "GBPUSD"])]
+            print("\n=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===")
+            print("  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)")
+            print("  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)")
+            print(f"  {'SMT signal':<14} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6} {'Avg pips':>10}")
+            print("  " + "-" * 66)
+            for label in ("confirmed", "opposing", ""):
+                grp = eu_gu[eu_gu["smt_pair_pref"] == label]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                avg_pips = grp["mfe_pips"].mean() if "mfe_pips" in grp.columns else 0
+                display = label if label else "no divergence"
+                print(f"  {display:<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f} {avg_pips:>10.1f}")
+            # Per-pair breakdown within confirmed
+            if (eu_gu["smt_pair_pref"] == "confirmed").any():
+                print("\n  --- SMT confirmed by pair ---")
+                conf = eu_gu[eu_gu["smt_pair_pref"] == "confirmed"]
+                for p in ("EURUSD", "GBPUSD"):
+                    grp = conf[conf["pair"] == p]
+                    if len(grp) == 0:
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    wr = 100 * w / len(grp)
+                    gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                    gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                    pf = (gw / gl) if gl > 0 else float("inf")
+                    print(f"    {p:<10} {len(grp):>5} trades  WR {wr:>5.1f}%  PF {pf:>6.2f}  "
+                          f"P&L {grp.pnl.sum():>12.2f}")
+            # Per-direction breakdown within confirmed
+            if (eu_gu["smt_pair_pref"] == "confirmed").any():
+                print("\n  --- SMT confirmed by direction ---")
+                conf = eu_gu[eu_gu["smt_pair_pref"] == "confirmed"]
+                for d, dlabel in [(1, "LONG"), (-1, "SHORT")]:
+                    grp = conf[conf["direction"] == d]
+                    if len(grp) == 0:
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    wr = 100 * w / len(grp)
+                    gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                    gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                    pf = (gw / gl) if gl > 0 else float("inf")
+                    print(f"    {dlabel:<10} {len(grp):>5} trades  WR {wr:>5.1f}%  PF {pf:>6.2f}  "
+                          f"P&L {grp.pnl.sum():>12.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "

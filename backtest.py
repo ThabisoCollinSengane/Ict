@@ -484,6 +484,7 @@ class Backtester:
             "amd_liq_run": st.get("amd_liq_run", ""),
             "bond_confirm": st.get("bond_confirm", False),
             "htf_smt": st.get("htf_smt", False),
+            "smt_pair_pref": st.get("smt_pair_pref", ""),
             "mm_adds": st.get("mm_adds", 0),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
@@ -567,6 +568,7 @@ class Backtester:
             "amd_liq_run": st.get("amd_liq_run", ""),
             "bond_confirm": st.get("bond_confirm", False),
             "htf_smt": st.get("htf_smt", False),
+            "smt_pair_pref": st.get("smt_pair_pref", ""),
             "mm_adds": st.get("mm_adds", 0),
             "mfe_pips": round((st.get("mfe_price", leg["entry"]) - leg["entry"])
                               * direction / pip_size(pair), 1),
@@ -2835,6 +2837,17 @@ class Backtester:
             if _htf_smt:
                 g["htf_smt"] = g.get("htf_smt", 0) + 1
 
+        # P44: Intraday EURUSD↔GBPUSD SMT pair preference — which pair FAILED to
+        # confirm the other's sweep? The failing pair is weaker and distributes
+        # harder in the reversal. Analytics-only: tags each trade, no gate/sizing.
+        _smt_pref = ""
+        if config.SMT_PAIR_PREF_ENABLED:
+            _smt_pref = self._smt_pair_pref(pair, direction, t)
+            if _smt_pref == "confirmed":
+                g["smt_pair_confirmed"] = g.get("smt_pair_confirmed", 0) + 1
+            elif _smt_pref == "opposing":
+                g["smt_pair_opposing"] = g.get("smt_pair_opposing", 0) + 1
+
         # NWOG (New Week Opening Gap): price delivering into the weekend gap's 50%
         # (consequent encroachment) aligned with the trade. The NWOG is an ICT HTF
         # PD array / draw on liquidity — a gap-up week supports longs, gap-down
@@ -3410,6 +3423,7 @@ class Backtester:
             "amd_liq_run": _amd_liq_run,
             "bond_confirm": _bond_confirm,
             "htf_smt": _htf_smt,
+            "smt_pair_pref": _smt_pref,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
@@ -3464,6 +3478,42 @@ class Backtester:
                     smt_divergence(r, p, direction, inverse=False, lookback=lb)):
                 return True
         return False
+
+    def _smt_pair_pref(self, pair, direction, t):
+        """Intraday EURUSD↔GBPUSD SMT pair-preference signal (P44 analytics).
+
+        Returns "confirmed" when the traded pair is the one that FAILED to confirm
+        the partner's sweep — the "weaker" pair that distributes harder in the
+        trade direction. Returns "opposing" when the traded pair LED the sweep
+        (the stronger one — expected smaller distribution). Returns "" when no
+        divergence is detected or the pair is not EURUSD/GBPUSD.
+
+        The key insight: the pair that fails to make the higher high (for shorts)
+        or lower low (for longs) is weaker in that direction. When it reverses,
+        it moves FURTHER because the institutional flow was never there — the
+        sweep was a fakeout that only one pair participated in.
+        """
+        partner = {"EURUSD": "GBPUSD", "GBPUSD": "EURUSD"}.get(pair)
+        if partner is None:
+            return ""
+        from ict.smt import smt_divergence
+        lb = config.MM_HTF_SMT_LOOKBACK
+        for tf in config.SMT_PAIR_PREF_TFS:
+            p = self.bars_up_to(pair, tf, t, max_bars=lb + 5)
+            r = self.bars_up_to(partner, tf, t, max_bars=lb + 5)
+            if len(p) < lb or len(r) < lb:
+                continue
+            # Check if the TRADED pair failed to confirm the partner's sweep
+            # (partner swept, traded pair didn't follow = traded pair is weaker)
+            pair_failed = smt_divergence(r, p, direction, inverse=False, lookback=lb)
+            # Check if the PARTNER failed to confirm the traded pair's sweep
+            # (traded pair swept, partner didn't follow = traded pair is stronger)
+            partner_failed = smt_divergence(p, r, direction, inverse=False, lookback=lb)
+            if pair_failed:
+                return "confirmed"
+            if partner_failed:
+                return "opposing"
+        return ""
 
     def _mm_structure_confirm(self, pair, direction, ifvg_tf, t):
         """Fresh, still-intact retracement swing in the trade direction, hunted on

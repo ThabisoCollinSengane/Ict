@@ -905,6 +905,15 @@ if INDICES_ENABLED:
 # DXY synthetic uses these (all available on OANDA):
 DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 
+# --- Intraday SMT pair preference (analytics, P44) ---
+# At each EURUSD/GBPUSD entry, check M15 SMT between the two pairs. The pair
+# that FAILED to confirm the other's sweep is the "weaker" pair — it distributes
+# harder in the reversal direction. Tags each trade "confirmed" (traded pair IS
+# the weaker = expected bigger move), "opposing" (traded pair is the stronger),
+# or "" (no divergence / NZDUSD). Analytics-only — no gate, no sizing.
+SMT_PAIR_PREF_ENABLED = bool(int(_os.environ.get("SMT_PAIR_PREF_ENABLED", 1)))
+SMT_PAIR_PREF_TFS     = ("15T", "5T")  # M15 primary, M5 fallback
+
 # --- Individual pair bias (synthetic EURGBP from EURUSD vs GBPUSD momentum) ---
 # When EURGBP is flat at both H1 and H4, compare which USD pair moved more over
 # EURGBP_SYNTHETIC_LOOKBACK H1 bars. If the divergence exceeds the threshold,
