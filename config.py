@@ -22,7 +22,7 @@ def _envi(name, default):
 
 
 # --- Capital + risk ---
-STARTING_CASH = _envi("STARTING_CASH", 500)   # ZAR starting capital (env-overridable)
+STARTING_CASH = _envi("STARTING_CASH", 1000)  # ZAR starting capital (env-overridable)
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
 
 # --- Profit withdrawal model (realistic account, no runaway compounding) ---
@@ -913,6 +913,13 @@ DXY_CONSTITUENTS = ("EURUSD", "USDJPY", "GBPUSD", "USDCAD", "USDSEK", "USDCHF")
 # or "" (no divergence / NZDUSD). Analytics-only — no gate, no sizing.
 SMT_PAIR_PREF_ENABLED = bool(int(_os.environ.get("SMT_PAIR_PREF_ENABLED", 1)))
 SMT_PAIR_PREF_TFS     = ("15T", "5T")  # M15 primary, M5 fallback
+
+# P44 golden rule sizing: SELL GBPUSD for shorts, BUY EURUSD for longs.
+# GBP is structurally weaker (distributes harder on the downside), EUR is
+# structurally stronger (distributes harder on the upside). IS/OOS validated:
+# golden WR 52.2%/50.3%, PF 3.79/6.60 vs against WR 39.3%/41.9%, PF 2.26/2.81.
+# Same 1.25x magnitude + R3k equity floor as P18/P19/P41. env-overridable.
+GOLDEN_RULE_MULT = float(_os.environ.get("GOLDEN_RULE_MULT", "1.25"))
 
 # --- Individual pair bias (synthetic EURGBP from EURUSD vs GBPUSD momentum) ---
 # When EURGBP is flat at both H1 and H4, compare which USD pair moved more over

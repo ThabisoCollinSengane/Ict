@@ -3282,6 +3282,14 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.BONDS_SIZE_MULT), min_units)
             g["bond_bias_sized"] = g.get("bond_bias_sized", 0) + 1
+        # P44 golden rule sizing: SELL GBPUSD shorts / BUY EURUSD longs. GBP
+        # distributes harder on downside, EUR distributes harder on upside.
+        # IS/OOS validated: golden WR 52/50%, PF 3.79/6.60 vs against 39/42%,
+        # PF 2.26/2.81. Same 1.25x magnitude + R3k floor as P18/P19/P41.
+        if (config.GOLDEN_RULE_MULT != 1.0 and _golden_rule == "golden"
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            units = max(int(units * config.GOLDEN_RULE_MULT), min_units)
+            g["golden_rule_sized"] = g.get("golden_rule_sized", 0) + 1
         # Entry-type tag (computed here so the P40 modulator below can read it;
         # also reused at fill time). news upgrade may already have set max_legs.
         base_type  = "amd" if amd_score else "mss"
