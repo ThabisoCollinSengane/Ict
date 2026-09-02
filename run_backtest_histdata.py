@@ -1049,10 +1049,19 @@ def _publish_backtest_report(results, backtester, years, df=None):
     def _git(*a):
         return subprocess.run(["git", *a], cwd=root, capture_output=True, text=True)
     sha = _git("rev-parse", "--short", "HEAD").stdout.strip() or "unknown"
+    branch = _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "HEAD"
     _git("add", "-f", out)
     _git("commit", "-q", "-m", f"HistData backtest {span} results (auto, {sha})")
-    _git("pull", "-q", "--no-rebase", "--no-edit", "origin", "HEAD")
-    if _git("push", "origin", "HEAD").returncode == 0:
+    # Pull with rebase to avoid merge conflicts from code pushes
+    _git("pull", "-q", "--rebase", "--no-edit", "origin", branch)
+    pushed = False
+    for attempt in range(4):
+        if _git("push", "origin", branch).returncode == 0:
+            pushed = True
+            break
+        import time
+        time.sleep(2 ** (attempt + 1))
+    if pushed:
         print(f"\nRESULTS PUSHED — Claude can read data/backtest_report.md")
     else:
         print("\n(auto-push failed — paste the === Results === block to Claude)")
