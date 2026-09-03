@@ -11,13 +11,16 @@ DXY (USD direction)
   └─ AUDNZD (selects NZD vs AUD family)   → NZDUSD (AUDUSD excluded: poor WR)
 ```
 
-**Live account target:** Exness ZAR-denominated, R500 start, manual funding.
-**Backtest result (4 years, 2022–2025):** 810 trades, WR 45.9%, PF 4.47, MaxDD -12.95%, R500 → R429.3M.
+**Live account target:** Exness ZAR-denominated, R1,000 start, manual funding.
+**Backtest result (4 years, 2022–2025, realistic income mode):** 736 trades, WR 43.9%, PF 4.01,
+MaxDD -13.24%, R1,000 start → R132k withdrawn (37 withdrawals) + R8.6k working balance.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
 HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
 targets, P18 score≥4 confluence sizing (1.25×), P19 H4-CRT Turtle Soup sizing (1.25×),
 P20 high-conviction target escalation, P21 pyramid gate fix, P22 pyramid gate relaxation,
-P23 milestone trailing stop, P26 v2 session+daily-open dual pattern. See P18 for the cache-bug post-mortem.)
+P23 milestone trailing stop, P26 v2 session+daily-open dual pattern, P44 golden rule sizing
+(1.25×). Scheduled monthly withdrawals keep equity at R6k working capital. See P18 for the
+cache-bug post-mortem.)
 
 ---
 
@@ -121,26 +124,37 @@ Every trade is tagged `entry_model` = **judas** (default) or **breakout**.
 
 ---
 
-## Equity tiers and lot sizing
+## Equity tiers, lot sizing, and withdrawal model
 
 ```python
 EQUITY_TIERS = [
-    (6_000, (0.10, 0.10, 0.10)),
+    (6_000, (0.09, 0.09, 0.09)),
     (3_000, (0.05, 0.05, 0.05)),
-    (1_500, (0.03, 0.03, 0.03)),
-    (750,   (0.02, 0.02, 0.02)),
+    (1_000, (0.02, 0.02, 0.02)),
     (0,     (0.01, 0.01, 0.01)),
 ]
 ```
 
-**Note from user (2026-06-03):** Intends to run simplified tiers on live Exness account:
-R0→R1,000 = 0.01 lots | R1,000→R3,000 = 0.02 lots | R3,000+ = 0.05 lots.
-Config will need updating before going live.
+**Realistic income mode (2026-09-03):** Scheduled monthly withdrawals bank all profit above
+R6,000 working capital. Account grows R1k → R6k then trades at 0.09 lots with steady income.
+`WITHDRAW_SCHEDULE=1`, `WITHDRAW_KEEP=6000`, `WITHDRAW_FRACTION=1.0`.
 
 Per-pip values at each lot size (EURUSD/GBPUSD, USD_ZAR≈18.5):
 - 0.01 lots: R1.85/pip | 10-pip stop = R18.50 | full pyramid win = R166
 - 0.02 lots: R3.70/pip | 10-pip stop = R37.00 | full pyramid win = R333
 - 0.05 lots: R9.25/pip | 10-pip stop = R92.50 | full pyramid win = R832
+- 0.09 lots: R16.65/pip | 10-pip stop = R166.50 | full pyramid win = R1,498
+
+**IS/OOS validation (realistic income mode, 2026-09-03):**
+
+| Metric | IS 2022-23 | OOS 2024-25 | Full 4yr |
+|---|---|---|---|
+| Trades | 355 | 385 | 736 |
+| PF | 3.38 | 4.29 | 4.01 |
+| MaxDD | -13.24% | -10.21% | -13.24% |
+| Income withdrawn | R41.5k | R66.7k | R132k |
+| Withdrawals | 16 | 16 | 37 |
+| Working balance | R6,988 | R8,555 | R8,555 |
 
 ---
 
@@ -1594,19 +1608,45 @@ Signal strength: 3+ confirmations = STRONG, 2 = MODERATE, 1 = WATCH
 
 **News events CSV updated:** `data/news_events.csv` extended through December 2026 (was H1 only).
 
+### P44 — Golden rule sizing lever (SHIPPED 2026-09-03)
+**What:** SELL GBPUSD for shorts, BUY EURUSD for longs. GBP is structurally weaker (distributes
+harder on downside), EUR is structurally stronger (distributes harder on upside). When a trade
+follows the golden rule, scale 1.25×. Same equity floor as draw cascade (`DRAW_SIZE_MIN_EQUITY`).
+
+**IS/OOS validation (realistic income mode):**
+
+| Metric | IS 2022-23 | OOS 2024-25 |
+|---|---|---|
+| Golden WR | 47.5% | 50.0% |
+| Golden PF | 4.07 | 4.39 |
+| Against WR | 39.7% | 42.2% |
+| Against PF | 2.84 | 4.06 |
+
+Positive both splits, same ballpark — textbook not-curve-fit. OOS beats IS.
+Config: `GOLDEN_RULE_MULT=1.25`. Counter: `golden_rule_sized`.
+
+**PD array setup type (analytics, confirmed both splits):**
+- OB GBPUSD: IS WR 60.0% / PF 15.42, OOS WR 64.3% / PF 10.71 — standout combo
+- OB overall: IS PF 3.72, OOS PF 5.18 (outperforms FVG in both splits)
+- FVG: workhorse volume (484 trades), IS PF 3.31, OOS PF 3.54
+
+**SMT pair preference:** FAILED IS/OOS — "opposing" flips from weakest IS to strongest OOS. Not actionable.
+
 ---
 
-## 3-month live account scenarios (R500 start, discussed 2026-06-03)
+## 3-month live account scenarios (R1,000 start, updated 2026-09-03)
 
 | Scenario | Conditions | End equity (3 months) |
 |---|---|---|
 | Best case | Trending USD, 48 trades, WR 54% | R3,200–R3,800 |
-| Normal case | Mixed market, 40 trades, WR 48% | R1,700–R2,100 |
-| Rough start | Choppy, circuit breakers fire 1-2x | R800–R1,000 |
-| Worst case | Max adversity, halts multiple times | R500–R700 |
+| Normal case | Mixed market, 40 trades, WR 48% | R2,200–R2,800 |
+| Rough start | Choppy, circuit breakers fire 1-2x | R1,200–R1,500 |
+| Worst case | Max adversity, halts multiple times | R800–R1,000 |
 
-**Key milestone:** R3,000 — draw multiplier (2x/3x sizing) engages. Growth accelerates dramatically past this point.
+**Key milestones:** R3,000 = 0.05 lots + draw multipliers engage. R6,000 = 0.09 lots + withdrawals start.
 At 0.01 lots, maximum single-day loss = 3 trades × R18.50 = R55.50. Account cannot blow up at this size.
+
+**Realistic annual income (from 4yr backtest):** ~R33k/year average once the account reaches R6k working capital.
 
 ---
 
