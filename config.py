@@ -34,7 +34,7 @@ ACCOUNT_CURRENCY = "ZAR"          # account denomination
 # a drawdown. WITHDRAW_AT=0 disables it (byte-identical baseline).
 #   e.g. WITHDRAW_AT=20000 WITHDRAW_KEEP=500  -> grow 500->20k, bank ~19.5k, repeat.
 WITHDRAW_AT   = _envf("WITHDRAW_AT", 0)          # ceiling; 0 = off
-WITHDRAW_KEEP = _envf("WITHDRAW_KEEP", 3000)  # keep R3k working (0.05 lot tier)
+WITHDRAW_KEEP = _envf("WITHDRAW_KEEP", 6000)  # keep R6k working (0.09 lot tier)
 # Fraction of each cycle's profit to actually WITHDRAW (income); the rest is
 # reinvested — the keep-level and ceiling ratchet UP by the reinvested amount, so
 # the working base compounds while you still draw income. 1.0 = withdraw everything
@@ -102,13 +102,15 @@ LOT_UNITS       = 100_000
 PYRAMID_LOTS    = (0.02, 0.02, 0.02)    # flat — same lot on every leg
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 
-# Equity tiers — user's live Exness plan (3 tiers, capped at 0.05).
+# Equity tiers — user's live Exness plan (4 tiers).
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
 #
 #   R0    → 0.01 flat  — full pyramid win R166  on 40-pip trade
 #   R1000 → 0.02 flat  — full pyramid win R333  on 40-pip trade
-#   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade (capped here)
+#   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade
+#   R6000 → 0.09 flat  — full pyramid win R1498 on 40-pip trade
 EQUITY_TIERS = [
+    (6_000, (0.09, 0.09, 0.09)),
     (3_000, (0.05, 0.05, 0.05)),
     (1_000, (0.02, 0.02, 0.02)),
     (0,     (0.01, 0.01, 0.01)),
