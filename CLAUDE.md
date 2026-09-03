@@ -1632,6 +1632,40 @@ Config: `GOLDEN_RULE_MULT=1.25`. Counter: `golden_rule_sized`.
 
 **SMT pair preference:** FAILED IS/OOS — "opposing" flips from weakest IS to strongest OOS. Not actionable.
 
+### P45 — Session-range consolidation fallback (BUILT 2026-09-03, default ON, pending IS/OOS validation)
+**What:** `detect_amd_setup` requires an M15 consolidation range with both extremes touched ≥2×
+(8-96 bars, ≤35 pips). This misses ~50% of valid setups (`consolidation_found` fires only ~965
+out of ~1926 MSS-confirmed checks). The root cause: the algo builds ranges from live M15 bars
+only — it doesn't look at the PREVIOUS session's range as the accumulation zone.
+
+**ICT model:** each session's accumulation IS the previous session's range. Asian session creates
+the range → London sweeps one side (Judas) → distributes. London creates a range → NY sweeps →
+distributes. The session H/L is the consolidation zone that the next session's manipulation targets.
+
+**Implementation (`_session_range_amd` + `_prev_session_range` in backtest.py):**
+- Fires ONLY when `detect_amd_setup` returns None (fallback, not a replacement)
+- **London entries**: use overnight/Asian range (17:00 ET prev day → 03:00 ET) as the zone
+- **NY entries**: use London range (03:00 → 07:00 ET) as the zone
+- **PDH/PDL fallback**: if session range doesn't show a sweep, check prior-day H/L as zone
+- Sweep detection: any M15 bar after the range ended swept beyond one extreme AND price closed
+  back inside = Judas (same logic as `detect_amd_setup`, applied to the session range)
+- Returns `(Range, sweep_dir)` — fully compatible with the downstream AMD analytics, conviction
+  scoring, P41 PDH/PDL sweep check, and Judas marking
+- Session range cached per (pair, session, date) — computed once per session
+- `SESSION_RANGE_MAX_WIDTH_PIPS=80` filters out extreme days (session range > 80 pips = trending,
+  not accumulating)
+
+**Analytics:** `amd_source` column on every trade: `"m15_range"` (existing), `"session_range"`
+(new fallback), `""` (no AMD). Gate counter: `session_range_found`. Reporting: "AMD consolidation
+source" table by source showing WR/PF breakdown.
+
+**Config:** `SESSION_RANGE_ENABLED=1` (default ON, env-overridable), `SESSION_RANGE_MAX_WIDTH_PIPS=80`.
+
+**Status:** built, compiles clean, default ON. Needs IS/OOS validation — run locally with
+`python run_backtest_histdata.py --years 2022 2023` and `--years 2024 2025`. Ships only if both
+splits stay positive PF and MaxDD holds. The `amd_source` analytics will show exactly how many
+new trades the fallback opens and their quality.
+
 ---
 
 ## 3-month live account scenarios (R1,000 start, updated 2026-09-03)

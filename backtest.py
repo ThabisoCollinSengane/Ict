@@ -204,6 +204,8 @@ class Backtester:
         # a continuation of the day's move (handover consolidation → MSS → continue),
         # not a reversal — even when it "looks like a small Judas swing".
         self._london_dir = {}          # ny_date -> direction (+1/-1)
+        # Session-range consolidation cache: (pair, session, date) -> (H, L, start_et, end_et) | None
+        self._session_range_cache = {}
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -482,6 +484,7 @@ class Backtester:
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
+            "amd_source": st.get("amd_source", ""),
             "bond_confirm": st.get("bond_confirm", False),
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
@@ -567,6 +570,7 @@ class Backtester:
             "amd_swept_pdliq": st.get("amd_swept_pdliq"),
             "amd_entry_zone": st.get("amd_entry_zone", ""),
             "amd_liq_run": st.get("amd_liq_run", ""),
+            "amd_source": st.get("amd_source", ""),
             "bond_confirm": st.get("bond_confirm", False),
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
@@ -1122,6 +1126,143 @@ class Backtester:
         if len(seg) == 0:
             return None
         return float(seg["High"].max()) if direction > 0 else float(seg["Low"].min())
+
+    def _prev_session_range(self, pair, t):
+        """H/L of the previous session block for session-range consolidation.
+
+        ICT session-to-session handoff — the previous session IS the
+        accumulation zone the current session sweeps:
+          London entry → overnight/Asian range (17:00 ET prev day → 03:00 ET)
+          NY entry     → London range (03:00 → 07:00 ET)
+
+        Returns (high, low, range_start_et, range_end_et) or None.
+        Cached per (pair, session, date).
+        """
+        import pytz as _pytz
+        _ny_tz = _pytz.timezone("America/New_York")
+        ts = pd.Timestamp(t)
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        cur = ts.tz_convert(_ny_tz)
+        h = cur.hour
+        day = cur.normalize()
+
+        if 2 <= h < 5:
+            sess = "london"
+            range_start = day - pd.Timedelta(hours=7)    # 17:00 ET prev day
+            range_end   = day + pd.Timedelta(hours=3)    # 03:00 ET today
+        elif 7 <= h < 10:
+            sess = "ny"
+            range_start = day + pd.Timedelta(hours=3)    # 03:00 ET today
+            range_end   = day + pd.Timedelta(hours=7)    # 07:00 ET today
+        else:
+            return None
+
+        cache_key = (pair, sess, cur.date())
+        cached = self._session_range_cache.get(cache_key)
+        if cached is not None:
+            return cached if cached != "NONE" else None
+
+        df = self.tf_dfs.get((pair, "5T"))
+        if df is None or len(df) == 0:
+            self._session_range_cache[cache_key] = "NONE"
+            return None
+
+        et_idx = df.index.tz_convert(_ny_tz)
+        mask = (et_idx >= range_start) & (et_idx < range_end) & (df.index < ts)
+        seg = df[mask]
+        if len(seg) < 10:
+            self._session_range_cache[cache_key] = "NONE"
+            return None
+
+        result = (float(seg["High"].max()), float(seg["Low"].min()),
+                  range_start, range_end)
+        self._session_range_cache[cache_key] = result
+        return result
+
+    def _session_range_amd(self, pair, t, bars15):
+        """Fallback AMD: previous session H/L as the consolidation zone.
+
+        When detect_amd_setup finds no M15 range, check whether the previous
+        session's H/L (Asian for London, London for NY) was swept by a Judas
+        move and price closed back inside. Also checks PDH/PDL as a secondary
+        consolidation reference.
+
+        Returns (Range, sweep_dir) or None — same format as detect_amd_setup.
+        """
+        if not bars15:
+            return None
+
+        sr = self._prev_session_range(pair, t)
+        pip = pip_size(pair)
+
+        sources = []
+        if sr is not None:
+            sess_high, sess_low, range_start_et, range_end_et = sr
+            width = sess_high - sess_low
+            if width / pip <= config.SESSION_RANGE_MAX_WIDTH_PIPS:
+                sources.append(("session", sess_high, sess_low,
+                                range_start_et, range_end_et))
+
+        mp = self._market_profile(pair, t)
+        if mp is not None:
+            pdh, pdl = mp["pdh"], mp["pdl"]
+            pd_width = pdh - pdl
+            if pd_width / pip <= config.SESSION_RANGE_MAX_WIDTH_PIPS:
+                import pytz as _pytz
+                _ny_tz = _pytz.timezone("America/New_York")
+                ts = pd.Timestamp(t)
+                if ts.tzinfo is None:
+                    ts = ts.tz_localize("UTC")
+                cur = ts.tz_convert(_ny_tz)
+                day = cur.normalize()
+                pd_start = day - pd.Timedelta(days=1)
+                pd_end = day
+                sources.append(("pdhl", pdh, pdl, pd_start, pd_end))
+
+        if not sources:
+            return None
+
+        _m15_idx = getattr(self, "tf_index", {}).get((pair, "15T"))
+        if _m15_idx is None or len(_m15_idx) == 0:
+            return None
+
+        from ict.amd import Range
+
+        for src_name, rng_high, rng_low, r_start_et, r_end_et in sources:
+            r_end_utc = r_end_et.tz_convert("UTC")
+            r_start_utc = r_start_et.tz_convert("UTC")
+
+            end_pos = int(_m15_idx.searchsorted(r_end_utc, side="right"))
+            start_pos = int(_m15_idx.searchsorted(r_start_utc, side="left"))
+
+            if end_pos <= 0 or end_pos > len(bars15):
+                continue
+            start_pos = max(0, start_pos)
+
+            rng = Range(
+                high=rng_high, low=rng_low,
+                start_idx=start_pos,
+                end_idx=min(end_pos, len(bars15)),
+                touches_high=2, touches_low=2,
+            )
+
+            tail_start = rng.end_idx
+            tail_end = min(tail_start + config.AMD_SWEEP_LOOKBACK, len(bars15))
+            tail = bars15[tail_start:tail_end]
+            if not tail:
+                continue
+
+            last = bars15[-1]
+            low_swept = any(c.Low < rng_low for c in tail) and last.Close > rng_low
+            high_swept = any(c.High > rng_high for c in tail) and last.Close < rng_high
+
+            if low_swept and not high_swept:
+                return (rng, +1)
+            if high_swept and not low_swept:
+                return (rng, -1)
+
+        return None
 
     def _draw_ladder(self, pair, direction, price, t):
         """Distance (pips) to the nearest UNSWEPT draw ahead at each liquidity rung,
@@ -2679,6 +2820,14 @@ class Backtester:
         _amd_price = bars15[-1].Close if bars15 else None
         amd = detect_amd_setup(bars15, pair,
                                max_range_pips=self._amd_max_range(pair, _amd_price))
+        _amd_source = ""
+        if amd is not None:
+            _amd_source = "m15_range"
+        elif config.SESSION_RANGE_ENABLED:
+            amd = self._session_range_amd(pair, t, bars15)
+            if amd is not None:
+                _amd_source = "session_range"
+                g["session_range_found"] = g.get("session_range_found", 0) + 1
         amd_score = 0
         # AMD analytics: accumulation shape + stop-run (manipulation) depth per trade.
         _amd_range_pips = _amd_range_bars = None
@@ -3449,6 +3598,7 @@ class Backtester:
             "amd_swept_pdliq": _amd_swept_pdliq,
             "amd_entry_zone": _amd_entry_zone,
             "amd_liq_run": _amd_liq_run,
+            "amd_source": _amd_source,
             "bond_confirm": _bond_confirm,
             "htf_smt": _htf_smt,
             "smt_pair_pref": _smt_pref,

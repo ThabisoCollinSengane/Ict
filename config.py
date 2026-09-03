@@ -727,6 +727,17 @@ SOJ_EXTEND_MIN_PIPS = float(_os.environ.get("SOJ_EXTEND_MIN_PIPS", 8.0)) # min m
 SOJ_RETEST_TOL_PIPS = float(_os.environ.get("SOJ_RETEST_TOL_PIPS", 5.0)) # tolerance at open
 SOJ_LOOKBACK_BARS  = int(_os.environ.get("SOJ_LOOKBACK_BARS",      48))   # covers full session
 
+# --- Session-range consolidation fallback ---
+# When detect_amd_setup finds no M15 consolidation range, use the previous
+# session's H/L as the accumulation zone and check for a Judas sweep of it.
+# ICT session-to-session handoff:
+#   London entry → Asian range (17:00 ET prev day → 03:00 ET)
+#   NY entry     → London range (03:00 → 07:00 ET)
+# Also checks PDH/PDL as an alternative consolidation reference (the previous
+# day's dealing range extremes). Either source can produce a valid sweep.
+SESSION_RANGE_ENABLED        = bool(int(_os.environ.get("SESSION_RANGE_ENABLED", 1)))
+SESSION_RANGE_MAX_WIDTH_PIPS = _envf("SESSION_RANGE_MAX_WIDTH_PIPS", 80)
+
 # Multi-TF breakout calibration (v4 — per-TF parameters for detect_breakout).
 # Each instrument (EU, GU) independently confirms on its highest available TF
 # (D1 → H4 → H1 → M15 cascade); directions must still all agree.  Parameters

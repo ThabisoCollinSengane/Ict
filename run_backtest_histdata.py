@@ -366,6 +366,22 @@ def main():
             pf = (gw / gl) if gl > 0 else float("inf")
             print(f"  {stype+' '+pair:<20} {len(grp):>7} {w:>5} {wr:>5.1f}% {pf:>6.2f}")
 
+        if "amd_source" in df.columns:
+            print("\n=== AMD consolidation source ===")
+            print(f"  {'Source':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} {'PF':>6}")
+            print("  " + "-" * 44)
+            for src in ["m15_range", "session_range", ""]:
+                grp = df[df["amd_source"] == src]
+                if grp.empty:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                label = src if src else "(no AMD)"
+                print(f"  {label:<18} {len(grp):>7} {w:>5} {wr:>5.1f}% {pf:>6.2f}")
+
         if "draw_score" in df.columns:
             print("\n=== HTF Draw cascade (W→D→H4 agreement) — all trades ===")
             print("  draw_score = how many of Weekly/Daily/H4 agreed with trade direction")
@@ -985,6 +1001,23 @@ def _publish_backtest_report(results, backtester, years, df=None):
             L.append(f"{etype:<22} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                      f"{grp.pnl.mean():>10.2f} {_pf(grp):>6.2f}")
         L.append("```")
+
+        # --- AMD source breakdown ---
+        if "amd_source" in df.columns:
+            L += ["", "## AMD consolidation source", "", "```"]
+            L.append(f"{'Source':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                     f"{'P&L ZAR':>12} {'PF':>6}")
+            L.append("-" * 56)
+            for src in ["m15_range", "session_range", ""]:
+                grp = df[df["amd_source"] == src]
+                if grp.empty:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                label = src if src else "(no AMD)"
+                L.append(f"{label:<18} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                         f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+            L.append("```")
 
         # --- Golden rule (P44) ---
         if "golden_rule" in df.columns:
