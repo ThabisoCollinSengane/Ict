@@ -1181,29 +1181,57 @@ class Backtester:
         return result
 
     def _session_range_amd(self, pair, t, bars15):
-        """Fallback AMD: previous session H/L as the consolidation zone.
+        """Fallback AMD: find the tight consolidation WITHIN the previous session.
 
-        When detect_amd_setup finds no M15 range, check whether the previous
-        session's H/L (Asian for London, London for NY) was swept by a Judas
-        move and price closed back inside. Also checks PDH/PDL as a secondary
-        consolidation reference.
+        When detect_amd_setup finds no M15 range in its normal scan, extract the
+        M15 bars from the previous session window (Asian for London, London for
+        NY) and run detect_consolidation on them to find the 15-30 pip coil that
+        the current session's Judas targets.  Falls back to PDH/PDL as a
+        secondary range reference.
 
         Returns (Range, sweep_dir) or None — same format as detect_amd_setup.
         """
         if not bars15:
             return None
 
+        _m15_idx = getattr(self, "tf_index", {}).get((pair, "15T"))
+        if _m15_idx is None or len(_m15_idx) == 0:
+            return None
+
+        from ict.amd import Range, detect_consolidation
+
         sr = self._prev_session_range(pair, t)
         pip = pip_size(pair)
 
-        sources = []
+        # --- Source 1: consolidation WITHIN the previous session's M15 bars ---
         if sr is not None:
-            sess_high, sess_low, range_start_et, range_end_et = sr
-            width = sess_high - sess_low
-            if width / pip <= config.SESSION_RANGE_MAX_WIDTH_PIPS:
-                sources.append(("session", sess_high, sess_low,
-                                range_start_et, range_end_et))
+            _, _, range_start_et, range_end_et = sr
+            r_start_utc = range_start_et.tz_convert("UTC")
+            r_end_utc = range_end_et.tz_convert("UTC")
+            start_pos = int(_m15_idx.searchsorted(r_start_utc, side="left"))
+            end_pos = int(_m15_idx.searchsorted(r_end_utc, side="right"))
+            start_pos = max(0, start_pos)
+            end_pos = min(end_pos, len(bars15))
 
+            session_bars = bars15[start_pos:end_pos]
+            if len(session_bars) >= config.AMD_MIN_RANGE_BARS:
+                rng = detect_consolidation(
+                    session_bars, pair,
+                    max_range_pips=config.SESSION_RANGE_MAX_WIDTH_PIPS,
+                )
+                if rng is not None:
+                    g_rng = Range(
+                        high=rng.high, low=rng.low,
+                        start_idx=start_pos + rng.start_idx,
+                        end_idx=start_pos + rng.end_idx,
+                        touches_high=rng.touches_high,
+                        touches_low=rng.touches_low,
+                    )
+                    result = self._check_session_sweep(g_rng, bars15)
+                    if result is not None:
+                        return result
+
+        # --- Source 2: PDH/PDL as secondary range ---
         mp = self._market_profile(pair, t)
         if mp is not None:
             pdh, pdl = mp["pdh"], mp["pdl"]
@@ -1218,50 +1246,40 @@ class Backtester:
                 day = cur.normalize()
                 pd_start = day - pd.Timedelta(days=1)
                 pd_end = day
-                sources.append(("pdhl", pdh, pdl, pd_start, pd_end))
+                r_start_utc = pd_start.tz_convert("UTC")
+                r_end_utc = pd_end.tz_convert("UTC")
+                end_pos = int(_m15_idx.searchsorted(r_end_utc, side="right"))
+                start_pos = int(_m15_idx.searchsorted(r_start_utc, side="left"))
+                start_pos = max(0, start_pos)
+                end_pos = min(end_pos, len(bars15))
+                rng = Range(
+                    high=pdh, low=pdl,
+                    start_idx=start_pos, end_idx=end_pos,
+                    touches_high=2, touches_low=2,
+                )
+                result = self._check_session_sweep(rng, bars15)
+                if result is not None:
+                    return result
 
-        if not sources:
+        return None
+
+    def _check_session_sweep(self, rng, bars15):
+        """Check if post-range bars swept one side of the range (Judas).
+
+        Returns (Range, +1/-1) or None.
+        """
+        tail_start = rng.end_idx
+        tail_end = min(tail_start + config.AMD_SWEEP_LOOKBACK, len(bars15))
+        tail = bars15[tail_start:tail_end]
+        if not tail:
             return None
-
-        _m15_idx = getattr(self, "tf_index", {}).get((pair, "15T"))
-        if _m15_idx is None or len(_m15_idx) == 0:
-            return None
-
-        from ict.amd import Range
-
-        for src_name, rng_high, rng_low, r_start_et, r_end_et in sources:
-            r_end_utc = r_end_et.tz_convert("UTC")
-            r_start_utc = r_start_et.tz_convert("UTC")
-
-            end_pos = int(_m15_idx.searchsorted(r_end_utc, side="right"))
-            start_pos = int(_m15_idx.searchsorted(r_start_utc, side="left"))
-
-            if end_pos <= 0 or end_pos > len(bars15):
-                continue
-            start_pos = max(0, start_pos)
-
-            rng = Range(
-                high=rng_high, low=rng_low,
-                start_idx=start_pos,
-                end_idx=min(end_pos, len(bars15)),
-                touches_high=2, touches_low=2,
-            )
-
-            tail_start = rng.end_idx
-            tail_end = min(tail_start + config.AMD_SWEEP_LOOKBACK, len(bars15))
-            tail = bars15[tail_start:tail_end]
-            if not tail:
-                continue
-
-            last = bars15[-1]
-            low_swept = any(c.Low < rng_low for c in tail) and last.Close > rng_low
-            high_swept = any(c.High > rng_high for c in tail) and last.Close < rng_high
-
-            if low_swept and not high_swept:
-                return (rng, +1)
-            if high_swept and not low_swept:
-                return (rng, -1)
-
+        last = bars15[-1]
+        low_swept = any(c.Low < rng.low for c in tail) and last.Close > rng.low
+        high_swept = any(c.High > rng.high for c in tail) and last.Close < rng.high
+        if low_swept and not high_swept:
+            return (rng, +1)
+        if high_swept and not low_swept:
+            return (rng, -1)
         return None
 
     def _draw_ladder(self, pair, direction, price, t):
