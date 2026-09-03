@@ -34,7 +34,7 @@ ACCOUNT_CURRENCY = "ZAR"          # account denomination
 # a drawdown. WITHDRAW_AT=0 disables it (byte-identical baseline).
 #   e.g. WITHDRAW_AT=20000 WITHDRAW_KEEP=500  -> grow 500->20k, bank ~19.5k, repeat.
 WITHDRAW_AT   = _envf("WITHDRAW_AT", 0)          # ceiling; 0 = off
-WITHDRAW_KEEP = _envf("WITHDRAW_KEEP", STARTING_CASH)  # initial keep-working level
+WITHDRAW_KEEP = _envf("WITHDRAW_KEEP", 3000)  # keep R3k working (0.05 lot tier)
 # Fraction of each cycle's profit to actually WITHDRAW (income); the rest is
 # reinvested — the keep-level and ceiling ratchet UP by the reinvested amount, so
 # the working base compounds while you still draw income. 1.0 = withdraw everything
@@ -49,7 +49,7 @@ WITHDRAW_FRACTION = _envf("WITHDRAW_FRACTION", 1.0)
 # profit above the keep-level and reinvests the rest (so the base compounds and the
 # cadence can climb). Uses WITHDRAW_KEEP as the initial working base. Enable with
 # WITHDRAW_SCHEDULE=1 (this then OWNS withdrawals — the ceiling trigger is off).
-WITHDRAW_SCHEDULE      = bool(_envi("WITHDRAW_SCHEDULE", 0))
+WITHDRAW_SCHEDULE      = bool(_envi("WITHDRAW_SCHEDULE", 1))
 WITHDRAW_MONTHLY_DAYS  = _envi("WITHDRAW_MONTHLY_DAYS", 30)   # cadence when small
 WITHDRAW_BIWEEKLY_DAYS = _envi("WITHDRAW_BIWEEKLY_DAYS", 14)
 WITHDRAW_WEEKLY_DAYS   = _envi("WITHDRAW_WEEKLY_DAYS", 7)
@@ -102,19 +102,15 @@ LOT_UNITS       = 100_000
 PYRAMID_LOTS    = (0.02, 0.02, 0.02)    # flat — same lot on every leg
 MIN_LOT_SIZE    = PYRAMID_LOTS[0]
 
-# Equity tiers — all legs stay equal; only the lot size grows with the account.
+# Equity tiers — user's live Exness plan (3 tiers, capped at 0.05).
 # Format: (min_equity_ZAR, (leg1_lots, leg2_lots, leg3_lots))
 #
-#   R0    → 0.01 flat  — full pyramid win R166  on 40-pip trade  (3.7% risk at R500)
-#   R750  → 0.02 flat  — full pyramid win R333  on 40-pip trade  (4.4% risk at R750)
-#   R1500 → 0.03 flat  — full pyramid win R499  on 40-pip trade  (3.3% risk at R1500)
-#   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade
-#   R6000 → 0.10 flat  — full pyramid win R1665 on 40-pip trade
+#   R0    → 0.01 flat  — full pyramid win R166  on 40-pip trade
+#   R1000 → 0.02 flat  — full pyramid win R333  on 40-pip trade
+#   R3000 → 0.05 flat  — full pyramid win R832  on 40-pip trade (capped here)
 EQUITY_TIERS = [
-    (6_000, (0.10, 0.10, 0.10)),
     (3_000, (0.05, 0.05, 0.05)),
-    (1_500, (0.03, 0.03, 0.03)),
-    (750,   (0.02, 0.02, 0.02)),
+    (1_000, (0.02, 0.02, 0.02)),
     (0,     (0.01, 0.01, 0.01)),
 ]
 
