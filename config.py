@@ -737,6 +737,9 @@ SOJ_LOOKBACK_BARS  = int(_os.environ.get("SOJ_LOOKBACK_BARS",      48))   # cove
 # Also checks PDH/PDL as an alternative consolidation reference.
 SESSION_RANGE_ENABLED        = bool(int(_os.environ.get("SESSION_RANGE_ENABLED", 1)))
 SESSION_RANGE_MAX_WIDTH_PIPS = _envf("SESSION_RANGE_MAX_WIDTH_PIPS", 35)
+SESSION_RANGE_MIN_BARS       = int(_os.environ.get("SESSION_RANGE_MIN_BARS", 4))
+SESSION_RANGE_MIN_TOUCHES    = int(_os.environ.get("SESSION_RANGE_MIN_TOUCHES", 1))
+SESSION_RANGE_TOUCH_TOL_PIPS = _envf("SESSION_RANGE_TOUCH_TOL_PIPS", 3.0)
 
 # Multi-TF breakout calibration (v4 — per-TF parameters for detect_breakout).
 # Each instrument (EU, GU) independently confirms on its highest available TF

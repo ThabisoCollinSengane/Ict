@@ -1214,9 +1214,12 @@ class Backtester:
             end_pos = min(end_pos, len(bars15))
 
             session_bars = bars15[start_pos:end_pos]
-            if len(session_bars) >= config.AMD_MIN_RANGE_BARS:
+            if len(session_bars) >= config.SESSION_RANGE_MIN_BARS:
                 rng = detect_consolidation(
                     session_bars, pair,
+                    min_bars=config.SESSION_RANGE_MIN_BARS,
+                    min_touches=config.SESSION_RANGE_MIN_TOUCHES,
+                    touch_tol_pips=config.SESSION_RANGE_TOUCH_TOL_PIPS,
                     max_range_pips=config.SESSION_RANGE_MAX_WIDTH_PIPS,
                 )
                 if rng is not None:

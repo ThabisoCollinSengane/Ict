@@ -143,6 +143,7 @@ def detect_consolidation(
     max_range_pips: float = None,
     min_touches: int = None,
     range_end_lookback: int = None,
+    touch_tol_pips: float = None,
 ) -> Optional[Range]:
     """Return the longest valid accumulation range ending within `range_end_lookback`
     bars of the most recent close, or None if no qualifying range exists.
@@ -170,7 +171,7 @@ def detect_consolidation(
 
     pip = _pip(symbol)
     max_width = max_range_pips * pip
-    touch_tol = 1.0 * pip
+    touch_tol = (touch_tol_pips if touch_tol_pips is not None else 1.0) * pip
 
     earliest_end = max(min_bars, n - range_end_lookback)
     for end in range(n - 1, earliest_end - 1, -1):
