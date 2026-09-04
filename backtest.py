@@ -1241,10 +1241,13 @@ class Backtester:
                         touches_high=rng.touches_high,
                         touches_low=rng.touches_low,
                     )
-                    result = self._check_session_sweep(g_rng, bars15)
+                    _diag = {}
+                    result = self._check_session_sweep(g_rng, bars15, diag=_diag)
                     if result is not None:
                         return result
                     g["sr_consol_no_sweep"] = g.get("sr_consol_no_sweep", 0) + 1
+                    _r = _diag.get("reason", "unknown")
+                    g[f"sr_fail_{_r}"] = g.get(f"sr_fail_{_r}", 0) + 1
 
         # --- Source 2: PDH/PDL as secondary range ---
         g["sr_pdliq_attempted"] = g.get("sr_pdliq_attempted", 0) + 1
@@ -1281,23 +1284,44 @@ class Backtester:
 
         return None
 
-    def _check_session_sweep(self, rng, bars15):
+    def _check_session_sweep(self, rng, bars15, diag=None):
         """Check if post-range bars swept one side of the range (Judas).
 
         Returns (Range, +1/-1) or None.
+        When `diag` is a dict, records why the sweep check failed.
         """
         tail_start = rng.end_idx
         tail_end = min(tail_start + config.AMD_SWEEP_LOOKBACK, len(bars15))
         tail = bars15[tail_start:tail_end]
         if not tail:
+            if diag is not None:
+                diag["reason"] = "no_tail"
             return None
         last = bars15[-1]
-        low_swept = any(c.Low < rng.low for c in tail) and last.Close > rng.low
-        high_swept = any(c.High > rng.high for c in tail) and last.Close < rng.high
+        any_low = any(c.Low < rng.low for c in tail)
+        any_high = any(c.High > rng.high for c in tail)
+        close_above_low = last.Close > rng.low
+        close_below_high = last.Close < rng.high
+        low_swept = any_low and close_above_low
+        high_swept = any_high and close_below_high
         if low_swept and not high_swept:
             return (rng, +1)
         if high_swept and not low_swept:
             return (rng, -1)
+        if diag is not None:
+            if not any_low and not any_high:
+                diag["reason"] = "no_sweep"
+            elif any_low and any_high:
+                if low_swept and high_swept:
+                    diag["reason"] = "both_swept"
+                else:
+                    diag["reason"] = "both_wicked_no_close"
+            elif any_low and not close_above_low:
+                diag["reason"] = "low_swept_no_close_back"
+            elif any_high and not close_below_high:
+                diag["reason"] = "high_swept_no_close_back"
+            else:
+                diag["reason"] = "unknown"
         return None
 
     def _draw_ladder(self, pair, direction, price, t):
