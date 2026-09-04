@@ -382,6 +382,17 @@ def main():
                 label = src if src else "(no AMD)"
                 print(f"  {label:<18} {len(grp):>7} {w:>5} {wr:>5.1f}% {pf:>6.2f}")
 
+            sr_widths = getattr(backtester, "_sr_widths", [])
+            if sr_widths:
+                sw = sorted(sr_widths)
+                n = len(sw)
+                med = sw[n // 2]
+                p75 = sw[int(n * 0.75)]
+                p90 = sw[int(n * 0.90)]
+                print(f"\n  Session-range widths (n={n}): "
+                      f"median={med:.1f} p75={p75:.1f} p90={p90:.1f} pips "
+                      f"(cap={config.SESSION_RANGE_MAX_WIDTH_PIPS})")
+
         if "draw_score" in df.columns:
             print("\n=== HTF Draw cascade (W→D→H4 agreement) — all trades ===")
             print("  draw_score = how many of Weekly/Daily/H4 agreed with trade direction")
@@ -1018,6 +1029,17 @@ def _publish_backtest_report(results, backtester, years, df=None):
                 L.append(f"{label:<18} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                          f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
             L.append("```")
+
+            sr_widths = getattr(backtester, "_sr_widths", [])
+            if sr_widths:
+                sw = sorted(sr_widths)
+                n = len(sw)
+                med = sw[n // 2]
+                p75 = sw[int(n * 0.75)]
+                p90 = sw[int(n * 0.90)]
+                L.append(f"\n_Session-range widths (n={n}): "
+                         f"median={med:.1f} p75={p75:.1f} p90={p90:.1f} pips "
+                         f"(cap={config.SESSION_RANGE_MAX_WIDTH_PIPS})_")
 
         # --- Golden rule (P44) ---
         if "golden_rule" in df.columns:

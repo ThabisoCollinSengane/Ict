@@ -206,6 +206,7 @@ class Backtester:
         self._london_dir = {}          # ny_date -> direction (+1/-1)
         # Session-range consolidation cache: (pair, session, date) -> (H, L, start_et, end_et) | None
         self._session_range_cache = {}
+        self._sr_widths = []
 
         self.news = NewsCalendar()
         for path in ("data/news_events.csv", "./data/news_events.csv"):
@@ -1191,6 +1192,9 @@ class Backtester:
 
         Returns (Range, sweep_dir) or None — same format as detect_amd_setup.
         """
+        g = self.gate
+        g["sr_attempted"] = g.get("sr_attempted", 0) + 1
+
         if not bars15:
             return None
 
@@ -1205,6 +1209,7 @@ class Backtester:
 
         # --- Source 1: consolidation WITHIN the previous session's M15 bars ---
         if sr is not None:
+            g["sr_prev_session_ok"] = g.get("sr_prev_session_ok", 0) + 1
             _, _, range_start_et, range_end_et = sr
             r_start_utc = range_start_et.tz_convert("UTC")
             r_end_utc = range_end_et.tz_convert("UTC")
@@ -1214,7 +1219,12 @@ class Backtester:
             end_pos = min(end_pos, len(bars15))
 
             session_bars = bars15[start_pos:end_pos]
+            session_width = (max(c.High for c in session_bars) -
+                             min(c.Low for c in session_bars)) / pip if session_bars else 0
+            self._sr_widths.append(session_width)
+
             if len(session_bars) >= config.SESSION_RANGE_MIN_BARS:
+                g["sr_enough_bars"] = g.get("sr_enough_bars", 0) + 1
                 rng = detect_consolidation(
                     session_bars, pair,
                     min_bars=config.SESSION_RANGE_MIN_BARS,
@@ -1223,6 +1233,7 @@ class Backtester:
                     max_range_pips=config.SESSION_RANGE_MAX_WIDTH_PIPS,
                 )
                 if rng is not None:
+                    g["sr_consol_found"] = g.get("sr_consol_found", 0) + 1
                     g_rng = Range(
                         high=rng.high, low=rng.low,
                         start_idx=start_pos + rng.start_idx,
@@ -1233,13 +1244,16 @@ class Backtester:
                     result = self._check_session_sweep(g_rng, bars15)
                     if result is not None:
                         return result
+                    g["sr_consol_no_sweep"] = g.get("sr_consol_no_sweep", 0) + 1
 
         # --- Source 2: PDH/PDL as secondary range ---
+        g["sr_pdliq_attempted"] = g.get("sr_pdliq_attempted", 0) + 1
         mp = self._market_profile(pair, t)
         if mp is not None:
             pdh, pdl = mp["pdh"], mp["pdl"]
             pd_width = pdh - pdl
             if pd_width / pip <= config.SESSION_RANGE_MAX_WIDTH_PIPS:
+                g["sr_pdliq_width_ok"] = g.get("sr_pdliq_width_ok", 0) + 1
                 import pytz as _pytz
                 _ny_tz = _pytz.timezone("America/New_York")
                 ts = pd.Timestamp(t)
@@ -1262,6 +1276,7 @@ class Backtester:
                 )
                 result = self._check_session_sweep(rng, bars15)
                 if result is not None:
+                    g["sr_pdliq_sweep"] = g.get("sr_pdliq_sweep", 0) + 1
                     return result
 
         return None
