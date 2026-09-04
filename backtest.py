@@ -1244,8 +1244,11 @@ class Backtester:
                     session_boundary_idx = int(_m15_idx.searchsorted(r_end_utc, side="left"))
                     _diag = {}
                     result = self._check_session_sweep(g_rng, bars15, diag=_diag,
-                                                       min_tail_start=session_boundary_idx)
+                                                       min_tail_start=session_boundary_idx,
+                                                       pair=pair)
                     if result is not None:
+                        if _diag.get("reason") == "breakout":
+                            g["sr_breakout_found"] = g.get("sr_breakout_found", 0) + 1
                         return result
                     g["sr_consol_no_sweep"] = g.get("sr_consol_no_sweep", 0) + 1
                     _r = _diag.get("reason", "unknown")
@@ -1279,20 +1282,21 @@ class Backtester:
                     start_idx=start_pos, end_idx=end_pos,
                     touches_high=2, touches_low=2,
                 )
-                result = self._check_session_sweep(rng, bars15)
+                result = self._check_session_sweep(rng, bars15, pair=pair)
                 if result is not None:
                     g["sr_pdliq_sweep"] = g.get("sr_pdliq_sweep", 0) + 1
                     return result
 
         return None
 
-    def _check_session_sweep(self, rng, bars15, diag=None, min_tail_start=None):
-        """Check if post-range bars swept one side of the range (Judas).
+    def _check_session_sweep(self, rng, bars15, diag=None, min_tail_start=None, pair=None):
+        """Check if post-range bars swept one side of the range (Judas or breakout).
 
         Returns (Range, +1/-1) or None.
         When `diag` is a dict, records why the sweep check failed.
         When `min_tail_start` is given, the tail begins no earlier than that
         index — ensures only current-session bars are checked for the sweep.
+        When `pair` is given, also checks for breakout (swept + holding outside).
         """
         tail_start = rng.end_idx
         if min_tail_start is not None:
@@ -1314,6 +1318,18 @@ class Backtester:
             return (rng, +1)
         if high_swept and not low_swept:
             return (rng, -1)
+        # Breakout: swept one side and HOLDING outside (continuation, not Judas)
+        if pair is not None:
+            _pip = 0.01 if pair.endswith("JPY") else 0.0001
+            hold_dist = config.BREAKOUT_HOLD_PIPS * _pip
+            if any_low and not any_high and last.Close < rng.low - hold_dist:
+                if diag is not None:
+                    diag["reason"] = "breakout"
+                return (rng, -1)
+            if any_high and not any_low and last.Close > rng.high + hold_dist:
+                if diag is not None:
+                    diag["reason"] = "breakout"
+                return (rng, +1)
         if diag is not None:
             if not any_low and not any_high:
                 diag["reason"] = "no_sweep"

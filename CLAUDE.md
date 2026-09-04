@@ -1589,8 +1589,10 @@ had genuine money edge (PF 2.98, R1.16B at 0.6× throttle) but unfilterable -21-
 -15% breaker at the min lot). The winners are unpredictable in advance — but the USER can pick them
 discretionally. Setup:
 
-- **Dollar UP → SELL GBPUSD** (GBP is weaker than EUR in the user's intermarket read)
-- **Dollar DOWN → BUY EURUSD** (EUR is stronger than GBP)
+- **Dollar UP → SELL GBPUSD only** (GBP is weaker than EUR in the user's intermarket read)
+- **Dollar DOWN → BUY EURUSD only** (EUR is stronger than GBP)
+
+**Pair constraint:** MM buy model = EURUSD only, MM sell model = GBPUSD only. No cross-pairing.
 
 **Entry detectors (semi-auto alerts):**
 1. IFVG zone — price retraced into an inverted FVG (cascade H4→H1→M30→M15→M5)
