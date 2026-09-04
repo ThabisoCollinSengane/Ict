@@ -144,6 +144,7 @@ class Backtester:
         self._mm_day_dir = {}     # (pair, date) -> locked MM distribution direction
         self._mm_day_range = {}   # (pair, date) -> (dr_high, dr_low, equilibrium)
         self._mm_day_count = {}   # (pair, date) -> standalone MM entries opened today
+        self._mm_golden_count = {}  # (pair, date) -> golden rule MM entries opened today
         self.trades = []
         self.reject_log = []   # near-misses: setups that formed then hit a gate
         # Diagnostic counters: how many times each gate was reached / rejected.
@@ -277,7 +278,9 @@ class Backtester:
                     self._mm_continuation(pair, t)
                 elif can_open_new_trade(now, pair):
                     self._maybe_open(pair, t)
-                    if pair not in self.active:   # base didn't open → standalone MM
+                    if pair not in self.active:
+                        self._mm_golden_entry(pair, t)
+                    if pair not in self.active:   # base + golden didn't open → standalone MM
                         self._mm_standalone(pair, t)
 
             if i % 1000 == 0 and i > 0:
@@ -4040,6 +4043,257 @@ class Backtester:
             "stop_reason": "mm_pd_array",
         }
         self.gate["mm_std_opened"] = self.gate.get("mm_std_opened", 0) + 1
+
+    # ── P46: Golden Rule MM Channel ────────────────────────────────────────
+    def _mm_golden_entry(self, pair, t):
+        """Relaxed-gate daily entry for EURUSD long / GBPUSD short.
+
+        Uses the base strategy's consolidation+sweep AMD cycle, but bypasses
+        the EURGBP cascade (95% bottleneck) and MSS 2-of-3 (65% bottleneck).
+        The golden rule structural edge (P44) replaces the pair-selection
+        signal. DXY direction is still required as the primary USD gate.
+        """
+        if not config.MM_GOLDEN_ENABLED or pair in self.active:
+            return
+        if pair not in ("EURUSD", "GBPUSD"):
+            return
+        g = self.gate
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+
+        # Circuit breakers (read from base strategy state).
+        _dk = now.date()
+        if self._drawdown_halt_until is not None and _dk < self._drawdown_halt_until:
+            return
+        _day_open = self._day_open_eq.get(_dk)
+        if _day_open and (_day_open - self.equity) / _day_open * 100 >= config.MAX_DAILY_LOSS_PCT:
+            return
+        if self._consec_losses >= config.MAX_CONSECUTIVE_LOSSES:
+            return
+
+        # News gate.
+        news_impact = self.news.nearest_impact(now)
+        if news_impact in ("Medium", "Critical"):
+            return
+
+        # DXY direction (hard gate).
+        dxy_bias = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
+        if dxy_bias == 0:
+            return
+
+        # Golden rule: DXY↓ = EURUSD long, DXY↑ = GBPUSD short.
+        if pair == "EURUSD" and dxy_bias == -1:
+            direction = +1
+        elif pair == "GBPUSD" and dxy_bias == +1:
+            direction = -1
+        else:
+            return
+        g["mm_golden_checked"] = g.get("mm_golden_checked", 0) + 1
+
+        # Daily cap (separate from base strategy slots).
+        daykey = (pair, _dk)
+        if self._mm_golden_count.get(daykey, 0) >= config.MM_GOLDEN_MAX_PER_DAY:
+            g["mm_golden_daily_cap"] = g.get("mm_golden_daily_cap", 0) + 1
+            return
+
+        # De-correlation: block if a same-direction golden rule trade is open.
+        if any(op.get("entry_model") == "mm_golden" and op["direction"] == direction
+               for op in self.active.values()):
+            g["mm_golden_corr_block"] = g.get("mm_golden_corr_block", 0) + 1
+            return
+
+        # Consolidation + sweep (same as base strategy AMD path).
+        bars15 = self.bars_up_to(pair, "15T", t)
+        if not bars15:
+            return
+        _amd_price = bars15[-1].Close
+        amd = detect_amd_setup(bars15, pair,
+                               max_range_pips=self._amd_max_range(pair, _amd_price))
+        _amd_source = ""
+        if amd is not None:
+            _amd_source = "m15_range"
+        elif config.SESSION_RANGE_ENABLED:
+            amd = self._session_range_amd(pair, t, bars15)
+            if amd is not None:
+                _amd_source = "session_range"
+        if amd is None:
+            g["mm_golden_no_amd"] = g.get("mm_golden_no_amd", 0) + 1
+            return
+        rng, sweep_dir = amd
+        if sweep_dir != direction:
+            g["mm_golden_wrong_sweep"] = g.get("mm_golden_wrong_sweep", 0) + 1
+            return
+        g["mm_golden_amd_ok"] = g.get("mm_golden_amd_ok", 0) + 1
+
+        # Draw cascade 0/3 gate (same reversal logic as base).
+        pip_v = pip_size(pair)
+        bars_w = self.bars_up_to(pair, "W", t)
+        bars_d = self.bars_up_to(pair, "D", t)
+        bars_h4 = self.bars_up_to(pair, "240T", t)
+        _draw_score = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
+        if _draw_score == 0:
+            g["mm_golden_no_draw"] = g.get("mm_golden_no_draw", 0) + 1
+            return
+
+        # FVG/OB/breaker entry pattern (same as base).
+        bars5 = self.bars_up_to(pair, "5T", t)
+        if not bars5:
+            return
+        cur_price = bars5[-1].Close
+        bars1h = self.bars_up_to(pair, "60T", t)
+        bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
+        pat = self._get_limit_entry(bars5, bars15, bars1h, pair, direction, cur_price,
+                                    bars1m=bars1m)
+        if pat is None:
+            g["mm_golden_no_pattern"] = g.get("mm_golden_no_pattern", 0) + 1
+            return
+        _level, stop, pattern_tag = pat
+
+        pip = pip_size(pair)
+        _spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        if news_impact == "High":
+            _spread = max(_spread, config.NEWS_HIGH_SPREAD_PIPS)
+        _friction = (_spread / 2 + config.SLIPPAGE_PIPS) * pip
+        entry = cur_price + direction * _friction
+
+        # Stop: structural stop → M1 stop → pattern stop, capped at 10 pips.
+        _stop_reason = "pattern (FVG/OB boundary)"
+        _struct_stop = None
+        if config.STRUCTURE_STOP_ENABLED:
+            _struct_stop = self._structure_stop(pair, direction, entry, pip, t)
+        if _struct_stop is not None:
+            stop = _struct_stop
+            _stop_reason = "structural swing (intact ITL/ITH)"
+        else:
+            _m1_stop = self._m1_structure_stop(bars1m, direction, entry, pip)
+            if _m1_stop is not None:
+                stop = _m1_stop
+                _stop_reason = "M1 swing"
+        if news_impact == "High":
+            stop = (entry - config.FIXED_STOP_PIPS * pip if direction > 0
+                    else entry + config.FIXED_STOP_PIPS * pip)
+            _stop_reason = "fixed 10-pip (high-impact news)"
+        _max_stop = config.FIXED_STOP_PIPS * pip
+        if abs(entry - stop) > _max_stop:
+            stop = entry - _max_stop if direction > 0 else entry + _max_stop
+
+        # Target selection (reuse base — includes FVGs, ITH/ITL, PDH/PDL, fibs).
+        _tgt = self._find_target(pair, direction, t, entry, stop=stop)
+        if _tgt is None:
+            g["mm_golden_no_target"] = g.get("mm_golden_no_target", 0) + 1
+            return
+        target, target_type, _target_score, _tgt_escalated = _tgt
+        reward_pips = abs(target - entry) / pip
+        if reward_pips < self._min_pips_target():
+            g["mm_golden_target_short"] = g.get("mm_golden_target_short", 0) + 1
+            return
+
+        # Position sizing: risk-based, with golden rule 1.25× always applied
+        # (these ARE golden rule trades by construction), plus draw cascade sizing.
+        equity_usd = self._size_equity() / config.USD_ZAR
+        units = int(position_size(equity_usd, entry, stop, pair))
+        tier_lots = self._pyramid_lots()
+        min_units = int(tier_lots[0] * self._contract_units(pair))
+        units = max(units, min_units)
+        _draw_mult = config.DRAW_SIZE_MULT.get(_draw_score, 1.0)
+        if _draw_mult != 1.0 and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
+            units = max(int(units * _draw_mult), min_units)
+        if config.GOLDEN_RULE_MULT != 1.0 and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
+            units = max(int(units * config.GOLDEN_RULE_MULT), min_units)
+        if (_target_score >= config.TARGET_SCORE_MULT_THRESHOLD
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            units = max(int(units * config.TARGET_SCORE_MULT), min_units)
+        if units == 0:
+            return
+
+        # Max-risk-per-trade guard.
+        _risk_cap = self.equity * (config.MAX_RISK_PER_TRADE_PCT / 100.0)
+        trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
+        if trade_risk_zar > _risk_cap:
+            if config.RISK_CAP_HALVE:
+                _floor = max(1, int(config.MIN_LOT_SIZE * self._contract_units(pair)))
+                while units > _floor and units * abs(entry - stop) * config.USD_ZAR > _risk_cap:
+                    units = max(_floor, units // 2)
+            else:
+                g["mm_golden_risk_cap"] = g.get("mm_golden_risk_cap", 0) + 1
+                return
+
+        # Conviction (simplified — DXY + AMD always present).
+        conviction = 2 + _draw_score
+        if _target_score >= 4:
+            conviction += 2
+        elif _target_score >= 3:
+            conviction += 1
+        max_legs = 1
+        if conviction > 4:
+            max_legs = config.MAX_LEGS
+        elif conviction > 2:
+            max_legs = 2
+
+        entry_type = f"amd_{pattern_tag}"
+        _session_label = self._session_label(t)
+        leg = {
+            "entry": entry, "stop": stop, "units": units,
+            "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
+            "session_side": "golden",
+            "tp1": None, "tp1_hit": True,
+            "_units_tp1": 0, "_units_tp2": units,
+            "runner_be_after_tp1": False,
+        }
+        self.active[pair] = {
+            "direction": direction,
+            "mfe_price": entry,
+            "lad_sess": 0, "lad_d3": 0, "lad_wk": 0, "lad_d30": 0, "lad_d60": 0,
+            "target": target,
+            "tp1_price": None, "tp_runner": False,
+            "target_type": target_type,
+            "stop_reason": _stop_reason,
+            "legs": [leg],
+            "weekly_amd_dir": 0,
+            "profile_score": 0,
+            "max_legs": max_legs,
+            "draw_score": _draw_score,
+            "im_scenario": "golden",
+            "entry_model": "mm_golden",
+            "session_phase": f"{_session_label}_golden",
+            "profile": _session_label,
+            "htf_fvg": "",
+            "dxy_fvg_tf": "",
+            "ny_cont": False,
+            "target_confluence": _target_score,
+            "mstruct_pts": 0,
+            "mstruct_align": "",
+            "mstruct_htf_dir": 0,
+            "mstruct_minor_sweep": False,
+            "mstruct_intact_tf": "",
+            "dxy_mstruct_align": "",
+            "dxy_mstruct_sweep": False,
+            "crt_tf": "",
+            "nwog": "",
+            "smt_idx": False,
+            "smt_dxy": False,
+            "target_escalated": _tgt_escalated,
+            "soj_sweep": False,
+            "soj_type": "",
+            "amd_range_pips": round(rng.width / pip, 1) if hasattr(rng, "width") else None,
+            "amd_range_bars": rng.length_bars if hasattr(rng, "length_bars") else None,
+            "amd_touches_hi": getattr(rng, "touches_high", None),
+            "amd_touches_lo": getattr(rng, "touches_low", None),
+            "amd_sweep_side": "low" if sweep_dir > 0 else "high",
+            "amd_sweep_depth": None,
+            "amd_sweep_aligned": True,
+            "amd_accum_start": None, "amd_accum_end": None,
+            "amd_sweep_time": None, "amd_sweep_time_m5": None,
+            "amd_swept_pdliq": None,
+            "amd_entry_zone": "",
+            "amd_liq_run": "",
+            "amd_source": _amd_source,
+            "bond_confirm": False,
+            "htf_smt": False,
+            "smt_pair_pref": "",
+            "golden_rule": "golden",
+        }
+        g["mm_golden_opened"] = g.get("mm_golden_opened", 0) + 1
+        self._mm_golden_count[daykey] = self._mm_golden_count.get(daykey, 0) + 1
 
     def _mm_standalone(self, pair, t):
         """Open the MM model as its OWN trade on the day's Judas sweep + IFVG retrace,

@@ -608,6 +608,16 @@ MM_SEMI_AUTO_MIN_CONFIRMS = int(_os.environ.get("MM_SEMI_AUTO_MIN_CONFIRMS", 2))
 MM_SEMI_AUTO_COOLDOWN_MIN = int(_os.environ.get("MM_SEMI_AUTO_COOLDOWN_MIN", 30))
 MM_SEMI_AUTO_MAX_PER_DAY = int(_os.environ.get("MM_SEMI_AUTO_MAX_PER_DAY", 3))
 
+# --- P46: Golden Rule MM Channel ---
+# Relaxed-gate daily entries for EURUSD long / GBPUSD short. Uses the base
+# strategy's consolidation+sweep AMD cycle, but bypasses the EURGBP cascade
+# (95% bottleneck) and MSS 2-of-3 (65% bottleneck). The golden rule structural
+# edge (P44: WR 50%, PF 4.40) replaces the EURGBP pair-selection signal. DXY
+# direction is still required as the primary USD gate. Default OFF — validate
+# IS/OOS before shipping. Set MM_GOLDEN_ENABLED=1 env to test.
+MM_GOLDEN_ENABLED = bool(int(_os.environ.get("MM_GOLDEN_ENABLED", 0)))
+MM_GOLDEN_MAX_PER_DAY = int(_os.environ.get("MM_GOLDEN_MAX_PER_DAY", "1"))
+
 # --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
 # US Treasury yields lead the dollar (higher yields -> USD bid). scripts/
 # bonds_analysis.py measures whether a yield-structure confirmation of the trade's

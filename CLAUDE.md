@@ -1668,6 +1668,40 @@ source" table by source showing WR/PF breakdown.
 splits stay positive PF and MaxDD holds. The `amd_source` analytics will show exactly how many
 new trades the fallback opens and their quality.
 
+### P46 — Golden Rule MM Channel (BUILT 2026-09-04, default OFF, pending IS/OOS validation)
+**What:** A second entry channel that fires MORE trades by bypassing the two biggest
+bottlenecks — the EURGBP cascade (95% rejection) and MSS 2-of-3 (65% rejection) — for
+golden rule pairs only. EURUSD long when DXY↓, GBPUSD short when DXY↑. Uses the base
+strategy's proven consolidation+sweep AMD cycle, not the dealing range + IFVG cascade
+(which hit -21-23% MaxDD in the standalone MM).
+
+**How it differs from the base strategy:**
+- **Bypasses:** EURGBP/AUDNZD cascade, MSS 2-of-3, im_score threshold, scenario classification
+- **Keeps:** DXY direction (hard gate), consolidation+sweep (AMD structure), draw cascade 0/3,
+  FVG/OB entry, target selection with confluence scoring, all circuit breakers, kill zones,
+  news filter, daily caps
+
+**Why it should work where MM standalone failed:**
+1. Consolidation+sweep requirement (proven AMD structure) vs dealing range + IFVG (WR 21%)
+2. DXY gate (directional conviction) vs no gate
+3. Golden rule constraint (P44: WR 50%, PF 4.40) vs all pairs
+4. Draw cascade 0/3 (HTF draw alignment) vs no draw gate
+5. Standard FVG/OB entry + targets vs IFVG retrace
+
+**Implementation (`_mm_golden_entry` in backtest.py):**
+- Called from `run()` after `_maybe_open` fails, before `_mm_standalone`
+- Only EURUSD (+1) and GBPUSD (-1), only in the golden rule direction
+- Daily cap `MM_GOLDEN_MAX_PER_DAY` (default 1) per pair, separate from base slots
+- De-correlation: one same-direction golden rule trade at a time
+- Tagged `entry_model="mm_golden"`, `golden_rule="golden"`, `im_scenario="golden"`
+- Sizing: golden rule 1.25× + draw cascade 2×/3× + target score 1.25× (same levers)
+
+**Config:** `MM_GOLDEN_ENABLED=0` (default OFF, env-overridable), `MM_GOLDEN_MAX_PER_DAY=1`.
+
+**Status:** built, compiles clean, default OFF (byte-identical when off). Needs IS/OOS
+validation: `MM_GOLDEN_ENABLED=1 python run_backtest_histdata.py --years 2022 2023` and
+`--years 2024 2025`. Ships only if both splits stay positive PF and MaxDD holds ≤ -15%.
+
 ---
 
 ## 3-month live account scenarios (R1,000 start, updated 2026-09-03)
