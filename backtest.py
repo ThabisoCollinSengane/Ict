@@ -1241,8 +1241,10 @@ class Backtester:
                         touches_high=rng.touches_high,
                         touches_low=rng.touches_low,
                     )
+                    session_boundary_idx = int(_m15_idx.searchsorted(r_end_utc, side="left"))
                     _diag = {}
-                    result = self._check_session_sweep(g_rng, bars15, diag=_diag)
+                    result = self._check_session_sweep(g_rng, bars15, diag=_diag,
+                                                       min_tail_start=session_boundary_idx)
                     if result is not None:
                         return result
                     g["sr_consol_no_sweep"] = g.get("sr_consol_no_sweep", 0) + 1
@@ -1284,13 +1286,17 @@ class Backtester:
 
         return None
 
-    def _check_session_sweep(self, rng, bars15, diag=None):
+    def _check_session_sweep(self, rng, bars15, diag=None, min_tail_start=None):
         """Check if post-range bars swept one side of the range (Judas).
 
         Returns (Range, +1/-1) or None.
         When `diag` is a dict, records why the sweep check failed.
+        When `min_tail_start` is given, the tail begins no earlier than that
+        index — ensures only current-session bars are checked for the sweep.
         """
         tail_start = rng.end_idx
+        if min_tail_start is not None:
+            tail_start = max(tail_start, min_tail_start)
         tail_end = min(tail_start + config.AMD_SWEEP_LOOKBACK, len(bars15))
         tail = bars15[tail_start:tail_end]
         if not tail:
