@@ -621,12 +621,12 @@ MM_GOLDEN_DECORR_ALL = bool(int(_os.environ.get("MM_GOLDEN_DECORR_ALL", "1")))
 MM_GOLDEN_MIN_DRAW = int(_os.environ.get("MM_GOLDEN_MIN_DRAW", "2"))
 
 # --- P47: Narrative context scoring ---
-# Contextual "story" layer: DOW tendency, NFP-week, rate decisions, prior-session
+# Contextual "story" layer: ICT Weekly Profile, NFP-week, rate decisions, prior-session
 # PD array provenance, seasonal lean. Each factor contributes 0 or 1 to conviction.
 # Analytics-only on first deployment — proves the signal before gating/sizing.
 NARRATIVE_ENABLED = bool(int(_os.environ.get("NARRATIVE_ENABLED", "1")))
-NARRATIVE_DOW_ENABLED = bool(int(_os.environ.get("NARRATIVE_DOW_ENABLED", "1")))
-NARRATIVE_DOW_DAYS = _os.environ.get("NARRATIVE_DOW_DAYS", "1,2")   # Tue=1, Wed=2
+NARRATIVE_WEEKLY_PROFILE_ENABLED = bool(int(
+    _os.environ.get("NARRATIVE_WEEKLY_PROFILE_ENABLED", "1")))
 NARRATIVE_NFP_ENABLED = bool(int(_os.environ.get("NARRATIVE_NFP_ENABLED", "1")))
 NARRATIVE_RATE_ENABLED = bool(int(_os.environ.get("NARRATIVE_RATE_ENABLED", "1")))
 NARRATIVE_PD_PROV_ENABLED = bool(int(_os.environ.get("NARRATIVE_PD_PROV_ENABLED", "1")))

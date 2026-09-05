@@ -809,7 +809,7 @@ def main():
 
         if "narrative_score" in df.columns:
             print("\n=== Narrative context scoring (P47) ===")
-            print("  Factors: DOW tendency, NFP-week, rate decision, PD array provenance, seasonal")
+            print("  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal")
             print(f"  {'Score':<8} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
                   f"{'P&L ZAR':>14} {'PF':>6}")
             print("  " + "-" * 52)
@@ -826,7 +826,7 @@ def main():
             print(f"  {'Factor':<20} {'Fired':>7} {'WR%':>6} {'PF':>6}   "
                   f"{'Absent':>7} {'WR%':>6} {'PF':>6}")
             print("  " + "-" * 70)
-            for col, label in [("narrative_dow", "DOW (Tue/Wed)"),
+            for col, label in [("narrative_weekly_profile", "Weekly Profile"),
                                ("narrative_nfp", "NFP week Mon/Tue"),
                                ("narrative_rate", "Rate decision"),
                                ("narrative_pd_prov", "PD prov (sweep)"),
@@ -1156,7 +1156,7 @@ def _publish_backtest_report(results, backtester, years, df=None):
             L.append(f"{'Factor':<20} {'Fired':>7} {'WR%':>6} {'PF':>6}  "
                      f"{'Absent':>7} {'WR%':>6} {'PF':>6}")
             L.append("-" * 68)
-            for col, label in [("narrative_dow", "DOW (Tue/Wed)"),
+            for col, label in [("narrative_weekly_profile", "Weekly Profile"),
                                ("narrative_nfp", "NFP week Mon/Tue"),
                                ("narrative_rate", "Rate decision"),
                                ("narrative_pd_prov", "PD prov (sweep)"),

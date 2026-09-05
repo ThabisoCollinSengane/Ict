@@ -1,7 +1,8 @@
 """Narrative context scoring — contextual story layer for trade conviction.
 
 Factors a narrative for WHY a move should happen using:
-  1. Day-of-week tendency (Tue/Wed = distribution days)
+  1. ICT Weekly Profile (three archetypes: Classic Expansion, Consolidation
+     Reversal, Midweek Reversal — context-dependent day roles using weekly AMD)
   2. NFP-week consolidation context (Mon/Tue of NFP week = tight range = quality Judas)
   3. Rate decision context (day-after-FOMC/ECB/BOE = post-decision continuation)
   4. Prior-session PD array provenance (previous session sweep agrees with direction)
@@ -25,7 +26,7 @@ class NarrativeContext:
         self._seasonal_loaded = False
 
     def score(self, pair, direction, t, news_cal=None,
-              prev_session_sweep_dir=None):
+              prev_session_sweep_dir=None, weekly_amd_dir=None):
         """Compute narrative conviction score.
 
         Args:
@@ -36,11 +37,13 @@ class NarrativeContext:
             prev_session_sweep_dir: +1/-1/None — the AMD sweep direction from
                 the previous session (London for NY, Asian for London). Caller
                 computes this from _session_range_amd or _prev_session_range.
+            weekly_amd_dir: +1/-1/0/None — weekly AMD direction from
+                detect_weekly_amd. 0 or None = no weekly sweep yet.
 
         Returns:
-            dict with keys: total, dow, nfp, rate, pd_prov, seasonal
+            dict with keys: total, weekly_profile, nfp, rate, pd_prov, seasonal
         """
-        result = {"total": 0, "dow": False, "nfp": False,
+        result = {"total": 0, "weekly_profile": False, "nfp": False,
                   "rate": 0, "pd_prov": False, "seasonal": False}
 
         if not config.NARRATIVE_ENABLED:
@@ -53,9 +56,10 @@ class NarrativeContext:
             import pytz
             dt = pytz.utc.localize(dt)
 
-        if config.NARRATIVE_DOW_ENABLED:
-            result["dow"] = self._dow_score(dt)
-            if result["dow"]:
+        if config.NARRATIVE_WEEKLY_PROFILE_ENABLED:
+            result["weekly_profile"] = self._weekly_profile_score(
+                direction, dt, weekly_amd_dir)
+            if result["weekly_profile"]:
                 result["total"] += 1
 
         if config.NARRATIVE_NFP_ENABLED and news_cal is not None:
@@ -81,10 +85,19 @@ class NarrativeContext:
 
         return result
 
-    def _dow_score(self, dt):
-        """Tue/Wed are the strongest distribution days (ICT)."""
-        dow_days = [int(d) for d in config.NARRATIVE_DOW_DAYS.split(",")]
-        return dt.weekday() in dow_days
+    def _weekly_profile_score(self, direction, dt, weekly_amd_dir):
+        """ICT Weekly Profile: context-dependent day roles in the weekly delivery cycle.
+        Three profiles: Classic Expansion, Consolidation Reversal, Midweek Reversal.
+        Tuesday=always, Mon/Wed=tradeable (manipulation window), Thu/Fri=confirmed only."""
+        dow = dt.weekday()
+        if dow == 1:  # Tuesday — the key manipulation day (all profiles)
+            return True
+        has_amd = weekly_amd_dir is not None and weekly_amd_dir != 0
+        if has_amd:
+            return weekly_amd_dir == direction
+        if dow <= 2:  # Monday or Wednesday — manipulation/range-building window
+            return True
+        return False  # Thursday or Friday with no AMD — no profile confirmation
 
     def _nfp_week_score(self, dt, news_cal):
         """Mon/Tue of NFP week: tight consolidation = high-quality Judas."""

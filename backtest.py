@@ -3328,7 +3328,8 @@ class Backtester:
                     _prev_sweep_dir = -1
         _narrative = self._narrative_ctx.score(
             pair, direction, t, news_cal=self.news,
-            prev_session_sweep_dir=_prev_sweep_dir)
+            prev_session_sweep_dir=_prev_sweep_dir,
+            weekly_amd_dir=weekly_amd_dir)
         _narrative_score = _narrative["total"]
         conviction += _narrative_score
 
@@ -3711,7 +3712,7 @@ class Backtester:
             "smt_pair_pref": _smt_pref,
             "golden_rule": _golden_rule,
             "narrative_score": _narrative_score,
-            "narrative_dow": _narrative["dow"],
+            "narrative_weekly_profile": _narrative["weekly_profile"],
             "narrative_nfp": _narrative["nfp"],
             "narrative_rate": _narrative["rate"],
             "narrative_pd_prov": _narrative["pd_prov"],
@@ -4263,9 +4264,12 @@ class Backtester:
 
         # P47 — Narrative context scoring for golden rule channel.
         _prev_sweep_dir_g = sweep_dir if sweep_dir == direction else None
+        wamd_g = self._get_weekly_amd(pair, t)
+        weekly_amd_dir_g = wamd_g.direction if wamd_g is not None else 0
         _narrative = self._narrative_ctx.score(
             pair, direction, t, news_cal=self.news,
-            prev_session_sweep_dir=_prev_sweep_dir_g)
+            prev_session_sweep_dir=_prev_sweep_dir_g,
+            weekly_amd_dir=weekly_amd_dir_g)
         _narrative_score = _narrative["total"]
         conviction += _narrative_score
 
@@ -4294,7 +4298,7 @@ class Backtester:
             "target_type": target_type,
             "stop_reason": _stop_reason,
             "legs": [leg],
-            "weekly_amd_dir": 0,
+            "weekly_amd_dir": weekly_amd_dir_g,
             "profile_score": 0,
             "max_legs": max_legs,
             "draw_score": _draw_score,
@@ -4338,7 +4342,7 @@ class Backtester:
             "smt_pair_pref": "",
             "golden_rule": "golden",
             "narrative_score": _narrative_score,
-            "narrative_dow": _narrative["dow"],
+            "narrative_weekly_profile": _narrative["weekly_profile"],
             "narrative_nfp": _narrative["nfp"],
             "narrative_rate": _narrative["rate"],
             "narrative_pd_prov": _narrative["pd_prov"],
