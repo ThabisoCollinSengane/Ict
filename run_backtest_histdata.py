@@ -807,6 +807,52 @@ def main():
                         sp_label = sp if sp else "no div"
                         print(f"    {gr+' + '+sp_label:<28} {len(grp):>5} {wr:>5.1f}% {pf:>6.2f}")
 
+        if "narrative_score" in df.columns:
+            print("\n=== Narrative context scoring (P47) ===")
+            print("  Factors: DOW tendency, NFP-week, rate decision, PD array provenance, seasonal")
+            print(f"  {'Score':<8} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>14} {'PF':>6}")
+            print("  " + "-" * 52)
+            for sc in sorted(df["narrative_score"].unique()):
+                grp = df[df["narrative_score"] == sc]
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                gw = grp.loc[grp.pnl > 0, "pnl"].sum()
+                gl = abs(grp.loc[grp.pnl < 0, "pnl"].sum())
+                pf = (gw / gl) if gl > 0 else float("inf")
+                print(f"  {sc:<8} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>14.2f} {pf:>6.2f}")
+            print("\n  --- Per-factor breakdown ---")
+            print(f"  {'Factor':<20} {'Fired':>7} {'WR%':>6} {'PF':>6}   "
+                  f"{'Absent':>7} {'WR%':>6} {'PF':>6}")
+            print("  " + "-" * 70)
+            for col, label in [("narrative_dow", "DOW (Tue/Wed)"),
+                               ("narrative_nfp", "NFP week Mon/Tue"),
+                               ("narrative_rate", "Rate decision"),
+                               ("narrative_pd_prov", "PD prov (sweep)"),
+                               ("narrative_seasonal", "Seasonal lean")]:
+                if col not in df.columns:
+                    continue
+                if col == "narrative_rate":
+                    fired = df[df[col] > 0]
+                    absent = df[df[col] <= 0]
+                else:
+                    fired = df[df[col] == True]
+                    absent = df[df[col] == False]
+                def _wpf(g):
+                    if len(g) == 0:
+                        return 0, 0, 0.0
+                    w = (g.pnl > 0).sum()
+                    wr = 100 * w / len(g)
+                    gw_ = g.loc[g.pnl > 0, "pnl"].sum()
+                    gl_ = abs(g.loc[g.pnl < 0, "pnl"].sum())
+                    pf_ = (gw_ / gl_) if gl_ > 0 else float("inf")
+                    return len(g), wr, pf_
+                fn, fwr, fpf = _wpf(fired)
+                an, awr, apf = _wpf(absent)
+                print(f"  {label:<20} {fn:>7} {fwr:>5.1f}% {fpf:>6.2f}   "
+                      f"{an:>7} {awr:>5.1f}% {apf:>6.2f}")
+
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
             print(f"  {'Draw on liquidity':<18} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
@@ -1093,6 +1139,45 @@ def _publish_backtest_report(results, backtester, years, df=None):
                     L.append(f"{lbl:<14} {len(grp):>7} {w:>5} {wr:>5.1f}% "
                              f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
                 L.append("```")
+
+        # --- Narrative context scoring (P47) ---
+        if "narrative_score" in df.columns:
+            L += ["", "## Narrative context scoring (P47)", "", "```"]
+            L.append(f"{'Score':<8} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                     f"{'P&L ZAR':>12} {'PF':>6}")
+            L.append("-" * 52)
+            for sc in sorted(df["narrative_score"].unique()):
+                grp = df[df["narrative_score"] == sc]
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                L.append(f"{sc:<8} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                         f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+            L.append("")
+            L.append(f"{'Factor':<20} {'Fired':>7} {'WR%':>6} {'PF':>6}  "
+                     f"{'Absent':>7} {'WR%':>6} {'PF':>6}")
+            L.append("-" * 68)
+            for col, label in [("narrative_dow", "DOW (Tue/Wed)"),
+                               ("narrative_nfp", "NFP week Mon/Tue"),
+                               ("narrative_rate", "Rate decision"),
+                               ("narrative_pd_prov", "PD prov (sweep)"),
+                               ("narrative_seasonal", "Seasonal lean")]:
+                if col not in df.columns:
+                    continue
+                if col == "narrative_rate":
+                    fired = df[df[col] > 0]
+                    absent = df[df[col] <= 0]
+                else:
+                    fired = df[df[col] == True]
+                    absent = df[df[col] == False]
+                fn = len(fired)
+                fwr = 100 * (fired.pnl > 0).sum() / fn if fn else 0
+                fpf = _pf(fired) if fn else 0
+                an = len(absent)
+                awr = 100 * (absent.pnl > 0).sum() / an if an else 0
+                apf = _pf(absent) if an else 0
+                L.append(f"{label:<20} {fn:>7} {fwr:>5.1f}% {fpf:>6.2f}  "
+                         f"{an:>7} {awr:>5.1f}% {apf:>6.2f}")
+            L.append("```")
 
         # cleanup temp columns
         df.drop(columns=["_setup_type", "_setup_tf"], inplace=True, errors="ignore")

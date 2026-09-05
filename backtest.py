@@ -26,6 +26,7 @@ from ict import market_structure as mstruct
 from ict.dxy_synthetic import compute_dxy, compute_dxy_range
 from ict.amd import detect_consolidation, detect_manipulation, detect_amd_setup, detect_breakout
 from ict.volume_modulator import get_volume_modifier
+from ict.narrative import NarrativeContext
 from ict.ote import in_ote, find_swing
 from ict.liquidity_divergence import judas_sweep_divergence
 from ict.fib_targets import nearest_fib_target
@@ -145,6 +146,7 @@ class Backtester:
         self._mm_day_range = {}   # (pair, date) -> (dr_high, dr_low, equilibrium)
         self._mm_day_count = {}   # (pair, date) -> standalone MM entries opened today
         self._mm_golden_count = {}  # (pair, date) -> golden rule MM entries opened today
+        self._narrative_ctx = NarrativeContext()
         self.trades = []
         self.reject_log = []   # near-misses: setups that formed then hit a gate
         # Diagnostic counters: how many times each gate was reached / rejected.
@@ -3310,6 +3312,26 @@ class Backtester:
                     g["gt_mp_extreme"] = g.get("gt_mp_extreme", 0) + 1
         # ─────────────────────────────────────────────────────────────────────
 
+        # P47 — Narrative context scoring: DOW tendency, NFP-week, rate decision
+        # context, prior-session PD array provenance, seasonal lean.
+        _prev_sweep_dir = None
+        if amd is not None:
+            _prev_sweep_dir = sweep_dir if sweep_dir == direction else None
+        elif config.SESSION_RANGE_ENABLED:
+            _psr = self._prev_session_range(pair, t)
+            if _psr is not None:
+                _psr_high, _psr_low, _, _ = _psr
+                _psr_mid = (_psr_high + _psr_low) / 2
+                if cur_price > _psr_mid:
+                    _prev_sweep_dir = 1
+                elif cur_price < _psr_mid:
+                    _prev_sweep_dir = -1
+        _narrative = self._narrative_ctx.score(
+            pair, direction, t, news_cal=self.news,
+            prev_session_sweep_dir=_prev_sweep_dir)
+        _narrative_score = _narrative["total"]
+        conviction += _narrative_score
+
         min_conv = config.MIN_CONVICTION_NY if _is_ny else config.MIN_CONVICTION
         if conviction < min_conv:
             g["low_conviction"] += 1
@@ -3688,6 +3710,12 @@ class Backtester:
             "htf_smt": _htf_smt,
             "smt_pair_pref": _smt_pref,
             "golden_rule": _golden_rule,
+            "narrative_score": _narrative_score,
+            "narrative_dow": _narrative["dow"],
+            "narrative_nfp": _narrative["nfp"],
+            "narrative_rate": _narrative["rate"],
+            "narrative_pd_prov": _narrative["pd_prov"],
+            "narrative_seasonal": _narrative["seasonal"],
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
@@ -4095,11 +4123,20 @@ class Backtester:
             g["mm_golden_daily_cap"] = g.get("mm_golden_daily_cap", 0) + 1
             return
 
-        # De-correlation: block if a same-direction golden rule trade is open.
-        if any(op.get("entry_model") == "mm_golden" and op["direction"] == direction
-               for op in self.active.values()):
-            g["mm_golden_corr_block"] = g.get("mm_golden_corr_block", 0) + 1
-            return
+        # De-correlation: block if any position has the same dollar direction.
+        # All pairs are X/USD, so dollar_dir = -direction (long X/USD = short USD).
+        # With MM_GOLDEN_DECORR_ALL (default ON), this catches base strategy trades
+        # too — EU base long + GU golden short = double dollar exposure.
+        _dollar_dir = -direction
+        if config.MM_GOLDEN_DECORR_ALL:
+            if any(-op["direction"] == _dollar_dir for op in self.active.values()):
+                g["mm_golden_corr_block"] = g.get("mm_golden_corr_block", 0) + 1
+                return
+        else:
+            if any(op.get("entry_model") == "mm_golden" and op["direction"] == direction
+                   for op in self.active.values()):
+                g["mm_golden_corr_block"] = g.get("mm_golden_corr_block", 0) + 1
+                return
 
         # Consolidation + sweep (same as base strategy AMD path).
         bars15 = self.bars_up_to(pair, "15T", t)
@@ -4130,7 +4167,7 @@ class Backtester:
         bars_d = self.bars_up_to(pair, "D", t)
         bars_h4 = self.bars_up_to(pair, "240T", t)
         _draw_score = draw_cascade_score(bars_w, bars_d, bars_h4, pair, direction, pip_v)
-        if _draw_score == 0:
+        if _draw_score < config.MM_GOLDEN_MIN_DRAW:
             g["mm_golden_no_draw"] = g.get("mm_golden_no_draw", 0) + 1
             return
 
@@ -4223,6 +4260,15 @@ class Backtester:
             conviction += 2
         elif _target_score >= 3:
             conviction += 1
+
+        # P47 — Narrative context scoring for golden rule channel.
+        _prev_sweep_dir_g = sweep_dir if sweep_dir == direction else None
+        _narrative = self._narrative_ctx.score(
+            pair, direction, t, news_cal=self.news,
+            prev_session_sweep_dir=_prev_sweep_dir_g)
+        _narrative_score = _narrative["total"]
+        conviction += _narrative_score
+
         max_legs = 1
         if conviction > 4:
             max_legs = config.MAX_LEGS
@@ -4291,6 +4337,12 @@ class Backtester:
             "htf_smt": False,
             "smt_pair_pref": "",
             "golden_rule": "golden",
+            "narrative_score": _narrative_score,
+            "narrative_dow": _narrative["dow"],
+            "narrative_nfp": _narrative["nfp"],
+            "narrative_rate": _narrative["rate"],
+            "narrative_pd_prov": _narrative["pd_prov"],
+            "narrative_seasonal": _narrative["seasonal"],
         }
         g["mm_golden_opened"] = g.get("mm_golden_opened", 0) + 1
         self._mm_golden_count[daykey] = self._mm_golden_count.get(daykey, 0) + 1
