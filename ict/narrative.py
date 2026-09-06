@@ -7,8 +7,10 @@ Factors a narrative for WHY a move should happen using:
   3. Rate decision context (day-after-FOMC/ECB/BOE = post-decision continuation)
   4. Prior-session PD array provenance (previous session sweep agrees with direction)
   5. Seasonal/monthly tendency (monthly directional lean per pair)
+  6. HTF Order Block context (H4 OB with liquidity pairing — inside or continuation)
+  7. D1 narrative draw (unmitigated D1 FVG or relative equal lows/highs ahead)
 
-Each factor contributes 0 or 1 to the total narrative score (0-5).
+Each factor contributes 0 or 1 to the total narrative score (0-7).
 Analytics-only on first deployment — conviction contributor, NOT a gate.
 """
 from __future__ import annotations
@@ -26,7 +28,8 @@ class NarrativeContext:
         self._seasonal_loaded = False
 
     def score(self, pair, direction, t, news_cal=None,
-              prev_session_sweep_dir=None, weekly_amd_dir=None):
+              prev_session_sweep_dir=None, weekly_amd_dir=None,
+              htf_ob_ctx=None, d1_draw=None):
         """Compute narrative conviction score.
 
         Args:
@@ -39,12 +42,18 @@ class NarrativeContext:
                 computes this from _session_range_amd or _prev_session_range.
             weekly_amd_dir: +1/-1/0/None — weekly AMD direction from
                 detect_weekly_amd. 0 or None = no weekly sweep yet.
+            htf_ob_ctx: str or None — "inside" / "continuation" / "" from
+                _htf_ob_context. Caller computes this in backtest.py.
+            d1_draw: tuple or None — (has_draw, draw_type, draw_price) from
+                _d1_narrative_draw. Caller computes this in backtest.py.
 
         Returns:
-            dict with keys: total, weekly_profile, nfp, rate, pd_prov, seasonal
+            dict with keys: total, weekly_profile, nfp, rate, pd_prov,
+            seasonal, htf_ob, d1_draw
         """
         result = {"total": 0, "weekly_profile": False, "nfp": False,
-                  "rate": 0, "pd_prov": False, "seasonal": False}
+                  "rate": 0, "pd_prov": False, "seasonal": False,
+                  "htf_ob": False, "d1_draw": False}
 
         if not config.NARRATIVE_ENABLED:
             return result
@@ -81,6 +90,16 @@ class NarrativeContext:
         if config.NARRATIVE_SEASONAL_ENABLED:
             result["seasonal"] = self._seasonal_score(pair, direction, dt)
             if result["seasonal"]:
+                result["total"] += 1
+
+        if config.NARRATIVE_HTF_OB_ENABLED:
+            result["htf_ob"] = htf_ob_ctx in ("inside", "continuation")
+            if result["htf_ob"]:
+                result["total"] += 1
+
+        if config.NARRATIVE_D1_DRAW_ENABLED:
+            if d1_draw is not None and len(d1_draw) >= 1 and d1_draw[0]:
+                result["d1_draw"] = True
                 result["total"] += 1
 
         return result

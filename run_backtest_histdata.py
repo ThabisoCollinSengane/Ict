@@ -830,7 +830,9 @@ def main():
                                ("narrative_nfp", "NFP week Mon/Tue"),
                                ("narrative_rate", "Rate decision"),
                                ("narrative_pd_prov", "PD prov (sweep)"),
-                               ("narrative_seasonal", "Seasonal lean")]:
+                               ("narrative_seasonal", "Seasonal lean"),
+                               ("narrative_htf_ob", "HTF OB Context"),
+                               ("narrative_d1_draw", "D1 Draw")]:
                 if col not in df.columns:
                     continue
                 if col == "narrative_rate":
@@ -852,6 +854,62 @@ def main():
                 an, awr, apf = _wpf(absent)
                 print(f"  {label:<20} {fn:>7} {fwr:>5.1f}% {fpf:>6.2f}   "
                       f"{an:>7} {awr:>5.1f}% {apf:>6.2f}")
+
+        # P48 — HTF OB context breakdown.
+        if "htf_ob_context" in df.columns:
+            print("\n=== HTF OB context breakdown (P48) ===")
+            print(f"  {'Context':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>12} {'PF':>6} {'Mean R':>8}")
+            print("  " + "-" * 62)
+            def _pf_calc(g):
+                gw = g.loc[g.pnl > 0, "pnl"].sum()
+                gl = abs(g.loc[g.pnl < 0, "pnl"].sum())
+                return (gw / gl) if gl > 0 else float("inf")
+            for ctx_val in ["inside", "continuation", ""]:
+                ctx_label = ctx_val if ctx_val else "(none)"
+                grp = df[df["htf_ob_context"] == ctx_val] if ctx_val else df[df["htf_ob_context"].isin(["", None]) | df["htf_ob_context"].isna()]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                pf = _pf_calc(grp)
+                meanr = grp.pnl.mean()
+                print(f"  {ctx_label:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>12.2f} {pf:>6.2f} {meanr:>8.2f}")
+            # Sub-breakdown by liquidity type for OB-confirmed trades.
+            if "htf_ob_liq_type" in df.columns:
+                ob_trades = df[df["htf_ob_context"].isin(["inside", "continuation"])]
+                if len(ob_trades) > 0:
+                    print(f"\n  {'Liq type':<16} {'Trades':>7} {'WR%':>6} {'PF':>6}")
+                    print("  " + "-" * 40)
+                    for liq, grp in ob_trades.groupby("htf_ob_liq_type"):
+                        if not liq:
+                            continue
+                        w = (grp.pnl > 0).sum()
+                        wr = 100 * w / len(grp)
+                        pf = _pf_calc(grp)
+                        print(f"  {liq:<16} {len(grp):>7} {wr:>5.1f}% {pf:>6.2f}")
+
+        # P48 — D1 narrative draw breakdown.
+        if "d1_draw_type" in df.columns:
+            print("\n=== D1 narrative draw breakdown (P48) ===")
+            print(f"  {'Draw type':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                  f"{'P&L ZAR':>12} {'PF':>6}")
+            print("  " + "-" * 56)
+            def _pf_calc2(g):
+                gw = g.loc[g.pnl > 0, "pnl"].sum()
+                gl = abs(g.loc[g.pnl < 0, "pnl"].sum())
+                return (gw / gl) if gl > 0 else float("inf")
+            for dt_val in ["d1_fvg", "equal_hl", ""]:
+                dt_label = dt_val if dt_val else "(none)"
+                grp = df[df["d1_draw_type"] == dt_val] if dt_val else df[df["d1_draw_type"].isin(["", None]) | df["d1_draw_type"].isna()]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                pf = _pf_calc2(grp)
+                print(f"  {dt_label:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                      f"{grp.pnl.sum():>12.2f} {pf:>6.2f}")
 
         if "target_type" in df.columns:
             print("\n=== Draw on liquidity (target type) — all trades ===")
@@ -1160,7 +1218,9 @@ def _publish_backtest_report(results, backtester, years, df=None):
                                ("narrative_nfp", "NFP week Mon/Tue"),
                                ("narrative_rate", "Rate decision"),
                                ("narrative_pd_prov", "PD prov (sweep)"),
-                               ("narrative_seasonal", "Seasonal lean")]:
+                               ("narrative_seasonal", "Seasonal lean"),
+                               ("narrative_htf_ob", "HTF OB Context"),
+                               ("narrative_d1_draw", "D1 Draw")]:
                 if col not in df.columns:
                     continue
                 if col == "narrative_rate":
@@ -1177,6 +1237,52 @@ def _publish_backtest_report(results, backtester, years, df=None):
                 apf = _pf(absent) if an else 0
                 L.append(f"{label:<20} {fn:>7} {fwr:>5.1f}% {fpf:>6.2f}  "
                          f"{an:>7} {awr:>5.1f}% {apf:>6.2f}")
+            L.append("```")
+
+        # P48 — HTF OB context breakdown (markdown report).
+        if "htf_ob_context" in df.columns:
+            L += ["", "## HTF OB context breakdown (P48)", "", "```"]
+            L.append(f"{'Context':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                     f"{'P&L ZAR':>12} {'PF':>6}")
+            L.append("-" * 56)
+            for ctx_val in ["inside", "continuation", ""]:
+                ctx_label = ctx_val if ctx_val else "(none)"
+                grp = df[df["htf_ob_context"] == ctx_val] if ctx_val else df[df["htf_ob_context"].isin(["", None]) | df["htf_ob_context"].isna()]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                L.append(f"{ctx_label:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                         f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+            if "htf_ob_liq_type" in df.columns:
+                ob_trades = df[df["htf_ob_context"].isin(["inside", "continuation"])]
+                if len(ob_trades) > 0:
+                    L.append("")
+                    L.append(f"{'Liq type':<16} {'Trades':>7} {'WR%':>6} {'PF':>6}")
+                    L.append("-" * 40)
+                    for liq, grp in ob_trades.groupby("htf_ob_liq_type"):
+                        if not liq:
+                            continue
+                        w = (grp.pnl > 0).sum()
+                        wr = 100 * w / len(grp)
+                        L.append(f"{liq:<16} {len(grp):>7} {wr:>5.1f}% {_pf(grp):>6.2f}")
+            L.append("```")
+
+        # P48 — D1 narrative draw breakdown (markdown report).
+        if "d1_draw_type" in df.columns:
+            L += ["", "## D1 narrative draw breakdown (P48)", "", "```"]
+            L.append(f"{'Draw type':<16} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                     f"{'P&L ZAR':>12} {'PF':>6}")
+            L.append("-" * 56)
+            for dt_val in ["d1_fvg", "equal_hl", ""]:
+                dt_label = dt_val if dt_val else "(none)"
+                grp = df[df["d1_draw_type"] == dt_val] if dt_val else df[df["d1_draw_type"].isin(["", None]) | df["d1_draw_type"].isna()]
+                if len(grp) == 0:
+                    continue
+                w = (grp.pnl > 0).sum()
+                wr = 100 * w / len(grp)
+                L.append(f"{dt_label:<16} {len(grp):>7} {w:>5} {wr:>5.1f}% "
+                         f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
             L.append("```")
 
         # cleanup temp columns

@@ -634,6 +634,18 @@ NARRATIVE_SEASONAL_ENABLED = bool(int(_os.environ.get("NARRATIVE_SEASONAL_ENABLE
 NARRATIVE_SEASONAL_FILE = _os.environ.get(
     "NARRATIVE_SEASONAL_FILE", _os.path.join("data", "seasonal_bias.json"))
 
+# --- P48: HTF Order Block narrative + D1 draw awareness ---
+NARRATIVE_HTF_OB_ENABLED = bool(int(
+    _os.environ.get("NARRATIVE_HTF_OB_ENABLED", "1")))
+NARRATIVE_D1_DRAW_ENABLED = bool(int(
+    _os.environ.get("NARRATIVE_D1_DRAW_ENABLED", "1")))
+HTF_OB_LOOKBACK = int(_os.environ.get("HTF_OB_LOOKBACK", "200"))
+HTF_OB_CONT_MAX_PIPS = float(_os.environ.get("HTF_OB_CONT_MAX_PIPS", "150"))
+HTF_OB_LIQ_TOL_PIPS = float(_os.environ.get("HTF_OB_LIQ_TOL_PIPS", "5"))
+D1_EQUAL_HL_TOL_PIPS = float(_os.environ.get("D1_EQUAL_HL_TOL_PIPS", "10"))
+D1_EQUAL_HL_LOOKBACK = int(_os.environ.get("D1_EQUAL_HL_LOOKBACK", "60"))
+D1_DRAW_LOOKBACK_BARS = int(_os.environ.get("D1_DRAW_LOOKBACK_BARS", "120"))
+
 # --- Bonds/yields dollar-bias sizing lever (intermarket; OFF by default) ---
 # US Treasury yields lead the dollar (higher yields -> USD bid). scripts/
 # bonds_analysis.py measures whether a yield-structure confirmation of the trade's

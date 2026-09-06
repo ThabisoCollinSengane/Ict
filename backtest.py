@@ -2201,6 +2201,204 @@ class Backtester:
                     return 1, tf
         return 0, ""
 
+    def _htf_ob_context(self, pair, direction, cur_price, t):
+        """P48 — H4 OB context: is price inside or continuing from a liquidity-paired H4 OB?
+
+        The correct ICT sequence is top-down: find the H4 order block first (the
+        last opposite-color candle before displacement that visited prior liquidity),
+        then hunt AMD/Judas within it. The OB candle MUST have visited prior
+        liquidity (unmitigated D1/W FVG, prior OB, breaker, PDH/PDL) — without
+        this pairing the OB is noise.
+
+        Golden rule: GBPUSD → bearish OBs only, EURUSD → bullish OBs only.
+        NZDUSD checks both directions.
+
+        Returns (context, ob_tf, liq_type):
+          context: "inside" / "continuation" / ""
+          ob_tf: "240T" / ""
+          liq_type: "d1_fvg" / "w_fvg" / "pdhl" / "ob" / "breaker" / ""
+        """
+        if not config.NARRATIVE_HTF_OB_ENABLED:
+            return "", "", ""
+
+        pip_v = pip_size(pair)
+        liq_tol = config.HTF_OB_LIQ_TOL_PIPS * pip_v
+        cont_max = config.HTF_OB_CONT_MAX_PIPS * pip_v
+
+        h4_bars = self.bars_up_to(pair, "240T", t)
+        if h4_bars is None or len(h4_bars) < 5:
+            return "", "", ""
+
+        obs = detect_order_blocks(h4_bars, lookback=config.HTF_OB_LOOKBACK)
+
+        # Golden rule filter: GBPUSD only bearish OBs, EURUSD only bullish OBs.
+        if pair == "GBPUSD":
+            obs = [o for o in obs if o.direction == -1]
+        elif pair == "EURUSD":
+            obs = [o for o in obs if o.direction == 1]
+
+        # Filter to unmitigated OBs matching trade direction.
+        obs = [o for o in obs if not o.mitigated and o.direction == direction]
+        if not obs:
+            return "", "", ""
+
+        # Get D1/W bars for liquidity pairing check.
+        d1_bars = self.bars_up_to(pair, "D", t)
+        w_bars = self.bars_up_to(pair, "W", t)
+
+        # Get PDH/PDL from market profile.
+        mp = self._market_profile(pair, t)
+        pdh = mp["pdh"] if mp else None
+        pdl = mp["pdl"] if mp else None
+
+        # Scan for D1 and W unmitigated FVGs.
+        d1_fvgs = self._scan_htf_fvgs(d1_bars, pair) if d1_bars and len(d1_bars) >= 3 else []
+        w_fvgs = self._scan_htf_fvgs(w_bars, pair) if w_bars and len(w_bars) >= 3 else []
+
+        # Also detect H4 OBs and breakers for liquidity pairing.
+        h4_breakers = []
+        for ob in detect_order_blocks(h4_bars, lookback=config.HTF_OB_LOOKBACK):
+            if ob.mitigated:
+                h4_breakers.append(ob)
+
+        def _ob_overlaps_range(ob, lo, hi):
+            return ob.top + liq_tol >= lo and ob.bottom - liq_tol <= hi
+
+        def _check_liquidity_pairing(ob):
+            ob_lo, ob_hi = ob.bottom, ob.top
+            # Check unmitigated D1 FVGs.
+            for fvg in d1_fvgs:
+                if not fvg.mitigated and _ob_overlaps_range(ob, fvg.bottom, fvg.top):
+                    return "d1_fvg"
+            # Check unmitigated W FVGs.
+            for fvg in w_fvgs:
+                if not fvg.mitigated and _ob_overlaps_range(ob, fvg.bottom, fvg.top):
+                    return "w_fvg"
+            # Check PDH/PDL.
+            if pdh is not None and pdl is not None:
+                if abs(ob_hi - pdh) <= liq_tol or abs(ob_lo - pdh) <= liq_tol:
+                    return "pdhl"
+                if abs(ob_hi - pdl) <= liq_tol or abs(ob_lo - pdl) <= liq_tol:
+                    return "pdhl"
+            # Check breaker zones (mitigated OBs of opposite direction).
+            for br in h4_breakers:
+                if br.direction == -ob.direction and _ob_overlaps_range(ob, br.body_bottom, br.body_top):
+                    return "breaker"
+            # Check prior unmitigated OBs on D1.
+            if d1_bars and len(d1_bars) >= 5:
+                d1_obs = detect_order_blocks(d1_bars, lookback=config.HTF_OB_LOOKBACK)
+                for d1ob in d1_obs:
+                    if not d1ob.mitigated and _ob_overlaps_range(ob, d1ob.bottom, d1ob.top):
+                        return "ob"
+            return ""
+
+        # Check each candidate OB (nearest to price first).
+        obs.sort(key=lambda o: abs(o.mid - cur_price))
+        for ob in obs:
+            liq_type = _check_liquidity_pairing(ob)
+            if not liq_type:
+                continue
+            # Determine context: inside or continuation.
+            if ob.bottom <= cur_price <= ob.top:
+                return "inside", "240T", liq_type
+            if direction > 0 and cur_price > ob.top and (cur_price - ob.top) <= cont_max:
+                return "continuation", "240T", liq_type
+            if direction < 0 and cur_price < ob.bottom and (ob.bottom - cur_price) <= cont_max:
+                return "continuation", "240T", liq_type
+
+        return "", "", ""
+
+    def _d1_narrative_draw(self, pair, direction, cur_price, t):
+        """P48 — D1 narrative draw: unmitigated D1 FVG or relative equal lows/highs ahead.
+
+        The D1 narrative is the "why" behind the move — where price is drawn to on
+        the swing timeframe. Applies to both "inside OB" and "continuation" contexts.
+
+        Returns (has_draw, draw_type, draw_price):
+          has_draw: True/False
+          draw_type: "d1_fvg" / "equal_hl" / ""
+          draw_price: float or 0.0
+        """
+        if not config.NARRATIVE_D1_DRAW_ENABLED:
+            return False, "", 0.0
+
+        pip_v = pip_size(pair)
+        d1_bars = self.bars_up_to(pair, "D", t)
+        if d1_bars is None or len(d1_bars) < 5:
+            return False, "", 0.0
+
+        # Limit scan window.
+        scan_bars = d1_bars[-config.D1_DRAW_LOOKBACK_BARS:] if len(d1_bars) > config.D1_DRAW_LOOKBACK_BARS else d1_bars
+
+        # Check for unmitigated D1 FVGs ahead in the trade direction.
+        d1_fvgs = self._scan_htf_fvgs(scan_bars, pair)
+        best_fvg_price = None
+        best_fvg_dist = float("inf")
+        for fvg in d1_fvgs:
+            if fvg.mitigated:
+                continue
+            fvg_mid = fvg.mid
+            if direction > 0 and fvg.direction > 0 and fvg_mid > cur_price:
+                dist = fvg_mid - cur_price
+                if dist < best_fvg_dist:
+                    best_fvg_dist = dist
+                    best_fvg_price = fvg_mid
+            elif direction < 0 and fvg.direction < 0 and fvg_mid < cur_price:
+                dist = cur_price - fvg_mid
+                if dist < best_fvg_dist:
+                    best_fvg_dist = dist
+                    best_fvg_price = fvg_mid
+
+        # Check for relative equal lows (shorts) / equal highs (longs) in D1 bars.
+        eq_tol = config.D1_EQUAL_HL_TOL_PIPS * pip_v
+        eq_lookback = min(config.D1_EQUAL_HL_LOOKBACK, len(scan_bars))
+        recent_bars = scan_bars[-eq_lookback:]
+        best_eq_price = None
+        best_eq_dist = float("inf")
+
+        if direction < 0:
+            # Look for equal lows below price (sell-side liquidity draw).
+            lows = [float(b.Low) for b in recent_bars]
+            for i in range(len(lows)):
+                cluster = [lows[i]]
+                for j in range(i + 1, len(lows)):
+                    if abs(lows[j] - lows[i]) <= eq_tol:
+                        cluster.append(lows[j])
+                if len(cluster) >= 2:
+                    eq_level = sum(cluster) / len(cluster)
+                    if eq_level < cur_price:
+                        dist = cur_price - eq_level
+                        if dist < best_eq_dist:
+                            best_eq_dist = dist
+                            best_eq_price = eq_level
+        else:
+            # Look for equal highs above price (buy-side liquidity draw).
+            highs = [float(b.High) for b in recent_bars]
+            for i in range(len(highs)):
+                cluster = [highs[i]]
+                for j in range(i + 1, len(highs)):
+                    if abs(highs[j] - highs[i]) <= eq_tol:
+                        cluster.append(highs[j])
+                if len(cluster) >= 2:
+                    eq_level = sum(cluster) / len(cluster)
+                    if eq_level > cur_price:
+                        dist = eq_level - cur_price
+                        if dist < best_eq_dist:
+                            best_eq_dist = dist
+                            best_eq_price = eq_level
+
+        # Return the nearest qualifying draw.
+        if best_fvg_price is not None and best_eq_price is not None:
+            if best_fvg_dist <= best_eq_dist:
+                return True, "d1_fvg", best_fvg_price
+            return True, "equal_hl", best_eq_price
+        if best_fvg_price is not None:
+            return True, "d1_fvg", best_fvg_price
+        if best_eq_price is not None:
+            return True, "equal_hl", best_eq_price
+
+        return False, "", 0.0
+
     def _load_bond_bias(self):
         """Lazy-load data/bond_bias.json -> {date_str: +1/-1/0} (DGS10 structure).
 
@@ -3314,6 +3512,7 @@ class Backtester:
 
         # P47 — Narrative context scoring: DOW tendency, NFP-week, rate decision
         # context, prior-session PD array provenance, seasonal lean.
+        # P48 — HTF OB context + D1 narrative draw.
         _prev_sweep_dir = None
         if amd is not None:
             _prev_sweep_dir = sweep_dir if sweep_dir == direction else None
@@ -3326,10 +3525,15 @@ class Backtester:
                     _prev_sweep_dir = 1
                 elif cur_price < _psr_mid:
                     _prev_sweep_dir = -1
+        _ob_ctx, _ob_tf, _ob_liq = self._htf_ob_context(pair, direction, cur_price, t)
+        _d1_drw, _d1_drw_type, _d1_drw_price = self._d1_narrative_draw(
+            pair, direction, cur_price, t)
         _narrative = self._narrative_ctx.score(
             pair, direction, t, news_cal=self.news,
             prev_session_sweep_dir=_prev_sweep_dir,
-            weekly_amd_dir=weekly_amd_dir)
+            weekly_amd_dir=weekly_amd_dir,
+            htf_ob_ctx=_ob_ctx,
+            d1_draw=(_d1_drw, _d1_drw_type, _d1_drw_price))
         _narrative_score = _narrative["total"]
         conviction += _narrative_score
 
@@ -3717,6 +3921,12 @@ class Backtester:
             "narrative_rate": _narrative["rate"],
             "narrative_pd_prov": _narrative["pd_prov"],
             "narrative_seasonal": _narrative["seasonal"],
+            "narrative_htf_ob": _narrative["htf_ob"],
+            "narrative_d1_draw": _narrative["d1_draw"],
+            "htf_ob_context": _ob_ctx,
+            "htf_ob_liq_type": _ob_liq,
+            "d1_draw_type": _d1_drw_type,
+            "d1_draw_price": _d1_drw_price,
         }
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
@@ -4263,13 +4473,19 @@ class Backtester:
             conviction += 1
 
         # P47 — Narrative context scoring for golden rule channel.
+        # P48 — HTF OB context + D1 narrative draw.
         _prev_sweep_dir_g = sweep_dir if sweep_dir == direction else None
         wamd_g = self._get_weekly_amd(pair, t)
         weekly_amd_dir_g = wamd_g.direction if wamd_g is not None else 0
+        _ob_ctx, _ob_tf, _ob_liq = self._htf_ob_context(pair, direction, cur_price, t)
+        _d1_drw, _d1_drw_type, _d1_drw_price = self._d1_narrative_draw(
+            pair, direction, cur_price, t)
         _narrative = self._narrative_ctx.score(
             pair, direction, t, news_cal=self.news,
             prev_session_sweep_dir=_prev_sweep_dir_g,
-            weekly_amd_dir=weekly_amd_dir_g)
+            weekly_amd_dir=weekly_amd_dir_g,
+            htf_ob_ctx=_ob_ctx,
+            d1_draw=(_d1_drw, _d1_drw_type, _d1_drw_price))
         _narrative_score = _narrative["total"]
         conviction += _narrative_score
 
@@ -4347,6 +4563,12 @@ class Backtester:
             "narrative_rate": _narrative["rate"],
             "narrative_pd_prov": _narrative["pd_prov"],
             "narrative_seasonal": _narrative["seasonal"],
+            "narrative_htf_ob": _narrative["htf_ob"],
+            "narrative_d1_draw": _narrative["d1_draw"],
+            "htf_ob_context": _ob_ctx,
+            "htf_ob_liq_type": _ob_liq,
+            "d1_draw_type": _d1_drw_type,
+            "d1_draw_price": _d1_drw_price,
         }
         g["mm_golden_opened"] = g.get("mm_golden_opened", 0) + 1
         self._mm_golden_count[daykey] = self._mm_golden_count.get(daykey, 0) + 1
