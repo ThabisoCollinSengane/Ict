@@ -1663,10 +1663,23 @@ source" table by source showing WR/PF breakdown.
 
 **Config:** `SESSION_RANGE_ENABLED=1` (default ON, env-overridable), `SESSION_RANGE_MAX_WIDTH_PIPS=80`.
 
-**Status:** built, compiles clean, default ON. Needs IS/OOS validation — run locally with
-`python run_backtest_histdata.py --years 2022 2023` and `--years 2024 2025`. Ships only if both
-splits stay positive PF and MaxDD holds. The `amd_source` analytics will show exactly how many
-new trades the fallback opens and their quality.
+**IS/OOS RESULT (RAN 2026-09-06) — 🟡 KEPT ON, but weaker than baseline in BOTH splits:**
+
+| Source | IS trades / WR / PF | OOS trades / WR / PF |
+|---|---|---|
+| m15_range | 315 / 43.2% / **3.54** | 353 / 44.8% / **4.48** |
+| session_range | 29 / 41.4% / **2.08** | 25 / 48.0% / **2.34** |
+| (no AMD) | 11 / 45.5% / 2.91 | 7 / 14.3% / 0.62 |
+
+The fallback underperforms the M15-range baseline by ~40-45% on PF in both splits — the full-4yr
+aggregate (session_range PF 3.92 vs m15 4.08) masked this, because OOS was carrying it. **Kept ON
+anyway:** PF stays > 1 in both splits, so per the P8/P10/P11 path-dependency lesson, gating a
+weak-but-positive bucket costs compounding without saving drawdown. Not expanded either.
+
+**Actionable hint — the width cap is too loose.** OOS session ranges were far tighter than IS
+(median 28.6 / p90 52.7 pips vs IS 57.3 / 95.8) and performed better (48.0% vs 41.4% WR). Both
+run far above the M15 consolidation cap of 35 pips. `SESSION_RANGE_MAX_WIDTH_PIPS=80` looks too
+permissive; a tightening toward ~50 is a single-parameter test, not a curve-fit. Untested.
 
 ### P46 — Golden Rule MM Channel (BUILT 2026-09-04, default OFF, pending IS/OOS validation)
 **What:** A second entry channel that fires MORE trades by bypassing the two biggest
@@ -1763,6 +1776,38 @@ absent breakdown (WR/PF each). In both console output and `data/backtest_report.
 **Config:** `NARRATIVE_ENABLED=1` (master switch), per-factor `NARRATIVE_*_ENABLED=1`, all
 env-overridable. `NARRATIVE_SEASONAL_FILE=data/seasonal_bias.json`.
 
+**IS/OOS RESULT (RAN 2026-09-06, after the P48 column-plumbing fix — see P48) — 🔴 mostly RED.
+One factor passes, one is consistently INVERTED, one never fires:**
+
+| Factor | IS fired WR / PF (vs absent) | OOS fired WR / PF (vs absent) | Verdict |
+|---|---|---|---|
+| NFP week Mon/Tue | 62.5% / 4.66 (41.2% / 3.25) | 52.1% / 6.12 (43.3% / 4.03) | ✅ **only pass** |
+| PD prov (sweep) | 43.1% / 3.19 (43.2% / **5.35**) | 42.0% / 3.65 (**57.4% / 8.43**) | ⚠️ **inverted, both splits** |
+| Weekly Profile | 44.8% / 4.04 (39.8% / 2.19) | 45.3% / 4.13 (42.1% / **4.85**) | ❌ PF inverts OOS |
+| Rate decision | 36.7% / **1.20** (43.7% / 3.73) | 53.6% / **10.02** (43.7% / 4.12) | ❌ sign flips — noise |
+| HTF OB (P48) | 51.2% / 5.14 (40.6% / 2.84) | 45.0% / 4.81 (44.1% / 3.92) | ❌ magnitude collapses |
+| D1 Draw (P48) | 43.3% / 3.40 (41.9% / 3.18) | 44.6% / 4.28 (42.9% / 4.35) | ❌ non-selective (~90%) |
+| Seasonal lean | **0 fires** | **0 fires** | ❌ file never generated |
+
+**Three findings:**
+
+1. **`data/seasonal_bias.json` does not exist** — the factor degrades gracefully to 0 exactly as
+   designed, so it silently contributed nothing to all 740 trades across both splits. The effective
+   score ceiling is 6, not 7. `scripts/build_seasonal.py` exists but has never been run. Either
+   generate the file or drop the factor from the score.
+2. **PD provenance is backwards.** It is the ONLY factor consistent across both splits — and in
+   both, the trades where it does NOT fire are materially better (PF 5.35 vs 3.19 IS; 8.43 vs 3.65
+   and WR 57.4% vs 42.0% OOS). "Prior session's sweep agrees with my direction" is a mild NEGATIVE
+   signal. It also fires on ~90% of trades, so as a +1 it is near-useless in either polarity.
+   Inverting it is a candidate, but conviction is saturation-inert so it changes nothing until/unless
+   narrative becomes a gate or sizing lever.
+3. **The aggregate score is not ordinal** and should not be used as a lever. IS: score 1 → PF 0.93,
+   2 → 4.17, 3 → 2.94, 4 → 3.82, 5 → 15.01. OOS: 1 → 3.35, 2 → 4.55, 3 → 4.63, 4 → 3.53, 5 → 5.40.
+   Score 1 is the only losing bucket in IS but is fine in OOS. Unsurprising when three of seven
+   factors are dead, inverted, or non-selective — fix the factors before trusting the total.
+
+**Nothing shipped.** Same measure-first discipline as P39/P40/P42.
+
 ### P48 — HTF Order Block narrative + D1 draw awareness (BUILT 2026-09-06, analytics-only)
 **What:** top-down H4 order block detection with liquidity pairing + D1 narrative draw on
 liquidity — two new factors in the narrative engine (P47), bringing the total from 5 to 7
@@ -1829,13 +1874,38 @@ HTF OB context and D1 draws predict trade quality in IS/OOS.
 `HTF_OB_CONT_MAX_PIPS=150`, `HTF_OB_LIQ_TOL_PIPS=5`, `D1_EQUAL_HL_TOL_PIPS=10`,
 `D1_EQUAL_HL_LOOKBACK=60`, `D1_DRAW_LOOKBACK_BARS=120` (all env-overridable).
 
-**Status:** analytics-only, pending IS/OOS validation. Run locally:
-`python run_backtest_histdata.py --years 2022 2023` and `--years 2024 2025`.
+**⚠️ Column-plumbing bug (FOUND + FIXED 2026-09-06, commit `3c226e8`):** the closed-trade record
+in `_close_leg` (both the full-close and TP1-partial paths) is built from an explicit whitelist of
+`st.get()` keys. All twelve P47/P48 fields were written into the OPEN-side position dict but were
+missing from that whitelist, so they never reached `backtester.trades` → `DataFrame` → the report
+writer, which gates its three tables on `narrative_score` / `htf_ob_context` / `d1_draw_type`
+being in `df.columns`. All three were absent, so the tables were **silently omitted from every
+report**. Since P47/P48 are conviction-saturation-inert by design (`low_conviction: 0` in the gate
+funnel across all runs), the analytics WERE their entire deliverable — both builds produced nothing
+measurable from ship date until the fix. **Lesson:** a build whose only output is an analytics
+column needs its column asserted end-to-end, not just written at the call site. An absent column
+makes the report section vanish rather than error.
 
-**Future levers (pending GREEN validation):**
-- OB-confirmed sizing 1.25× (analogous to P9/P18/P19/P41 sizing bumps)
-- MM standalone filter (use HTF OB context to filter standalone entries → reduce DD)
-- Swing target unlock (when inside an H4 OB with D1 draw, escalate target to the D1 draw)
+**IS/OOS RESULT (RAN 2026-09-06, post-fix) — 🔴 RED, no lever ships:**
+
+| Signal | IS | OOS | Verdict |
+|---|---|---|---|
+| HTF OB continuation | 83 tr / 50.6% / PF 5.08 | 129 tr / 45.0% / PF 4.81 | — |
+| HTF OB none (baseline) | 271 tr / 40.6% / PF 2.84 | 256 tr / 44.1% / PF 3.92 | — |
+| **HTF OB WR edge** | **+10.0pp** | **+0.9pp** | ❌ magnitude collapses |
+| D1 Draw (equal_hl) | 311/355 = 88% fire | 348/385 = 90% fire | ❌ non-selective |
+
+The HTF OB edge is positive in both splits but **+10.0pp → +0.9pp fails not-curve-fit criterion #3**
+(magnitudes must be same-ballpark). Liquidity sub-buckets confirm instability: `pdhl` flips 33.3% /
+PF 0.56 (IS) → 56.2% / 1.46 (OOS); `breaker` WR 52.6% → 41.2%. The `inside` context fired **once in
+355 IS trades** — effectively dead; all P48 OB value sits in `continuation`. D1 Draw fires on ~90%
+of trades (`D1_EQUAL_HL_TOL_PIPS=10` over 60 daily bars is loose enough that nearly any price has
+relative equal H/L ahead), so it cannot discriminate; the `d1_fvg` branch fired 1× IS / 2× OOS.
+
+**Future levers — CANCELLED on this evidence:**
+- ~~OB-confirmed sizing 1.25×~~ — the OOS edge (+0.9pp) does not justify a sizing bump
+- ~~MM standalone filter via OB context~~ — signal too unstable to filter on
+- ~~Swing target unlock on inside+D1 draw~~ — `inside` fires ~0× ; premise doesn't occur
 
 ---
 
