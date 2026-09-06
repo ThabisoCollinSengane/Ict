@@ -1763,6 +1763,80 @@ absent breakdown (WR/PF each). In both console output and `data/backtest_report.
 **Config:** `NARRATIVE_ENABLED=1` (master switch), per-factor `NARRATIVE_*_ENABLED=1`, all
 env-overridable. `NARRATIVE_SEASONAL_FILE=data/seasonal_bias.json`.
 
+### P48 — HTF Order Block narrative + D1 draw awareness (BUILT 2026-09-06, analytics-only)
+**What:** top-down H4 order block detection with liquidity pairing + D1 narrative draw on
+liquidity — two new factors in the narrative engine (P47), bringing the total from 5 to 7
+(score 0-7). Implements the ICT three-layer hierarchy: D1/W = NARRATIVE (FVGs + equal
+lows/highs = draws), H4 = ORDER BLOCK (setup zone), H1/M15 = ENTRY (AMD/Judas fractal).
+
+**Factor 6 — HTF Order Block context (`_htf_ob_context` in backtest.py):**
+- Scans H4 bars (`HTF_OB_LOOKBACK=200`) for unmitigated order blocks via `detect_order_blocks`
+- **Golden rule filter**: GBPUSD → bearish OBs only (sell GBP), EURUSD → bullish OBs only
+  (buy EUR). Other pairs accept both directions.
+- **Liquidity pairing requirement**: the H4 OB must overlap (within `HTF_OB_LIQ_TOL_PIPS=5`)
+  with at least one prior liquidity source:
+  - Unmitigated D1/W FVG (via `_scan_htf_fvgs`)
+  - PDH/PDL (via `_market_profile`)
+  - Breaker zone (mitigated H4 OB that swept a prior OB = breaker)
+  - Prior D1 OB (via `detect_order_blocks` on D1 bars)
+- **Context classification**:
+  - `"inside"`: price is within the H4 OB wick range (high–low) — the accumulation zone
+  - `"continuation"`: price is past the OB in the trade direction, within `HTF_OB_CONT_MAX_PIPS=150`
+  - `""`: no qualifying OB found
+- Returns `(context, ob_tf, liq_type)` — e.g. `("inside", "240T", "d1_fvg")`
+- +1 narrative conviction when context is `"inside"` or `"continuation"`
+
+**Factor 7 — D1 narrative draw (`_d1_narrative_draw` in backtest.py):**
+- Scans D1 bars (`D1_DRAW_LOOKBACK_BARS=120`) for swing-level draws ahead in the trade direction
+- **Unmitigated D1 FVGs**: bullish FVG above price (for longs) or bearish FVG below (for shorts)
+  — the bigger-timeframe draw on liquidity that the current AMD cycle delivers INTO
+- **Relative equal lows/highs**: 2+ daily extremes within `D1_EQUAL_HL_TOL_PIPS=10` — resting
+  buy-stop (equal highs) or sell-stop (equal lows) liquidity pools. Scanned over
+  `D1_EQUAL_HL_LOOKBACK=60` daily bars.
+- Returns `(has_draw, draw_type, draw_price)` — e.g. `(True, "d1_fvg", 1.1250)`
+- +1 narrative conviction when a qualifying draw exists ahead
+
+**ICT Market Maker Model mapping (confirmed 2026-09-06 from 7 MM Model screenshots):**
+Every stage of the ICT Buy/Sell Model maps to an existing algo component:
+
+| MM Model Stage | Algo Component | Build |
+|---|---|---|
+| +OB [1st Stage Accumulation] | `_htf_ob_context` | P48 |
+| +FVG C.E. [2nd Stage Reaccum.] | `_htf_fvg_conviction` (50% midpoint) | P9 |
+| Smart Money Reversal | MSS 2-of-3 gate | base |
+| -Breaker [1st Stage Distribution] | `find_breaker_zone` | base |
+| -OB [2nd Stage Redistribution] | `detect_order_blocks` + IFVG cascade | P43 |
+| Buyside/Sellside Liquidity raid | AMD Judas sweep | base |
+| Return To Original Consolidation | Draw cascade + target selection | P15/P17 |
+| 60 Minute FVG (SIBI/BISI) | `_htf_fvg_conviction` H1 scan | P9 |
+
+**Wiring:** both `_maybe_open` and `_mm_golden_entry` compute HTF OB context and D1 draw
+before calling `NarrativeContext.score()`, passing `htf_ob_ctx=` and `d1_draw=` params.
+Expected to be conviction-saturation-inert on first deployment (same as P9/P15/P16/P19/P47
+— trades already at conviction > 4). The value is in the analytics columns proving whether
+HTF OB context and D1 draws predict trade quality in IS/OOS.
+
+**Trade record columns:** `narrative_htf_ob` (bool), `narrative_d1_draw` (bool),
+`htf_ob_context` ("inside"/"continuation"/""), `htf_ob_liq_type` ("d1_fvg"/"pdhl"/"breaker"/
+"d1_ob"/""), `d1_draw_type` ("d1_fvg"/"equal_hl"/""), `d1_draw_price` (float or "").
+
+**Reporting:** two new tables in console + markdown:
+- "HTF OB context breakdown (P48)": inside/continuation/none × WR/PF, with liquidity type
+  sub-breakdown (d1_fvg, pdhl, breaker, d1_ob)
+- "D1 narrative draw breakdown (P48)": d1_fvg/equal_hl/none × WR/PF
+
+**Config:** `NARRATIVE_HTF_OB_ENABLED=1`, `NARRATIVE_D1_DRAW_ENABLED=1`, `HTF_OB_LOOKBACK=200`,
+`HTF_OB_CONT_MAX_PIPS=150`, `HTF_OB_LIQ_TOL_PIPS=5`, `D1_EQUAL_HL_TOL_PIPS=10`,
+`D1_EQUAL_HL_LOOKBACK=60`, `D1_DRAW_LOOKBACK_BARS=120` (all env-overridable).
+
+**Status:** analytics-only, pending IS/OOS validation. Run locally:
+`python run_backtest_histdata.py --years 2022 2023` and `--years 2024 2025`.
+
+**Future levers (pending GREEN validation):**
+- OB-confirmed sizing 1.25× (analogous to P9/P18/P19/P41 sizing bumps)
+- MM standalone filter (use HTF OB context to filter standalone entries → reduce DD)
+- Swing target unlock (when inside an H4 OB with D1 draw, escalate target to the D1 draw)
+
 ---
 
 ## 3-month live account scenarios (R1,000 start, updated 2026-09-03)
