@@ -1076,5 +1076,13 @@ TELEGRAM_CHAT_ID   = ""   # e.g. "987654321"  (your personal chat ID)
 # -- a bar that is still forming at t but whose High/Low/Close were resampled from the
 # whole window. At t=09:00 an 08:00-12:00 H4 bar already carried its 11:00 high, so
 # every H4/D/H1/M15 read saw up to a full bar of future data. Verified empirically.
-# 1 = drop the forming bar (correct). 0 = old behaviour, for A/B measuring the bias only.
-STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "1")))
+# DEFAULT 0 — dropping the forming bar is NOT the right remedy and is off until the
+# partial-bar version is built. Three possible states for the bar forming at t:
+#   whole window incl. future  -> lookahead          (the original bug)
+#   dropped entirely           -> up to 15/60/240min stale  (STRICT_BAR_CLOSE=1)
+#   truncated to open..t       -> what live sees     (correct; not yet implemented)
+# Dropping it broke the engine: detect_amd_setup runs on M15, so the Judas sweep was
+# detected up to 15 minutes late while entry still priced off the current M5 bar.
+# Full 4yr came back 60 trades / WR 11.7% / PF 0.33 / -51.7%.
+# 1 = drop the forming bar (measurement only, KNOWN BROKEN). 0 = pre-existing behaviour.
+STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "0")))
