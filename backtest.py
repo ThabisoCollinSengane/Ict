@@ -225,12 +225,23 @@ class Backtester:
 
         self.log = TradeLog()
 
+    # pandas `resample` labels bars by their OPEN time for every rule we use except
+    # "W", which it labels by the period END. A left-labelled bar whose open <= t is
+    # therefore still FORMING at t; a right-labelled one whose label <= t is complete.
+    _RIGHT_LABELLED_TFS = frozenset({"W"})
+
     def bars_up_to(self, sym, tf, t, max_bars=None):
         idx = self.tf_index.get((sym, tf))
         if idx is None:
             return []
         pos = idx.searchsorted(t, side="right")
-        if pos == 0:
+        if config.STRICT_BAR_CLOSE and tf not in self._RIGHT_LABELLED_TFS:
+            # Drop the still-forming bar. Its High/Low/Close were resampled from the
+            # WHOLE window, so at t=09:00 an 08:00-12:00 H4 bar already carries the
+            # 11:00 high — three hours of future data. Every HTF read (draw cascade,
+            # HTF FVG, market structure, CRT, ITH/ITL, OB context) sat on this.
+            pos -= 1
+        if pos <= 0:
             return []
         bars = self.tf_bars[(sym, tf)]
         if max_bars is not None:

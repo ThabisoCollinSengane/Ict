@@ -1069,3 +1069,12 @@ SCALE_OUT_MIN_TARGET_PIPS  = float(_os.environ.get("SCALE_OUT_MIN_TARGET_PIPS", 
 # Leave empty to disable all notifications (backtest / no-live mode).
 TELEGRAM_BOT_TOKEN = ""   # e.g. "123456789:AABBccDDeeFFggHHiiJJkkLLmmNNoo"
 TELEGRAM_CHAT_ID   = ""   # e.g. "987654321"  (your personal chat ID)
+
+# --- Bar-close discipline (lookahead fix, 2026-09-07) ---
+# pandas resample labels bars by their OPEN time (except "W", labelled by period end).
+# bars_up_to used searchsorted(t, side="right"), which INCLUDES the bar whose open <= t
+# -- a bar that is still forming at t but whose High/Low/Close were resampled from the
+# whole window. At t=09:00 an 08:00-12:00 H4 bar already carried its 11:00 high, so
+# every H4/D/H1/M15 read saw up to a full bar of future data. Verified empirically.
+# 1 = drop the forming bar (correct). 0 = old behaviour, for A/B measuring the bias only.
+STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "1")))
