@@ -631,9 +631,12 @@ MM_GOLDEN_MIN_DRAW = int(_os.environ.get("MM_GOLDEN_MIN_DRAW", "2"))
 # failure is the other's trigger, so the two are mutually exclusive by construction and
 # both are never held at once.
 MM_GOLDEN_OB_ENABLED = bool(int(_os.environ.get("MM_GOLDEN_OB_ENABLED", "1")))
-# Cascade highest-first: take the biggest timeframe that holds a valid paired OB.
+# Cascade highest-first: take the biggest timeframe that holds a valid paired OB, and
+# STEP DOWN when it doesn't. D1 -> H4 -> H1 -> M15. Stopping at H4 (the original pair)
+# left 533 consolidations with no paired block at all; the block often lives one or two
+# rungs lower, and a respected H1/M15 equilibrium tells the same story on a finer scale.
 MM_GOLDEN_OB_TFS = tuple(
-    _os.environ.get("MM_GOLDEN_OB_TFS", "D,240T").split(","))
+    _os.environ.get("MM_GOLDEN_OB_TFS", "D,240T,60T,15T").split(","))
 MM_GOLDEN_OB_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_LOOKBACK", "200"))
 # How close the consolidation must sit to the OB zone to count as "paired".
 MM_GOLDEN_OB_PAIR_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_OB_PAIR_TOL_PIPS", "15"))

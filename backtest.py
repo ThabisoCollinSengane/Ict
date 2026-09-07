@@ -495,6 +495,11 @@ class Backtester:
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
             "golden_rule": st.get("golden_rule", ""),
+            "golden_via": st.get("golden_via", ""),
+            "golden_ob_tf": st.get("golden_ob_tf", ""),
+            "golden_ob_state": st.get("golden_ob_state", ""),
+            "golden_smt": st.get("golden_smt", False),
+            "golden_score": st.get("golden_score", 0),
             "narrative_score": st.get("narrative_score", 0),
             "narrative_weekly_profile": st.get("narrative_weekly_profile", 0),
             "narrative_nfp": st.get("narrative_nfp", 0),
@@ -593,6 +598,11 @@ class Backtester:
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
             "golden_rule": st.get("golden_rule", ""),
+            "golden_via": st.get("golden_via", ""),
+            "golden_ob_tf": st.get("golden_ob_tf", ""),
+            "golden_ob_state": st.get("golden_ob_state", ""),
+            "golden_smt": st.get("golden_smt", False),
+            "golden_score": st.get("golden_score", 0),
             "narrative_score": st.get("narrative_score", 0),
             "narrative_weekly_profile": st.get("narrative_weekly_profile", 0),
             "narrative_nfp": st.get("narrative_nfp", 0),
@@ -4393,13 +4403,19 @@ class Backtester:
             obs = [o for o in obs if o.direction == direction]
             if not obs:
                 continue
-            # Consolidation must sit at the block: zones overlap within tolerance.
-            paired = [o for o in obs
-                      if o.top + tol >= rng.low and o.bottom - tol <= rng.high]
-            if not paired:
-                continue
-            # Nearest block to the coil is the one price is reacting to.
-            paired.sort(key=lambda o: abs(o.body_mid - (rng.high + rng.low) / 2.0))
+            if rng is not None:
+                # Consolidation must sit at the block: zones overlap within tolerance.
+                paired = [o for o in obs
+                          if o.top + tol >= rng.low and o.bottom - tol <= rng.high]
+                if not paired:
+                    continue                       # step down a timeframe
+                anchor = (rng.high + rng.low) / 2.0
+            else:
+                # No consolidation supplied (cascade read of the OTHER pair): the block
+                # price is currently reacting to is the one that tells the story.
+                paired, anchor = obs, bars[-1].Close
+            # Nearest block to the anchor is the one price is reacting to.
+            paired.sort(key=lambda o: abs(o.body_mid - anchor))
             ob = paired[0]
             return (self._ob_equilibrium_state(ob, bars, direction), tf, ob.body_mid)
         return "", "", 0.0
@@ -4419,16 +4435,10 @@ class Backtester:
             return False, ""
         other = "GBPUSD" if pair == "EURUSD" else "EURUSD"
         other_dir = -direction          # the other pair's golden direction is opposite
-        bars15 = self.bars_up_to(other, "15T", t)
-        if not bars15:
-            return False, ""
-        other_amd = detect_amd_setup(
-            bars15, other, max_range_pips=self._amd_max_range(other, bars15[-1].Close))
-        if other_amd is None and config.SESSION_RANGE_ENABLED:
-            other_amd = self._session_range_amd(other, t, bars15)
-        if other_amd is None:
-            return False, ""
-        state, tf, _eq = self._golden_ob_pairing(other, other_dir, other_amd[0], t)
+        # NOTE: deliberately no AMD requirement on the other pair. Its zone failing is
+        # observable from its own order block regardless of whether IT has a
+        # consolidation — requiring one was why the cascade fired 5 times against 173.
+        state, tf, _eq = self._golden_ob_pairing(other, other_dir, None, t)
         if state != "failed":
             return False, ""
         if not config.MM_GOLDEN_CASCADE_NEEDS_IFVG:
@@ -4565,10 +4575,15 @@ class Backtester:
                 return
         g[f"mm_golden_via_{_golden_via}"] = g.get(f"mm_golden_via_{_golden_via}", 0) + 1
 
-        # SMT (EU/GU divergence) alongside the equilibrium read, when required.
-        if config.MM_GOLDEN_OB_SMT_REQUIRED and not self._htf_pair_smt(pair, direction, t):
+        # SMT (EU/GU divergence) alongside the equilibrium read — the bodies tell the
+        # direction story, SMT confirms the two pairs disagree. Scored, not just gated,
+        # so the analytics can show whether it separates winners from losers.
+        _golden_smt = bool(self._htf_pair_smt(pair, direction, t))
+        if config.MM_GOLDEN_OB_SMT_REQUIRED and not _golden_smt:
             g["mm_golden_no_smt"] = g.get("mm_golden_no_smt", 0) + 1
             return
+        g[f"mm_golden_smt_{'yes' if _golden_smt else 'no'}"] = (
+            g.get(f"mm_golden_smt_{'yes' if _golden_smt else 'no'}", 0) + 1)
 
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)
@@ -4718,6 +4733,15 @@ class Backtester:
             "draw_score": _draw_score,
             "im_scenario": "golden",
             "entry_model": "mm_golden",
+            # P49 analytics — what the trades that DO fire actually have.
+            "golden_via": _golden_via,          # own_ob | cascade
+            "golden_ob_tf": _ob_tf,             # D | 240T | 60T | 15T
+            "golden_ob_state": _ob_state,       # respected | failed | untested | ""
+            "golden_smt": _golden_smt,
+            # Quality score: equilibrium respected + SMT + a strong HTF draw.
+            "golden_score": ((_golden_via == "own_ob")
+                             + int(_golden_smt)
+                             + int(_draw_score >= 3)),
             "session_phase": f"{_session_label}_golden",
             "profile": _session_label,
             "htf_fvg": "",
