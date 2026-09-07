@@ -4702,6 +4702,18 @@ class Backtester:
         _narrative_score = _narrative["total"]
         conviction += _narrative_score
 
+        # P49c — make the narrative actually DECIDE something on this channel.
+        # Adding to `conviction` is inert: the gate funnel shows low_conviction: 0 on
+        # every run ever recorded, so conviction has never once blocked or allowed a
+        # trade. A minimum narrative score is the first place the session's story is
+        # allowed to veto an entry. Default 0 = off (byte-identical) until the broken
+        # factors are repaired — seasonal never fires (data/seasonal_bias.json was
+        # never generated) and PD-provenance is inverted in all three measured runs,
+        # so the raw total is diluted by two dead inputs.
+        if _narrative_score < config.MM_GOLDEN_MIN_NARRATIVE:
+            g["mm_golden_low_narrative"] = g.get("mm_golden_low_narrative", 0) + 1
+            return
+
         max_legs = 1
         if conviction > 4:
             max_legs = config.MAX_LEGS

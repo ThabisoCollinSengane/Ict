@@ -651,8 +651,18 @@ MM_GOLDEN_CASCADE_IFVG_TFS = tuple(
 # "we dont and never hold both pairs at once"). Unlike MM_GOLDEN_DECORR_ALL this also
 # blocks OPPOSING dollar directions (EU long + GU short = two spreads for one bet).
 MM_GOLDEN_ONE_PAIR_ONLY = bool(int(_os.environ.get("MM_GOLDEN_ONE_PAIR_ONLY", "1")))
-# SMT (EU/GU divergence) confirmation alongside the equilibrium respect.
-MM_GOLDEN_OB_SMT_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_SMT_REQUIRED", "0")))
+# SMT (EU/GU divergence) confirmation alongside the equilibrium respect. REQUIRED:
+# SMT presence + the golden rule IS the trade. Which pair made the extreme does not
+# matter and no relative-strength comparison is made -- GBPUSD taking a high that
+# EURUSD fails to confirm is a GBPUSD sell (golden), not a reason to short the
+# "weaker" EURUSD. _htf_pair_smt already tests both pairs as the primary, so this is
+# pure presence-of-divergence in the trade direction.
+MM_GOLDEN_OB_SMT_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_SMT_REQUIRED", "1")))
+# Minimum P47/P48 narrative score for a golden entry. The narrative's only current
+# output is `conviction`, which is inert (low_conviction: 0 in every run), so this is
+# the first lever that lets the session's story veto a trade. Default 0 = off; raise
+# it only after the dead factors are fixed (see MM_GOLDEN_MIN_NARRATIVE notes in P49c).
+MM_GOLDEN_MIN_NARRATIVE = int(_os.environ.get("MM_GOLDEN_MIN_NARRATIVE", "0"))
 
 # --- P47: Narrative context scoring ---
 # Contextual "story" layer: ICT Weekly Profile, NFP-week, rate decisions, prior-session
