@@ -229,13 +229,20 @@ class Backtester:
     # "W", which it labels by the period END. A left-labelled bar whose open <= t is
     # therefore still FORMING at t; a right-labelled one whose label <= t is complete.
     _RIGHT_LABELLED_TFS = frozenset({"W"})
+    # The loop steps M5 and fills via _bar_at(pair, "5T", t), so the M5 bar AT t is the
+    # DECISION bar: signals and fills must both see it or entry prices go stale against
+    # the fill. M1 likewise feeds stop placement at t. Only timeframes COARSER than the
+    # loop step carry real lookahead, and only those may drop their forming bar.
+    _EXEC_TFS = frozenset({"1T", "5T"})
 
     def bars_up_to(self, sym, tf, t, max_bars=None):
         idx = self.tf_index.get((sym, tf))
         if idx is None:
             return []
         pos = idx.searchsorted(t, side="right")
-        if config.STRICT_BAR_CLOSE and tf not in self._RIGHT_LABELLED_TFS:
+        if (config.STRICT_BAR_CLOSE
+                and tf not in self._RIGHT_LABELLED_TFS
+                and tf not in self._EXEC_TFS):
             # Drop the still-forming bar. Its High/Low/Close were resampled from the
             # WHOLE window, so at t=09:00 an 08:00-12:00 H4 bar already carries the
             # 11:00 high — three hours of future data. Every HTF read (draw cascade,
