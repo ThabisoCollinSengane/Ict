@@ -4340,6 +4340,110 @@ class Backtester:
         }
         self.gate["mm_std_opened"] = self.gate.get("mm_std_opened", 0) + 1
 
+    # ── P49: consolidation ↔ HTF OB equilibrium pairing ────────────────────
+    @staticmethod
+    def _ob_equilibrium_state(ob, tf_bars, direction):
+        """Respect vs failure at the OB's EQUILIBRIUM (body_mid, 50% per Ep 35).
+
+        For a bearish OB (the GBPUSD sell zone): price should NOT close above
+        equilibrium. A completed candle on the OB's OWN timeframe that trades up to
+        equilibrium and CLOSES above it means the zone FAILED. Closing back on the
+        correct side after testing it means the zone was RESPECTED.
+
+        Returns "respected" / "failed" / "untested".
+        """
+        eq = ob.body_mid
+        tested = False
+        for c in tf_bars[ob.bar_index + 2:]:
+            if direction < 0:                      # bearish OB — sell zone
+                if c.High >= eq:
+                    tested = True
+                    if c.Close > eq:
+                        return "failed"
+            else:                                  # bullish OB — buy zone
+                if c.Low <= eq:
+                    tested = True
+                    if c.Close < eq:
+                        return "failed"
+        return "respected" if tested else "untested"
+
+    def _golden_ob_pairing(self, pair, direction, rng, t):
+        """Pair a consolidation to an order block on a higher timeframe, then read how
+        that timeframe is behaving around the block's equilibrium.
+
+        Cascades HIGHEST first (`MM_GOLDEN_OB_TFS` = D1 → H4): the biggest timeframe
+        holding a valid paired OB wins. Golden rule applies — GBPUSD pairs only with
+        BEARISH blocks, EURUSD only with BULLISH ones.
+
+        "Paired" means the consolidation range overlaps the OB zone within
+        `MM_GOLDEN_OB_PAIR_TOL_PIPS` — the coil is forming AT the block.
+
+        Returns (state, tf, equilibrium) where state is
+        "respected" / "failed" / "untested" / "" (no paired OB found).
+        """
+        if not config.MM_GOLDEN_OB_ENABLED:
+            return "respected", "", 0.0        # feature off → never gates
+
+        tol = config.MM_GOLDEN_OB_PAIR_TOL_PIPS * pip_size(pair)
+        for tf in config.MM_GOLDEN_OB_TFS:
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 5:
+                continue
+            obs = detect_order_blocks(bars, lookback=config.MM_GOLDEN_OB_LOOKBACK)
+            obs = [o for o in obs if o.direction == direction]
+            if not obs:
+                continue
+            # Consolidation must sit at the block: zones overlap within tolerance.
+            paired = [o for o in obs
+                      if o.top + tol >= rng.low and o.bottom - tol <= rng.high]
+            if not paired:
+                continue
+            # Nearest block to the coil is the one price is reacting to.
+            paired.sort(key=lambda o: abs(o.body_mid - (rng.high + rng.low) / 2.0))
+            ob = paired[0]
+            return (self._ob_equilibrium_state(ob, bars, direction), tf, ob.body_mid)
+        return "", "", 0.0
+
+    def _golden_cascade_ok(self, pair, direction, t):
+        """The failure cascade: one pair's failed zone is the other pair's signal.
+
+        GBPUSD failing its bearish zone (closing above equilibrium) means GBPUSD is
+        going UP → the dollar is going DOWN → that is the EURUSD golden BUY. The
+        inverse holds for EURUSD failing its bullish zone.
+
+        Confirmed with an IFVG in our direction when
+        `MM_GOLDEN_CASCADE_NEEDS_IFVG` is set — the inversion is what makes the other
+        pair's failure tradeable here rather than merely suggestive.
+        """
+        if not config.MM_GOLDEN_CASCADE_ENABLED:
+            return False, ""
+        other = "GBPUSD" if pair == "EURUSD" else "EURUSD"
+        other_dir = -direction          # the other pair's golden direction is opposite
+        bars15 = self.bars_up_to(other, "15T", t)
+        if not bars15:
+            return False, ""
+        other_amd = detect_amd_setup(
+            bars15, other, max_range_pips=self._amd_max_range(other, bars15[-1].Close))
+        if other_amd is None and config.SESSION_RANGE_ENABLED:
+            other_amd = self._session_range_amd(other, t, bars15)
+        if other_amd is None:
+            return False, ""
+        state, tf, _eq = self._golden_ob_pairing(other, other_dir, other_amd[0], t)
+        if state != "failed":
+            return False, ""
+        if not config.MM_GOLDEN_CASCADE_NEEDS_IFVG:
+            return True, tf
+        # IFVG confirmation on our own pair, in our direction.
+        from ict.ifvg import latest_inversion
+        for itf in config.MM_GOLDEN_CASCADE_IFVG_TFS:
+            ibars = self.bars_up_to(pair, itf, t)
+            if ibars is None or len(ibars) < 5:
+                continue
+            for fvg in self._scan_htf_fvgs(ibars, pair):
+                if latest_inversion(ibars, fvg.bottom, fvg.top) == direction:
+                    return True, tf
+        return False, ""
+
     # ── P46: Golden Rule MM Channel ────────────────────────────────────────
     def _mm_golden_entry(self, pair, t):
         """Relaxed-gate daily entry for EURUSD long / GBPUSD short.
@@ -4395,6 +4499,17 @@ class Backtester:
         # All pairs are X/USD, so dollar_dir = -direction (long X/USD = short USD).
         # With MM_GOLDEN_DECORR_ALL (default ON), this catches base strategy trades
         # too — EU base long + GU golden short = double dollar exposure.
+        # P49 hard rule — never hold EURUSD and GBPUSD at the same time. The two golden
+        # setups are mutually exclusive by construction (one pair's failed zone IS the
+        # other's trigger), so holding both means paying two spreads for one dollar bet
+        # — and with opposite directions they cancel to roughly flat exposure, which
+        # MM_GOLDEN_DECORR_ALL below does NOT catch (it only blocks the SAME direction).
+        if config.MM_GOLDEN_ONE_PAIR_ONLY:
+            _other = "GBPUSD" if pair == "EURUSD" else "EURUSD"
+            if _other in self.active:
+                g["mm_golden_other_pair_open"] = g.get("mm_golden_other_pair_open", 0) + 1
+                return
+
         _dollar_dir = -direction
         if config.MM_GOLDEN_DECORR_ALL:
             if any(-op["direction"] == _dollar_dir for op in self.active.values()):
@@ -4428,6 +4543,32 @@ class Backtester:
             g["mm_golden_wrong_sweep"] = g.get("mm_golden_wrong_sweep", 0) + 1
             return
         g["mm_golden_amd_ok"] = g.get("mm_golden_amd_ok", 0) + 1
+
+        # P49 — pair the consolidation to an HTF order block and read the equilibrium.
+        # Our own zone respected = take the golden entry. Our own zone FAILED = stand
+        # down (price is leaving in the wrong direction). No paired block at all = no
+        # trade: the consolidation has no higher-timeframe reason to exist.
+        _ob_state, _ob_tf, _ob_eq = self._golden_ob_pairing(pair, direction, rng, t)
+        _golden_via = ""
+        if _ob_state == "respected":
+            _golden_via = "own_ob"
+        else:
+            # Cascade: the OTHER pair failing its zone is our signal. GBPUSD failing
+            # its sell zone means the dollar is falling → EURUSD golden buy.
+            _casc_ok, _casc_tf = self._golden_cascade_ok(pair, direction, t)
+            if _casc_ok:
+                _golden_via = "cascade"
+                _ob_tf = _ob_tf or _casc_tf
+            else:
+                g[f"mm_golden_ob_{_ob_state or 'none'}"] = (
+                    g.get(f"mm_golden_ob_{_ob_state or 'none'}", 0) + 1)
+                return
+        g[f"mm_golden_via_{_golden_via}"] = g.get(f"mm_golden_via_{_golden_via}", 0) + 1
+
+        # SMT (EU/GU divergence) alongside the equilibrium read, when required.
+        if config.MM_GOLDEN_OB_SMT_REQUIRED and not self._htf_pair_smt(pair, direction, t):
+            g["mm_golden_no_smt"] = g.get("mm_golden_no_smt", 0) + 1
+            return
 
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)

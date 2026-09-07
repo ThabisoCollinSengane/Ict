@@ -620,6 +620,37 @@ MM_GOLDEN_MAX_PER_DAY = int(_os.environ.get("MM_GOLDEN_MAX_PER_DAY", "1"))
 MM_GOLDEN_DECORR_ALL = bool(int(_os.environ.get("MM_GOLDEN_DECORR_ALL", "1")))
 MM_GOLDEN_MIN_DRAW = int(_os.environ.get("MM_GOLDEN_MIN_DRAW", "2"))
 
+# --- P49: consolidation <-> HTF order-block equilibrium pairing (user's daily model) ---
+# Every consolidation must pair with an order block on a higher timeframe. The OB's
+# EQUILIBRIUM (body_mid, the 50% mean per Ep 35) is the level watched: for a GBPUSD
+# sell off a bearish OB price must NOT close above equilibrium. A completed candle on
+# the OB's own timeframe closing beyond it = the zone FAILED.
+#
+# The cascade: GBPUSD failing its sell zone means GBPUSD is going UP, i.e. the dollar
+# is going DOWN — which is the EURUSD golden BUY signal, taken via an IFVG. One pair's
+# failure is the other's trigger, so the two are mutually exclusive by construction and
+# both are never held at once.
+MM_GOLDEN_OB_ENABLED = bool(int(_os.environ.get("MM_GOLDEN_OB_ENABLED", "1")))
+# Cascade highest-first: take the biggest timeframe that holds a valid paired OB.
+MM_GOLDEN_OB_TFS = tuple(
+    _os.environ.get("MM_GOLDEN_OB_TFS", "D,240T").split(","))
+MM_GOLDEN_OB_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_LOOKBACK", "200"))
+# How close the consolidation must sit to the OB zone to count as "paired".
+MM_GOLDEN_OB_PAIR_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_OB_PAIR_TOL_PIPS", "15"))
+# Failure of the opposite pair's zone flips us to this pair (the cascade).
+MM_GOLDEN_CASCADE_ENABLED = bool(int(_os.environ.get("MM_GOLDEN_CASCADE_ENABLED", "1")))
+# A cascade entry (taken on the OTHER pair's failure) must show an IFVG in our direction.
+MM_GOLDEN_CASCADE_NEEDS_IFVG = bool(
+    int(_os.environ.get("MM_GOLDEN_CASCADE_NEEDS_IFVG", "1")))
+MM_GOLDEN_CASCADE_IFVG_TFS = tuple(
+    _os.environ.get("MM_GOLDEN_CASCADE_IFVG_TFS", "60T,15T,5T").split(","))
+# Never hold EURUSD and GBPUSD golden positions at the same time (user's hard rule:
+# "we dont and never hold both pairs at once"). Unlike MM_GOLDEN_DECORR_ALL this also
+# blocks OPPOSING dollar directions (EU long + GU short = two spreads for one bet).
+MM_GOLDEN_ONE_PAIR_ONLY = bool(int(_os.environ.get("MM_GOLDEN_ONE_PAIR_ONLY", "1")))
+# SMT (EU/GU divergence) confirmation alongside the equilibrium respect.
+MM_GOLDEN_OB_SMT_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_SMT_REQUIRED", "0")))
+
 # --- P47: Narrative context scoring ---
 # Contextual "story" layer: ICT Weekly Profile, NFP-week, rate decisions, prior-session
 # PD array provenance, seasonal lean. Each factor contributes 0 or 1 to conviction.
