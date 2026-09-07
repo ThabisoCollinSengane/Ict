@@ -2261,10 +2261,32 @@ class Backtester:
         elif pair == "EURUSD":
             obs = [o for o in obs if o.direction == 1]
 
-        # Filter to unmitigated OBs matching trade direction.
-        obs = [o for o in obs if not o.mitigated and o.direction == direction]
+        # Filter to OBs matching trade direction. NOTE: the `mitigated` flag is NOT
+        # applied here — it is applied per-context in the scan loop below. See
+        # `_ob_invalidated` for why.
+        obs = [o for o in obs if o.direction == direction]
         if not obs:
             return "", "", ""
+
+        def _ob_invalidated(ob):
+            """An OB is DEAD only when a later H4 bar CLOSED beyond its far side.
+
+            `OrderBlock.mitigated` (ict/order_block.py) is set by a mere WICK touch of
+            the body — but that is price RETURNING to the block, which in the ICT
+            Market Maker model is the +OB accumulation entry, not an invalidation.
+            Filtering on `mitigated` therefore made the "inside" context structurally
+            unreachable (price inside the OB implies the body was touched implies
+            mitigated), which is why it fired once in 355 trades.
+
+            This close-through-the-far-side test is the same rule P9 already uses for
+            HTF FVGs (ICT Ep 9: wicks don't mitigate).
+            """
+            for c in h4_bars[ob.bar_index + 2:]:
+                if ob.direction > 0 and c.Close < ob.bottom:
+                    return True
+                if ob.direction < 0 and c.Close > ob.top:
+                    return True
+            return False
 
         # Get D1/W bars for liquidity pairing check.
         d1_bars = self.bars_up_to(pair, "D", t)
@@ -2319,11 +2341,22 @@ class Backtester:
         # Check each candidate OB (nearest to price first).
         obs.sort(key=lambda o: abs(o.mid - cur_price))
         for ob in obs:
+            inside = ob.bottom <= cur_price <= ob.top
+            # "inside" = price has returned INTO the block (MM-model accumulation), so
+            # a body touch is expected; only a close through the far side kills it.
+            # "continuation" keeps the strict untouched-OB premise: price is running
+            # away from a block it never traded back into.
+            if inside:
+                if _ob_invalidated(ob):
+                    continue
+            elif ob.mitigated:
+                continue
+            # Liquidity pairing is the expensive check — run it only on a candidate
+            # that already passed the cheap context test.
             liq_type = _check_liquidity_pairing(ob)
             if not liq_type:
                 continue
-            # Determine context: inside or continuation.
-            if ob.bottom <= cur_price <= ob.top:
+            if inside:
                 return "inside", "240T", liq_type
             if direction > 0 and cur_price > ob.top and (cur_price - ob.top) <= cont_max:
                 return "continuation", "240T", liq_type
