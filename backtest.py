@@ -836,22 +836,21 @@ class Backtester:
         except Exception:
             pass
 
-        # 2/3. IFVG then FVG — an inverted gap outranks a plain one.
+        # 2. Gap — FVG and IFVG rank EQUALLY. Which formed first carries no
+        #    information; both are the same PD array, one simply had its polarity
+        #    flipped by a close through it. Take the most RECENT either way.
         try:
             from ict.ifvg import latest_inversion
             gaps = self._scan_htf_fvgs(bars, sym)
         except Exception:
             return None, 0.0, 0.0
-        plain = None
         for g in sorted(gaps, key=lambda x: -x.bar_index):
             if not inside(g.bottom, g.top):
                 continue
             if latest_inversion(bars, g.bottom, g.top) == direction:
                 return "ifvg", g.bottom, g.top
-            if plain is None and g.direction == direction and not g.mitigated:
-                plain = g
-        if plain is not None:
-            return "fvg", plain.bottom, plain.top
+            if g.direction == direction and not g.mitigated:
+                return "fvg", g.bottom, g.top
         return None, 0.0, 0.0
 
     def _pd_array_cascade(self, sym, direction, t, tfs=None):
@@ -3138,7 +3137,9 @@ class Backtester:
         # NZDUSD family (independent): AUDNZD selects NZD as preferred vs AUD; DXY confirms direction.
         dxy_bias = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
         if dxy_bias == 0:
+            g["dxy_flat"] = g.get("dxy_flat", 0) + 1
             return   # DXY flat → no USD bias → hard gate for all pairs
+        g["dxy_directional"] = g.get("dxy_directional", 0) + 1
 
         _im_scenario = "?"
         if pair in ("EURUSD", "GBPUSD"):
@@ -3166,15 +3167,20 @@ class Backtester:
                 if eurgbp_ip != 0:
                     eurgbp_bias  = eurgbp_ip
                     _ip_escalated = True
+            g["eurgbp_flat" if eurgbp_bias == 0 else "eurgbp_directional"] = (
+                g.get("eurgbp_flat" if eurgbp_bias == 0 else "eurgbp_directional", 0) + 1)
             direction, im_score = resolve_pair_direction(
                 dxy_bias, eurgbp_bias, pair, "EURUSD"
             )
             if direction is None:
+                g["im_resolve_none"] = g.get("im_resolve_none", 0) + 1
                 return
             if im_score < 0.75:
+                g["im_score_low"] = g.get("im_score_low", 0) + 1
                 return
             # When cross is flat at all three levels, GBPUSD has no selection signal.
             if eurgbp_bias == 0 and pair == "GBPUSD":
+                g["eurgbp_flat_gbp_blocked"] = g.get("eurgbp_flat_gbp_blocked", 0) + 1
                 return
             mss_sym1, mss_sym2 = "EURUSD", "GBPUSD"
             # ICT intermarket cheat sheet scenario classification.
@@ -3309,10 +3315,24 @@ class Backtester:
         sym2_mss  = self._pair_has_mss(mss_sym2, t, direction)
         dxy_mss   = self._dxy_has_mss(t, -direction)
         mss_count = sym1_mss + sym2_mss + dxy_mss
-        if mss_count < 2:
+        if config.MSS_REQUIRE_DXY:
+            # The dollar LEADS direction; a pair only confirms it. 2-of-3 was
+            # calibrated against a DXY leg that read flat ~90% of the time, so once
+            # DXY reads honestly, "any two" lets pair-only agreement through.
+            if not dxy_mss:
+                g["mss_no_dxy"] = g.get("mss_no_dxy", 0) + 1
+                self._log_reject(t, pair, direction, "MSS: DXY leg absent (DXY must lead)")
+                return
+            if not (sym1_mss or sym2_mss):
+                g["mss_no_pair"] = g.get("mss_no_pair", 0) + 1
+                self._log_reject(t, pair, direction, "MSS: DXY shifted but neither pair confirms")
+                return
+            g["mss_h1_m15_m5_ok"] += 1
+        elif mss_count < 2:
             self._log_reject(t, pair, direction, f"no MSS ({mss_count}/3 structure shift, need 2)")
             return   # Need at least 2-of-3 MSS
-        g["mss_h1_m15_m5_ok"] += 1
+        if not config.MSS_REQUIRE_DXY:
+            g["mss_h1_m15_m5_ok"] += 1
 
         # Optional Ep-12 structure entry trigger (default OFF -> no-op). Require a
         # freshly-confirmed LTF reversal swing (STL for longs / STH for shorts) —

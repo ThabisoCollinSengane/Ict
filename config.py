@@ -1126,3 +1126,12 @@ IFVG_SCAN_TFS = tuple(_os.environ.get("IFVG_SCAN_TFS", "D,240T,60T,15T,5T").spli
 # Default OFF -- this is the primary gate, and the last attempt to change it
 # (STRUCT_BIAS_ENABLED, the never-flat latch) produced MaxDD -26.84%.
 RANGE_BIAS_ENABLED = bool(int(_os.environ.get("RANGE_BIAS_ENABLED", "0")))
+
+# --- P54: DXY leads, pair confirms ---
+# The dollar sets direction; EURGBP adds strength; a pair only confirms. The old
+# 2-of-3 MSS (sym1 + sym2 + dxy_inverse >= 2) was calibrated against a DXY leg
+# that read flat ~90% of the time. Once DXY reads honestly the threshold lets
+# pair-only agreement through -- MSS pass rate went 34.8% -> 69.1% and MaxDD with
+# it. Requiring the DXY leg restores the intent: dollar mandatory, then either
+# pair confirms.
+MSS_REQUIRE_DXY = bool(int(_os.environ.get("MSS_REQUIRE_DXY", "0")))
