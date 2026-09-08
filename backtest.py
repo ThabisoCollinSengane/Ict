@@ -707,6 +707,26 @@ class Backtester:
                 direction = -1
         return direction
 
+    def _range_bias_from_bars(self, bars):
+        """Dealing-range read on a bar list directly — used for the synthetic DXY
+        series, which is assembled on the fly and has no registered symbol."""
+        if not bars or len(bars) < 10:
+            return 0, None
+        cap = config.STRUCT_BIAS_MAX_BARS
+        window = bars[-cap:] if cap and len(bars) > cap else bars
+        try:
+            dr = detect_dealing_range(window, lookback=len(window))
+        except Exception:
+            return 0, None
+        if dr is None or dr.width <= 0:
+            return 0, None
+        close = window[-1].Close
+        if close > dr.high:
+            return +1, dr
+        if close < dr.low:
+            return -1, dr
+        return 0, dr
+
     def _dealing_range_bias(self, sym, tf, t):
         """Bias from the DEALING RANGE — the missing consolidation detector.
 
@@ -788,6 +808,68 @@ class Backtester:
             return -1
         return 0
 
+    def _pd_array_in_range(self, sym, direction, dr, t, tf):
+        """The three PD arrays inside a dealing range, in the order price uses them.
+
+        OB is FIRST — the origin of the move, the deepest zone price returns to.
+        IFVG is SECOND — a gap price has closed through, flipped to the opposite
+        polarity, now holding as support/resistance.
+        FVG is THIRD — a plain unfilled gap.
+
+        Returns (kind, lo, hi) for the first array found, or (None, 0, 0). Only
+        zones inside [dr.low, dr.high] qualify — outside the range belongs to a
+        different leg.
+        """
+        bars = self.bars_up_to(sym, tf, t)
+        if not bars or len(bars) < 5 or dr is None:
+            return None, 0.0, 0.0
+
+        def inside(lo, hi):
+            return lo >= dr.low and hi <= dr.high
+
+        # 1. Order block — the first stage.
+        try:
+            for ob in sorted(detect_order_blocks(bars, lookback=config.MM_GOLDEN_OB_LOOKBACK),
+                             key=lambda o: -o.bar_index):
+                if ob.direction == direction and inside(ob.bottom, ob.top):
+                    return "ob", ob.bottom, ob.top
+        except Exception:
+            pass
+
+        # 2/3. IFVG then FVG — an inverted gap outranks a plain one.
+        try:
+            from ict.ifvg import latest_inversion
+            gaps = self._scan_htf_fvgs(bars, sym)
+        except Exception:
+            return None, 0.0, 0.0
+        plain = None
+        for g in sorted(gaps, key=lambda x: -x.bar_index):
+            if not inside(g.bottom, g.top):
+                continue
+            if latest_inversion(bars, g.bottom, g.top) == direction:
+                return "ifvg", g.bottom, g.top
+            if plain is None and g.direction == direction and not g.mitigated:
+                plain = g
+        if plain is not None:
+            return "fvg", plain.bottom, plain.top
+        return None, 0.0, 0.0
+
+    def _pd_array_cascade(self, sym, direction, t, tfs=None):
+        """Top-down PD array hunt: highest timeframe first, stepping down. Price is
+        fractal, so the same OB -> IFVG -> FVG hierarchy applies at every rung; the
+        rung that yields the array also sets how far the target sits.
+
+        Returns (kind, lo, hi, tf).
+        """
+        for tf in (tfs or config.STRUCT_BIAS_TFS):
+            d, dr = self._dealing_range_bias(sym, tf, t)
+            if dr is None:
+                continue
+            kind, lo, hi = self._pd_array_in_range(sym, direction, dr, t, tf)
+            if kind:
+                return kind, lo, hi, tf
+        return None, 0.0, 0.0, ""
+
     def _dealing_range_cascade(self, sym, t, tfs=None):
         """Top-down dealing-range read: highest timeframe first, step down while a
         rung reads flat (price still inside its range). Returns (direction, tf, dr)
@@ -813,6 +895,13 @@ class Backtester:
         return 0, ""
 
     def _sym_bias(self, sym, tf, t, lookback: int = None):
+        if config.RANGE_BIAS_ENABLED:
+            # Top-down: the requested tf first, then step DOWN the ladder while a
+            # rung is still inside its dealing range. Price is fractal, so the same
+            # read applies at every rung.
+            tfs = (tf,) + tuple(x for x in config.STRUCT_BIAS_TFS if x != tf)
+            d, _tf, _dr = self._dealing_range_cascade(sym, t, tfs=tfs)
+            return d
         bars = self.bars_up_to(sym, tf, t)
         if config.STRUCT_BIAS_ENABLED:
             return self._structural_direction(bars)
@@ -903,9 +992,11 @@ class Backtester:
             series.append(SynBar(o, h, l, c))
         if len(series) < lb + 2:
             return 0
+        if config.RANGE_BIAS_ENABLED:
+            # DXY reads its dealing range exactly like every other instrument.
+            d, _dr = self._range_bias_from_bars(series)
+            return d
         if config.STRUCT_BIAS_ENABLED:
-            # Same structural reader as every other instrument (user directive:
-            # EURGBP and DXY must read structure the way the tradeable pairs do).
             return self._structural_direction(series)
         return htf_bias(series, lookback=lb)
 

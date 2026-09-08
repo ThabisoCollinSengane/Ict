@@ -1116,3 +1116,13 @@ STRUCT_BIAS_TFS = tuple(_os.environ.get("STRUCT_BIAS_TFS", "240T,60T,15T").split
 STRUCT_BIAS_MAX_BARS = int(_os.environ.get("STRUCT_BIAS_MAX_BARS", "300"))
 # IFVG ladder, scanned highest-first. The rung that fires sets target distance.
 IFVG_SCAN_TFS = tuple(_os.environ.get("IFVG_SCAN_TFS", "D,240T,60T,15T,5T").split(","))
+
+# --- P53: dealing-range bias wired into the intermarket gate ---
+# Replaces htf_bias for DXY / EURGBP / pair reads with the dealing-range read:
+# flat while price is INSIDE its range, directional once it CLOSES beyond a
+# boundary. Measured flat rate ~17% in a trend / ~57% in chop, versus htf_bias's
+# 60-81% everywhere and the BOS latch's 0%. Top-down: the requested timeframe
+# first, then step down the ladder while a rung is still inside its range.
+# Default OFF -- this is the primary gate, and the last attempt to change it
+# (STRUCT_BIAS_ENABLED, the never-flat latch) produced MaxDD -26.84%.
+RANGE_BIAS_ENABLED = bool(int(_os.environ.get("RANGE_BIAS_ENABLED", "0")))
