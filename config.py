@@ -651,6 +651,19 @@ MM_GOLDEN_CASCADE_IFVG_TFS = tuple(
 # "we dont and never hold both pairs at once"). Unlike MM_GOLDEN_DECORR_ALL this also
 # blocks OPPOSING dollar directions (EU long + GU short = two spreads for one bet).
 MM_GOLDEN_ONE_PAIR_ONLY = bool(int(_os.environ.get("MM_GOLDEN_ONE_PAIR_ONLY", "1")))
+
+# --- P50: return-into-the-block entry trigger ---
+# A paired block whose equilibrium is respected is only POTENTIAL. The trade is the
+# RETRACE back into the zone on the entry timeframes: price sweeps liquidity, then
+# comes back into the block and is sold/bought from there. Without this the channel
+# can enter on the sweep leg itself, which is the opposite side of the move.
+# Read on M15 then M5 -- deliberately NOT on the block's own timeframe, where an M15
+# wick into a bearish zone would be misread as the zone failing.
+MM_GOLDEN_RETRACE_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_RETRACE_REQUIRED", "1")))
+MM_GOLDEN_RETRACE_TFS = tuple(
+    _os.environ.get("MM_GOLDEN_RETRACE_TFS", "15T,5T").split(","))
+# How far back to look for the touch into the zone.
+MM_GOLDEN_RETRACE_BARS = int(_os.environ.get("MM_GOLDEN_RETRACE_BARS", "24"))
 # SMT (EU/GU divergence) confirmation alongside the equilibrium respect. REQUIRED:
 # SMT presence + the golden rule IS the trade. Which pair made the extreme does not
 # matter and no relative-strength comparison is made -- GBPUSD taking a high that

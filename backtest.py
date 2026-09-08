@@ -516,6 +516,7 @@ class Backtester:
             "golden_via": st.get("golden_via", ""),
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
+            "golden_retrace_tf": st.get("golden_retrace_tf", ""),
             "golden_smt": st.get("golden_smt", False),
             "golden_score": st.get("golden_score", 0),
             "narrative_score": st.get("narrative_score", 0),
@@ -619,6 +620,7 @@ class Backtester:
             "golden_via": st.get("golden_via", ""),
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
+            "golden_retrace_tf": st.get("golden_retrace_tf", ""),
             "golden_smt": st.get("golden_smt", False),
             "golden_score": st.get("golden_score", 0),
             "narrative_score": st.get("narrative_score", 0),
@@ -4435,8 +4437,39 @@ class Backtester:
             # Nearest block to the anchor is the one price is reacting to.
             paired.sort(key=lambda o: abs(o.body_mid - anchor))
             ob = paired[0]
-            return (self._ob_equilibrium_state(ob, bars, direction), tf, ob.body_mid)
-        return "", "", 0.0
+            return (self._ob_equilibrium_state(ob, bars, direction), tf, ob.body_mid, ob)
+        return "", "", 0.0, None
+
+    def _ob_retrace_trigger(self, pair, direction, ob, t):
+        """Has price RETURNED INTO the block on the entry timeframes?
+
+        This is the trigger the live examples turn on: the block is paired and its
+        equilibrium is respected, price sweeps liquidity, then retraces back INTO the
+        zone on M15/M5 — and that return is the entry, not the pairing.
+
+        Distinct from the equilibrium test, which is read on the BLOCK's own timeframe
+        (H4/H1): an M15 wick up into a bearish zone is the setup, not a failure.
+
+        Fires when, within `MM_GOLDEN_RETRACE_BARS`, a bar traded into the zone AND
+        price has since come back out on the correct side (closed below a bearish
+        block / above a bullish one). Price still sitting inside the zone also counts —
+        that is the entry window itself.
+        """
+        if ob is None or not config.MM_GOLDEN_RETRACE_REQUIRED:
+            return True, ""
+        for tf in config.MM_GOLDEN_RETRACE_TFS:
+            bars = self.bars_up_to(pair, tf, t, max_bars=config.MM_GOLDEN_RETRACE_BARS)
+            if bars is None or len(bars) < 2:
+                continue
+            touched = any(b.High >= ob.bottom and b.Low <= ob.top for b in bars)
+            if not touched:
+                continue
+            cur = bars[-1].Close
+            inside = ob.bottom <= cur <= ob.top
+            back_out = (cur < ob.bottom) if direction < 0 else (cur > ob.top)
+            if inside or back_out:
+                return True, tf
+        return False, ""
 
     def _golden_cascade_ok(self, pair, direction, t):
         """The failure cascade: one pair's failed zone is the other pair's signal.
@@ -4456,7 +4489,7 @@ class Backtester:
         # NOTE: deliberately no AMD requirement on the other pair. Its zone failing is
         # observable from its own order block regardless of whether IT has a
         # consolidation — requiring one was why the cascade fired 5 times against 173.
-        state, tf, _eq = self._golden_ob_pairing(other, other_dir, None, t)
+        state, tf, _eq, _ob = self._golden_ob_pairing(other, other_dir, None, t)
         if state != "failed":
             return False, ""
         if not config.MM_GOLDEN_CASCADE_NEEDS_IFVG:
@@ -4576,9 +4609,19 @@ class Backtester:
         # Our own zone respected = take the golden entry. Our own zone FAILED = stand
         # down (price is leaving in the wrong direction). No paired block at all = no
         # trade: the consolidation has no higher-timeframe reason to exist.
-        _ob_state, _ob_tf, _ob_eq = self._golden_ob_pairing(pair, direction, rng, t)
+        _ob_state, _ob_tf, _ob_eq, _ob_zone = self._golden_ob_pairing(
+            pair, direction, rng, t)
         _golden_via = ""
+        _retrace_tf = ""
         if _ob_state == "respected":
+            # The block being respected is not yet the entry — price must RETURN INTO
+            # it on M15/M5. That retrace is the trade; without it the setup is only
+            # potential and we would be entering on the sweep leg itself.
+            _retrace_ok, _retrace_tf = self._ob_retrace_trigger(
+                pair, direction, _ob_zone, t)
+            if not _retrace_ok:
+                g["mm_golden_no_retrace"] = g.get("mm_golden_no_retrace", 0) + 1
+                return
             _golden_via = "own_ob"
         else:
             # Cascade: the OTHER pair failing its zone is our signal. GBPUSD failing
@@ -4767,6 +4810,7 @@ class Backtester:
             "golden_via": _golden_via,          # own_ob | cascade
             "golden_ob_tf": _ob_tf,             # D | 240T | 60T | 15T
             "golden_ob_state": _ob_state,       # respected | failed | untested | ""
+            "golden_retrace_tf": _retrace_tf,   # 15T | 5T | "" (cascade path)
             "golden_smt": _golden_smt,
             # Quality score: equilibrium respected + SMT + a strong HTF draw.
             "golden_score": ((_golden_via == "own_ob")
