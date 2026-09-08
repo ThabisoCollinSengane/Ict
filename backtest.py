@@ -978,6 +978,25 @@ class Backtester:
         return 0
 
     def _dxy_bias(self, tf, t, lookback: int = None):
+        # REAL UDXUSD first. The synthetic proxy is built from DXY_CONSTITUENTS
+        # ("EURUSD","USDJPY","GBPUSD","USDCAD","USDSEK","USDCHF"), but the HistData
+        # set carries only EURUSD and GBPUSD of those six -- the rest are dropped as
+        # empty rolls. That leaves the "dollar" computed from two EUR/GBP pairs,
+        # i.e. roughly inverted EURUSD, when the real index is EUR 57.6% / JPY 13.6%
+        # / GBP 11.9% / CAD 9.1% / SEK 4.2% / CHF 3.6%. UDXUSD is already loaded and
+        # registered (used by _dxy_htf_context); the bias gate simply never read it.
+        if config.DXY_PREFER_REAL:
+            real = self.bars_up_to("UDXUSD", tf, t)
+            if real and len(real) >= 10:
+                self.gate["dxy_real_used"] = self.gate.get("dxy_real_used", 0) + 1
+                if config.RANGE_BIAS_ENABLED:
+                    return self._range_bias_from_bars(real)[0]
+                lb_r = lookback if lookback is not None else config.SWING_LOOKBACK
+                return htf_bias(real, lookback=lb_r)
+            self.gate["dxy_real_missing"] = self.gate.get("dxy_real_missing", 0) + 1
+        return self._dxy_bias_synthetic(tf, t, lookback)
+
+    def _dxy_bias_synthetic(self, tf, t, lookback: int = None):
         """Synthetic DXY BOS on the given timeframe. Robust to a constituent the
         broker doesn't carry (e.g. USDSEK on Exness): drops empty rolls so one
         unavailable constituent can't zero the series and flat-line the DXY gate."""

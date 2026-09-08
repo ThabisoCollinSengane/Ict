@@ -1145,3 +1145,13 @@ MSS_REQUIRE_DXY = bool(int(_os.environ.get("MSS_REQUIRE_DXY", "0")))
 # The FVGs forming INSIDE the consolidation are the read while it is still
 # ranging -- _range_fvg_lean, built in P52b and left unwired until now.
 RANGE_BIAS_USE_LEAN = bool(int(_os.environ.get("RANGE_BIAS_USE_LEAN", "1")))
+
+# --- P56: read the REAL dollar index, not a 2-of-6 synthetic ---
+# _dxy_bias built a synthetic DXY from DXY_CONSTITUENTS, but the HistData set
+# carries only EURUSD and GBPUSD of those six. The other four (USDJPY, USDCAD,
+# USDSEK, USDCHF) are dropped as empty rolls, so the primary hard gate has been
+# reading a "dollar" made of the two EUR/GBP pairs EURGBP exists to separate --
+# effectively inverted EURUSD. Real UDXUSD is already loaded and registered
+# (_dxy_htf_context uses it); the bias gate never did.
+# Counters: dxy_real_used / dxy_real_missing.
+DXY_PREFER_REAL = bool(int(_os.environ.get("DXY_PREFER_REAL", "1")))
