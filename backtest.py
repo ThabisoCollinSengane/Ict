@@ -658,8 +658,71 @@ class Backtester:
         for leg in list(self.active[pair]["legs"]):
             self._exit_leg(pair, leg, price, t, reason)
 
+    @staticmethod
+    def _structural_direction(bars, max_bars: int = None):
+        """Persistent BOS state: +1 / -1 / 0. The SAME reader for every instrument.
+
+        Why not htf_bias: it asks "is this bar closing beyond the whole prior N-bar
+        range RIGHT NOW" -- instantaneous and stateless, so a genuine break sets
+        direction for one bar then reverts to 0 on the first pullback. That is why
+        DXY read flat ~90% of the time when a trader calls it flat ~10-15%.
+
+        Why not mstruct.structure_direction: it needs the ITH/ITL tier, which is
+        built by finding fractal peaks WITHIN the STH sequence. In a clean trend the
+        STH sequence rises monotonically and has no internal peak, so ITH/ITL come
+        back EMPTY and it returns 0 -- it reads flat exactly in a trend. Verified:
+        a textbook uptrend gives 24 STH / 23 STL but 0 ITH / 0 ITL.
+
+        This instead latches: break the last confirmed swing HIGH -> bullish and it
+        STAYS bullish through pullbacks; flips only when price breaks the last
+        confirmed swing LOW. Flat only before the first break.
+        """
+        if not bars:
+            return 0
+        cap = max_bars or config.STRUCT_BIAS_MAX_BARS
+        window = bars[-cap:] if cap and len(bars) > cap else bars
+        if len(window) < 5:
+            return 0
+        try:
+            sth, stl = mstruct._base_swings(window)
+        except Exception:
+            return 0
+        if not sth and not stl:
+            return 0
+        hi = [(n.bar_index, n.price) for n in sth]
+        lo = [(n.bar_index, n.price) for n in stl]
+        direction = 0
+        hi_i = lo_i = 0
+        last_hi = last_lo = None
+        for i, b in enumerate(window):
+            # A swing at bar j is only CONFIRMED once bar j+1 exists, so it can
+            # never be used on the bar that formed it (no lookahead).
+            while hi_i < len(hi) and hi[hi_i][0] < i:
+                last_hi = hi[hi_i][1]; hi_i += 1
+            while lo_i < len(lo) and lo[lo_i][0] < i:
+                last_lo = lo[lo_i][1]; lo_i += 1
+            if last_hi is not None and b.Close > last_hi:
+                direction = +1
+            elif last_lo is not None and b.Close < last_lo:
+                direction = -1
+        return direction
+
+    def _struct_bias_cascade(self, sym, t, tfs=None):
+        """Top-down structural bias: walk timeframes HIGHEST first and return the
+        first that reads directionally. "If nothing is noted we move timeframes
+        down." Returns (direction, tf) — tf is the rung that produced the read, so
+        callers can scale target distance to it.
+        """
+        for tf in (tfs or config.STRUCT_BIAS_TFS):
+            d = self._structural_direction(self.bars_up_to(sym, tf, t))
+            if d != 0:
+                return d, tf
+        return 0, ""
+
     def _sym_bias(self, sym, tf, t, lookback: int = None):
         bars = self.bars_up_to(sym, tf, t)
+        if config.STRUCT_BIAS_ENABLED:
+            return self._structural_direction(bars)
         return htf_bias(bars, lookback=lookback)
 
     def _eurgbp_synthetic(self, t, lookback: int, threshold_pips: float) -> int:
@@ -747,7 +810,32 @@ class Backtester:
             series.append(SynBar(o, h, l, c))
         if len(series) < lb + 2:
             return 0
+        if config.STRUCT_BIAS_ENABLED:
+            # Same structural reader as every other instrument (user directive:
+            # EURGBP and DXY must read structure the way the tradeable pairs do).
+            return self._structural_direction(series)
         return htf_bias(series, lookback=lb)
+
+    def _ifvg_cascade(self, sym, direction, t, tfs=None):
+        """Unified IFVG detection — the SAME scan for DXY, EURGBP, EURUSD, GBPUSD
+        and NZDUSD. Walks the ladder HIGHEST first and returns the first rung
+        holding an inversion in `direction`.
+
+        The IFVG is the trigger: once one is identified we start hunting entries.
+        The rung it fires on also sets how far the target should be — a higher
+        timeframe inversion draws to a further pool.
+
+        Returns (found, tf).
+        """
+        from ict.ifvg import latest_inversion
+        for tf in (tfs or config.IFVG_SCAN_TFS):
+            bars = self.bars_up_to(sym, tf, t)
+            if bars is None or len(bars) < 5:
+                continue
+            for fvg in self._scan_htf_fvgs(bars, sym):
+                if latest_inversion(bars, fvg.bottom, fvg.top) == direction:
+                    return True, tf
+        return False, ""
 
     def _dxy_bias_1h(self, t, lookback: int = None):
         return self._dxy_bias("60T", t, lookback=lookback)

@@ -1099,3 +1099,20 @@ TELEGRAM_CHAT_ID   = ""   # e.g. "987654321"  (your personal chat ID)
 # Full 4yr came back 60 trades / WR 11.7% / PF 0.33 / -51.7%.
 # 1 = drop the forming bar (measurement only, KNOWN BROKEN). 0 = pre-existing behaviour.
 STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "0")))
+
+# --- P51: unified structural bias + IFVG cascade (all instruments alike) ---
+# htf_bias asks "is this bar closing beyond the whole prior N-bar range right now" --
+# an instantaneous, stateless breakout test. A real break sets direction for ONE bar
+# then reverts to 0 on the first pullback, which is why DXY/EURGBP read flat ~90% of
+# the time when a trader would call them flat ~10-15%. structure_direction() reads
+# higher intermediate lows / lower intermediate highs instead, so direction PERSISTS
+# through short-term sweeps -- the same reader for DXY, EURGBP and every pair.
+# Default OFF: this changes the primary intermarket gate, so it must be A/B tested.
+STRUCT_BIAS_ENABLED = bool(int(_os.environ.get("STRUCT_BIAS_ENABLED", "0")))
+# Top-down: highest timeframe first, step down when a rung reads flat.
+STRUCT_BIAS_TFS = tuple(_os.environ.get("STRUCT_BIAS_TFS", "240T,60T,15T").split(","))
+# Cap passed to mstruct.classify -- O(n), and the P18 cache post-mortem warns against
+# running it uncapped on long series.
+STRUCT_BIAS_MAX_BARS = int(_os.environ.get("STRUCT_BIAS_MAX_BARS", "300"))
+# IFVG ladder, scanned highest-first. The rung that fires sets target distance.
+IFVG_SCAN_TFS = tuple(_os.environ.get("IFVG_SCAN_TFS", "D,240T,60T,15T,5T").split(","))
