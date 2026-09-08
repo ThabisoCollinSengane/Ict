@@ -1135,3 +1135,13 @@ RANGE_BIAS_ENABLED = bool(int(_os.environ.get("RANGE_BIAS_ENABLED", "0")))
 # it. Requiring the DXY leg restores the intent: dollar mandatory, then either
 # pair confirms.
 MSS_REQUIRE_DXY = bool(int(_os.environ.get("MSS_REQUIRE_DXY", "0")))
+
+# --- P55: use the in-range FVG lean as the directional read ---
+# _dealing_range_bias returned 0 whenever price sat inside its dealing range. On
+# real data that is most of the time -- measured dxy_flat 34,197 vs
+# dxy_directional 9,574, i.e. DXY still read flat 78% of the time even with the
+# dealing-range reader on. The synthetic fixtures said ~17% because they trended
+# hard enough to keep breaking out; the real dollar ranges.
+# The FVGs forming INSIDE the consolidation are the read while it is still
+# ranging -- _range_fvg_lean, built in P52b and left unwired until now.
+RANGE_BIAS_USE_LEAN = bool(int(_os.environ.get("RANGE_BIAS_USE_LEAN", "1")))

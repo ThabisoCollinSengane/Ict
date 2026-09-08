@@ -707,7 +707,7 @@ class Backtester:
                 direction = -1
         return direction
 
-    def _range_bias_from_bars(self, bars):
+    def _range_bias_from_bars(self, bars, sym_hint='UDXUSD'):
         """Dealing-range read on a bar list directly — used for the synthetic DXY
         series, which is assembled on the fly and has no registered symbol."""
         if not bars or len(bars) < 10:
@@ -725,6 +725,10 @@ class Backtester:
             return +1, dr
         if close < dr.low:
             return -1, dr
+        # INSIDE the range: not directionless. The FVGs forming inside the
+        # consolidation are the tell for which side it breaks.
+        if config.RANGE_BIAS_USE_LEAN:
+            return self._range_fvg_lean(sym_hint, window, dr), dr
         return 0, dr
 
     def _dealing_range_bias(self, sym, tf, t):
@@ -760,7 +764,13 @@ class Backtester:
             return +1, dr
         if close < dr.low:
             return -1, dr
-        return 0, dr          # inside the range = genuinely consolidating
+        # Inside the range the confirmed direction is 0, but the range still
+        # carries information: unmitigated gaps inside the consolidation point at
+        # the side it will break. Without this the reader called DXY flat 78% of
+        # the time on real data (measured), barely better than htf_bias.
+        if config.RANGE_BIAS_USE_LEAN:
+            return self._range_fvg_lean(sym, window, dr), dr
+        return 0, dr
 
     def _range_state(self, sym, tf, t):
         """Full read of one timeframe: (direction, lean, tf, dr).
