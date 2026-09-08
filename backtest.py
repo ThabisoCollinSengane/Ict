@@ -742,6 +742,52 @@ class Backtester:
             return -1, dr
         return 0, dr          # inside the range = genuinely consolidating
 
+    def _range_state(self, sym, tf, t):
+        """Full read of one timeframe: (direction, lean, tf, dr).
+
+        direction — confirmed: price has CLOSED beyond a range boundary. 0 inside.
+        lean      — anticipated break side from the FVGs inside the range, live even
+                    while direction is still 0. This is what makes an inside-the-range
+                    reading useful instead of merely "flat".
+        """
+        d, dr = self._dealing_range_bias(sym, tf, t)
+        if dr is None:
+            return 0, 0, tf, None
+        lean = self._range_fvg_lean(sym, self.bars_up_to(sym, tf, t), dr)
+        return d, lean, tf, dr
+
+    def _range_fvg_lean(self, sym, bars, dr):
+        """Which side is the range likely to BREAK? Read the FVGs inside it.
+
+        While price is inside a dealing range the confirmed direction is 0 — but the
+        range is not directionless. The FVGs forming INSIDE the consolidation are the
+        tell: unmitigated bullish gaps are unfilled demand holding price up and point
+        to an upside break; unmitigated bearish gaps point down. This is the
+        anticipation the confirmed break later validates.
+
+        Only gaps whose body lies inside the range count — a gap outside it belongs to
+        a different leg. Unmitigated gaps are weighted double: a gap price has already
+        closed through has spent its information.
+
+        Returns +1 / -1 / 0 (0 = balanced, no lean).
+        """
+        if dr is None or not bars:
+            return 0
+        try:
+            fvgs = self._scan_htf_fvgs(bars, sym)
+        except Exception:
+            return 0
+        score = 0
+        for g in fvgs:
+            if g.bottom < dr.low or g.top > dr.high:
+                continue                       # not inside the consolidation
+            score += g.direction * (1 if g.mitigated else 2)
+        if score > 0:
+            return +1
+        if score < 0:
+            return -1
+        return 0
+
     def _dealing_range_cascade(self, sym, t, tfs=None):
         """Top-down dealing-range read: highest timeframe first, step down while a
         rung reads flat (price still inside its range). Returns (direction, tf, dr)
