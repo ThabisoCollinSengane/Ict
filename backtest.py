@@ -707,6 +707,53 @@ class Backtester:
                 direction = -1
         return direction
 
+    def _dealing_range_bias(self, sym, tf, t):
+        """Bias from the DEALING RANGE — the missing consolidation detector.
+
+        A dealing range is bounded by two swept extremes: the ITH (range high) and
+        ITL (range low). While price sits INSIDE that range it is consolidating —
+        that is what "flat" actually means, and it is why neither previous reader
+        worked. htf_bias called flat 60-81% of the time (it demanded a fresh N-bar
+        extreme on the current bar); the BOS latch called it flat 0% (it never let
+        go of the last direction). Inside-the-range is the principled middle.
+
+        Directional only once price CLOSES beyond a boundary — the range has been
+        broken and delivery has begun. Fractal: the same read on D1, H4, H1, M15 or
+        M5, because a dealing range looks identical at every scale.
+
+        Returns (direction, dr) so callers can reuse the range for premium/discount
+        entry zoning and equilibrium without detecting it twice.
+        """
+        bars = self.bars_up_to(sym, tf, t)
+        if not bars or len(bars) < 10:
+            return 0, None
+        cap = config.STRUCT_BIAS_MAX_BARS
+        window = bars[-cap:] if cap and len(bars) > cap else bars
+        try:
+            dr = detect_dealing_range(window, lookback=len(window))
+        except Exception:
+            return 0, None
+        if dr is None or dr.width <= 0:
+            return 0, None
+        close = window[-1].Close
+        if close > dr.high:
+            return +1, dr
+        if close < dr.low:
+            return -1, dr
+        return 0, dr          # inside the range = genuinely consolidating
+
+    def _dealing_range_cascade(self, sym, t, tfs=None):
+        """Top-down dealing-range read: highest timeframe first, step down while a
+        rung reads flat (price still inside its range). Returns (direction, tf, dr)
+        so the rung that broke also sets how far the target should sit — a higher
+        timeframe break draws to a further pool.
+        """
+        for tf in (tfs or config.STRUCT_BIAS_TFS):
+            d, dr = self._dealing_range_bias(sym, tf, t)
+            if d != 0:
+                return d, tf, dr
+        return 0, "", None
+
     def _struct_bias_cascade(self, sym, t, tfs=None):
         """Top-down structural bias: walk timeframes HIGHEST first and return the
         first that reads directionally. "If nothing is noted we move timeframes
