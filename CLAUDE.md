@@ -148,6 +148,17 @@ part of the same leg. Applied in `_golden_ob_pairing`, which steps DOWN a
 timeframe when a rung's blocks have not raided. Config
 `MM_GOLDEN_OB_RAID_REQUIRED=1`. Counter `mm_golden_ob_no_raid`.
 
+**⚠️ The gate counter dict is `self.gate` — NOT `self.gate_counts`.** P63 shipped
+with `self.gate_counts[...]`, an attribute that does not exist on the class.
+Subscript-assigning a missing attribute evaluates the attribute FIRST, so this
+raises `AttributeError` — the IS run would have crashed on the first block that
+failed the raid check. Caught by a static audit before the run, not by the run.
+Third plumbing bug of this shape in the project (after the `_dxy_bias` override
+and the P47/P48 close-record whitelist): **new code that only writes a counter or
+a column is never exercised by `py_compile` or by a unit test of the pure logic.**
+Drive the actual call path on a stub, or grep that the name exists elsewhere in
+the file, before spending a run on it.
+
 **⚠️ NO IFVG = NO MM MODEL (P61, definitive 2026-09-09).** The inverted gap is
 the model's PRECONDITION, not merely one entry option, and it is one of the
 major influences on WHICH pair is taken: the DXY x EURGBP quadrant names a

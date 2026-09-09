@@ -4774,8 +4774,8 @@ class Backtester:
                            if self._ob_raided_liquidity(
                                bars, o, direction, _lb, htf_gaps=_hgaps)]
                 if not _raided:
-                    self.gate_counts["mm_golden_ob_no_raid"] = (
-                        self.gate_counts.get("mm_golden_ob_no_raid", 0) + 1)
+                    self.gate["mm_golden_ob_no_raid"] = (
+                        self.gate.get("mm_golden_ob_no_raid", 0) + 1)
                     continue                    # step down a timeframe
                 obs = _raided
             if not obs:
