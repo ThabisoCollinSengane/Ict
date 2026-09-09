@@ -1210,6 +1210,34 @@ def _publish_backtest_report(results, backtester, years, df=None):
                              f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
                 L.append("```")
 
+        # --- MM quadrant breakdown (P58): which of the four conditions pay? ---
+        if "mm_scenario" in df.columns:
+            _mq = df[df["mm_scenario"].astype(str) != ""]
+            if len(_mq):
+                L += ["", "## MM golden quadrant (P58)", "",
+                      "DXY x EURGBP -> pair + direction. 1a sell GU / 1b sell EU /",
+                      "2b buy GU / 2a buy EU.", "```"]
+                L.append(f"{'Quadrant':<10} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 52)
+                for _q in ("1a", "1b", "2a", "2b"):
+                    grp = _mq[_mq["mm_scenario"] == _q]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    L.append(f"{_q:<10} {len(grp):>7} {w:>5} {100*w/len(grp):>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+                # golden-rule half (1a/2a) vs against half (1b/2b) — the P44 question
+                for _lbl, _qs in (("golden (1a+2a)", ("1a", "2a")),
+                                  ("against (1b+2b)", ("1b", "2b"))):
+                    grp = _mq[_mq["mm_scenario"].isin(_qs)]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    L.append(f"{_lbl:<10} {len(grp):>7} {w:>5} {100*w/len(grp):>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+                L.append("```")
+
         # --- Narrative context scoring (P47) ---
         if "narrative_score" in df.columns:
             L += ["", "## Narrative context scoring (P47)", "", "```"]
