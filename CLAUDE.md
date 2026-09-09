@@ -115,6 +115,19 @@ absence of those signals is what tells you the condition is not really present.
 5. the quadrant says which pair actually breaks and moves — quadrant reads 1a, so
    watch GBPUSD respecting its IFVGs/FVGs
 
+**⚠️ NO IFVG = NO MM MODEL (P61, definitive 2026-09-09).** The inverted gap is
+the model's PRECONDITION, not merely one entry option, and it is one of the
+major influences on WHICH pair is taken: the DXY x EURGBP quadrant names a
+pair, and that pair must ALSO be showing an IFVG inverted our way and belonging
+to the consolidation. If it isn't, the MM model is not active — no trade, no
+fallback. `_mm_ifvg_present` (existence only, price need NOT be inside it yet)
+runs before the ladder; counter `mm_golden_no_ifvg`, and
+`mm_golden_ifvg_zone_<tf>` says which rung the qualifying gap lives on.
+
+Presence is separate from FILL. Once the model is live, where we get filled is
+the ladder below — the fill may land at the order block without price ever
+re-entering the gap.
+
 **The entry is a LADDER, not a set of gates (P60, corrected 2026-09-09).** The
 M15 retracement is a retest of the original consolidation, which CONTAINS the
 order block or IS the order block. The block is the first choice — but price

@@ -520,6 +520,7 @@ class Backtester:
             "mm_scenario": st.get("mm_scenario", ""),
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_pd_stage": st.get("mm_pd_stage", ""),
+            "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -631,6 +632,7 @@ class Backtester:
             "mm_scenario": st.get("mm_scenario", ""),
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_pd_stage": st.get("mm_pd_stage", ""),
+            "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -4879,7 +4881,25 @@ class Backtester:
         """
         return self._mm_gap_entry(pair, direction, t, inverted=False)
 
-    def _mm_gap_entry(self, pair, direction, t, inverted):
+    def _mm_ifvg_present(self, pair, direction, t):
+        """MODEL GATE: does a qualifying IFVG EXIST on this pair, inverted our way?
+
+        No IFVG -> no Market Maker model. This is the precondition for the channel
+        being active at all, and it is one of the major influences on WHICH pair we
+        take: the DXY x EURGBP quadrant names a pair, and that pair must also be
+        showing an inverted gap for the model to be live on it.
+
+        Distinct from _mm_ifvg_entry, which additionally requires price to be INSIDE
+        the zone RIGHT NOW (that is stage 2 of the fill ladder). Here we only ask
+        whether the inversion exists — the fill may still land at the order block
+        (stage 1) or a plain gap (stage 3) within the same retracement.
+
+        Returns (ok, tf, lo, hi).
+        """
+        return self._mm_gap_entry(pair, direction, t, inverted=True,
+                                  require_inside=False)
+
+    def _mm_gap_entry(self, pair, direction, t, inverted, require_inside=True):
         """Shared gap scan for the IFVG (stage 2) and FVG (stage 3) rungs.
 
         A gap qualifies only when it BELONGS to the consolidation being retested —
@@ -4919,6 +4939,8 @@ class Backtester:
                         continue
                     if latest_inversion(bars, g.bottom, g.top) != 0:
                         continue
+                if not require_inside:            # existence only (model gate)
+                    return True, tf, g.bottom, g.top
                 if g.bottom <= cur <= g.top:      # price INSIDE the zone = entry
                     return True, tf, g.bottom, g.top
         return False, "", 0.0, 0.0
@@ -5146,6 +5168,18 @@ class Backtester:
                 return
             g["mm_golden_im_ok"] = g.get("mm_golden_im_ok", 0) + 1
 
+        # MODEL GATE: no IFVG -> no Market Maker model. The quadrant named this pair;
+        # it only trades if it is ALSO showing an inverted gap belonging to the
+        # consolidation. Presence only — the fill location is the ladder below.
+        _zone_ok, _zone_tf, _zone_lo, _zone_hi = self._mm_ifvg_present(
+            pair, direction, t)
+        if not _zone_ok:
+            g["mm_golden_no_ifvg"] = g.get("mm_golden_no_ifvg", 0) + 1
+            return
+        if _zone_tf:
+            g[f"mm_golden_ifvg_zone_{_zone_tf}"] = (
+                g.get(f"mm_golden_ifvg_zone_{_zone_tf}", 0) + 1)
+
         # MM entry proper — the PD-array retracement ladder. These are STAGES of one
         # sequence, not parallel requirements. The M15 retracement is a retest of the
         # original consolidation, which contains (or IS) the order block:
@@ -5349,6 +5383,7 @@ class Backtester:
             "mm_scenario": _mm_scenario,
             "mm_ifvg_tf": _pd_tf,
             "mm_pd_stage": _pd_stage,
+            "mm_ifvg_zone_tf": _zone_tf,
             "mm_dxy_dir": _mm_dxy_dir, "mm_dxy_tf": _mm_dxy_tf,
             "mm_eurgbp_dir": _mm_eg_dir, "mm_eurgbp_tf": _mm_eg_tf,
             "golden_smt": _golden_smt,
