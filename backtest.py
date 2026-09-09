@@ -485,6 +485,8 @@ class Backtester:
             "mstruct_intact_tf": st.get("mstruct_intact_tf", ""),
             "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
+            "dxy_rev_day": st.get("dxy_rev_day", 0),
+            "dxy_rev_tf": st.get("dxy_rev_tf", ""),
             "crt_tf": st.get("crt_tf", ""),
             "nwog": st.get("nwog", ""),
             "smt_idx": st.get("smt_idx", False),
@@ -597,6 +599,8 @@ class Backtester:
             "mstruct_intact_tf": st.get("mstruct_intact_tf", ""),
             "dxy_mstruct_align": st.get("dxy_mstruct_align", ""),
             "dxy_mstruct_sweep": st.get("dxy_mstruct_sweep", False),
+            "dxy_rev_day": st.get("dxy_rev_day", 0),
+            "dxy_rev_tf": st.get("dxy_rev_tf", ""),
             "crt_tf": st.get("crt_tf", ""),
             "nwog": st.get("nwog", ""),
             "smt_idx": st.get("smt_idx", False),
@@ -2995,6 +2999,58 @@ class Backtester:
             "dxy_minor_sweep": dxy_minor_sweep,
         }
 
+    def _dxy_reversal_day(self, t):
+        """Dollar REVERSAL day: DXY took an intermediate level and turned back.
+
+        This is the COMPLEMENT of `is_minor_sweep`, which the existing DXY read
+        already covers. `is_minor_sweep` fires when a SHORT-term swing was raided
+        and the INTERMEDIATE swing held — a continuation Judas. It returns False
+        the moment the intermediate level actually breaks, and that break-and-
+        reverse is exactly the reversal day: DXY drives through a prior ITL,
+        takes the sell-side resting there, and closes back above it.
+
+        Read primarily on H1 — the trader's timeframe for DAILY dollar structure.
+        D1 is scanned too for the weekly-scale version.
+
+        Returns (direction, tf, level):
+          +1 = dollar reversed UP   (swept an ITL, closed back above)  -> pairs down
+          -1 = dollar reversed DOWN (swept an ITH, closed back below)  -> pairs up
+           0 = no fresh reversal.
+
+        Analytics only — this gates nothing.
+        """
+        if not config.DXY_REV_ENABLED:
+            return 0, "", 0.0
+        best = (0, "", 0.0, -1)          # dir, tf, level, freshness (sweep index)
+        for tf in config.DXY_REV_TFS:
+            bars = self.bars_up_to("UDXUSD", tf, t, max_bars=300)
+            if bars is None or len(bars) < 10:
+                continue
+            res = self._classify_cached(bars, "UDXUSD", tf)
+            cur = bars[-1].Close
+            horizon = config.DXY_REV_LOOKBACK_TF.get(tf, 24)
+            fresh_from = max(0, len(bars) - horizon)
+            for tier, want in (("itl", +1), ("ith", -1)):
+                for s in reversed(res.get(tier, [])):
+                    if not s.swept:
+                        continue          # level still holding -> not a reversal
+                    # When was it actually taken?
+                    swept_at = None
+                    for j in range(s.bar_index + 1, len(bars)):
+                        c = bars[j]
+                        if (s.kind == "low" and c.Low < s.price) or \
+                           (s.kind == "high" and c.High > s.price):
+                            swept_at = j
+                            break
+                    if swept_at is None or swept_at < fresh_from:
+                        break             # older swings are staler still
+                    # Reversed back through the level?
+                    reclaimed = (cur > s.price) if want > 0 else (cur < s.price)
+                    if reclaimed and swept_at > best[3]:
+                        best = (want, tf, s.price, swept_at)
+                    break                 # only the most recent swept swing counts
+        return best[0], best[1], best[2]
+
     def _structure_entry_confirmed(self, pair, direction, t):
         """Optional Ep-12 entry trigger — 'enter on the LTF reversal swing'.
 
@@ -3758,6 +3814,8 @@ class Backtester:
         # The minor-sweep flag identifies Judas continuations (STH/STL swept but the
         # ITH/ITL still intact = trend continues). Analytics columns recorded below.
         _ms = self._structure_conviction(pair, direction, t)
+        # Dollar reversal day (analytics only — gates nothing).
+        _dxy_rev_dir, _dxy_rev_tf, _dxy_rev_lvl = self._dxy_reversal_day(t)
         if _ms["points"]:
             conviction += _ms["points"]
             g["mstruct_align"] = g.get("mstruct_align", 0) + 1
@@ -4313,6 +4371,8 @@ class Backtester:
             "mstruct_intact_tf": _ms["ltf_intact_tf"],
             "dxy_mstruct_align": "|".join(_ms["dxy_align"]),
             "dxy_mstruct_sweep": _ms["dxy_minor_sweep"],
+            "dxy_rev_day": _dxy_rev_dir,
+            "dxy_rev_tf": _dxy_rev_tf,
             "crt_tf": _crt_tf,
             "nwog": _nwog_tf,
             "smt_idx": _smt["idx_smt"],
@@ -5520,6 +5580,8 @@ class Backtester:
             "mstruct_intact_tf": "",
             "dxy_mstruct_align": "",
             "dxy_mstruct_sweep": False,
+            "dxy_rev_day": 0,
+            "dxy_rev_tf": "",
             "crt_tf": "",
             "nwog": "",
             "smt_idx": False,

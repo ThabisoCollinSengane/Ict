@@ -221,6 +221,39 @@ intermarket gate is NOT touched, per the working agreement above.
 and read the quadrant counters — specifically whether 1b/2b (the newly reachable
 half) fire at all, and whether dxy_flat or eurgbp_flat is the dominant blocker.
 
+### P64 — Dollar REVERSAL day on DXY H1 (BUILT 2026-09-10, analytics-only)
+
+**The gap it fills.** DXY H1 structure was ALREADY read — `_structure_conviction`
+classifies UDXUSD with the Ep-12 fractal on W/D/H4/H1 (`_DXY_MSTRUCT_TFS`) and
+records `dxy_mstruct_align` / `dxy_mstruct_sweep` (both correctly plumbed to the
+report). But `dxy_mstruct_sweep` uses `is_minor_sweep`, whose contract is
+explicit: it returns **False the moment the intermediate level actually breaks**,
+"that would be a real structural shift, not a minor sweep." So the existing read
+captures CONTINUATION Judas swings only, and a dollar reversal day — DXY driving
+THROUGH a prior ITL, taking the sell-side, and closing back above it — is the
+exact complement of what was detected. Verified on a fixture: on the setup where
+`_dxy_reversal_day` returns +1, `is_minor_sweep` returns False.
+
+**`_dxy_reversal_day(t)`** — finds the most recent SWEPT intermediate swing,
+checks the sweep is fresh (per-TF horizon: 24 H1 bars = one day, 5 D1 bars = a
+week), and requires price to have CLOSED BACK through the level. Returns
+`(+1/-1/0, tf, level)`: **+1 = dollar reversed UP** (swept an ITL, reclaimed →
+pairs down), **-1 = dollar reversed DOWN** (swept an ITH → pairs up). H1 first —
+the trader's timeframe for DAILY dollar structure — then D1 for the weekly-scale
+version. Config `DXY_REV_ENABLED=1`, `DXY_REV_TFS="60T,D"`,
+`DXY_REV_LOOKBACK_TF={"60T":24,"D":5}`.
+
+**Analytics only — gates nothing.** Columns `dxy_rev_day` / `dxy_rev_tf`, written
+on the open side and in BOTH `_close_leg` whitelists plus the mm_golden default
+block (asserted 4 occurrences end-to-end). Report table "Dollar reversal day
+(P64)" splits WR/PF by direction x timeframe, and — the question that matters —
+**with-the-reversal vs against-it** (dollar up implies pairs down, so agreement is
+`direction == -dxy_rev_day`).
+
+**Day-of-week: NOT related.** P47's weekly profile reads `weekly_amd_dir` from the
+TRADED PAIR, never from DXY, and that factor measured RED (PF inverts OOS).
+Dollar reversal days are not recorded against the DOW bias anywhere.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

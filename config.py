@@ -1190,6 +1190,13 @@ MM_GOLDEN_QUADRANT = bool(int(_os.environ.get("MM_GOLDEN_QUADRANT", "1")))
 # distinct from the OB retrace trigger.
 # P63 — an HTF order block must have RAIDED a prior high/low before displacing away
 # (the trader's read: OB takes out prior liquidity, then displaces leaving an FVG).
+# Dollar REVERSAL day (analytics) — DXY took an intermediate level and turned
+# back. H1 is the trader's timeframe for DAILY dollar structure; D1 covers the
+# weekly-scale version. Lookback is per timeframe: 24 H1 bars = one day.
+DXY_REV_ENABLED = bool(int(_os.environ.get("DXY_REV_ENABLED", "1")))
+DXY_REV_TFS = tuple(_os.environ.get("DXY_REV_TFS", "60T,D").split(","))
+DXY_REV_LOOKBACK_TF = {"60T": 24, "D": 5}
+
 MM_GOLDEN_OB_RAID_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_RAID_REQUIRED", "1")))
 MM_GOLDEN_OB_RAID_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_RAID_LOOKBACK", "60"))
 # The raided pool may be from the current day OR previous days — size the lookback per

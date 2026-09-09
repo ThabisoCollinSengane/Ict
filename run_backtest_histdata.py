@@ -1238,6 +1238,53 @@ def _publish_backtest_report(results, backtester, years, df=None):
                              f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
                 L.append("```")
 
+        # --- Dollar reversal day (P64): DXY took an ITL/ITH and turned back ---
+        if "dxy_rev_day" in df.columns:
+            _rv = df[df["dxy_rev_day"].astype(str) != ""]
+            if len(_rv):
+                L += ["", "## Dollar reversal day (P64)", "",
+                      "DXY swept an intermediate level and CLOSED BACK through it.",
+                      "The complement of dxy_mstruct_sweep, which only fires while the",
+                      "intermediate level HOLDS. +1 = dollar reversed up (pairs down),",
+                      "-1 = dollar reversed down (pairs up). Does the trade agree?",
+                      "```"]
+                L.append(f"{'DXY rev':<12} {'TF':<6} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 60)
+                for _lbl, _sel in (("up (+1)", 1), ("down (-1)", -1), ("none", 0)):
+                    grp = _rv[_rv["dxy_rev_day"] == _sel]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    L.append(f"{_lbl:<12} {'all':<6} {len(grp):>7} {w:>5} "
+                             f"{100*w/len(grp):>5.1f}% {grp.pnl.sum():>12.2f} "
+                             f"{_pf(grp):>6.2f}")
+                    if _sel and "dxy_rev_tf" in grp.columns:
+                        for _tf in sorted(set(grp["dxy_rev_tf"].astype(str))):
+                            sub = grp[grp["dxy_rev_tf"].astype(str) == _tf]
+                            if not len(sub) or not _tf:
+                                continue
+                            w2 = (sub.pnl > 0).sum()
+                            L.append(f"{'':<12} {_tf:<6} {len(sub):>7} {w2:>5} "
+                                     f"{100*w2/len(sub):>5.1f}% {sub.pnl.sum():>12.2f} "
+                                     f"{_pf(sub):>6.2f}")
+                # Does the trade side WITH or AGAINST the dollar reversal?
+                # dollar up (+1) implies pairs down, so agreement is direction == -rev.
+                if "direction" in _rv.columns:
+                    _d = _rv[_rv["dxy_rev_day"] != 0]
+                    if len(_d):
+                        agree = _d[_d["direction"] == -_d["dxy_rev_day"]]
+                        against = _d[_d["direction"] == _d["dxy_rev_day"]]
+                        L.append("")
+                        for _lbl, grp in (("with rev", agree), ("against", against)):
+                            if not len(grp):
+                                continue
+                            w = (grp.pnl > 0).sum()
+                            L.append(f"{_lbl:<12} {'':<6} {len(grp):>7} {w:>5} "
+                                     f"{100*w/len(grp):>5.1f}% {grp.pnl.sum():>12.2f} "
+                                     f"{_pf(grp):>6.2f}")
+                L.append("```")
+
         # --- MM PD-array entry stage (P60): ob -> ifvg -> fvg ladder ---
         if "mm_pd_stage" in df.columns:
             _ps = df[df["mm_pd_stage"].astype(str) != ""]
