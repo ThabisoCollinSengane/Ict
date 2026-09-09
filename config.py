@@ -1154,4 +1154,8 @@ RANGE_BIAS_USE_LEAN = bool(int(_os.environ.get("RANGE_BIAS_USE_LEAN", "1")))
 # effectively inverted EURUSD. Real UDXUSD is already loaded and registered
 # (_dxy_htf_context uses it); the bias gate never did.
 # Counters: dxy_real_used / dxy_real_missing.
-DXY_PREFER_REAL = bool(int(_os.environ.get("DXY_PREFER_REAL", "1")))
+# DEFAULT OFF. The backtest overrides _dxy_bias entirely (HistdataBacktester),
+# so this only ever affected the LIVE engine -- shipping a change to the live
+# dollar read by default, on a premise that turned out to be wrong for the
+# backtest. Off until the live engine is deliberately revisited.
+DXY_PREFER_REAL = bool(int(_os.environ.get("DXY_PREFER_REAL", "0")))
