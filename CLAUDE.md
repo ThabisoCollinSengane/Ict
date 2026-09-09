@@ -24,6 +24,75 @@ cache-bug post-mortem.)
 
 ---
 
+## ⚠️ WORKING AGREEMENT — surgical edits only (agreed 2026-09-09)
+
+**The algorithm as it stands is correct and validated. Do not rebuild it.**
+Baseline: 736 trades / WR 43.9% / PF 4.01 / MaxDD -13.24% / R132k withdrawn.
+Any change whose default run does not reproduce that exactly is a regression,
+regardless of how good its own numbers look.
+
+### Three independent models contribute trades
+
+| Model | Entry | Status |
+|---|---|---|
+| **ICT 2022** (Judas reversal + breakout continuation) | FVG / OB / breaker after AMD sweep | shipped, the workhorse |
+| **CRT** (Candlestick Range Theory / Turtle Soup) | H4-CRT sizing lever, P19 | shipped |
+| **MM model** (Market Maker) | IFVG after a tag on liquidity | in development |
+
+Because the first two produce trades on their own, **MM-model work must not move
+the account's overall drawdown much.** If a change to the MM model swings MaxDD by
+several points, it is not an MM change — it is a change to something shared.
+
+### The rule that was broken, and must not be again
+
+**Never modify the shared intermarket gate to serve the MM model.** DXY bias,
+EURGBP bias, `htf_bias`, `_sym_bias`, `_dxy_bias`, the MSS 2-of-3 threshold and
+`resolve_pair_direction` are read by EVERY trade in the base strategy. The MM model
+is a SEPARATE channel and belongs in `_mm_golden_entry` / `_mm_standalone`, measured
+against an untouched baseline.
+
+On 2026-09-08/09 the bias reader was swapped three times (BOS latch, dealing range,
+in-range FVG lean) in an attempt to improve the MM channel. Each swap rewrote the
+core gate, so no result could be attributed to the MM idea or to the rewrite. Costs:
+MaxDD -26.84%, then -19.36%, then WR 15.2% / MaxDD -51.99%. All reverted; every flag
+is default OFF. See "Failed approaches" below before proposing any of it again.
+
+### `bars_up_to` / `_dxy_bias` — check for subclass overrides FIRST
+
+`HistdataBacktester` (run_backtest_histdata.py:96) **overrides `_dxy_bias`** and calls
+`htf_bias` directly on real UDXUSD. Four consecutive builds edited
+`Backtester._dxy_bias` in backtest.py and none of them ever executed in a backtest.
+The tell was visible and misread for hours: `eurgbp_flat` responded to changes
+(444 -> 85) while `dxy_flat` never moved off ~78% across three different readers,
+because `_sym_bias` is NOT overridden and `_dxy_bias` is.
+
+**Before editing any base-class method, grep run_backtest_histdata.py for an
+override of it.** Also note `_dxy_bars` and `_dxy_bias_1h` are overridden there.
+
+### The model, as the trader describes it
+
+1. **AMD predicts direction.** Knowing where the algo is in the cycle is step one.
+2. **Market structure** is the consolidation zone: ITH/ITL and STH/STL on the sides,
+   with FVGs and IFVGs forming inside the range. Bias determines which side it goes.
+3. **FVG and IFVG are DIFFERENT MODELS**, not two spellings of one PD array:
+   - **FVG** — ICT 2022 continuation WITH the trend, taken after a confirmed reversal
+     (a body close through the IFVG, or an MSS when there is no FVG).
+   - **IFVG** — the Market Maker model, a combination of both, entered after a **tag
+     on liquidity**.
+   Only their ORDER of formation is uninformative. Their ROLES are distinct.
+4. **Price is fractal** — the same dealing-range / OB / gap structure reads identically
+   on D1, H4, H1, M15 and M5. Read top-down; step down a timeframe when a rung is flat.
+   The rung that fires sets how far the target sits.
+5. **DXY leads direction, EURGBP confirms strength.** Whichever pair shows the MM model
+   alongside the dollar is the one likely to move; EURGBP confirms whether it really will.
+
+### Drawdown tolerance (corrected 2026-09-09)
+
+The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
+The trader's actual tolerance: **15-30% is acceptable if the strategy is sound; 50-75%
+is the real red flag.** Do not reject an otherwise-good result solely for crossing -15%
+— report it and let the trader decide.
+
 ## Files
 
 ```
@@ -1908,6 +1977,54 @@ relative equal H/L ahead), so it cannot discriminate; the `d1_fvg` branch fired 
 - ~~Swing target unlock on inside+D1 draw~~ — `inside` fires ~0× ; premise doesn't occur
 
 ---
+
+### P49-P56 — MM golden-rule channel + bias-reader attempts (2026-09-07/09)
+
+**Everything here is default OFF. The shipped path is untouched.**
+
+**Built and working (MM channel, `MM_GOLDEN_ENABLED=1`):**
+- `_golden_ob_pairing` — pairs the consolidation to an HTF order block, cascading
+  D1 -> H4 -> H1 -> M15 and stepping DOWN when a rung has no paired block. Fixed
+  `mm_golden_ob_none` 533 -> 1.
+- `_ob_equilibrium_state` — respect vs failure at the block's equilibrium
+  (`body_mid`, Ep 35), read on the BLOCK's own timeframe. Read on M15/M5 instead and
+  the wick into the zone is misscored as the block failing.
+- `_ob_retrace_trigger` (P50) — price must RETURN INTO the block on M15/M5. Without
+  it the channel entered on the sweep leg, the wrong side of the move.
+- `_golden_cascade_ok` — the interchangeable-pair rule: a failed block means the
+  opposite direction took control, and that direction belongs to the other pair
+  (GBPUSD sell zone invalidated -> dollar falling -> EURUSD golden buy).
+- `MM_GOLDEN_ONE_PAIR_ONLY` — never hold EURUSD and GBPUSD at once.
+  `MM_GOLDEN_DECORR_ALL` only ever blocked the SAME dollar direction, so EU long +
+  GU short (opposite directions, two spreads for one bet) passed straight through.
+  It was firing 1,272 times.
+
+**Best MM result so far (IS 2022-23):** 367 trades / WR 44.4% / PF 3.55 / MaxDD
+-10.24%, vs baseline 355 / 43.1% / 3.37 / -13.24%. Only 12 golden trades opened.
+`MM_GOLDEN_MIN_DRAW=2` is load-bearing — relaxing it to 1 tripled entries but bought
++R1k of equity for 3.28pp of drawdown. **OOS has never been run on any P49/P50 variant.**
+
+**Failed approaches — do not repeat:**
+
+| Attempt | Result |
+|---|---|
+| BOS-latch bias reader (`STRUCT_BIAS_ENABLED`) | never returns flat -> MSS DXY leg became a rubber stamp, pass rate 34.8% -> 75.7%, **MaxDD -26.84%** |
+| Dealing-range bias wired into the gate (`RANGE_BIAS_ENABLED`) | MaxDD -15.75%, then -19.36% with MSS_REQUIRE_DXY |
+| + in-range FVG lean (`RANGE_BIAS_USE_LEAN`) | **WR 15.2% / PF 0.64 / MaxDD -51.99%** — the lean's polarity was guessed, never specified, and is probably inverted |
+| `STRICT_BAR_CLOSE` (drop the forming bar) | 60 trades / WR 11.7% / -51.7%. `detect_amd_setup` runs on M15, so dropping its forming bar delayed sweep detection up to 15 min while entries still priced off the current M5 bar |
+
+**The lookahead finding is REAL and still unfixed.** `bars_up_to` returns the bar that
+is still forming, and in a backtest that bar carries its whole window -- at 09:00 an
+08:00-12:00 H4 bar already holds its 11:00 high. Verified empirically. The remedy is
+NOT to drop the bar (that makes signals staler than live); it is to TRUNCATE it to
+data up to `t`, rebuilt from the M5 series. Not built. Affects every H4/D/H1/M15 read
+and biases the backtest optimistically relative to live.
+
+**Analytics worth keeping (from the P26 draw-on-liquidity tables):** `pdh_pdl` is the
+best target family — 47 trades / **53.2% WR** / +R261 avg, roughly triple the average
+of `fib_extension` (255 trades / 41.2%), which carries most of the volume. `swing` is
+the weakest large bucket (62 / 35.5%). `ith/itl_liquidity` are 8 trades and negative.
+Trades tagged "no session" (23 / 17.4% WR / -R705) are the worst cell on the board.
 
 ## 3-month live account scenarios (R1,000 start, updated 2026-09-03)
 
