@@ -518,6 +518,7 @@ class Backtester:
             "golden_ob_state": st.get("golden_ob_state", ""),
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
             "mm_scenario": st.get("mm_scenario", ""),
+            "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -627,6 +628,7 @@ class Backtester:
             "golden_ob_state": st.get("golden_ob_state", ""),
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
             "mm_scenario": st.get("mm_scenario", ""),
+            "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -4845,6 +4847,48 @@ class Backtester:
         (-1, +1): ("EURUSD", +1, "2a"),   # dollar DOWN, EUR strong -> buy the stronger (EUR)
     }
 
+    def _mm_ifvg_entry(self, pair, direction, t):
+        """MM entry: price is INSIDE an IFVG born from an FVG adjacent to the
+        consolidation.
+
+        The trader's sequence:
+          1. consolidation (dealing range / market structure)
+          2. an FVG sits just ABOVE or BELOW that range — not necessarily inside it
+          3. price closes through the gap, INVERTING it into an IFVG
+          4. price returns INTO the IFVG -> that is the entry moment
+          5. the DXY x EURGBP quadrant says WHICH pair will actually break and move
+
+        Distinct from _ob_retrace_trigger, which watches an order block. This is the
+        MM model proper: IFVG after a tag on liquidity, per the FVG-vs-IFVG role
+        split in CLAUDE.md.
+
+        Cascades the entry ladder highest-first. Returns (ok, tf, lo, hi).
+        """
+        if not config.MM_GOLDEN_IFVG_ENTRY:
+            return True, "", 0.0, 0.0
+        from ict.ifvg import latest_inversion
+        pip_v = pip_size(pair)
+        adj = config.MM_GOLDEN_IFVG_ADJ_PIPS * pip_v
+        for tf in config.MM_GOLDEN_IFVG_TFS:
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 10:
+                continue
+            _d, dr = self._dealing_range_bias(pair, tf, t)
+            if dr is None:
+                continue
+            cur = bars[-1].Close
+            # The gap must belong to this consolidation: inside the range, or within
+            # MM_GOLDEN_IFVG_ADJ_PIPS just above / just below it.
+            lo_b, hi_b = dr.low - adj, dr.high + adj
+            for g in sorted(self._scan_htf_fvgs(bars, pair), key=lambda x: -x.bar_index):
+                if g.bottom < lo_b or g.top > hi_b:
+                    continue
+                if latest_inversion(bars, g.bottom, g.top) != direction:
+                    continue                      # not inverted our way
+                if g.bottom <= cur <= g.top:      # price INSIDE the IFVG = entry
+                    return True, tf, g.bottom, g.top
+        return False, "", 0.0, 0.0
+
     def _mm_quadrant(self, t):
         """Which pair and direction do DXY and EURGBP jointly select?
 
@@ -5064,6 +5108,15 @@ class Backtester:
                 return
             g["mm_golden_im_ok"] = g.get("mm_golden_im_ok", 0) + 1
 
+        # MM entry proper: price inside an IFVG born from an FVG adjacent to the
+        # consolidation. The quadrant already said THIS pair is the one that moves.
+        _ifvg_ok, _ifvg_tf, _ifvg_lo, _ifvg_hi = self._mm_ifvg_entry(pair, direction, t)
+        if not _ifvg_ok:
+            g["mm_golden_no_ifvg"] = g.get("mm_golden_no_ifvg", 0) + 1
+            return
+        if _ifvg_tf:
+            g[f"mm_golden_ifvg_{_ifvg_tf}"] = g.get(f"mm_golden_ifvg_{_ifvg_tf}", 0) + 1
+
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)
         bars_w = self.bars_up_to(pair, "W", t)
@@ -5230,6 +5283,7 @@ class Backtester:
             "golden_ob_state": _ob_state,       # respected | failed | untested | ""
             "golden_retrace_tf": _retrace_tf,   # 15T | 5T | "" (cascade path)
             "mm_scenario": _mm_scenario,
+            "mm_ifvg_tf": _ifvg_tf,
             "mm_dxy_dir": _mm_dxy_dir, "mm_dxy_tf": _mm_dxy_tf,
             "mm_eurgbp_dir": _mm_eg_dir, "mm_eurgbp_tf": _mm_eg_tf,
             "golden_smt": _golden_smt,

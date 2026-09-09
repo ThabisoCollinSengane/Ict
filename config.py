@@ -1181,3 +1181,14 @@ MM_GOLDEN_REQUIRE_EURGBP = bool(int(_os.environ.get("MM_GOLDEN_REQUIRE_EURGBP", 
 # refused 1b and 2b outright. Both instruments are read LOCALLY via the
 # dealing-range cascade; the shared intermarket gate is untouched.
 MM_GOLDEN_QUADRANT = bool(int(_os.environ.get("MM_GOLDEN_QUADRANT", "1")))
+
+# --- P59: MM entry = price INSIDE an IFVG adjacent to the consolidation ---
+# The trader's sequence: consolidation (dealing range) -> an FVG sits just above or
+# below it -> price closes through, inverting it to an IFVG -> price returns INSIDE
+# the IFVG = the entry. The DXY x EURGBP quadrant then says WHICH pair actually
+# breaks and moves. This is the MM model proper (IFVG after a tag on liquidity),
+# distinct from the OB retrace trigger.
+MM_GOLDEN_IFVG_ENTRY = bool(int(_os.environ.get("MM_GOLDEN_IFVG_ENTRY", "1")))
+MM_GOLDEN_IFVG_TFS = tuple(_os.environ.get("MM_GOLDEN_IFVG_TFS", "60T,15T,5T").split(","))
+# How far above/below the range a gap may sit and still belong to that consolidation.
+MM_GOLDEN_IFVG_ADJ_PIPS = float(_os.environ.get("MM_GOLDEN_IFVG_ADJ_PIPS", "20"))
