@@ -86,6 +86,41 @@ override of it.** Also note `_dxy_bars` and `_dxy_bias_1h` are overridden there.
 5. **DXY leads direction, EURGBP confirms strength.** Whichever pair shows the MM model
    alongside the dollar is the one likely to move; EURGBP confirms whether it really will.
 
+### 🎯 THE FOUR TRUE MM GOLDEN CONDITIONS (definitive, 2026-09-09)
+
+**The MM model activates ONLY in these four cases. Nothing else.**
+
+| DXY | EURGBP | Trade | Scenario |
+|---|---|---|---|
+| UP | UP | **SELL GBPUSD** | 1a — sell the weaker |
+| UP | DOWN | **SELL EURUSD** | 1b — sell the weaker |
+| DOWN | DOWN | **BUY GBPUSD** | 2b — buy the stronger |
+| DOWN | UP | **BUY EURUSD** | 2a — buy the stronger |
+| either FLAT | | **no MM setup** | — |
+
+DXY and EURGBP jointly select BOTH the pair AND the direction. This is not the
+old "golden rule" (EURUSD long / GBPUSD short only) — **EURUSD SHORT and GBPUSD
+LONG are valid** when the cross says so. These map exactly onto the existing ICT
+scenario table, so the MM channel and the base cheat-sheet agree on pair selection.
+
+On a DXY-down + EURGBP-down day the MM model should be breaking IFVGs and
+respecting them with buy signals on GBPUSD — that is the model activating, and the
+absence of those signals is what tells you the condition is not really present.
+
+**Implemented:** `_mm_quadrant(t)` + `_MM_QUADRANT` in backtest.py (P58).
+`MM_GOLDEN_QUADRANT=1` (default; unreachable while `MM_GOLDEN_ENABLED=0`).
+Both instruments are read LOCALLY via `_dealing_range_cascade` — the shared
+intermarket gate is NOT touched, per the working agreement above.
+
+**Instrumentation (built for "where do these conditions fail?"):**
+`mm_quad_1a` / `1b` / `2b` / `2a` (how often each condition occurs),
+`mm_quad_none_dxy_flat`, `mm_quad_none_eurgbp_flat`, `mm_quad_other_pair`,
+`mm_quad_selected`. Column `mm_scenario` on every trade splits WR/PF per quadrant.
+
+**Still to do:** run IS and OOS with `MM_GOLDEN_ENABLED=1 MM_GOLDEN_QUADRANT=1`
+and read the quadrant counters — specifically whether 1b/2b (the newly reachable
+half) fire at all, and whether dxy_flat or eurgbp_flat is the dominant blocker.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
@@ -2025,6 +2060,56 @@ best target family — 47 trades / **53.2% WR** / +R261 avg, roughly triple the 
 of `fib_extension` (255 trades / 41.2%), which carries most of the volume. `swing` is
 the weakest large bucket (62 / 35.5%). `ith/itl_liquidity` are 8 trades and negative.
 Trades tagged "no session" (23 / 17.4% WR / -R705) are the worst cell on the board.
+
+### P57-P58 — MM intermarket read + quadrant (2026-09-09, current work)
+
+**P57 clean IS result (`MM_GOLDEN_ENABLED=1 MM_GOLDEN_INTERMARKET=1`):**
+
+| | Baseline | P50 | **P57** |
+|---|---|---|---|
+| Trades | 355 | 367 | 363 |
+| WR | 43.1% | 44.4% | **44.4%** |
+| PF | 3.37 | 3.55 | **3.73** |
+| MaxDD | -13.24% | -10.24% | **-13.24%** |
+| Equity | R48,421 | R55,388 | **R56,239** |
+| golden opened | — | 12 | **5** |
+
+Better than baseline on WR, PF and equity (+16%) with MaxDD identical to the
+decimal. **But only 5 golden trades** — a +16% equity gain off 5 entries is
+path-dependency, not a demonstrated edge. Do not ship on this alone.
+
+This run also RETIRES P50's -10.24%: MaxDD here landed on exactly the baseline
+-13.24% because 5 extra trades barely move the equity path. P50's -10.24% was 12
+trades happening to buffer a drawdown, not risk control.
+
+P57 counters: `via_own_ob` 284, `via_cascade` 12 (up from 5 — freeing the
+other-pair requirement worked), `im_dxy_opposes` 59, `im_eurgbp` 97, `im_ok` 61.
+**EURGBP is the heavier filter** (97 vs 59) — the cross does more work than the
+dollar, consistent with "EURGBP is the real golden rule".
+
+**P58 replaced P57's EURGBP requirement** — it demanded EURGBP bullish for every
+entry, which only covers 1a and 2a. See the four-quadrant table at the top.
+
+**⚠️ PowerShell env vars persist for the life of the window.** A run on
+2026-09-09 came back 912 trades / WR 26.4% / PF 1.49 / MaxDD -45.35% purely
+because `RANGE_BIAS_ENABLED=1` and `MSS_REQUIRE_DXY=1` were still set from earlier
+experiments. Clear them explicitly before any MM run:
+
+```
+$env:RANGE_BIAS_ENABLED=$null; $env:STRUCT_BIAS_ENABLED=$null; $env:MSS_REQUIRE_DXY=$null; $env:RANGE_BIAS_USE_LEAN=$null; $env:STRICT_BAR_CLOSE=$null; $env:DXY_PREFER_REAL=$null; $env:MM_GOLDEN_MIN_DRAW=$null
+```
+
+**Clean-run check:** `dxy_real_used` must be ABSENT from the gate funnel. If it
+appears, a bias flag is still set and the run is contaminated.
+
+**NEXT STEPS (in order):**
+1. IS + OOS with `MM_GOLDEN_ENABLED=1` (quadrant is default on). Read the
+   `mm_quad_*` counters: do 1b/2b fire at all, and is dxy_flat or eurgbp_flat the
+   dominant blocker?
+2. Split WR/PF by `mm_scenario` — are all four quadrants equally good, or is the
+   edge concentrated in one or two?
+3. OOS is the decider. P46 looked fine IS then died OOS at -16.88%. No MM variant
+   has EVER been run OOS.
 
 ## 3-month live account scenarios (R1,000 start, updated 2026-09-03)
 
