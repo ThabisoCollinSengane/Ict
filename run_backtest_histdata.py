@@ -94,8 +94,20 @@ class HistdataBacktester(bt_module.Backtester):
             self.tf_index[("UDXUSD", tf_name)] = d.index
 
     def _dxy_bias(self, tf, t, lookback=None) -> int:
-        """Use real UDXUSD at any timeframe instead of ICE-formula synthetic DXY."""
+        """Use real UDXUSD at any timeframe instead of ICE-formula synthetic DXY.
+
+        NOTE: this OVERRIDES Backtester._dxy_bias completely. Any bias-reader change
+        made in backtest.py is invisible here unless it is routed below -- which is
+        exactly how RANGE_BIAS/STRUCT_BIAS/DXY_PREFER_REAL were all silently bypassed
+        for DXY while appearing to be wired.
+        """
         bars = self.bars_up_to("UDXUSD", tf, t)
+        if config.RANGE_BIAS_ENABLED:
+            self.gate["dxy_real_used"] = self.gate.get("dxy_real_used", 0) + 1
+            return self._range_bias_from_bars(bars, sym_hint="UDXUSD")[0]
+        if config.STRUCT_BIAS_ENABLED:
+            self.gate["dxy_real_used"] = self.gate.get("dxy_real_used", 0) + 1
+            return self._structural_direction(bars)
         lb = lookback if lookback is not None else config.SWING_LOOKBACK
         return htf_bias(bars, lookback=lb)
 
