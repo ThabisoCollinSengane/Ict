@@ -138,7 +138,16 @@ sequence:
 |---|---|---|
 | 1 | **OB** (`_ob_retrace_trigger`) | price returned INTO the block |
 | 2 | **IFVG** (`_mm_ifvg_entry`) | price left / never reached the block |
-| 3 | **FVG** (`_mm_fvg_entry`) | no inversion; an unmitigated gap running our way |
+| 3 | **FVG** (`_mm_fvg_entry`) | a gap running our way — inside the IFVG or not |
+| 3 | **OB2** (`_mm_ob_in_zone`) | a second block housed inside the IFVG |
+
+**The IFVG HOUSES PD arrays (P62).** An FVG can sit inside the IFVG, and so can
+a second order block — which of the two you call it makes no difference to the
+entry. So the FVG rung does NOT exclude inverted gaps (that exclusion was
+wrong), and a PD array qualifies when it belongs to the consolidation OR is
+housed in the IFVG zone. Stages 2/3 are labelling for the analytics, not a
+hierarchy of validity; the only real hierarchy is that the original order block
+is the first place we look.
 
 P59 briefly made the IFVG a second hard gate ON TOP of the OB retrace, so a
 setup had to satisfy two stages of one sequence simultaneously. Fixed in P60:

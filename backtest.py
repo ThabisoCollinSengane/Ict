@@ -4870,7 +4870,38 @@ class Backtester:
         """
         return self._mm_gap_entry(pair, direction, t, inverted=True)
 
-    def _mm_fvg_entry(self, pair, direction, t):
+    def _mm_ob_in_zone(self, pair, direction, t, zone):
+        """A SECOND order block housed inside the IFVG zone, price inside it.
+
+        The IFVG is the house; it can hold any PD array — an FVG, or another order
+        block. Which one you call it makes no difference to the entry, so a block
+        formed inside the inverted zone is as valid a trigger as the gap itself.
+        This is distinct from _ob_retrace_trigger, which watches the ORIGINAL block
+        the consolidation was paired to.
+
+        Returns (ok, tf, lo, hi).
+        """
+        if zone is None:
+            return False, "", 0.0, 0.0
+        from ict.order_block import detect_order_blocks
+        pip_v = pip_size(pair)
+        adj = config.MM_GOLDEN_IFVG_ADJ_PIPS * pip_v
+        z_lo, z_hi = zone[0] - adj, zone[1] + adj
+        for tf in config.MM_GOLDEN_IFVG_TFS:
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 10:
+                continue
+            cur = bars[-1].Close
+            for ob in reversed(detect_order_blocks(bars)):
+                if ob.direction != direction or getattr(ob, "mitigated", False):
+                    continue
+                if ob.bottom < z_lo or ob.top > z_hi:
+                    continue                       # not housed in the zone
+                if ob.bottom <= cur <= ob.top:     # price inside it = entry
+                    return True, tf, ob.bottom, ob.top
+        return False, "", 0.0, 0.0
+
+    def _mm_fvg_entry(self, pair, direction, t, zone=None):
         """MM entry STAGE 3: price is INSIDE a plain, unmitigated FVG running our way.
 
         The shallowest rung. When the retracement reached neither the order block nor
@@ -4879,7 +4910,7 @@ class Backtester:
 
         Returns (ok, tf, lo, hi).
         """
-        return self._mm_gap_entry(pair, direction, t, inverted=False)
+        return self._mm_gap_entry(pair, direction, t, inverted=False, zone=zone)
 
     def _mm_ifvg_present(self, pair, direction, t):
         """MODEL GATE: does a qualifying IFVG EXIST on this pair, inverted our way?
@@ -4899,7 +4930,8 @@ class Backtester:
         return self._mm_gap_entry(pair, direction, t, inverted=True,
                                   require_inside=False)
 
-    def _mm_gap_entry(self, pair, direction, t, inverted, require_inside=True):
+    def _mm_gap_entry(self, pair, direction, t, inverted, require_inside=True,
+                      zone=None):
         """Shared gap scan for the IFVG (stage 2) and FVG (stage 3) rungs.
 
         A gap qualifies only when it BELONGS to the consolidation being retested —
@@ -4927,17 +4959,23 @@ class Backtester:
             # MM_GOLDEN_IFVG_ADJ_PIPS just above / just below it.
             lo_b, hi_b = dr.low - adj, dr.high + adj
             for g in sorted(self._scan_htf_fvgs(bars, pair), key=lambda x: -x.bar_index):
-                if g.bottom < lo_b or g.top > hi_b:
+                _in_range = lo_b <= g.bottom and g.top <= hi_b
+                # ... or housed inside the IFVG zone, which can hold any PD array.
+                _in_zone = (zone is not None
+                            and g.bottom >= zone[0] - adj and g.top <= zone[1] + adj)
+                if not (_in_range or _in_zone):
                     continue
                 if inverted:
                     if latest_inversion(bars, g.bottom, g.top) != direction:
                         continue                  # not inverted our way
                 else:
-                    # A plain FVG: already running our way and not yet mitigated.
-                    # An inverted gap belongs to stage 2, so exclude it here.
-                    if g.direction != direction or g.mitigated:
-                        continue
-                    if latest_inversion(bars, g.bottom, g.top) != 0:
+                    # A gap running our way. It may sit INSIDE an IFVG or be one --
+                    # the IFVG houses PD arrays and the distinction makes no
+                    # difference to the entry, so an inverted gap is NOT excluded
+                    # here. Accept it if it points our way OR has been flipped our
+                    # way; only a still-intact zone qualifies.
+                    _inv = latest_inversion(bars, g.bottom, g.top)
+                    if _inv != direction and (g.direction != direction or g.mitigated):
                         continue
                 if not require_inside:            # existence only (model gate)
                     return True, tf, g.bottom, g.top
@@ -5202,11 +5240,21 @@ class Backtester:
             if _ifvg_ok:
                 _pd_stage, _pd_tf = "ifvg", _ifvg_tf
             else:
+                # The IFVG houses PD arrays — an FVG or a second order block inside
+                # it are equally valid triggers; which you call it makes no
+                # difference. Order here is labelling only.
+                _zone = (_zone_lo, _zone_hi) if _zone_tf else None
                 _fvg_ok, _fvg_tf, _fvg_lo, _fvg_hi = self._mm_fvg_entry(
-                    pair, direction, t)
+                    pair, direction, t, zone=_zone)
                 if _fvg_ok:
                     _pd_stage, _pd_tf = "fvg", _fvg_tf
                     _ifvg_lo, _ifvg_hi = _fvg_lo, _fvg_hi
+                else:
+                    _ob2_ok, _ob2_tf, _ob2_lo, _ob2_hi = self._mm_ob_in_zone(
+                        pair, direction, t, _zone)
+                    if _ob2_ok:
+                        _pd_stage, _pd_tf = "ob2", _ob2_tf
+                        _ifvg_lo, _ifvg_hi = _ob2_lo, _ob2_hi
         if not _pd_stage:
             g["mm_golden_no_pd"] = g.get("mm_golden_no_pd", 0) + 1
             return

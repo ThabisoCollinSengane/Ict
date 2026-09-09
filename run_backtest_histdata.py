@@ -1245,12 +1245,14 @@ def _publish_backtest_report(results, backtester, years, df=None):
                 L += ["", "## MM entry stage — PD-array ladder (P60)", "",
                       "Stages of ONE retracement, not parallel gates. The order block",
                       "is the first choice; when the M15 retrace does not reach back",
-                      "to it, the inverted gap (ifvg) then a plain gap (fvg) take over.",
+                      "to it, the inverted gap (ifvg) takes over — and the IFVG can",
+                      "house any PD array, so a gap (fvg) or a second block (ob2)",
+                      "inside it are equally valid triggers.",
                       "```"]
                 L.append(f"{'Stage':<8} {'TF':<6} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
                          f"{'P&L ZAR':>12} {'PF':>6}")
                 L.append("-" * 58)
-                for _st in ("ob", "ifvg", "fvg"):
+                for _st in ("ob", "ifvg", "fvg", "ob2"):
                     grp = _ps[_ps["mm_pd_stage"] == _st]
                     if not len(grp):
                         continue
