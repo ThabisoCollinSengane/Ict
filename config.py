@@ -1159,3 +1159,14 @@ RANGE_BIAS_USE_LEAN = bool(int(_os.environ.get("RANGE_BIAS_USE_LEAN", "1")))
 # dollar read by default, on a premise that turned out to be wrong for the
 # backtest. Off until the live engine is deliberately revisited.
 DXY_PREFER_REAL = bool(int(_os.environ.get("DXY_PREFER_REAL", "0")))
+
+# --- P57: MM-channel intermarket read (DXY leads, EURGBP confirms) ---
+# Read LOCALLY inside _mm_golden_entry via the dealing-range + in-range-lean model.
+# Deliberately does NOT touch _dxy_bias / _sym_bias -- those are the shared gate every
+# base-strategy trade uses, and rewriting them to serve the MM model is what caused
+# the -26.84% / -51.99% runs. A check inside the MM channel can only subtract MM
+# entries, never alter a base entry, so overall WR is structurally protected.
+MM_GOLDEN_INTERMARKET = bool(int(_os.environ.get("MM_GOLDEN_INTERMARKET", "0")))
+# Both golden trades map to EURGBP bullish (1a: dollar up + EUR strong -> sell GBP;
+# 2a: dollar down + EUR strong -> buy EUR) -- P44's premise, independently derived.
+MM_GOLDEN_REQUIRE_EURGBP = bool(int(_os.environ.get("MM_GOLDEN_REQUIRE_EURGBP", "1")))

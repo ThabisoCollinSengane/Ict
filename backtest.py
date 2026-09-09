@@ -517,6 +517,10 @@ class Backtester:
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
+            "mm_dxy_dir": st.get("mm_dxy_dir", 0),
+            "mm_dxy_tf": st.get("mm_dxy_tf", ""),
+            "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
+            "mm_eurgbp_tf": st.get("mm_eurgbp_tf", ""),
             "golden_smt": st.get("golden_smt", False),
             "golden_score": st.get("golden_score", 0),
             "narrative_score": st.get("narrative_score", 0),
@@ -621,6 +625,10 @@ class Backtester:
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
+            "mm_dxy_dir": st.get("mm_dxy_dir", 0),
+            "mm_dxy_tf": st.get("mm_dxy_tf", ""),
+            "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
+            "mm_eurgbp_tf": st.get("mm_eurgbp_tf", ""),
             "golden_smt": st.get("golden_smt", False),
             "golden_score": st.get("golden_score", 0),
             "narrative_score": st.get("narrative_score", 0),
@@ -4826,6 +4834,36 @@ class Backtester:
                     return True, tf
         return False, ""
 
+    def _mm_intermarket_confirm(self, direction, t):
+        """DXY leads direction, EURGBP confirms strength — read LOCALLY for MM only.
+
+        Deliberately does NOT call _dxy_bias / _sym_bias. Those are the shared gate
+        that every base-strategy trade passes through; changing them to serve the MM
+        model is what broke this repeatedly. This reads the same two instruments with
+        the dealing-range + in-range-lean model, so the MM channel gets the richer
+        dollar read while the base strategy keeps htf_bias untouched. Being a check
+        INSIDE _mm_golden_entry, it can only ever remove MM entries -- it cannot
+        alter a single base entry, so overall WR is structurally protected.
+
+        Both golden trades map to EURGBP BULLISH, per the scenario table:
+          dollar UP   + EUR strong -> sell the weaker one   -> GBPUSD short (1a)
+          dollar DOWN + EUR strong -> buy the stronger one  -> EURUSD long  (2a)
+        which is P44's "EUR is structurally stronger than GBP", reached independently.
+
+        Returns (ok, dxy_dir, dxy_tf, eg_dir, eg_tf).
+        """
+        # A long on any X/USD pair needs the dollar DOWN.
+        need_dxy = -direction
+        dxy_dir, dxy_tf, _dr = self._dealing_range_cascade("UDXUSD", t)
+        if dxy_dir == 0:
+            return False, 0, "", 0, ""
+        if dxy_dir != need_dxy:
+            return False, dxy_dir, dxy_tf, 0, ""
+        eg_dir, eg_tf, _egdr = self._dealing_range_cascade(config.REF_EURGBP, t)
+        if config.MM_GOLDEN_REQUIRE_EURGBP and eg_dir != +1:
+            return False, dxy_dir, dxy_tf, eg_dir, eg_tf
+        return True, dxy_dir, dxy_tf, eg_dir, eg_tf
+
     # ── P46: Golden Rule MM Channel ────────────────────────────────────────
     def _mm_golden_entry(self, pair, t):
         """Relaxed-gate daily entry for EURUSD long / GBPUSD short.
@@ -4966,6 +5004,21 @@ class Backtester:
             return
         g[f"mm_golden_smt_{'yes' if _golden_smt else 'no'}"] = (
             g.get(f"mm_golden_smt_{'yes' if _golden_smt else 'no'}", 0) + 1)
+
+        # Intermarket: the dollar leads, EURGBP confirms strength. Local read —
+        # the shared gate is untouched, so this can only subtract MM entries.
+        _mm_dxy_tf = _mm_eg_tf = ""
+        _mm_dxy_dir = _mm_eg_dir = 0
+        if config.MM_GOLDEN_INTERMARKET:
+            _im_ok, _mm_dxy_dir, _mm_dxy_tf, _mm_eg_dir, _mm_eg_tf = (
+                self._mm_intermarket_confirm(direction, t))
+            if not _im_ok:
+                _why = ("dxy_flat" if _mm_dxy_dir == 0
+                        else "dxy_opposes" if _mm_dxy_dir != -direction
+                        else "eurgbp")
+                g[f"mm_golden_im_{_why}"] = g.get(f"mm_golden_im_{_why}", 0) + 1
+                return
+            g["mm_golden_im_ok"] = g.get("mm_golden_im_ok", 0) + 1
 
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)
@@ -5132,6 +5185,8 @@ class Backtester:
             "golden_ob_tf": _ob_tf,             # D | 240T | 60T | 15T
             "golden_ob_state": _ob_state,       # respected | failed | untested | ""
             "golden_retrace_tf": _retrace_tf,   # 15T | 5T | "" (cascade path)
+            "mm_dxy_dir": _mm_dxy_dir, "mm_dxy_tf": _mm_dxy_tf,
+            "mm_eurgbp_dir": _mm_eg_dir, "mm_eurgbp_tf": _mm_eg_tf,
             "golden_smt": _golden_smt,
             # Quality score: equilibrium respected + SMT + a strong HTF draw.
             "golden_score": ((_golden_via == "own_ob")
