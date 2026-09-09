@@ -107,6 +107,19 @@ On a DXY-down + EURGBP-down day the MM model should be breaking IFVGs and
 respecting them with buy signals on GBPUSD — that is the model activating, and the
 absence of those signals is what tells you the condition is not really present.
 
+**The MM ENTRY sequence (P59) — the quadrant picks the pair, the IFVG is the trigger:**
+1. consolidation (dealing range / market structure)
+2. an FVG sits just ABOVE or BELOW that range — not necessarily inside it
+3. price closes through the gap, **inverting it into an IFVG**
+4. price returns **INSIDE the IFVG** → that is the entry moment
+5. the quadrant says which pair actually breaks and moves — quadrant reads 1a, so
+   watch GBPUSD respecting its IFVGs/FVGs
+
+`_mm_ifvg_entry` (60T→15T→5T cascade, `MM_GOLDEN_IFVG_ADJ_PIPS=20` adjacency).
+This is the FVG-vs-IFVG role split made concrete: FVG = ICT 2022 continuation
+array; IFVG = the Market Maker entry after a tag on liquidity. `_ob_retrace_trigger`
+(P50, order-block based) remains a separate check.
+
 **Implemented:** `_mm_quadrant(t)` + `_MM_QUADRANT` in backtest.py (P58).
 `MM_GOLDEN_QUADRANT=1` (default; unreachable while `MM_GOLDEN_ENABLED=0`).
 Both instruments are read LOCALLY via `_dealing_range_cascade` — the shared
