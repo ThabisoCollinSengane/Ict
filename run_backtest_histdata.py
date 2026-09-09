@@ -1238,6 +1238,37 @@ def _publish_backtest_report(results, backtester, years, df=None):
                              f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
                 L.append("```")
 
+        # --- MM PD-array entry stage (P60): ob -> ifvg -> fvg ladder ---
+        if "mm_pd_stage" in df.columns:
+            _ps = df[df["mm_pd_stage"].astype(str) != ""]
+            if len(_ps):
+                L += ["", "## MM entry stage — PD-array ladder (P60)", "",
+                      "Stages of ONE retracement, not parallel gates. The order block",
+                      "is the first choice; when the M15 retrace does not reach back",
+                      "to it, the inverted gap (ifvg) then a plain gap (fvg) take over.",
+                      "```"]
+                L.append(f"{'Stage':<8} {'TF':<6} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 58)
+                for _st in ("ob", "ifvg", "fvg"):
+                    grp = _ps[_ps["mm_pd_stage"] == _st]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    L.append(f"{_st:<8} {'all':<6} {len(grp):>7} {w:>5} "
+                             f"{100*w/len(grp):>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+                    if "mm_ifvg_tf" in grp.columns:
+                        for _tf in sorted(set(grp["mm_ifvg_tf"].astype(str))):
+                            sub = grp[grp["mm_ifvg_tf"].astype(str) == _tf]
+                            if not len(sub):
+                                continue
+                            w2 = (sub.pnl > 0).sum()
+                            L.append(f"{'':<8} {(_tf or '-'):<6} {len(sub):>7} {w2:>5} "
+                                     f"{100*w2/len(sub):>5.1f}% "
+                                     f"{sub.pnl.sum():>12.2f} {_pf(sub):>6.2f}")
+                L.append("```")
+
         # --- Narrative context scoring (P47) ---
         if "narrative_score" in df.columns:
             L += ["", "## Narrative context scoring (P47)", "", "```"]

@@ -519,6 +519,7 @@ class Backtester:
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
             "mm_scenario": st.get("mm_scenario", ""),
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
+            "mm_pd_stage": st.get("mm_pd_stage", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -629,6 +630,7 @@ class Backtester:
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
             "mm_scenario": st.get("mm_scenario", ""),
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
+            "mm_pd_stage": st.get("mm_pd_stage", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -4848,8 +4850,7 @@ class Backtester:
     }
 
     def _mm_ifvg_entry(self, pair, direction, t):
-        """MM entry: price is INSIDE an IFVG born from an FVG adjacent to the
-        consolidation.
+        """MM entry STAGE 2: price is INSIDE an IFVG adjacent to the consolidation.
 
         The trader's sequence:
           1. consolidation (dealing range / market structure)
@@ -4858,11 +4859,36 @@ class Backtester:
           4. price returns INTO the IFVG -> that is the entry moment
           5. the DXY x EURGBP quadrant says WHICH pair will actually break and move
 
-        Distinct from _ob_retrace_trigger, which watches an order block. This is the
-        MM model proper: IFVG after a tag on liquidity, per the FVG-vs-IFVG role
-        split in CLAUDE.md.
+        This is stage 2 of the retracement ladder, not a parallel requirement: the
+        order block (stage 1) is the first choice, but the M15 retracement does not
+        always reach back to it. Once price has left the block, the inverted gap is
+        where the model enters. See _mm_pd_entry.
 
-        Cascades the entry ladder highest-first. Returns (ok, tf, lo, hi).
+        Returns (ok, tf, lo, hi).
+        """
+        return self._mm_gap_entry(pair, direction, t, inverted=True)
+
+    def _mm_fvg_entry(self, pair, direction, t):
+        """MM entry STAGE 3: price is INSIDE a plain, unmitigated FVG running our way.
+
+        The shallowest rung. When the retracement reached neither the order block nor
+        an inverted gap, an ordinary gap in the trade direction — inside or adjacent
+        to the consolidation being retested — is still a valid PD array to enter on.
+
+        Returns (ok, tf, lo, hi).
+        """
+        return self._mm_gap_entry(pair, direction, t, inverted=False)
+
+    def _mm_gap_entry(self, pair, direction, t, inverted):
+        """Shared gap scan for the IFVG (stage 2) and FVG (stage 3) rungs.
+
+        A gap qualifies only when it BELONGS to the consolidation being retested —
+        inside the dealing range, or within MM_GOLDEN_IFVG_ADJ_PIPS just above or
+        below it. `inverted` picks the stage: True wants a gap a body close has
+        flipped our way (IFVG); False wants an ordinary unmitigated gap already
+        pointing our way (FVG). Either way the entry moment is price INSIDE the zone.
+
+        Cascades the timeframe ladder highest-first. Returns (ok, tf, lo, hi).
         """
         if not config.MM_GOLDEN_IFVG_ENTRY:
             return True, "", 0.0, 0.0
@@ -4883,9 +4909,17 @@ class Backtester:
             for g in sorted(self._scan_htf_fvgs(bars, pair), key=lambda x: -x.bar_index):
                 if g.bottom < lo_b or g.top > hi_b:
                     continue
-                if latest_inversion(bars, g.bottom, g.top) != direction:
-                    continue                      # not inverted our way
-                if g.bottom <= cur <= g.top:      # price INSIDE the IFVG = entry
+                if inverted:
+                    if latest_inversion(bars, g.bottom, g.top) != direction:
+                        continue                  # not inverted our way
+                else:
+                    # A plain FVG: already running our way and not yet mitigated.
+                    # An inverted gap belongs to stage 2, so exclude it here.
+                    if g.direction != direction or g.mitigated:
+                        continue
+                    if latest_inversion(bars, g.bottom, g.top) != 0:
+                        continue
+                if g.bottom <= cur <= g.top:      # price INSIDE the zone = entry
                     return True, tf, g.bottom, g.top
         return False, "", 0.0, 0.0
 
@@ -5060,15 +5094,19 @@ class Backtester:
             pair, direction, rng, t)
         _golden_via = ""
         _retrace_tf = ""
+        _retrace_ok, _retrace_tf = False, ""
         if _ob_state == "respected":
             # The block being respected is not yet the entry — price must RETURN INTO
-            # it on M15/M5. That retrace is the trade; without it the setup is only
-            # potential and we would be entering on the sweep leg itself.
+            # a PD array on the M15 retracement. The block is the FIRST choice, but
+            # the retracement does not always reach back to it; the ladder below
+            # falls through to the IFVG, then a plain FVG. Entering on the sweep leg
+            # is still excluded — every rung requires price INSIDE a zone.
             _retrace_ok, _retrace_tf = self._ob_retrace_trigger(
                 pair, direction, _ob_zone, t)
             if not _retrace_ok:
                 g["mm_golden_no_retrace"] = g.get("mm_golden_no_retrace", 0) + 1
-                return
+                if not config.MM_GOLDEN_IFVG_ENTRY:
+                    return          # no ladder -> the block was the only rung
             _golden_via = "own_ob"
         else:
             # Cascade: the OTHER pair failing its zone is our signal. GBPUSD failing
@@ -5108,14 +5146,40 @@ class Backtester:
                 return
             g["mm_golden_im_ok"] = g.get("mm_golden_im_ok", 0) + 1
 
-        # MM entry proper: price inside an IFVG born from an FVG adjacent to the
-        # consolidation. The quadrant already said THIS pair is the one that moves.
-        _ifvg_ok, _ifvg_tf, _ifvg_lo, _ifvg_hi = self._mm_ifvg_entry(pair, direction, t)
-        if not _ifvg_ok:
-            g["mm_golden_no_ifvg"] = g.get("mm_golden_no_ifvg", 0) + 1
+        # MM entry proper — the PD-array retracement ladder. These are STAGES of one
+        # sequence, not parallel requirements. The M15 retracement is a retest of the
+        # original consolidation, which contains (or IS) the order block:
+        #   stage 1  ob   — price returned INTO the block          (first choice)
+        #   stage 2  ifvg — price left / never reached the block; the inverted gap
+        #   stage 3  fvg  — no inversion; an ordinary gap running our way
+        # The quadrant has already said THIS pair is the one that moves; the ladder
+        # only decides WHERE in the retracement we get filled.
+        _pd_stage, _pd_tf = "", ""
+        _ifvg_tf, _ifvg_lo, _ifvg_hi = "", 0.0, 0.0
+        if not config.MM_GOLDEN_IFVG_ENTRY:
+            # Ladder disabled -> pre-P59 behaviour: the block was the only rung and
+            # a failed retrace already returned above.
+            _pd_stage, _pd_tf = ("ob", _retrace_tf) if _retrace_ok else ("none", "")
+        elif _retrace_ok:
+            _pd_stage, _pd_tf = "ob", _retrace_tf
+        else:
+            _ifvg_ok, _ifvg_tf, _ifvg_lo, _ifvg_hi = self._mm_ifvg_entry(
+                pair, direction, t)
+            if _ifvg_ok:
+                _pd_stage, _pd_tf = "ifvg", _ifvg_tf
+            else:
+                _fvg_ok, _fvg_tf, _fvg_lo, _fvg_hi = self._mm_fvg_entry(
+                    pair, direction, t)
+                if _fvg_ok:
+                    _pd_stage, _pd_tf = "fvg", _fvg_tf
+                    _ifvg_lo, _ifvg_hi = _fvg_lo, _fvg_hi
+        if not _pd_stage:
+            g["mm_golden_no_pd"] = g.get("mm_golden_no_pd", 0) + 1
             return
-        if _ifvg_tf:
-            g[f"mm_golden_ifvg_{_ifvg_tf}"] = g.get(f"mm_golden_ifvg_{_ifvg_tf}", 0) + 1
+        g[f"mm_golden_pd_{_pd_stage}"] = g.get(f"mm_golden_pd_{_pd_stage}", 0) + 1
+        if _pd_tf:
+            g[f"mm_golden_pd_{_pd_stage}_{_pd_tf}"] = (
+                g.get(f"mm_golden_pd_{_pd_stage}_{_pd_tf}", 0) + 1)
 
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)
@@ -5283,7 +5347,8 @@ class Backtester:
             "golden_ob_state": _ob_state,       # respected | failed | untested | ""
             "golden_retrace_tf": _retrace_tf,   # 15T | 5T | "" (cascade path)
             "mm_scenario": _mm_scenario,
-            "mm_ifvg_tf": _ifvg_tf,
+            "mm_ifvg_tf": _pd_tf,
+            "mm_pd_stage": _pd_stage,
             "mm_dxy_dir": _mm_dxy_dir, "mm_dxy_tf": _mm_dxy_tf,
             "mm_eurgbp_dir": _mm_eg_dir, "mm_eurgbp_tf": _mm_eg_tf,
             "golden_smt": _golden_smt,
