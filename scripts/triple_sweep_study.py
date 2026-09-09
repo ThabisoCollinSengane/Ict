@@ -37,6 +37,7 @@ REPORT = os.path.join(ROOT, "data", "triple_sweep_report.md")
 
 PAIRS = ("EURUSD", "GBPUSD")
 DXY = "UDXUSD"
+NO_PUSH = False
 IS_YEARS = (2022, 2023)
 OOS_YEARS = (2024, 2025)
 
@@ -270,6 +271,8 @@ def run(tf, window, horizon):
             out[label][f"mss{split}"] = summarise(rows, 0.0001)
 
     _write(out, tf, window, horizon)
+    if not NO_PUSH:
+        _publish(REPORT)
     return 0
 
 
@@ -312,6 +315,42 @@ def _write(out, tf, window, horizon):
         f.write("\n".join(L) + "\n")
     print("\n".join(L))
     print(f"\n  wrote {REPORT}")
+
+
+def _publish(path):
+    """Force-add (data/ is gitignored), commit and push the report.
+
+    Verifies rather than assuming: mm_analysis's version prints "RESULTS PUSHED"
+    even when the commit was empty, which cost several exchanges of confusion when
+    an unchanged report looked like a successful publish. Here an empty stage is
+    reported as such.
+    """
+    import subprocess
+
+    def _git(*args):
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True,
+                              text=True)
+
+    _git("add", "-f", path)
+    staged = _git("diff", "--cached", "--quiet", "--", path)
+    if staged.returncode == 0:
+        print(f"\n  report unchanged since the last push — nothing to commit."
+              f"\n  If Claude has not seen it, paste {os.path.basename(path)} "
+              f"directly.")
+        return
+    sha = (_git("rev-parse", "--short", "HEAD").stdout.strip() or "unknown")
+    c = _git("commit", "-q", "-m", f"triple-sweep report (auto, on {sha})")
+    if c.returncode != 0:
+        print("\n  (commit failed — paste the report above)\n" + c.stderr[-300:])
+        return
+    _git("pull", "-q", "--no-rebase", "--no-edit", "origin", "HEAD")
+    p = _git("push", "origin", "HEAD")
+    if p.returncode == 0:
+        print(f"\n  RESULTS PUSHED — Claude can read data/"
+              f"{os.path.basename(path)}")
+    else:
+        print("\n  (auto-push failed — paste the report above)\n"
+              + p.stderr[-300:])
 
 
 # ──────────────────────────────── selftest ────────────────────────────────────
@@ -374,9 +413,13 @@ def main():
     ap.add_argument("--horizon", type=int, default=24,
                     help="forward bars to measure the reversal over")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--no-push", action="store_true",
+                    help="write the report but do not commit/push it")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    global NO_PUSH
+    NO_PUSH = a.no_push
     return run(a.tf, a.window, a.horizon)
 
 
