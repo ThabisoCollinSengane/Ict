@@ -115,10 +115,31 @@ absence of those signals is what tells you the condition is not really present.
 5. the quadrant says which pair actually breaks and moves — quadrant reads 1a, so
    watch GBPUSD respecting its IFVGs/FVGs
 
-`_mm_ifvg_entry` (60T→15T→5T cascade, `MM_GOLDEN_IFVG_ADJ_PIPS=20` adjacency).
-This is the FVG-vs-IFVG role split made concrete: FVG = ICT 2022 continuation
-array; IFVG = the Market Maker entry after a tag on liquidity. `_ob_retrace_trigger`
-(P50, order-block based) remains a separate check.
+**The entry is a LADDER, not a set of gates (P60, corrected 2026-09-09).** The
+M15 retracement is a retest of the original consolidation, which CONTAINS the
+order block or IS the order block. The block is the first choice — but price
+does not always retrace far enough to reach it. These are STAGES of one
+sequence:
+
+| Stage | Rung | When it takes over |
+|---|---|---|
+| 1 | **OB** (`_ob_retrace_trigger`) | price returned INTO the block |
+| 2 | **IFVG** (`_mm_ifvg_entry`) | price left / never reached the block |
+| 3 | **FVG** (`_mm_fvg_entry`) | no inversion; an unmitigated gap running our way |
+
+P59 briefly made the IFVG a second hard gate ON TOP of the OB retrace, so a
+setup had to satisfy two stages of one sequence simultaneously. Fixed in P60:
+a failed OB retrace falls THROUGH to the next rung. Every rung still requires
+price INSIDE a zone (entering on the sweep leg stays excluded), and a gap only
+qualifies when it belongs to the consolidation being retested — inside the
+dealing range or within `MM_GOLDEN_IFVG_ADJ_PIPS` (20) of it.
+
+`_mm_gap_entry` shares the scan across stages 2 and 3 (60T→15T→5T cascade);
+stage 3 excludes inverted gaps (those ARE stage 2), mitigated gaps, and gaps
+pointing the wrong way. Column `mm_pd_stage` + report table "MM entry stage —
+PD-array ladder (P60)" split stage × timeframe, so which rung actually pays is
+measurable. `MM_GOLDEN_IFVG_ENTRY=0` restores the pre-P59 single-rung
+behaviour for A/B.
 
 **Implemented:** `_mm_quadrant(t)` + `_MM_QUADRANT` in backtest.py (P58).
 `MM_GOLDEN_QUADRANT=1` (default; unreachable while `MM_GOLDEN_ENABLED=0`).
