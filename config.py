@@ -1192,6 +1192,22 @@ MM_GOLDEN_QUADRANT = bool(int(_os.environ.get("MM_GOLDEN_QUADRANT", "1")))
 # (the trader's read: OB takes out prior liquidity, then displaces leaving an FVG).
 MM_GOLDEN_OB_RAID_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_RAID_REQUIRED", "1")))
 MM_GOLDEN_OB_RAID_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_RAID_LOOKBACK", "60"))
+# The raided pool may be from the current day OR previous days — size the lookback per
+# timeframe so every rung reaches back several days, not just the current session.
+MM_GOLDEN_OB_RAID_LOOKBACK_TF = {
+    "D": 90,        # ~4 months
+    "240T": 120,    # ~20 trading days
+    "60T": 240,     # ~10 trading days
+    "15T": 480,     # ~5 trading days
+}
+# Price is fractal: a visited BIGGER-timeframe FVG counts as a swing pool attacked,
+# because the gap's high and low read as a swing high and low one timeframe down.
+MM_GOLDEN_OB_RAID_HTF = {
+    "15T": ("60T", "240T"),
+    "60T": ("240T", "D"),
+    "240T": ("D", "W"),
+    "D": ("W",),
+}
 MM_GOLDEN_IFVG_ENTRY = bool(int(_os.environ.get("MM_GOLDEN_IFVG_ENTRY", "1")))
 MM_GOLDEN_IFVG_TFS = tuple(_os.environ.get("MM_GOLDEN_IFVG_TFS", "60T,15T,5T").split(","))
 # How far above/below the range a gap may sit and still belong to that consolidation.

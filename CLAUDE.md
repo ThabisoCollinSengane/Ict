@@ -126,13 +126,27 @@ the zone, the displacement FVG becomes the IFVG.
 **P63 — the block must have RAIDED liquidity.** `detect_order_blocks` already
 requires the displacement + imbalance (Ep 18 `_has_fvg_between`), but only asks
 that the displacement candle close beyond the OB candle's OWN high/low — far
-weaker than running a prior swing. `_ob_raided_liquidity` adds the missing half:
-a sell block must have exceeded a prior swing HIGH, a buy block run a prior swing
-LOW, at least `min_gap` bars back so the reference is genuinely "from the past"
-and not the same leg. Applied in `_golden_ob_pairing`, which steps DOWN a
+weaker than running a prior swing. `_ob_raided_liquidity` adds the missing half.
+**TWO things count as the pool, because price is fractal:**
+
+1. **A prior swing** — a sell block exceeded a prior swing HIGH, a buy block ran a
+   prior swing LOW. **The swing may be from the current day OR from previous
+   days**, so the lookback is sized PER TIMEFRAME to span several days on every
+   rung (`MM_GOLDEN_OB_RAID_LOOKBACK_TF`: D 90 / H4 120 / H1 240 / M15 480). A
+   flat 60 bars was wrong — on H1 that is 2.5 days and on M15 only 15 hours, so
+   pools from previous days were invisible.
+2. **A visited BIGGER-timeframe FVG** — the high and low of an HTF gap read as a
+   swing high and low one timeframe down, so reaching into one IS an attack on a
+   swing. A sell block qualifies when it pushed UP into a gap above it; a buy
+   block when it pushed DOWN into a gap below (`MM_GOLDEN_OB_RAID_HTF` maps each
+   OB timeframe to the rungs above it). The direction constraint also means a
+   block can never qualify on the gap its OWN displacement created — that gap is
+   always on the far side.
+
+`min_gap` (3 bars) keeps the swing reference genuinely in the past rather than
+part of the same leg. Applied in `_golden_ob_pairing`, which steps DOWN a
 timeframe when a rung's blocks have not raided. Config
-`MM_GOLDEN_OB_RAID_REQUIRED=1`, `MM_GOLDEN_OB_RAID_LOOKBACK=60`. Counter
-`mm_golden_ob_no_raid`.
+`MM_GOLDEN_OB_RAID_REQUIRED=1`. Counter `mm_golden_ob_no_raid`.
 
 **⚠️ NO IFVG = NO MM MODEL (P61, definitive 2026-09-09).** The inverted gap is
 the model's PRECONDITION, not merely one entry option, and it is one of the

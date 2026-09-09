@@ -4760,10 +4760,19 @@ class Backtester:
             obs = [o for o in obs if o.direction == direction]
             if config.MM_GOLDEN_OB_RAID_REQUIRED and obs:
                 # The block must have RAIDED a prior high/low before displacing away.
+                # The pool may be from today or from previous days, so the lookback is
+                # sized per timeframe to span several days either way; and a visited
+                # BIGGER-timeframe gap counts as a swing, price being fractal.
+                _lb = config.MM_GOLDEN_OB_RAID_LOOKBACK_TF.get(
+                    tf, config.MM_GOLDEN_OB_RAID_LOOKBACK)
+                _hgaps = []
+                for _htf in config.MM_GOLDEN_OB_RAID_HTF.get(tf, ()):
+                    _hb = self.bars_up_to(pair, _htf, t)
+                    if _hb and len(_hb) >= 3:
+                        _hgaps.extend(self._scan_htf_fvgs(_hb, pair))
                 _raided = [o for o in obs
                            if self._ob_raided_liquidity(
-                               bars, o, direction,
-                               config.MM_GOLDEN_OB_RAID_LOOKBACK)]
+                               bars, o, direction, _lb, htf_gaps=_hgaps)]
                 if not _raided:
                     self.gate_counts["mm_golden_ob_no_raid"] = (
                         self.gate_counts.get("mm_golden_ob_no_raid", 0) + 1)
@@ -4789,8 +4798,8 @@ class Backtester:
         return "", "", 0.0, None
 
     @staticmethod
-    def _ob_raided_liquidity(bars, ob, direction, lookback, min_gap=3):
-        """Did this order block TAKE OUT a prior high (or low) from the past?
+    def _ob_raided_liquidity(bars, ob, direction, lookback, min_gap=3, htf_gaps=None):
+        """Did this order block TAKE OUT a prior high/low, or reach into an HTF gap?
 
         The trader's read of a valid HTF block: it raids liquidity first, THEN
         displaces away leaving an FVG. `detect_order_blocks` already requires the
@@ -4798,25 +4807,42 @@ class Backtester:
         the displacement candle close beyond the OB candle's OWN high/low — which is
         far weaker than running a prior swing.
 
-        A bearish (sell) block must have exceeded a prior swing HIGH; a bullish block
-        must have run a prior swing LOW. `min_gap` keeps the reference in "the past" —
-        the bars immediately before the block are part of the same leg, not a pool.
+        TWO things count as the raided pool, because price is fractal:
 
-        Returns True when the raid is confirmed.
+        1. **A prior swing** — a sell block must have exceeded a prior swing HIGH, a
+           buy block run a prior swing LOW. The swing may be from the current day or
+           from previous days: `lookback` is sized PER TIMEFRAME to span several days
+           either way (`MM_GOLDEN_OB_RAID_LOOKBACK_TF`). `min_gap` keeps the reference
+           in the past — the bars immediately before the block are the same leg.
+
+        2. **A bigger-timeframe FVG that price visited** — the high and low of an HTF
+           gap read as a swing high and low one timeframe down, so reaching into one
+           IS an attack on a swing. A sell block qualifies when it pushed UP into a
+           gap sitting above it; a buy block when it pushed DOWN into a gap below.
+           The direction constraint also means a block can never qualify on the gap
+           its OWN displacement created — that gap is on the far side.
+
+        Returns True when either raid is confirmed.
         """
         i = ob.bar_index
         start = max(1, i - lookback)
         end = i - min_gap                       # prior swings only
-        if end - start < 2:
-            return False
-        for j in range(start + 1, end):
-            a, b, c = bars[j - 1], bars[j], bars[j + 1]
-            if direction < 0:                   # sell block raids buy-side liquidity
-                if b.High > a.High and b.High > c.High and ob.top > b.High:
-                    return True
-            else:                               # buy block raids sell-side liquidity
-                if b.Low < a.Low and b.Low < c.Low and ob.bottom < b.Low:
-                    return True
+        if end - start >= 2:
+            for j in range(start + 1, end):
+                a, b, c = bars[j - 1], bars[j], bars[j + 1]
+                if direction < 0:               # sell block raids buy-side liquidity
+                    if b.High > a.High and b.High > c.High and ob.top > b.High:
+                        return True
+                else:                           # buy block raids sell-side liquidity
+                    if b.Low < a.Low and b.Low < c.Low and ob.bottom < b.Low:
+                        return True
+        for g in (htf_gaps or ()):              # an HTF gap reads as a swing pool
+            if direction < 0:
+                if g.bottom > ob.bottom and ob.top >= g.bottom:
+                    return True                 # pushed UP into a gap above
+            else:
+                if g.top < ob.top and ob.bottom <= g.top:
+                    return True                 # pushed DOWN into a gap below
         return False
 
     def _ob_retrace_trigger(self, pair, direction, ob, t):
