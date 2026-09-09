@@ -1170,3 +1170,14 @@ MM_GOLDEN_INTERMARKET = bool(int(_os.environ.get("MM_GOLDEN_INTERMARKET", "0")))
 # Both golden trades map to EURGBP bullish (1a: dollar up + EUR strong -> sell GBP;
 # 2a: dollar down + EUR strong -> buy EUR) -- P44's premise, independently derived.
 MM_GOLDEN_REQUIRE_EURGBP = bool(int(_os.environ.get("MM_GOLDEN_REQUIRE_EURGBP", "1")))
+
+# --- P58: the four TRUE MM golden conditions (DXY x EURGBP quadrant) ---
+#   DXY UP   + EURGBP UP   -> SELL GBPUSD   (1a, sell the weaker)
+#   DXY UP   + EURGBP DOWN -> SELL EURUSD   (1b, sell the weaker)
+#   DXY DOWN + EURGBP DOWN -> BUY  GBPUSD   (2b, buy the stronger)
+#   DXY DOWN + EURGBP UP   -> BUY  EURUSD   (2a, buy the stronger)
+# Either instrument flat -> the MM model does NOT activate. This replaces the
+# DXY-only golden rule, which only ever produced EURUSD long / GBPUSD short and so
+# refused 1b and 2b outright. Both instruments are read LOCALLY via the
+# dealing-range cascade; the shared intermarket gate is untouched.
+MM_GOLDEN_QUADRANT = bool(int(_os.environ.get("MM_GOLDEN_QUADRANT", "1")))

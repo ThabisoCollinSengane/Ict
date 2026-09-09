@@ -517,6 +517,7 @@ class Backtester:
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
+            "mm_scenario": st.get("mm_scenario", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -625,6 +626,7 @@ class Backtester:
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
             "golden_retrace_tf": st.get("golden_retrace_tf", ""),
+            "mm_scenario": st.get("mm_scenario", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
             "mm_eurgbp_dir": st.get("mm_eurgbp_dir", 0),
@@ -4834,6 +4836,33 @@ class Backtester:
                     return True, tf
         return False, ""
 
+    # DXY x EURGBP -> (pair, direction). The four TRUE MM golden conditions.
+    # Maps exactly onto the existing ICT scenario table (1a / 1b / 2b / 2a).
+    _MM_QUADRANT = {
+        (+1, +1): ("GBPUSD", -1, "1a"),   # dollar UP,   EUR strong -> sell the weaker (GBP)
+        (+1, -1): ("EURUSD", -1, "1b"),   # dollar UP,   GBP strong -> sell the weaker (EUR)
+        (-1, -1): ("GBPUSD", +1, "2b"),   # dollar DOWN, GBP strong -> buy the stronger (GBP)
+        (-1, +1): ("EURUSD", +1, "2a"),   # dollar DOWN, EUR strong -> buy the stronger (EUR)
+    }
+
+    def _mm_quadrant(self, t):
+        """Which pair and direction do DXY and EURGBP jointly select?
+
+        The MM model activates ONLY when both instruments read directionally and the
+        pair combination lands in one of the four quadrants above. Either reading flat
+        means no MM setup exists — not a weaker one.
+
+        Read LOCALLY via the dealing-range cascade; the shared gate is untouched.
+
+        Returns (pair, direction, scenario, dxy_dir, eg_dir) or (None, 0, "", d, e).
+        """
+        dxy_dir, _dtf, _ddr = self._dealing_range_cascade("UDXUSD", t)
+        eg_dir, _etf, _edr = self._dealing_range_cascade(config.REF_EURGBP, t)
+        sel = self._MM_QUADRANT.get((dxy_dir, eg_dir))
+        if sel is None:
+            return None, 0, "", dxy_dir, eg_dir
+        return sel[0], sel[1], sel[2], dxy_dir, eg_dir
+
     def _mm_intermarket_confirm(self, direction, t):
         """DXY leads direction, EURGBP confirms strength — read LOCALLY for MM only.
 
@@ -4895,18 +4924,33 @@ class Backtester:
         if news_impact in ("Medium", "Critical"):
             return
 
-        # DXY direction (hard gate).
-        dxy_bias = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
-        if dxy_bias == 0:
-            return
-
-        # Golden rule: DXY↓ = EURUSD long, DXY↑ = GBPUSD short.
-        if pair == "EURUSD" and dxy_bias == -1:
-            direction = +1
-        elif pair == "GBPUSD" and dxy_bias == +1:
-            direction = -1
+        _mm_scenario = ""
+        _mm_dxy_q = _mm_eg_q = 0
+        if config.MM_GOLDEN_QUADRANT:
+            # The four TRUE MM golden conditions. DXY and EURGBP jointly select BOTH
+            # the pair and the direction — including EURUSD short (1b) and GBPUSD long
+            # (2b), which the old DXY-only golden rule refused outright.
+            _want_pair, direction, _mm_scenario, _mm_dxy_q, _mm_eg_q = self._mm_quadrant(t)
+            if _want_pair is None:
+                _why = ("dxy_flat" if _mm_dxy_q == 0 else "eurgbp_flat")
+                g[f"mm_quad_none_{_why}"] = g.get(f"mm_quad_none_{_why}", 0) + 1
+                return
+            g[f"mm_quad_{_mm_scenario}"] = g.get(f"mm_quad_{_mm_scenario}", 0) + 1
+            if pair != _want_pair:
+                g["mm_quad_other_pair"] = g.get("mm_quad_other_pair", 0) + 1
+                return
+            g["mm_quad_selected"] = g.get("mm_quad_selected", 0) + 1
         else:
-            return
+            # Legacy: DXY-only golden rule (EURUSD long / GBPUSD short).
+            dxy_bias = self._dxy_bias("60T", t, lookback=config.SWING_LOOKBACK_STH)
+            if dxy_bias == 0:
+                return
+            if pair == "EURUSD" and dxy_bias == -1:
+                direction = +1
+            elif pair == "GBPUSD" and dxy_bias == +1:
+                direction = -1
+            else:
+                return
         g["mm_golden_checked"] = g.get("mm_golden_checked", 0) + 1
 
         # Daily cap (separate from base strategy slots).
@@ -5185,6 +5229,7 @@ class Backtester:
             "golden_ob_tf": _ob_tf,             # D | 240T | 60T | 15T
             "golden_ob_state": _ob_state,       # respected | failed | untested | ""
             "golden_retrace_tf": _retrace_tf,   # 15T | 5T | "" (cascade path)
+            "mm_scenario": _mm_scenario,
             "mm_dxy_dir": _mm_dxy_dir, "mm_dxy_tf": _mm_dxy_tf,
             "mm_eurgbp_dir": _mm_eg_dir, "mm_eurgbp_tf": _mm_eg_tf,
             "golden_smt": _golden_smt,
