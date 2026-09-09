@@ -115,6 +115,25 @@ absence of those signals is what tells you the condition is not really present.
 5. the quadrant says which pair actually breaks and moves — quadrant reads 1a, so
    watch GBPUSD respecting its IFVGs/FVGs
 
+**Worked example — GBPUSD sell, 9 Sep 2026 (user charts, quadrant 1a):** EURGBP
+bullish + DXY bullish -> sell GBPUSD, exactly the 1a row of the table above. The
+setup then read, in order: an **H1 order block that took out a prior high from
+the past** (a liquidity raid), **displacement away from it leaving an FVG**, and
+that gap later inverting into the IFVG which price reached and passed. This is
+the full sequence in one chart — quadrant picks the pair, the raided HTF block is
+the zone, the displacement FVG becomes the IFVG.
+
+**P63 — the block must have RAIDED liquidity.** `detect_order_blocks` already
+requires the displacement + imbalance (Ep 18 `_has_fvg_between`), but only asks
+that the displacement candle close beyond the OB candle's OWN high/low — far
+weaker than running a prior swing. `_ob_raided_liquidity` adds the missing half:
+a sell block must have exceeded a prior swing HIGH, a buy block run a prior swing
+LOW, at least `min_gap` bars back so the reference is genuinely "from the past"
+and not the same leg. Applied in `_golden_ob_pairing`, which steps DOWN a
+timeframe when a rung's blocks have not raided. Config
+`MM_GOLDEN_OB_RAID_REQUIRED=1`, `MM_GOLDEN_OB_RAID_LOOKBACK=60`. Counter
+`mm_golden_ob_no_raid`.
+
 **⚠️ NO IFVG = NO MM MODEL (P61, definitive 2026-09-09).** The inverted gap is
 the model's PRECONDITION, not merely one entry option, and it is one of the
 major influences on WHICH pair is taken: the DXY x EURGBP quadrant names a

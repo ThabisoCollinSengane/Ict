@@ -4758,6 +4758,17 @@ class Backtester:
                 continue
             obs = detect_order_blocks(bars, lookback=config.MM_GOLDEN_OB_LOOKBACK)
             obs = [o for o in obs if o.direction == direction]
+            if config.MM_GOLDEN_OB_RAID_REQUIRED and obs:
+                # The block must have RAIDED a prior high/low before displacing away.
+                _raided = [o for o in obs
+                           if self._ob_raided_liquidity(
+                               bars, o, direction,
+                               config.MM_GOLDEN_OB_RAID_LOOKBACK)]
+                if not _raided:
+                    self.gate_counts["mm_golden_ob_no_raid"] = (
+                        self.gate_counts.get("mm_golden_ob_no_raid", 0) + 1)
+                    continue                    # step down a timeframe
+                obs = _raided
             if not obs:
                 continue
             if rng is not None:
@@ -4776,6 +4787,37 @@ class Backtester:
             ob = paired[0]
             return (self._ob_equilibrium_state(ob, bars, direction), tf, ob.body_mid, ob)
         return "", "", 0.0, None
+
+    @staticmethod
+    def _ob_raided_liquidity(bars, ob, direction, lookback, min_gap=3):
+        """Did this order block TAKE OUT a prior high (or low) from the past?
+
+        The trader's read of a valid HTF block: it raids liquidity first, THEN
+        displaces away leaving an FVG. `detect_order_blocks` already requires the
+        displacement + imbalance (Ep 18 `_has_fvg_between`), but it only asks that
+        the displacement candle close beyond the OB candle's OWN high/low — which is
+        far weaker than running a prior swing.
+
+        A bearish (sell) block must have exceeded a prior swing HIGH; a bullish block
+        must have run a prior swing LOW. `min_gap` keeps the reference in "the past" —
+        the bars immediately before the block are part of the same leg, not a pool.
+
+        Returns True when the raid is confirmed.
+        """
+        i = ob.bar_index
+        start = max(1, i - lookback)
+        end = i - min_gap                       # prior swings only
+        if end - start < 2:
+            return False
+        for j in range(start + 1, end):
+            a, b, c = bars[j - 1], bars[j], bars[j + 1]
+            if direction < 0:                   # sell block raids buy-side liquidity
+                if b.High > a.High and b.High > c.High and ob.top > b.High:
+                    return True
+            else:                               # buy block raids sell-side liquidity
+                if b.Low < a.Low and b.Low < c.Low and ob.bottom < b.Low:
+                    return True
+        return False
 
     def _ob_retrace_trigger(self, pair, direction, ob, t):
         """Has price RETURNED INTO the block on the entry timeframes?

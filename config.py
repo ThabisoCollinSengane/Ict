@@ -1188,6 +1188,10 @@ MM_GOLDEN_QUADRANT = bool(int(_os.environ.get("MM_GOLDEN_QUADRANT", "1")))
 # the IFVG = the entry. The DXY x EURGBP quadrant then says WHICH pair actually
 # breaks and moves. This is the MM model proper (IFVG after a tag on liquidity),
 # distinct from the OB retrace trigger.
+# P63 — an HTF order block must have RAIDED a prior high/low before displacing away
+# (the trader's read: OB takes out prior liquidity, then displaces leaving an FVG).
+MM_GOLDEN_OB_RAID_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_RAID_REQUIRED", "1")))
+MM_GOLDEN_OB_RAID_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_RAID_LOOKBACK", "60"))
 MM_GOLDEN_IFVG_ENTRY = bool(int(_os.environ.get("MM_GOLDEN_IFVG_ENTRY", "1")))
 MM_GOLDEN_IFVG_TFS = tuple(_os.environ.get("MM_GOLDEN_IFVG_TFS", "60T,15T,5T").split(","))
 # How far above/below the range a gap may sit and still belong to that consolidation.
