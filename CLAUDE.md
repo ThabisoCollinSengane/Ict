@@ -254,6 +254,55 @@ block (asserted 4 occurrences end-to-end). Report table "Dollar reversal day
 TRADED PAIR, never from DXY, and that factor measured RED (PF inverts OOS).
 Dollar reversal days are not recorded against the DOW bias anywhere.
 
+### P65 — Triple liquidity raid study (MEASURED 2026-09-10) — 🔴 RED, no edge
+
+**What:** EURUSD + GBPUSD take HIGHS while DXY takes LOWS (and the mirror), then
+structure shifts and price reverses. Measured on RAW H1 price via
+`scripts/triple_sweep_study.py`, independent of the strategy's entries, with the
+control that decides the question: a SINGLE-pair raid where the trio did NOT
+align. Coverage IS 9,682 / OOS 10,804 bars; 1,541 short trios, 1,504 long trios.
+
+| | triple IS | single IS | triple OOS | single OOS |
+|---|---|---|---|---|
+| short | 52.3% | 50.6% | 50.5% | 49.1% |
+| long | 48.7% | 47.8% | 51.7% | 52.3% |
+
+**Everything is ~50%.** Every bucket, both directions, both splits, 47.5-52.3%.
+The short lift (+1.7pp IS / +1.4pp OOS) is inside the ±1.9pp standard error of a
+difference at n≈1,400; the long side flips sign. **Excursions are symmetric**
+(medFav vs medAdv 48.6/41.3, 32.8/32.3, 43.6/44.9, 35.6/31.4) — no asymmetry to
+trade. `trip+MSS` is no better than anything else, and a trio makes a structure
+shift no more likely than a lone sweep (MSS ~40% vs ~43%).
+
+**Why:** 1,541 trios over 4 years is ~1.5/day. A three-way H1 raid is not a rare
+institutional fingerprint — it is what the dollar complex does most days,
+mechanically, BECAUSE the pairs are inverse to DXY. The "triple confirmation" is
+one event counted three times. Same landing as P39/P47/P48: real phenomenon, no
+orthogonal edge. **Nothing shipped.**
+
+**⚠️ Two bugs of mine invalidated the first two runs — both instructive:**
+
+1. **Circular trip+MSS (P65c).** `mss_after` used the SAME 24-bar horizon the
+   excursion was measured over, so "structure shifted our way" and "price moved
+   our way" were the same statement — a 100-pip favourable move has necessarily
+   broken the prior swing. The bucket scored 100% (short) / 83% (long) by
+   construction. Fixed: the shift must confirm in a short window (default 6 bars)
+   and the excursion is measured from the MSS bar FORWARD, so the windows never
+   overlap. Post-fix the bucket is ~50% like everything else.
+2. **Dead-latch in sweep detection (P65d) — the bigger one.** `sweep_events`
+   re-armed only at a MORE EXTREME level, so in a trend every new fractal low sat
+   higher than the stale armed one and the detector stayed latched on a level
+   price never returned to. It went permanently dead: **101 low-sweeps in 2022-23
+   and exactly ZERO in 2024-25 on balanced bar counts.** Trio counts were 6 and 30
+   instead of 1,541 and 1,504. The tell was the impossible IS/OOS asymmetry, and
+   the **bar-coverage line added to the report header is what disproved the
+   "missing UDXUSD data" hypothesis** and forced the search into the code.
+
+**Lesson for future studies:** print per-split COVERAGE next to per-split results.
+An empty bucket is ambiguous between "no data" and "no events"; the coverage line
+disambiguates it in one glance and turned a wrong guess into a found bug. And
+never measure a confirmation over the same window as the outcome it predicts.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
