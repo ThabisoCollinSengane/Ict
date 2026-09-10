@@ -127,22 +127,34 @@ def forward_excursion(highs, lows, start, horizon, direction, ref):
     return float(max(hi)) - ref, ref - float(min(lo))
 
 
-def mss_after(highs, lows, start, horizon, direction):
-    """Did structure shift in the reversal direction after the raid?
+def mss_bar(highs, lows, start, window, direction):
+    """Index of the bar where structure SHIFTED after the raid, or None.
 
     After a buy-side raid (direction -1 = expecting down) the shift is price
-    breaking BELOW the lowest low of the bars leading into the raid. That is the
-    opposing short-term swing being taken — the confirmation the trader waits for.
+    breaking BELOW the lowest low of the bars leading into the raid — the
+    opposing short-term swing being taken, the confirmation the trader waits for.
+
+    ⚠️ `window` MUST be short and MUST NOT be the same horizon the reversal is
+    later measured over. The first version of this study used the full 24-bar
+    horizon for both, which made "structure shifted our way" and "price moved our
+    way" the same statement — a 100-pip favourable move has necessarily broken the
+    prior swing — so the trip+MSS bucket scored ~100% by construction. The MSS
+    must confirm quickly; the excursion is then measured from the MSS bar FORWARD,
+    so the two windows never overlap.
     """
     look = 3
     a = max(0, start - look)
     if direction < 0:
         ref = float(min(lows[a:start + 1]))
-        seg = lows[start + 1: start + 1 + horizon]
-        return bool(len(seg)) and float(min(seg)) < ref
+        for j in range(start + 1, min(start + 1 + window, len(lows))):
+            if lows[j] < ref:
+                return j
+        return None
     ref = float(max(highs[a:start + 1]))
-    seg = highs[start + 1: start + 1 + horizon]
-    return bool(len(seg)) and float(max(seg)) > ref
+    for j in range(start + 1, min(start + 1 + window, len(highs))):
+        if highs[j] > ref:
+            return j
+    return None
 
 
 def summarise(rows, pip):
@@ -213,7 +225,7 @@ def _resample(m1, tf):
         {"h": "max", "l": "min", "c": "last"}).dropna()
 
 
-def run(tf, window, horizon):
+def run(tf, window, horizon, mss_win):
     import pandas as pd
 
     series = {}
@@ -234,6 +246,11 @@ def run(tf, window, horizon):
     arr = {s: (series[s]["h"].to_numpy(), series[s]["l"].to_numpy(),
                series[s]["c"].to_numpy()) for s in series}
     years = idx.year.to_numpy()
+    cover = {}
+    for y in IS_YEARS + OOS_YEARS:
+        cover[y] = int((years == y).sum())
+    cover["IS"] = sum(cover[y] for y in IS_YEARS)
+    cover["OOS"] = sum(cover[y] for y in OOS_YEARS)
 
     out = {}
     for label, pdir in (("short (pairs take HIGHS, DXY takes LOWS)", -1),
@@ -244,42 +261,56 @@ def run(tf, window, horizon):
         ev[DXY] = sweep_events(arr[DXY][0], arr[DXY][1], -praid)
         trio = align_triple(ev[PAIRS[0]], ev[PAIRS[1]], ev[DXY], window)
 
-        buckets = {"IS": [], "OOS": [], "ctrlIS": [], "ctrlOOS": []}
+        buckets = {"IS": [], "OOS": [], "ctrlIS": [], "ctrlOOS": [],
+                   "mssIS": [], "mssOOS": []}
         for sym in PAIRS:
             h, l, c = arr[sym]
             pip = 0.0001
             trio_set = set(trio)
+            def _measure(i):
+                """(fav, adv, mss_idx) measured from the RAID bar; mss_idx is the
+                separate short-window confirmation, never the same window."""
+                fav, adv = forward_excursion(h, l, i, horizon, pdir, float(c[i]))
+                return fav, adv, mss_bar(h, l, i, mss_win, pdir)
+
             for i in trio:
                 if i >= len(c) - 1:
                     continue
-                fav, adv = forward_excursion(h, l, i, horizon, pdir, float(c[i]))
-                m = mss_after(h, l, i, horizon, pdir)
-                buckets["IS" if years[i] in IS_YEARS else "OOS"].append((fav, adv, m))
+                fav, adv, mi = _measure(i)
+                key = "IS" if years[i] in IS_YEARS else "OOS"
+                buckets[key].append((fav, adv, mi is not None))
+                # trip+MSS: entered AT the shift, so the excursion is measured
+                # from the MSS bar forward — no overlap with the MSS window.
+                if mi is not None and mi < len(c) - 1:
+                    f2, a2 = forward_excursion(h, l, mi, horizon, pdir,
+                                               float(c[mi]))
+                    buckets["mss" + key].append((f2, a2, True))
             # control-1: this pair raided but the trio did NOT align
             for i, _lvl in ev[sym]:
                 if i in trio_set or i >= len(c) - 1:
                     continue
-                fav, adv = forward_excursion(h, l, i, horizon, pdir, float(c[i]))
-                m = mss_after(h, l, i, horizon, pdir)
+                fav, adv, mi = _measure(i)
                 buckets["ctrlIS" if years[i] in IS_YEARS else "ctrlOOS"].append(
-                    (fav, adv, m))
+                    (fav, adv, mi is not None))
         out[label] = {k: summarise(v, 0.0001) for k, v in buckets.items()}
         out[label]["_trio"] = len(trio)
-        # sweep+MSS subset — does demanding the shift improve it?
-        for split, key in (("IS", "IS"), ("OOS", "OOS")):
-            rows = [r for r in buckets[key] if r[2]]
-            out[label][f"mss{split}"] = summarise(rows, 0.0001)
 
-    _write(out, tf, window, horizon)
+    _write(out, tf, window, horizon, mss_win, cover)
     if not NO_PUSH:
         _publish(REPORT)
     return 0
 
 
-def _write(out, tf, window, horizon):
+def _write(out, tf, window, horizon, mss_win, cover):
+    cov = " / ".join(f"{y}: {cover.get(y, 0)}" for y in IS_YEARS + OOS_YEARS)
     L = ["# Triple liquidity raid — EURUSD + GBPUSD vs DXY", "",
          f"Timeframe **{tf}**, sync window **{window}** bars, "
-         f"forward horizon **{horizon}** bars.", "",
+         f"forward horizon **{horizon}** bars, MSS confirms within "
+         f"**{mss_win}** bars.", "",
+         f"**Bar coverage** (bars present in ALL THREE symbols): {cov}  \n"
+         f"IS **{cover.get('IS', 0)}** / OOS **{cover.get('OOS', 0)}**. "
+         f"An empty OOS bucket below usually means missing UDXUSD data for those "
+         f"years, not an absence of setups — check this line first.", "",
          "`rev_rate` = share of events where price travelled FURTHER in the "
          "reversal direction than against it. `rev20` = share reaching 20+ pips "
          "our way. `single` = the same pair raided its own level while the trio "
@@ -389,9 +420,14 @@ def selftest():
     fav, adv = forward_excursion(hh, ll, 2, 2, -1, 1.0)
     assert abs(fav - 0.05) < 1e-9 and abs(adv - 0.02) < 1e-9, (fav, adv)
 
-    # mss_after: price breaks below the pre-raid low → shift confirmed
-    assert mss_after([1.0]*6, [0.99, 0.99, 0.99, 0.98, 0.97, 0.96], 2, 3, -1)
-    assert not mss_after([1.0]*6, [0.99]*4 + [0.995, 0.996], 2, 3, -1)
+    # mss_bar: returns WHERE structure shifted, so the excursion can start there
+    assert mss_bar([1.0]*6, [0.99, 0.99, 0.99, 0.98, 0.97, 0.96], 2, 3, -1) == 3
+    assert mss_bar([1.0]*6, [0.99]*4 + [0.995, 0.996], 2, 3, -1) is None
+    # the short window must not reach a late break
+    assert mss_bar([1.0]*8, [0.99]*6 + [0.90, 0.90], 2, 2, -1) is None
+    assert mss_bar([1.0]*8, [0.99]*6 + [0.90, 0.90], 2, 5, -1) == 6
+    # long side mirrors
+    assert mss_bar([1.0, 1.0, 1.0, 1.01, 1.02], [0.9]*5, 2, 3, +1) == 3
 
     # summarise + verdict gating
     s = summarise([(0.0030, 0.0010, True), (0.0005, 0.0020, False)], 0.0001)
@@ -413,6 +449,8 @@ def main():
     ap.add_argument("--horizon", type=int, default=24,
                     help="forward bars to measure the reversal over")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--mss-window", type=int, default=6,
+                    help="bars after the raid in which the shift must confirm")
     ap.add_argument("--no-push", action="store_true",
                     help="write the report but do not commit/push it")
     a = ap.parse_args()
@@ -420,7 +458,7 @@ def main():
         return selftest()
     global NO_PUSH
     NO_PUSH = a.no_push
-    return run(a.tf, a.window, a.horizon)
+    return run(a.tf, a.window, a.horizon, a.mss_window)
 
 
 if __name__ == "__main__":
