@@ -100,31 +100,32 @@ def sweep_events(highs, lows, direction):
     return out
 
 
-def direction_series(highs, lows, n, stale):
-    """Per-bar structural direction: +1 / -1 / 0, from the most recent BOS.
+def daily_direction(o, h, l, c, deadband):
+    """Direction of ONE completed daily candle: +1 / -1 / 0.
 
-    Reuses `sweep_events` — a break of the most recent intact fractal high is an
-    up-shift, of the low a down-shift — then forward-fills that read.
+    The trader's anchor: the day's CLOSE says what is likely next. A day closing
+    well above its open is a dollar-bullish day; below, bearish; a day that closes
+    near where it opened has said nothing and reads FLAT.
 
-    `stale` is what makes a FLAT state possible: a break older than `stale` bars
-    no longer speaks for the present. Without it a BOS latch never returns flat,
-    which is precisely the failure that made STRUCT_BIAS_ENABLED unusable as a
-    live gate (it turned the MSS dollar leg into a rubber stamp). Here the read is
-    measurement-only, but the quadrant's "either flat -> no setup" row cannot be
-    tested at all unless flat genuinely occurs.
+    `deadband` is the minimum body as a fraction of the day's range, which is what
+    makes flat genuinely reachable — and the quadrant's "either flat -> no MM
+    setup" row cannot be tested unless flat occurs. It is also scale-free, so the
+    same threshold works on DXY (~100) and EURGBP (~0.85).
+
+    ⚠️ Replaces an earlier same-bar BOS latch, which was wrong twice over: it
+    never went flat (9 flat bars in 20,374 — the STRUCT_BIAS_ENABLED failure), and
+    it read the dollar's bias off the manipulation leg itself. A short trio is
+    DEFINED as DXY taking a low, so at that bar the latch necessarily read DXY
+    down while the quadrant needs it up — trio and quadrant were anti-correlated
+    by construction, which is why QUAD-ok held only 1-3% of trios instead of ~25%.
     """
-    marks = [(i, +1) for i, _ in sweep_events(highs, lows, +1)]
-    marks += [(i, -1) for i, _ in sweep_events(highs, lows, -1)]
-    marks.sort()
-    out = [0] * n
-    last_i, last_d = None, 0
-    m = 0
-    for i in range(n):
-        while m < len(marks) and marks[m][0] <= i:
-            last_i, last_d = marks[m]
-            m += 1
-        out[i] = last_d if (last_i is not None and i - last_i <= stale) else 0
-    return out
+    rng = h - l
+    if rng <= 0:
+        return 0
+    body = c - o
+    if abs(body) < deadband * rng:
+        return 0
+    return +1 if body > 0 else -1
 
 
 def quadrant_at(dxy_dir, eg_dir):
@@ -269,18 +270,19 @@ def _freq(tf):
 
 def _resample(m1, tf):
     return m1.resample(_freq(tf)).agg(
-        {"h": "max", "l": "min", "c": "last"}).dropna()
+        {"o": "first", "h": "max", "l": "min", "c": "last"}).dropna()
 
 
-def run(tf, window, horizon, mss_win, dir_stale):
+def run(tf, window, horizon, mss_win, deadband):
     import pandas as pd
 
-    series = {}
+    series, raw_m1 = {}, {}
     for sym in PAIRS + (DXY, EURGBP):
         m1 = _load(sym)
         if m1 is None:
             print(f"  MISSING {sym} — put {sym}_YYYY.csv in data/histdata/")
             return 1
+        raw_m1[sym] = m1
         series[sym] = _resample(m1, tf)
 
     idx = series[PAIRS[0]].index
@@ -301,9 +303,19 @@ def run(tf, window, horizon, mss_win, dir_stale):
 
     # The quadrant, bar by bar: DXY x EURGBP jointly name the pair AND direction.
     n = len(idx)
-    dxy_dir = direction_series(arr[DXY][0], arr[DXY][1], n, dir_stale)
-    eg_dir = direction_series(arr[EURGBP][0], arr[EURGBP][1], n, dir_stale)
-    quad = [quadrant_at(dxy_dir[i], eg_dir[i]) for i in range(n)]
+    # The bias is the PREVIOUS completed daily candle, carried onto every
+    # intraday bar of the following day. shift(1) is what keeps it honest: today's
+    # entries never see today's close, and the bias necessarily PRECEDES the raid
+    # it is meant to contextualise.
+    def _daily_dir(sym):
+        d = _resample(raw_m1[sym], "1D")
+        dd = d.apply(lambda r: daily_direction(r["o"], r["h"], r["l"], r["c"],
+                                               deadband), axis=1).shift(1)
+        return dd.reindex(idx, method="ffill").fillna(0).astype(int).to_numpy()
+
+    dxy_dir = _daily_dir(DXY)
+    eg_dir = _daily_dir(EURGBP)
+    quad = [quadrant_at(int(dxy_dir[i]), int(eg_dir[i])) for i in range(n)]
     flat_bars = sum(1 for q in quad if q is None)
     scen_count = {}
     for q in quad:
@@ -362,13 +374,13 @@ def run(tf, window, horizon, mss_win, dir_stale):
 
     cover['_flat'] = flat_bars
     cover['_scen'] = scen_count
-    _write(out, tf, window, horizon, mss_win, cover, dir_stale)
+    _write(out, tf, window, horizon, mss_win, cover, deadband)
     if not NO_PUSH:
         _publish(REPORT)
     return 0
 
 
-def _write(out, tf, window, horizon, mss_win, cover, dir_stale):
+def _write(out, tf, window, horizon, mss_win, cover, deadband):
     cov = " / ".join(f"{y}: {cover.get(y, 0)}" for y in IS_YEARS + OOS_YEARS)
     L = ["# Triple liquidity raid — EURUSD + GBPUSD vs DXY", "",
          f"Timeframe **{tf}**, sync window **{window}** bars, "
@@ -393,8 +405,10 @@ def _write(out, tf, window, horizon, mss_win, cover, dir_stale):
          "direction, QUAD-no the rest. If the raid is only a trigger and the "
          "quadrant is the filter, the gap between those two rows is where it shows.",
          "",
-         f"Direction read: most recent BOS, going flat after **{dir_stale}** bars "
-         f"without one. Quadrant occupancy — flat (no setup) on "
+         f"Bias read: the PREVIOUS completed DAILY candle of DXY and EURGBP, "
+         f"carried onto the next day's bars (body must exceed **{deadband:.0%}** "
+         f"of the day's range or the day reads flat). Quadrant occupancy — flat "
+         f"(no setup) on "
          f"**{cover.get('_flat', 0)}** bars; "
          + ", ".join(f"{k} {v}" for k, v in sorted(cover.get('_scen', {}).items()))
          + ".", ""]
@@ -507,14 +521,17 @@ def selftest():
     assert len(ev_dh) == 1 and ev_dh[0][0] == 6, ev_dh
     assert abs(ev_dh[0][1] - 1.005) < 1e-9, ev_dh
 
-    # direction_series: a break sets direction, and it goes FLAT when stale
-    dh = [1.005, 1.010, 1.004, 1.002, 1.005, 1.001, 1.007] + [1.006] * 10
-    dl = [0.99] * 17
-    ds = direction_series(dh, dl, len(dh), stale=3)
-    assert ds[6] == +1, ds                 # the sweep bar itself reads up
-    assert ds[9] == +1, ds                 # still fresh 3 bars later
-    assert ds[10] == 0, ds                 # stale -> FLAT, not latched forever
-    assert all(d == 0 for d in ds[:6]), ds  # nothing before the first break
+    # daily_direction: the day's CLOSE says what is likely next
+    assert daily_direction(1.00, 1.02, 0.99, 1.019, 0.15) == +1     # closes high
+    assert daily_direction(1.00, 1.01, 0.98, 0.981, 0.15) == -1     # closes low
+    assert daily_direction(1.00, 1.05, 0.95, 1.001, 0.15) == 0      # doji -> FLAT
+    assert daily_direction(1.00, 1.00, 1.00, 1.00, 0.15) == 0       # zero range
+    # scale-free: the same threshold works on a ~100-scale index
+    assert daily_direction(98.0, 99.0, 97.5, 98.9, 0.15) == +1
+    assert daily_direction(98.0, 98.1, 98.0, 98.01, 0.15) == 0   # body 10% < 15%
+    # the deadband is what makes FLAT reachable at all
+    assert daily_direction(1.00, 1.02, 0.99, 1.004, 0.15) == 0      # body 13% < 15%
+    assert daily_direction(1.00, 1.02, 0.99, 1.004, 0.10) == +1     # body 13% > 10%
 
     # the four golden conditions, and flat meaning NO setup
     assert quadrant_at(+1, +1) == ("GBPUSD", -1, "1a")
@@ -568,8 +585,9 @@ def main():
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--mss-window", type=int, default=6,
                     help="bars after the raid in which the shift must confirm")
-    ap.add_argument("--dir-stale", type=int, default=48,
-                    help="bars after which a BOS no longer sets direction (flat)")
+    ap.add_argument("--deadband", type=float, default=0.15,
+                    help="min daily body as a fraction of range; below it the day "
+                         "reads FLAT (no MM setup)")
     ap.add_argument("--no-push", action="store_true",
                     help="write the report but do not commit/push it")
     a = ap.parse_args()
@@ -577,7 +595,7 @@ def main():
         return selftest()
     global NO_PUSH
     NO_PUSH = a.no_push
-    return run(a.tf, a.window, a.horizon, a.mss_window, a.dir_stale)
+    return run(a.tf, a.window, a.horizon, a.mss_window, a.deadband)
 
 
 if __name__ == "__main__":
