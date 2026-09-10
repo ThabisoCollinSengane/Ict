@@ -69,19 +69,24 @@ def sweep_events(highs, lows, direction):
             elif direction < 0 and lows[i] < pending:
                 out.append((i, pending))
                 pending = None
-        # Arm the fractal confirmed by bar i (its centre is i-1).
-        if i + 1 <= n - 1 or True:
-            c = i - 1
-            if c >= 1:
-                if direction > 0:
-                    if highs[c] > highs[c - 1] and highs[c] > highs[i]:
-                        # only re-arm at a level not already beaten
-                        if pending is None or highs[c] > pending:
-                            pending = highs[c]
-                else:
-                    if lows[c] < lows[c - 1] and lows[c] < lows[i]:
-                        if pending is None or lows[c] < pending:
-                            pending = lows[c]
+        # Arm the fractal confirmed by bar i (its centre is i-1). ALWAYS take the
+        # most recent one — that is the live structural reference, whether or not
+        # it sits beyond the previously armed level.
+        #
+        # ⚠️ An earlier version only re-armed at a MORE EXTREME level
+        # ("pending is None or lows[c] < pending"). In a trending market every new
+        # fractal low is higher than the stale armed one, so the detector latched
+        # onto a far level that price never returned to and went permanently dead:
+        # 101 low-sweeps in 2022-23 and exactly ZERO in 2024-25 on equal bar
+        # counts, which is what exposed it.
+        c = i - 1
+        if c >= 1:
+            if direction > 0:
+                if highs[c] > highs[c - 1] and highs[c] > highs[i]:
+                    pending = highs[c]
+            else:
+                if lows[c] < lows[c - 1] and lows[c] < lows[i]:
+                    pending = lows[c]
     return out
 
 
@@ -406,6 +411,22 @@ def selftest():
     hi = [1.01, 1.00, 0.99, 1.00, 0.97, 0.99]
     evl = sweep_events(hi, lo, -1)
     assert evl and evl[0][0] == 4 and abs(evl[0][1] - 0.90) < 1e-9, evl
+
+    # DEAD-LATCH regression. Two fractal lows, the second HIGHER than the first;
+    # price then dips below the SECOND but stays above the first. The live
+    # structural level is the second, so this IS a sweep. The old "only re-arm at
+    # a lower low" guard kept the stale first level armed and found nothing —
+    # which in a trending market silenced the detector for years at a time.
+    dl_l = [0.995, 0.990, 0.996, 0.998, 0.995, 0.999, 0.993]
+    dl_h = [1.01] * 7
+    ev_dl = sweep_events(dl_h, dl_l, -1)
+    assert len(ev_dl) == 1 and ev_dl[0][0] == 6, ev_dl
+    assert abs(ev_dl[0][1] - 0.995) < 1e-9, ev_dl      # the SECOND low, not 0.990
+    # mirrored on the high side
+    dh_h = [1.005, 1.010, 1.004, 1.002, 1.005, 1.001, 1.007]
+    ev_dh = sweep_events(dh_h, [0.99] * 7, +1)
+    assert len(ev_dh) == 1 and ev_dh[0][0] == 6, ev_dh
+    assert abs(ev_dh[0][1] - 1.005) < 1e-9, ev_dh
 
     # align_triple: within window → one trio at the LAST index
     assert align_triple([(10, 0)], [(12, 0)], [(11, 0)], 4) == [12]
