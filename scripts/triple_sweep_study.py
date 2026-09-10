@@ -37,6 +37,16 @@ REPORT = os.path.join(ROOT, "data", "triple_sweep_report.md")
 
 PAIRS = ("EURUSD", "GBPUSD")
 DXY = "UDXUSD"
+EURGBP = "EURGBP"
+
+# The four MM golden conditions (CLAUDE.md). DXY and EURGBP jointly select BOTH
+# the pair and the direction; either reading flat means no MM setup exists.
+QUADRANT = {
+    (+1, +1): ("GBPUSD", -1, "1a"),   # dollar up,   EUR strong -> sell the weaker
+    (+1, -1): ("EURUSD", -1, "1b"),
+    (-1, -1): ("GBPUSD", +1, "2b"),
+    (-1, +1): ("EURUSD", +1, "2a"),   # dollar down, EUR strong -> buy the stronger
+}
 NO_PUSH = False
 IS_YEARS = (2022, 2023)
 OOS_YEARS = (2024, 2025)
@@ -88,6 +98,38 @@ def sweep_events(highs, lows, direction):
                 if lows[c] < lows[c - 1] and lows[c] < lows[i]:
                     pending = lows[c]
     return out
+
+
+def direction_series(highs, lows, n, stale):
+    """Per-bar structural direction: +1 / -1 / 0, from the most recent BOS.
+
+    Reuses `sweep_events` — a break of the most recent intact fractal high is an
+    up-shift, of the low a down-shift — then forward-fills that read.
+
+    `stale` is what makes a FLAT state possible: a break older than `stale` bars
+    no longer speaks for the present. Without it a BOS latch never returns flat,
+    which is precisely the failure that made STRUCT_BIAS_ENABLED unusable as a
+    live gate (it turned the MSS dollar leg into a rubber stamp). Here the read is
+    measurement-only, but the quadrant's "either flat -> no setup" row cannot be
+    tested at all unless flat genuinely occurs.
+    """
+    marks = [(i, +1) for i, _ in sweep_events(highs, lows, +1)]
+    marks += [(i, -1) for i, _ in sweep_events(highs, lows, -1)]
+    marks.sort()
+    out = [0] * n
+    last_i, last_d = None, 0
+    m = 0
+    for i in range(n):
+        while m < len(marks) and marks[m][0] <= i:
+            last_i, last_d = marks[m]
+            m += 1
+        out[i] = last_d if (last_i is not None and i - last_i <= stale) else 0
+    return out
+
+
+def quadrant_at(dxy_dir, eg_dir):
+    """(pair, direction, scenario) the two instruments jointly select, or None."""
+    return QUADRANT.get((dxy_dir, eg_dir))
 
 
 def align_triple(ev_a, ev_b, ev_dxy, window):
@@ -230,11 +272,11 @@ def _resample(m1, tf):
         {"h": "max", "l": "min", "c": "last"}).dropna()
 
 
-def run(tf, window, horizon, mss_win):
+def run(tf, window, horizon, mss_win, dir_stale):
     import pandas as pd
 
     series = {}
-    for sym in PAIRS + (DXY,):
+    for sym in PAIRS + (DXY, EURGBP):
         m1 = _load(sym)
         if m1 is None:
             print(f"  MISSING {sym} — put {sym}_YYYY.csv in data/histdata/")
@@ -242,11 +284,11 @@ def run(tf, window, horizon, mss_win):
         series[sym] = _resample(m1, tf)
 
     idx = series[PAIRS[0]].index
-    for sym in PAIRS[1:] + (DXY,):
+    for sym in PAIRS[1:] + (DXY, EURGBP):
         idx = idx.intersection(series[sym].index)
     for sym in series:
         series[sym] = series[sym].reindex(idx)
-    print(f"  aligned {len(idx)} {tf} bars across EURUSD/GBPUSD/{DXY}")
+    print(f"  aligned {len(idx)} {tf} bars across EURUSD/GBPUSD/{DXY}/{EURGBP}")
 
     arr = {s: (series[s]["h"].to_numpy(), series[s]["l"].to_numpy(),
                series[s]["c"].to_numpy()) for s in series}
@@ -256,6 +298,17 @@ def run(tf, window, horizon, mss_win):
         cover[y] = int((years == y).sum())
     cover["IS"] = sum(cover[y] for y in IS_YEARS)
     cover["OOS"] = sum(cover[y] for y in OOS_YEARS)
+
+    # The quadrant, bar by bar: DXY x EURGBP jointly name the pair AND direction.
+    n = len(idx)
+    dxy_dir = direction_series(arr[DXY][0], arr[DXY][1], n, dir_stale)
+    eg_dir = direction_series(arr[EURGBP][0], arr[EURGBP][1], n, dir_stale)
+    quad = [quadrant_at(dxy_dir[i], eg_dir[i]) for i in range(n)]
+    flat_bars = sum(1 for q in quad if q is None)
+    scen_count = {}
+    for q in quad:
+        if q:
+            scen_count[q[2]] = scen_count.get(q[2], 0) + 1
 
     out = {}
     for label, pdir in (("short (pairs take HIGHS, DXY takes LOWS)", -1),
@@ -267,7 +320,10 @@ def run(tf, window, horizon, mss_win):
         trio = align_triple(ev[PAIRS[0]], ev[PAIRS[1]], ev[DXY], window)
 
         buckets = {"IS": [], "OOS": [], "ctrlIS": [], "ctrlOOS": [],
-                   "mssIS": [], "mssOOS": []}
+                   "mssIS": [], "mssOOS": [],
+                   # the conditioned test: does the quadrant name THIS pair and
+                   # THIS direction at the moment the trio completes?
+                   "qokIS": [], "qokOOS": [], "qbadIS": [], "qbadOOS": []}
         for sym in PAIRS:
             h, l, c = arr[sym]
             pip = 0.0001
@@ -284,6 +340,10 @@ def run(tf, window, horizon, mss_win):
                 fav, adv, mi = _measure(i)
                 key = "IS" if years[i] in IS_YEARS else "OOS"
                 buckets[key].append((fav, adv, mi is not None))
+                q = quad[i]
+                aligned = bool(q) and q[0] == sym and q[1] == pdir
+                buckets[("qok" if aligned else "qbad") + key].append(
+                    (fav, adv, mi is not None))
                 # trip+MSS: entered AT the shift, so the excursion is measured
                 # from the MSS bar forward — no overlap with the MSS window.
                 if mi is not None and mi < len(c) - 1:
@@ -300,13 +360,15 @@ def run(tf, window, horizon, mss_win):
         out[label] = {k: summarise(v, 0.0001) for k, v in buckets.items()}
         out[label]["_trio"] = len(trio)
 
-    _write(out, tf, window, horizon, mss_win, cover)
+    cover['_flat'] = flat_bars
+    cover['_scen'] = scen_count
+    _write(out, tf, window, horizon, mss_win, cover, dir_stale)
     if not NO_PUSH:
         _publish(REPORT)
     return 0
 
 
-def _write(out, tf, window, horizon, mss_win, cover):
+def _write(out, tf, window, horizon, mss_win, cover, dir_stale):
     cov = " / ".join(f"{y}: {cover.get(y, 0)}" for y in IS_YEARS + OOS_YEARS)
     L = ["# Triple liquidity raid — EURUSD + GBPUSD vs DXY", "",
          f"Timeframe **{tf}**, sync window **{window}** bars, "
@@ -323,7 +385,19 @@ def _write(out, tf, window, horizon, mss_win, cover):
          "is worth anything. `trip+MSS` additionally requires structure to shift "
          "after the raid.", "",
          "`n` counts PER-PAIR observations: one aligned trio contributes two "
-         "rows (the EURUSD read and the GBPUSD read), so n = 2 x trios.", ""]
+         "rows (the EURUSD read and the GBPUSD read), so n = 2 x trios.", "",
+         "**QUAD-ok / QUAD-no** is the conditioned test — the one that matches the "
+         "traded model rather than the raid stripped bare. At the bar the trio "
+         "completes, DXY x EURGBP name a pair AND a direction (the four golden "
+         "conditions); QUAD-ok is the subset where they name THIS pair in THIS "
+         "direction, QUAD-no the rest. If the raid is only a trigger and the "
+         "quadrant is the filter, the gap between those two rows is where it shows.",
+         "",
+         f"Direction read: most recent BOS, going flat after **{dir_stale}** bars "
+         f"without one. Quadrant occupancy — flat (no setup) on "
+         f"**{cover.get('_flat', 0)}** bars; "
+         + ", ".join(f"{k} {v}" for k, v in sorted(cover.get('_scen', {}).items()))
+         + ".", ""]
     for label, st in out.items():
         L += [f"## {label}", "", f"Aligned trios: **{st['_trio']}**", "",
               "```",
@@ -332,7 +406,9 @@ def _write(out, tf, window, horizon, mss_win, cover):
               "-" * 60]
         for key, name in (("IS", "triple IS"), ("OOS", "triple OOS"),
                           ("ctrlIS", "single IS"), ("ctrlOOS", "single OOS"),
-                          ("mssIS", "trip+MSS IS"), ("mssOOS", "trip+MSS OOS")):
+                          ("mssIS", "trip+MSS IS"), ("mssOOS", "trip+MSS OOS"),
+                          ("qokIS", "QUAD-ok IS"), ("qokOOS", "QUAD-ok OOS"),
+                          ("qbadIS", "QUAD-no IS"), ("qbadOOS", "QUAD-no OOS")):
             s = st.get(key, {})
             if not s.get("n"):
                 L.append(f"{name:<10} {0:>6}   —")
@@ -343,7 +419,10 @@ def _write(out, tf, window, horizon, mss_win, cover):
         L.append("```")
         v, why = verdict(st.get("IS", {}), st.get("OOS", {}),
                          st.get("ctrlIS", {}), st.get("ctrlOOS", {}))
-        L += ["", f"**Verdict: {v}** — {why}", ""]
+        L += ["", f"**Verdict (raid vs single-pair control): {v}** — {why}"]
+        qv, qwhy = verdict(st.get("qokIS", {}), st.get("qokOOS", {}),
+                           st.get("qbadIS", {}), st.get("qbadOOS", {}))
+        L += [f"**Verdict (quadrant-aligned vs not): {qv}** — {qwhy}", ""]
     L += ["---", "", "Measurement only. A GREEN earns an IS/OOS validation of a "
           "real lever; YELLOW/RED stands as the record of why nothing shipped."]
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
@@ -428,6 +507,23 @@ def selftest():
     assert len(ev_dh) == 1 and ev_dh[0][0] == 6, ev_dh
     assert abs(ev_dh[0][1] - 1.005) < 1e-9, ev_dh
 
+    # direction_series: a break sets direction, and it goes FLAT when stale
+    dh = [1.005, 1.010, 1.004, 1.002, 1.005, 1.001, 1.007] + [1.006] * 10
+    dl = [0.99] * 17
+    ds = direction_series(dh, dl, len(dh), stale=3)
+    assert ds[6] == +1, ds                 # the sweep bar itself reads up
+    assert ds[9] == +1, ds                 # still fresh 3 bars later
+    assert ds[10] == 0, ds                 # stale -> FLAT, not latched forever
+    assert all(d == 0 for d in ds[:6]), ds  # nothing before the first break
+
+    # the four golden conditions, and flat meaning NO setup
+    assert quadrant_at(+1, +1) == ("GBPUSD", -1, "1a")
+    assert quadrant_at(+1, -1) == ("EURUSD", -1, "1b")
+    assert quadrant_at(-1, -1) == ("GBPUSD", +1, "2b")
+    assert quadrant_at(-1, +1) == ("EURUSD", +1, "2a")
+    assert quadrant_at(0, +1) is None and quadrant_at(-1, 0) is None
+    assert quadrant_at(0, 0) is None
+
     # align_triple: within window → one trio at the LAST index
     assert align_triple([(10, 0)], [(12, 0)], [(11, 0)], 4) == [12]
     # outside window → nothing
@@ -472,6 +568,8 @@ def main():
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--mss-window", type=int, default=6,
                     help="bars after the raid in which the shift must confirm")
+    ap.add_argument("--dir-stale", type=int, default=48,
+                    help="bars after which a BOS no longer sets direction (flat)")
     ap.add_argument("--no-push", action="store_true",
                     help="write the report but do not commit/push it")
     a = ap.parse_args()
@@ -479,7 +577,7 @@ def main():
         return selftest()
     global NO_PUSH
     NO_PUSH = a.no_push
-    return run(a.tf, a.window, a.horizon, a.mss_window)
+    return run(a.tf, a.window, a.horizon, a.mss_window, a.dir_stale)
 
 
 if __name__ == "__main__":
