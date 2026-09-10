@@ -11,37 +11,37 @@ IS **9682** / OOS **10804**. An empty OOS bucket below usually means missing UDX
 
 ## short (pairs take HIGHS, DXY takes LOWS)
 
-Aligned trios: **6**
+Aligned trios: **1541**
 
 ```
 bucket          n    rev%   rev20%   medFav   medAdv    MSS%
 ------------------------------------------------------------
-triple IS      12   41.7%    41.7%     17.5     72.0   33.3%
-triple OOS      0   —
-single IS      14   57.1%    57.1%     49.1     37.3   50.0%
-single OOS     21   61.9%    76.2%     50.0     25.5   23.8%
-trip+MSS IS      4   75.0%   100.0%     59.6     29.8  100.0%
-trip+MSS OOS      0   —
+triple IS    1444   52.3%    77.6%     48.6     41.3   40.2%
+triple OOS   1638   50.5%    67.6%     32.8     32.3   37.5%
+single IS    1056   50.6%    75.9%     46.7     43.8   44.0%
+single OOS   1264   49.1%    67.4%     32.0     33.2   42.1%
+trip+MSS IS    581   47.5%    74.4%     41.7     47.0  100.0%
+trip+MSS OOS    615   50.2%    67.2%     34.4     33.8  100.0%
 ```
 
-**Verdict: RED** — no events in one or both splits
+**Verdict: YELLOW** — positive but weak (+1.7pp IS / +1.4pp OOS)
 
 ## long  (pairs take LOWS,  DXY takes HIGHS)
 
-Aligned trios: **30**
+Aligned trios: **1504**
 
 ```
 bucket          n    rev%   rev20%   medFav   medAdv    MSS%
 ------------------------------------------------------------
-triple IS      60   51.7%    75.0%     47.2     37.4   25.0%
-triple OOS      0   —
-single IS     101   43.6%    73.3%     44.2     56.5   23.8%
-single OOS      0   —
-trip+MSS IS     15   66.7%    86.7%     51.5     24.9  100.0%
-trip+MSS OOS      0   —
+triple IS    1436   48.7%    75.7%     43.6     44.9   38.2%
+triple OOS   1572   51.7%    71.1%     35.6     31.4   39.1%
+single IS    1080   47.8%    72.8%     41.7     48.3   42.7%
+single OOS   1202   52.3%    68.6%     33.7     30.7   43.3%
+trip+MSS IS    548   50.0%    75.2%     46.5     46.8  100.0%
+trip+MSS OOS    615   50.7%    69.9%     34.4     32.5  100.0%
 ```
 
-**Verdict: RED** — no events in one or both splits
+**Verdict: RED** — no consistent lift (+0.9pp IS / -0.7pp OOS)
 
 ---
 
