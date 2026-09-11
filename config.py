@@ -1197,6 +1197,11 @@ DXY_REV_ENABLED = bool(int(_os.environ.get("DXY_REV_ENABLED", "1")))
 DXY_REV_TFS = tuple(_os.environ.get("DXY_REV_TFS", "60T,D").split(","))
 DXY_REV_LOOKBACK_TF = {"60T": 24, "D": 5}
 
+# Path obstruction (analytics): an unmitigated OPPOSING HTF gap between entry and
+# target — somewhere price is drawn to stall on the way to its draw.
+PATH_OBSTRUCTION_ENABLED = bool(int(_os.environ.get("PATH_OBSTRUCTION_ENABLED", "1")))
+PATH_OBSTRUCTION_TFS = tuple(_os.environ.get("PATH_OBSTRUCTION_TFS", "240T,D").split(","))
+
 MM_GOLDEN_OB_RAID_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_RAID_REQUIRED", "1")))
 MM_GOLDEN_OB_RAID_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_RAID_LOOKBACK", "60"))
 # The raided pool may be from the current day OR previous days — size the lookback per

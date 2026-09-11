@@ -1238,6 +1238,62 @@ def _publish_backtest_report(results, backtester, years, df=None):
                              f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
                 L.append("```")
 
+        # --- P67: is the target reachable, and is the path to it clear? ---
+        if "target_rung" in df.columns:
+            _rg = df[df["target_rung"].astype(str) != ""]
+            if len(_rg):
+                L += ["", "## Target rung on the cascade ladder (P67)", "",
+                      "The pure-price cascade study measured how often price "
+                      "reaches each pool after a daily sweep: 3-day **58%/61%**, "
+                      "30-day **21%/20%**, 60-day **15%/13%**. This asks which "
+                      "rung the engine actually aimed at. A target out at d30/d60 "
+                      "is one price rarely delivers to — the lever there is skip "
+                      "or resize, NOT hold longer (HTF_TARGET_PREF -22% MaxDD, "
+                      "TRAIL_AT_TP -49%, TP-runner -75% all died aiming further).",
+                      "```"]
+                L.append(f"{'Rung':<8} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 50)
+                for _r, _lbl in (("near", "near"), ("d3", "3-day"),
+                                 ("d30", "30-day"), ("d60", "60-day")):
+                    grp = _rg[_rg["target_rung"] == _r]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    L.append(f"{_lbl:<8} {len(grp):>7} {w:>5} {100*w/len(grp):>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+                L.append("```")
+
+        if "path_blocked" in df.columns:
+            _pb = df[df["path_blocked"].notna()]
+            if len(_pb):
+                L += ["", "## Path obstruction (P67)", "",
+                      "An unmitigated OPPOSING HTF gap sitting BETWEEN entry and "
+                      "target — somewhere price is drawn to stall on the way to "
+                      "its draw. A statement about where price is going, not what "
+                      "the pattern looks like.", "```"]
+                L.append(f"{'Path':<12} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 54)
+                for _v, _lbl in ((True, "blocked"), (False, "clear")):
+                    grp = _pb[_pb["path_blocked"] == _v]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    L.append(f"{_lbl:<12} {len(grp):>7} {w:>5} "
+                             f"{100*w/len(grp):>5.1f}% {grp.pnl.sum():>12.2f} "
+                             f"{_pf(grp):>6.2f}")
+                    if _v and "path_block_tf" in grp.columns:
+                        for _tf in sorted(set(grp["path_block_tf"].astype(str))):
+                            sub = grp[grp["path_block_tf"].astype(str) == _tf]
+                            if not len(sub) or not _tf:
+                                continue
+                            w2 = (sub.pnl > 0).sum()
+                            L.append(f"{'  on ' + _tf:<12} {len(sub):>7} {w2:>5} "
+                                     f"{100*w2/len(sub):>5.1f}% "
+                                     f"{sub.pnl.sum():>12.2f} {_pf(sub):>6.2f}")
+                L.append("```")
+
         # --- Dollar reversal day (P64): DXY took an ITL/ITH and turned back ---
         if "dxy_rev_day" in df.columns:
             _rv = df[df["dxy_rev_day"].astype(str) != ""]

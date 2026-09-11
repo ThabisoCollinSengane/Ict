@@ -303,6 +303,45 @@ An empty bucket is ambiguous between "no data" and "no events"; the coverage lin
 disambiguates it in one glance and turned a wrong guess into a found bug. And
 never measure a confirmation over the same window as the outcome it predicts.
 
+### P67 — Target rung + path obstruction (BUILT 2026-09-11, analytics-only)
+
+**Why:** effort in this project has skewed heavily to ANALYSIS (detecting the
+setup) over the DRAW (where price is going) — and the draw is the part that
+actually measured predictive. The pure-price cascade study is the strongest
+forward result here (3-day pool **58% IS / 61% OOS**, 30-day 21%/20%, 60-day
+15%/13%, all three pairs agreeing), yet **it was never connected to target
+selection.** Targets are classified by SOURCE FAMILY (fib / FVG / OB / PDH-PDL /
+ITH-ITL) and never by cascade RUNG, so the engine could not tell whether it was
+aiming at the pool price reaches three times in five or one time in eight.
+Nothing checked the PATH either — `_htf_fvg_opposing` asks only whether an
+opposing gap exists AHEAD, unbounded, so a gap far beyond the target counts.
+
+**`_target_rung(ladder, target_pips)`** — classifies the chosen target by the
+furthest cascade rung it clears, reusing `_draw_ladder`: `near` (inside the
+3-day pool) / `d3` / `d30` / `d60`. Pure, static, no state.
+
+**`_path_obstruction(pair, direction, entry, target, t)`** — is an unmitigated
+OPPOSING HTF gap sitting strictly BETWEEN entry and target? Scans
+`PATH_OBSTRUCTION_TFS` (H4, D). Returns `(blocked, tf)`.
+
+**⚠️ This is NOT an argument for aiming further.** Every attempt at that failed:
+`HTF_TARGET_PREF` −22% MaxDD, `TRAIL_AT_TP` −49%, TP-runner −75%. The cascade
+rates point the OTHER way — a target at the 30/60-day rung is one price rarely
+delivers to, so the candidate lever is **skip or resize**, not hold longer.
+
+**Columns:** `target_rung`, `path_blocked`, `path_block_tf` — plumbed 4× each
+(base open + mm_golden open + BOTH `_close_leg` whitelists), asserted end to end
+per the counter/column lesson. Two report tables. Config
+`PATH_OBSTRUCTION_ENABLED=1`, `PATH_OBSTRUCTION_TFS="240T,D"`.
+
+**Verified:** rung boundaries (25→near, 40→d3 exactly at the pool, 60→d3,
+100→d30, 200→d60), missing rungs early in the series, and the null target; path
+obstruction blocks an opposing gap inside the path but NOT one beyond the target
+(the case distinguishing it from `_htf_fvg_opposing`), nor behind entry, nor one
+pulling our way, nor a mitigated one — long side mirrored, flag-off respected.
+
+**Analytics only — gates nothing.** Read the two tables before proposing a lever.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

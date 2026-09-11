@@ -469,6 +469,9 @@ class Backtester:
             "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
             "session_side": leg.get("session_side", "no_open"),
             "target_type": st.get("target_type", "unknown"),
+            "target_rung": st.get("target_rung", ""),
+            "path_blocked": st.get("path_blocked", False),
+            "path_block_tf": st.get("path_block_tf", ""),
             "draw_score": st.get("draw_score", 0),
             "im_scenario": st.get("im_scenario", "?"),
             "entry_model": st.get("entry_model", "judas"),
@@ -583,6 +586,9 @@ class Backtester:
             "entry_type": leg.get("entry_type", "unknown"),
             "session_side": leg.get("session_side", "no_open"),
             "target_type": st.get("target_type", "unknown"),
+            "target_rung": st.get("target_rung", ""),
+            "path_blocked": st.get("path_blocked", False),
+            "path_block_tf": st.get("path_block_tf", ""),
             "draw_score": st.get("draw_score", 0),
             "im_scenario": st.get("im_scenario", "?"),
             "entry_model": st.get("entry_model", "judas"),
@@ -1752,6 +1758,68 @@ class Backtester:
             "lad_d30":  ahead(ext(d[-30:])) if len(d) >= 30 else None,
             "lad_d60":  ahead(ext(d[-60:])) if len(d) >= 60 else None,
         }
+
+    @staticmethod
+    def _target_rung(ladder, target_pips):
+        """Which cascade rung does the chosen target sit at?
+
+        The pure-price cascade study is the strongest predictive result in this
+        project: after a daily-liquidity sweep price reaches the 3-day pool 58%
+        (IS) / 61% (OOS), the 30-day pool 21%/20%, the 60-day pool 15%/13% — all
+        three pairs agreeing. But targets are classified by SOURCE FAMILY (fib /
+        FVG / OB / PDH-PDL ...), never by rung, so the engine cannot tell whether
+        it is aiming at the pool price reaches three times in five or the one it
+        reaches one time in eight.
+
+        The rungs are ascending by construction (3d <= 30d <= 60d), so the target
+        is classified by the furthest rung it clears:
+          "near" — inside the 3-day pool, the nearest draw
+          "d3"   — at/beyond the 3-day pool   (reliable rung)
+          "d30"  — at/beyond the 30-day pool  (~20% reached)
+          "d60"  — at/beyond the 60-day pool  (~13% reached)
+
+        Analytics only. NB this is NOT an argument for aiming further — every
+        attempt at that failed (HTF_TARGET_PREF -22% MaxDD, TRAIL_AT_TP -49%,
+        TP-runner -75%). If anything the cascade rates point the other way: a
+        target out at the 30/60-day rung is one price rarely delivers to.
+        """
+        if target_pips is None:
+            return ""
+        rung = "near"
+        for key, name in (("lad_d3", "d3"), ("lad_d30", "d30"), ("lad_d60", "d60")):
+            lvl = ladder.get(key)
+            if lvl is not None and target_pips >= lvl:
+                rung = name
+        return rung
+
+    def _path_obstruction(self, pair, direction, entry, target, t):
+        """Is an unmitigated OPPOSING HTF gap sitting between entry and target?
+
+        A statement about where price is GOING rather than what the pattern looks
+        like: to reach its draw the trade must travel the whole path, and an
+        unmitigated gap pulling the other way inside that path is somewhere price
+        is institutionally drawn to stall or turn.
+
+        Distinct from `_htf_fvg_opposing`, which asks only whether such a gap
+        exists AHEAD — unbounded, so a gap far beyond the target counts there and
+        is irrelevant here.
+
+        Returns (blocked, timeframe).
+        """
+        if not config.PATH_OBSTRUCTION_ENABLED:
+            return False, ""
+        lo, hi = (min(entry, target), max(entry, target))
+        for tf in config.PATH_OBSTRUCTION_TFS:
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 5:
+                continue
+            for g in self._scan_htf_fvgs(bars, pair):
+                if g.mitigated or g.direction == direction:
+                    continue          # spent, or pulling our way
+                mid = (g.top + g.bottom) / 2.0
+                if lo < mid < hi:     # strictly inside the path we must travel
+                    return True, tf
+        return False, ""
 
     def _min_pips_target(self):
         """Equity-scaled minimum target floor. Below the R3k multiplier threshold
@@ -4336,6 +4404,10 @@ class Backtester:
             "runner_be_after_tp1": _runner_applies,
         }
         _ladder = self._draw_ladder(pair, direction, cur_price, t)
+        # Where does this target sit on the cascade ladder, and is the path clear?
+        _tgt_rung = self._target_rung(_ladder, abs(target - entry) / pip)
+        _path_blocked, _path_tf = self._path_obstruction(
+            pair, direction, entry, target, t)
         self.gate["entry_opened"] = self.gate.get("entry_opened", 0) + 1
         self.active[pair] = {
             "direction": direction,
@@ -4349,6 +4421,9 @@ class Backtester:
             "tp1_price": target if _runner_applies else None,
             "tp_runner": _runner_applies,
             "target_type": target_type,
+            "target_rung": _tgt_rung,
+            "path_blocked": _path_blocked,
+            "path_block_tf": _path_tf,
             "stop_reason": _stop_reason,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir,
@@ -5543,6 +5618,7 @@ class Backtester:
             "target": target,
             "tp1_price": None, "tp_runner": False,
             "target_type": target_type,
+            "target_rung": "", "path_blocked": False, "path_block_tf": "",
             "stop_reason": _stop_reason,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir_g,
