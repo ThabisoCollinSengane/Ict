@@ -470,6 +470,8 @@ class Backtester:
             "session_side": leg.get("session_side", "no_open"),
             "target_type": st.get("target_type", "unknown"),
             "target_rung": st.get("target_rung", ""),
+            "target_pd": st.get("target_pd", ""),
+            "target_pd_tf": st.get("target_pd_tf", ""),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "draw_score": st.get("draw_score", 0),
@@ -587,6 +589,8 @@ class Backtester:
             "session_side": leg.get("session_side", "no_open"),
             "target_type": st.get("target_type", "unknown"),
             "target_rung": st.get("target_rung", ""),
+            "target_pd": st.get("target_pd", ""),
+            "target_pd_tf": st.get("target_pd_tf", ""),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "draw_score": st.get("draw_score", 0),
@@ -1791,6 +1795,50 @@ class Backtester:
             if lvl is not None and target_pips >= lvl:
                 rung = name
         return rung
+
+    def _target_pd_array(self, pair, direction, target, t):
+        """Which HTF PD ARRAY does the chosen target actually sit on?
+
+        The trader's draw definition: every new day, the draws are the W1/D1/H4
+        PD arrays — FVG, IFVG, breaker, OB — and **the FVG is the most important
+        of them, because price always gravitates toward an unfilled gap even if it
+        takes days.** A fib extension is a PROJECTION, not a draw: nothing is
+        resting there and nothing is pulled toward it.
+
+        This is the yardstick `_target_rung` should have used. That one measures
+        distance to price EXTREMES (session/3d/30d/60d pools), which is a
+        different thing and — per the draw-ladder study, where fib extensions were
+        217 of 218 targets — probably not what most targets are anchored on.
+
+        Scans biggest timeframe first (W -> D -> H4) and prefers the FVG reading,
+        since that is the draw that calls price. Returns (kind, tf):
+          kind in {"fvg", "ifvg", "ob", ""}, tf in {"W", "D", "240T", ""}.
+        """
+        if not config.TARGET_PD_ENABLED:
+            return "", ""
+        from ict.ifvg import latest_inversion
+        from ict.order_block import detect_order_blocks
+        tol = config.TARGET_CONFLUENCE_TOL_PIPS * pip_size(pair)
+        ob_hit = ("", "")
+        for tf in config.TARGET_PD_TFS:
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 5:
+                continue
+            for g in self._scan_htf_fvgs(bars, pair):
+                if g.mitigated:
+                    continue                     # a filled gap no longer calls
+                if g.bottom - tol <= target <= g.top + tol:
+                    # inverted counts as its own array (the MM draw)
+                    inv = latest_inversion(bars, g.bottom, g.top)
+                    return ("ifvg" if inv else "fvg"), tf
+            if not ob_hit[0]:                    # remember, but keep hunting FVGs
+                for ob in detect_order_blocks(bars):
+                    if getattr(ob, "mitigated", False):
+                        continue
+                    if ob.bottom - tol <= target <= ob.top + tol:
+                        ob_hit = ("ob", tf)
+                        break
+        return ob_hit
 
     def _path_obstruction(self, pair, direction, entry, target, t):
         """Is an unmitigated OPPOSING HTF gap sitting between entry and target?
@@ -4408,6 +4456,7 @@ class Backtester:
         _tgt_rung = self._target_rung(_ladder, abs(target - entry) / pip)
         _path_blocked, _path_tf = self._path_obstruction(
             pair, direction, entry, target, t)
+        _tgt_pd, _tgt_pd_tf = self._target_pd_array(pair, direction, target, t)
         self.gate["entry_opened"] = self.gate.get("entry_opened", 0) + 1
         self.active[pair] = {
             "direction": direction,
@@ -4422,6 +4471,8 @@ class Backtester:
             "tp_runner": _runner_applies,
             "target_type": target_type,
             "target_rung": _tgt_rung,
+            "target_pd": _tgt_pd,
+            "target_pd_tf": _tgt_pd_tf,
             "path_blocked": _path_blocked,
             "path_block_tf": _path_tf,
             "stop_reason": _stop_reason,
@@ -5619,6 +5670,7 @@ class Backtester:
             "tp1_price": None, "tp_runner": False,
             "target_type": target_type,
             "target_rung": "", "path_blocked": False, "path_block_tf": "",
+            "target_pd": "", "target_pd_tf": "",
             "stop_reason": _stop_reason,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir_g,

@@ -1264,6 +1264,54 @@ def _publish_backtest_report(results, backtester, years, df=None):
                              f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
                 L.append("```")
 
+        # --- P68: is the target a real HTF DRAW, or a projection? ---
+        if "target_pd" in df.columns:
+            L += ["", "## Target on an HTF PD array (P68)", "",
+                  "The trader's draw definition: the daily draws are the W1/D1/H4 "
+                  "PD arrays, and the **FVG is the most important** — price "
+                  "gravitates to an unfilled gap even if it takes days. A fib "
+                  "extension is a PROJECTION: nothing rests there and nothing is "
+                  "pulled to it. This asks what the engine actually aimed at.",
+                  "```"]
+            L.append(f"{'PD array':<10} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                     f"{'P&L ZAR':>12} {'PF':>6}")
+            L.append("-" * 52)
+            for _k, _lbl in (("fvg", "FVG"), ("ifvg", "IFVG"), ("ob", "OB"),
+                             ("", "none (projection)")):
+                grp = df[df["target_pd"].astype(str) == _k]
+                if not len(grp):
+                    continue
+                w = (grp.pnl > 0).sum()
+                L.append(f"{_lbl:<10} {len(grp):>7} {w:>5} {100*w/len(grp):>5.1f}% "
+                         f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+            L.append("```")
+
+        # --- P68: rung x target_type — is the far-rung loss just fib extensions? ---
+        if "target_rung" in df.columns and "target_type" in df.columns:
+            _x = df[df["target_rung"].astype(str) != ""]
+            if len(_x):
+                L += ["", "## Rung x target family (P68)", "",
+                      "The question the rung table alone cannot answer: do the "
+                      "far rungs lose because they are FAR, or because they are "
+                      "fib PROJECTIONS rather than real draws? If the loss "
+                      "concentrates in fib_extension, distance was never the "
+                      "variable.", "```"]
+                L.append(f"{'Rung':<7} {'Family':<15} {'Trades':>7} {'Wins':>5} "
+                         f"{'WR%':>6} {'PF':>6}")
+                L.append("-" * 52)
+                for _r in ("near", "d3", "d30", "d60"):
+                    sub = _x[_x["target_rung"] == _r]
+                    if not len(sub):
+                        continue
+                    for _fam in sorted(set(sub["target_type"].astype(str))):
+                        g2 = sub[sub["target_type"].astype(str) == _fam]
+                        if len(g2) < 3:
+                            continue
+                        w = (g2.pnl > 0).sum()
+                        L.append(f"{_r:<7} {_fam:<15} {len(g2):>7} {w:>5} "
+                                 f"{100*w/len(g2):>5.1f}% {_pf(g2):>6.2f}")
+                L.append("```")
+
         if "path_blocked" in df.columns:
             _pb = df[df["path_blocked"].notna()]
             if len(_pb):

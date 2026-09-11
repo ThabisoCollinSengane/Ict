@@ -1199,6 +1199,11 @@ DXY_REV_LOOKBACK_TF = {"60T": 24, "D": 5}
 
 # Path obstruction (analytics): an unmitigated OPPOSING HTF gap between entry and
 # target — somewhere price is drawn to stall on the way to its draw.
+# Which HTF PD array the target sits on — the trader's draw definition (FVG the
+# most important: price gravitates to an unfilled gap even if it takes days).
+TARGET_PD_ENABLED = bool(int(_os.environ.get("TARGET_PD_ENABLED", "1")))
+TARGET_PD_TFS = tuple(_os.environ.get("TARGET_PD_TFS", "W,D,240T").split(","))
+
 PATH_OBSTRUCTION_ENABLED = bool(int(_os.environ.get("PATH_OBSTRUCTION_ENABLED", "1")))
 PATH_OBSTRUCTION_TFS = tuple(_os.environ.get("PATH_OBSTRUCTION_TFS", "240T,D").split(","))
 
