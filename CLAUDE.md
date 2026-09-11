@@ -303,6 +303,52 @@ An empty bucket is ambiguous between "no data" and "no events"; the coverage lin
 disambiguates it in one glance and turned a wrong guess into a found bug. And
 never measure a confirmation over the same window as the outcome it predicts.
 
+### P66 — Triple raid CONDITIONED on the quadrant (MEASURED 2026-09-11) — 🔴 RED
+
+**The question P65 never asked:** P65 measured the raid stripped bare and found
+~50%. But the traded model has the DXY x EURGBP quadrant around it. So: is the
+raid a fine TRIGGER once the dollar and the cross have already chosen the pair?
+
+**Bias read = the PREVIOUS completed DAILY candle** (trader's spec: standard
+timeframes for top-down, H1/M15 for entries, the current day's close says what is
+likely next). Body must exceed 15% of the day's range or the day reads flat.
+
+| | QUAD-ok vs QUAD-no (IS / OOS) |
+|---|---|
+| H1 short | −4.8pp / −0.0pp |
+| H1 long | −3.2pp / +2.1pp |
+| M15 short | −0.5pp / −0.1pp |
+| M15 long | −2.3pp / +0.6pp |
+
+**RED in all four cells.** Knowing the prior day's bias does not make a raid more
+likely to reverse; every IS cell is negative. `medFav ≈ medAdv` in EVERY bucket on
+both timeframes (43.4/41.3, 33.8/30.8, 24.6/22.6, 18.4/16.8) — symmetric
+excursions, a near-martingale. The quadrant does not even change how often
+structure shifts afterwards (MSS ~33-40% everywhere).
+
+**Scope:** condemns the quadrant as a FILTER ON THIS PATTERN — raw price, H1/M15,
+fixed horizon, no killzone, no PD-array entry, no costs. NOT the quadrant inside
+the full strategy, which is a different claim.
+
+**⚠️ The first two runs were void — my measurement, not the market:**
+1. **Circular MSS** — the shift was detected over the SAME horizon the reversal
+   was measured across, so "structure shifted our way" and "price moved our way"
+   were one statement. The bucket scored 100%/83% by construction.
+2. **Bias read off the MANIPULATION LEG.** A same-bar BOS latch never went flat
+   (9 flat bars in 81,446 — the STRUCT_BIAS_ENABLED failure) AND a short trio is
+   DEFINED as DXY taking a low, so the latch necessarily read DXY down while the
+   quadrant needs it up. Trio and quadrant were anti-correlated by construction:
+   QUAD-ok held 1-3% of trios where independence gives ~25%.
+
+After the daily-close fix: flat occupancy **29%** on both timeframes, QUAD-ok
+sample up 6-20x (44→268 on H1 short, 121→1,044 on M15). THEN the answer was
+trustworthy. **Lesson: when a conditioned subset holds a wildly wrong share of
+the population, suspect the conditioning variable before reading the result.**
+
+**Third clean negative on the ANALYSIS axis** — raid alone, raid+MSS, raid+quadrant.
+Consistent with the project-wide pattern: the analysis layer measures null; the
+predictive part is the DRAW (see P67).
+
 ### P67 — Target rung + path obstruction (BUILT 2026-09-11, analytics-only)
 
 **Why:** effort in this project has skewed heavily to ANALYSIS (detecting the
