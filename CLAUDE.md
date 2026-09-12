@@ -721,6 +721,74 @@ $env:TARGET_RUNG_FAR_MULT=$null;  $env:TARGET_RUNG_SKIP_FAR=1;    python run_bac
 Ship gate: full-4yr equity UP with MaxDD held, and both splits still positive.
 Baseline to beat: 736 / 43.9% / PF 4.01 / MaxDD −13.24%.
 
+### P71 — What the DAILY timeframe does (BUILT 2026-09-12, measurement-only)
+
+Deliberately on the TARGET axis, where every validated result in this project
+sits, rather than the analysis axis, where eight consecutive studies have
+measured null. `scripts/daily_anatomy_study.py`, five sections:
+
+1. **Shape** — daily range p25/median/p75 per pair per split, `body/range` (how
+   much of its travel a day keeps) and where the close sits in the range.
+2. **Timing** — the ET session in which the daily HIGH and the daily LOW print,
+   against the clock-time share each session would get if it were flat (asia 9h,
+   london 4h, ny_am 5h, ny_pm 4h) so concentration is read against hours, not
+   against the other sessions.
+3. **The daily Judas** — did price run the 00:00 UTC open early and close back
+   through it.
+4. **What is LEFT** — from the close of each ET hour, the median pips price still
+   travels before the UTC day ends, up / down / better-of.
+5. **Target demand** — every real target from `trades_dump.csv` divided by the
+   median "left" for its pair, split and entry hour, scored on WR/PF and crossed
+   against `target_rung`.
+
+**§4/§5 are the point.** They are a MECHANISM for P67: a far target may not be
+low-quality so much as unreachable in the time available. If demand explains
+outcomes better than distance does, the lever is choosing targets against what
+is left — a target-SELECTION change, not a removal, and removals have never
+survived the full run here (P8 −R31M, P10, P9's −20.15%).
+
+**Timezone, stated because a time-of-day study lives or dies on it.** HistData is
+fixed EST; `run_backtest_histdata.py` adds 5h for UTC and the engine's daily bars
+are UTC days, with killzones read in New York time. This file mirrors that
+exactly and does NOT reuse `triple_sweep_study._load`, which omits the
+conversion — so the "D" bars in P68b/P69 are EST-days rather than the engine's
+UTC-days. Harmless there (gap and control share the same bars, so the lift is
+internally valid) but wrong for this.
+
+**⚠️ §3 needed a placebo, and the unconditional rate is NOT one.** Two separate
+failure modes surfaced on the random-walk fixture, both caught before any real
+run:
+1. Measured across the FULL day, "ran the low" merely selects days that ENDED
+   down — the condition contains its outcome. Read **−43pp** on the null. Fixed
+   with an early window (default 12 UTC hours = Asia + London; the close it
+   predicts comes after).
+2. Even windowed, a driftless walk that ran the low early tends to STAY there, so
+   the lift against the unconditional close rate was still **−30pp** with no
+   institution involved. The unconditional rate cannot control this statistic.
+   `placebo_level` asks the identical question of a meaningless level — a quarter
+   of the previous day's range from the open, side alternating by date,
+   deterministic, no RNG. Post-fix the null reads **−0.2pp**.
+
+That is the fourth and fifth time this class of error has appeared here (P65c,
+P66, P68b, P69, now twice in one section). **A conditional rate needs a control
+built the same way as the condition; an unconditional base rate is almost never
+it.**
+
+**Verified:** selftest covers the session map, close position, all four Judas
+cases including the both-sides day and the late-low day the early window must
+reject, the placebo's determinism and alternation, demand buckets, quantiles and
+lift. Driven end-to-end on synthetic M1 across all five sections, including §5
+against a stub `trades_dump.csv`. Three plumbing bugs only the end-to-end run
+could find: `.dt.tz_convert(...).hour` needs a second `.dt`, `itertuples` renames
+leading-underscore columns so `r._eth` is an AttributeError, and the extreme-hour
+columns were assigned positionally while `d` was being filtered.
+
+**Run (the dump must exist for §5, so do the backtest first):**
+```
+python run_backtest_histdata.py
+python scripts/daily_anatomy_study.py
+```
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
