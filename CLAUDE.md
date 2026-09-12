@@ -803,6 +803,43 @@ Before any future lever, check whether its signal touches a forming HTF bar.
 Expect the near/far gap to shrink sharply; if it vanishes, P67 was never a finding
 and the far-rung work closes.
 
+### POST-FIX CONFIRMATION (RAN 2026-09-12, IS 2022-23) — the skip arm is 🔴 RED
+### and the lookahead accounted for ALL of it
+
+An accidental run — `TARGET_RUNG_SKIP_FAR=1` was still set in the window (the
+documented PowerShell persistence hazard) — but on the FIXED ladder, verified by
+unparsing `_draw_ladder` from that exact revision (`dc = d[:-1]` present,
+`d[-3:]` absent). It is the most informative run of the sequence.
+
+| IS 2022-23 | Baseline | skip-far, post-fix |
+|---|---|---|
+| Trades | 355 | 297 |
+| WR | 43.1% | 41.1% |
+| PF | **3.37** | **2.62** ❌ |
+| Equity | R48,421 | **R27,911 (−42%)** ❌ |
+| Withdrawn | R41,433 | **R20,373** ❌ |
+| MaxDD | −13.24% | −13.38% ❌ |
+| Working MaxDD | 21.89% | **31.60%** ❌ |
+
+**Worse on every metric.** The contaminated version of this same arm read PF 7.64
+/ MaxDD −6.83% / equity +17%. **The entire result was the lookahead** — nothing
+survives the fix.
+
+And the precedent I kept citing was right after all: removing trades destroys the
+compounding path (P8 −R31M, P10, P9's −20.15%). I had started to doubt it on the
+strength of the contaminated far-downsize and skip numbers, and wrote that the
+P8/P10 lesson might not transfer to realistic-income mode. **That doubt was
+founded on the artifact; the precedent stands unamended.**
+
+**What this means for the far bucket.** On honest levels the far-rung trades are
+net-POSITIVE to the path — removing them costs 42% of IS equity. So the far rungs
+are not a losing bucket at all; they only looked like one because "near" was
+silently selecting days that had already moved.
+
+**Still outstanding:** a CLEAN baseline run (every arm off) to see the honest
+four-rung table. That table decides whether `target_rung` retains any analytic
+value or should be dropped entirely. Expect near/far to be close.
+
 ### P70 ARM 1 — near-rung upsize 1.25× (RAN 2026-09-12, full 4yr) — 🔴 RED
 
 | Metric | Baseline | `TARGET_RUNG_NEAR_MULT=1.25` |
