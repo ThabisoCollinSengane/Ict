@@ -754,6 +754,41 @@ to**. Blanket-disabling it would throw away the near-rung benefit.
 prize is modest; the reason to pursue it is that it is a target-SELECTION fix,
 the only class of change that has ever worked here.
 
+### P70 ARM 1 — near-rung upsize 1.25× (RAN 2026-09-12, full 4yr) — 🔴 RED
+
+| Metric | Baseline | `TARGET_RUNG_NEAR_MULT=1.25` |
+|---|---|---|
+| Trades | 736 | **696** |
+| WR | 43.9% | 42.8% |
+| PF | **4.01** | **3.58** ❌ |
+| Equity | R140,576 | R137,472 ❌ |
+| Withdrawn | R132,020 | R128,173 ❌ |
+| MaxDD | −13.24% | −13.24% ✓ |
+
+**Two reasons it failed, both worth keeping:**
+
+1. **The near bucket is 69% of the book (505 of 736).** Sizing up two-thirds of
+   all trades is LEVERAGE, not selection — it lifts winners and losers together,
+   so PF can only fall. Every sizing lever that has ever shipped here targeted a
+   small, distinctive subset: P9 fired 15 times, P41 91, P19 122. **A 1.25× is a
+   selection tool; applied broadly it is just a bigger lot size.**
+2. **`risk_cap_skip` = 414.** The larger positions breach
+   `MAX_RISK_PER_TRADE_PCT`, and with `RISK_CAP_HALVE` off those entries are
+   SKIPPED — which is why a pure sizing multiplier moved the trade count 736→696.
+   **A broad sizing lever in this engine silently converts into a removal**, and
+   removals have never survived the full run. Any future multiplier applied to a
+   large bucket must be read against `risk_cap_skip`, or the sizing and the
+   skipping cannot be told apart.
+
+The rung table under the arm (near PF 7.20→5.89, d3 0.84→1.08) shifted only
+because the equity path and therefore the trade set changed — the lever never
+touched the far rungs.
+
+**Verdict: do not ship.** `TARGET_RUNG_NEAR_MULT=1.0` stays. This also lowers the
+prior on the remaining broad arms (far-downsize, skip) and raises it on P72,
+which is surgical by construction: it changes the TARGET on ~156 trades and
+removes nothing.
+
 ### P72 — de-escalate a far-rung target (BUILT 2026-09-12, default OFF)
 
 When P20 escalation produces a target on a far rung, take the nearer
