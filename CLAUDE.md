@@ -539,6 +539,64 @@ study without it read 90%/95% and GREEN. On a random walk it also reads 93.5%
 GREEN. Any future "does price go to X" study must carry a placebo at the same
 distance, or it measures proximity and calls it prediction.
 
+### P69 — the REACTION at the gap (BUILT 2026-09-12, measurement-first, NOT run)
+
+**The trader's model, stated 2026-09-12:** trade toward these areas; once visited
+and structure shifts, flip bias and look for new gaps on the opposing side; and
+**if the FVG is broken that is a breakaway — treat it as an IFVG.**
+
+**One half of that is already answered RED.** "Trade TOWARD the gap" is exactly
+what P68b measured: arrival carries no directional information (lift ≤ +0.8pp on
+every rung, both splits), and P67 independently says far targets lose in both
+splits (near PF 5.31/9.15 vs every far rung < 1.0). Aiming at the gap is the one
+piece the evidence argues against, and no lever should be built on it.
+
+**The other half is untested and is the better question.** P68b measured whether
+price ARRIVES. The trader is describing what happens AT and AFTER arrival —
+respect vs break, the shift, the flip, the broken gap as an IFVG. None of that
+needs the gap to be a magnet: price gets there regardless (90-95%). If there is
+an edge here it is in the reaction, and the reaction is measured AT a level price
+has already reached, so the directional problem disappears.
+
+**`scripts/fvg_reaction_study.py`** — for every W/D/H4 gap that price touches:
+- `classify_reaction` → **respect** (a full BODY closes back out the side price
+  came from) / **break** (a body closes through the far side) / unresolved.
+  Whichever comes first within `--react-window` (3). A wick through is not a
+  break, per the project's full-body-close inversion rule.
+- `excursion` from the CONFIRMATION bar forward (`--horizon` 12), reporting
+  medFav AND medAdv — symmetric medians are a coin flip whatever the rate says
+  (P65/P66). Confirmation and outcome windows never overlap (P65c/P66/P68b).
+- `retest_holds` → the **breakaway → IFVG** claim: once broken, does the zone
+  reject price when it comes back?
+- **Every rate carries a control** (`control_zone`): same width, same distance,
+  opposite side of price — the reaction rows AND the breakaway rows.
+
+**Two wiring bugs, both caught by the random-walk null, neither by unit tests:**
+1. `reaction_direction` was inlined and INVERTED (respect read as `-gdir`). A
+   bullish gap is support: respecting it means bouncing back UP, its own
+   direction. This would have flipped every fav/adv column while every pure-logic
+   test still passed. Now a named function with its mapping pinned in the
+   selftest.
+2. **The control was handed the gap's own orientation.** A bullish gap sits below
+   price and is approached DOWNWARD (near side = its top); the mirror sits ABOVE
+   price and is approached UPWARD (near side = its bottom). Scoring the control
+   with the gap's orientation turned its rejections into breaks and produced
+   **respect 58% vs control 23%, a +35pp "edge", ON A RANDOM WALK.** `control_zone`
+   now returns the inverted gdir with the band.
+
+Post-fix the null reads **RED, lift −1.6pp IS / −1.7pp OOS**, and the breakaway
+lift −1.2pp IS. The study reproduces "no edge" on data that has none — the
+property P68b's first version lacked. (The null's +14.3pp OOS breakaway on n=29
+is a live demonstration of why both splits are required.)
+
+**Read the LIFT, never the rate.** Raw respect runs ~65% and raw breakaway-holds
+~64-72% on a random walk; both are geometry. Verified end-to-end by driving
+`run()` on a stubbed data module across D and H4.
+
+**Run:** `python scripts/fvg_reaction_study.py` (auto-pushes
+`data/fvg_reaction_report.md`). Nothing ships from this; it decides whether the
+bias-flip state machine has a foundation before any of it is built.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
