@@ -593,9 +593,65 @@ is a live demonstration of why both splits are required.)
 ~64-72% on a random walk; both are geometry. Verified end-to-end by driving
 `run()` on a stubbed data module across D and H4.
 
+**RESULT (RAN 2026-09-12) — 🔴 RED on all three timeframes. The gap is not
+the actor, and the one cell that looks like a signal loses money.**
+
+| TF | gap respect IS/OOS | control IS/OOS | lift | significance |
+|---|---|---|---|---|
+| W | 69.6% / 69.2% | 63.8% / 73.6% | +5.7pp / **−4.4pp** | 0.6 / −0.5 SE |
+| D | 70.2% / 66.9% | 60.5% / 63.4% | **+9.7pp** / +3.5pp | **2.7** / 1.0 SE |
+| H4 | 64.2% / 66.4% | 63.7% / 64.3% | +0.6pp / +2.1pp | 0.4 / 1.4 SE |
+
+Price DOES usually bounce at an HTF gap — 64-70% of the time. It also bounces at
+a mirror band the same distance away 60-74% of the time. **"The gap held" is a
+description of how price behaves at any nearby level, not evidence the gap did
+anything.** W flips sign; H4, on n≈2,000 per split where the standard error is
+only 1.5pp, is flat.
+
+**D1 is the only cell above noise (+9.7pp, 2.7 SE) and it does not survive.**
+OOS drops to +3.5pp (1.0 SE — indistinguishable from zero), the same
+IS≈+10pp → OOS≈+1-3pp collapse as P48's HTF OB and P68's `target_pd`. And the
+**payoff kills it outright: D1 OOS respect pays medFav 86.3 vs medAdv 98.4 —
+the branch loses.** A higher reversal rate that loses money is not a lever.
+
+**The excursions are the real verdict, and they flip sign on every rung:**
+resFav vs resAdv is 132.9/101.7 IS but **86.3/98.4 OOS** (D), 47.2/52.0 IS but
+38.8/36.5 OOS (H4), 268.0/277.5 IS but 304.1/169.3 OOS (W). Symmetric,
+sign-unstable medians — the P65/P66 martingale signature. Nothing to trade in
+either direction.
+
+**Breakaway → IFVG: null, and this is the SECOND independent test.** Raw hold
+rates look strong (63-78%) but the control does 61-75%; every lift is under 1 SE
+and D flips sign (+3.0pp IS / −3.9pp OOS). `scripts/backtest_ifvg.py` already
+found IFVG-as-standalone-entry RED (PF 0.80 IS / 0.76 OOS, every TF, both target
+variants). Different construction, same answer: **the full-body-close inversion
+is a real market-structure event that carries no measurable edge on its own.**
+
+**Where this leaves the proposed state machine.** Every link is now measured
+null: trade TOWARD the gap (P68b, zero lift), the gap HOLDS on arrival (here),
+the broken gap acts as an IFVG (here + the earlier standalone test). It has no
+foundation as a standalone mechanism and should not be built.
+
+**⚠️ SCOPE — what this does NOT condemn.** This measures gaps STRIPPED BARE:
+raw price, every gap on the chart, no quadrant, no DXY/EURGBP context, no
+killzone, no liquidity raid, no costs, a mechanical 3-bar confirm. The MM model's
+precondition (P61) is an IFVG *on the quadrant-selected pair, in a killzone,
+after a raided order block* — a far narrower population this study never
+isolates. It also does not touch P9's shipped HTF-FVG 50% sizing lever, which is
+IS/OOS-validated on its own terms.
+
+**The pattern across the whole book is now unmistakable.** Eight studies on the
+ANALYSIS axis — P39, P40, P47, P48, P65, P66, P68b, P69 — have measured null,
+while every result that VALIDATED sits on the TARGET axis (P67 rung near PF
+5.31/9.15 vs far <1.0 both splits; the pure-price cascade 58%/61%). **Detecting
+the setup is not where this edge lives; choosing the draw is.** The strongest
+unexploited finding in the project is P67's 234 trades (32% of the book) aiming
+at rungs that lose in both splits — that, measured on the FULL continuous run
+against the P8/P10 path-dependency precedent, is the test worth spending a run
+on. Not more gap semantics.
+
 **Run:** `python scripts/fvg_reaction_study.py` (auto-pushes
-`data/fvg_reaction_report.md`). Nothing ships from this; it decides whether the
-bias-flip state machine has a foundation before any of it is built.
+`data/fvg_reaction_report.md`).
 
 ### Drawdown tolerance (corrected 2026-09-09)
 
