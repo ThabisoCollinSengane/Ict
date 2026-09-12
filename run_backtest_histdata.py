@@ -1514,7 +1514,7 @@ def _publish_backtest_report(results, backtester, years, df=None):
 
     out = os.path.join(root, "data", "backtest_report.md")
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    open(out, "w").write("\n".join(L) + "\n")
+    open(out, "w", encoding="utf-8").write("\n".join(L) + "\n")
 
     def _git(*a):
         return subprocess.run(["git", *a], cwd=root, capture_output=True, text=True)

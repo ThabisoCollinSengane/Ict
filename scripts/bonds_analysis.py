@@ -512,7 +512,7 @@ def main():
     else:
         lines, verdict = result, "?"
     text = "\n".join(lines) + "\n"
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8") as f:
         f.write(text)
     print(text)
     if a.emit_bias:

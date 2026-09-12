@@ -199,7 +199,7 @@ def main():
     rows = df.to_dict("records")
     text = build_report(rows)
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    open(REPORT, "w").write(text)
+    open(REPORT, "w", encoding="utf-8").write(text)
     print(text)
     _publish()
     return 0

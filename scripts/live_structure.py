@@ -269,7 +269,7 @@ def main():
 
 def _write(lines):
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
 

@@ -251,7 +251,7 @@ def main():
     if a.selftest:
         return _selftest()
     text = "\n".join(analyse(a.horizon_days)) + "\n"
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8") as f:
         f.write(text)
     print(text)
     print(f"[report → {REPORT}]")

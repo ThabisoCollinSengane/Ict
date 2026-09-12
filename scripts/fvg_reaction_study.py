@@ -307,8 +307,8 @@ def _write(out, tfs, react_win, horizon, retest_h):
                 + ("—" if gp is None else f"{gp:.0f}% held")
                 + f", control {cn} "
                 + ("—" if cp is None else f"{cp:.0f}%")
-                + f" → **lift {lift}**")
-        L += ["", f"*Breakaway → IFVG — does a BROKEN gap hold when price comes "
+                + f" -> **lift {lift}**")
+        L += ["", f"*Breakaway -> IFVG — does a BROKEN gap hold when price comes "
                   f"back to it (within {retest_h} bars)? Escaping a band you "
                   f"already broke is partly geometry and reads 64-72% on a random "
                   f"walk, so read the lift, not the rate:*", ""]
@@ -322,12 +322,30 @@ def _write(out, tfs, react_win, horizon, retest_h):
           "— price was going to turn there as often as anywhere. In that case the "
           "bias-flip state machine has nothing to stand on and the reaction, not "
           "the study, is what needs rethinking. Measurement only; nothing ships."]
+    text = "\n".join(L) + "\n"
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    with open(REPORT, "w") as f:
-        f.write("\n".join(L) + "\n")
-    print("\n".join(L))
+    # utf-8 explicitly: Windows defaults this to cp1252, which has no "->" arrow
+    # and no box-drawing. A first run of this study did the ENTIRE measurement and
+    # then died here, discarding all of it, on one character.
+    with open(REPORT, "w", encoding="utf-8") as f:
+        f.write(text)
+    _safe_print(text)
     if not NO_PUSH:
         _publish(REPORT)
+
+
+def _safe_print(text):
+    """Print without letting the console encoding destroy a finished run.
+
+    The report is already on disk by the time this is called; a PowerShell
+    console at cp1252 must never be able to turn a completed study into a
+    traceback. Anything it cannot represent degrades to "?" instead.
+    """
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        enc = (getattr(sys.stdout, "encoding", None) or "ascii")
+        print(text.encode(enc, "replace").decode(enc, "replace"))
 
 
 def _publish(path):

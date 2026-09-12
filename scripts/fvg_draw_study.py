@@ -286,7 +286,7 @@ def _write(out, tfs, max_days, mss_win):
           "without it, a high reach rate only says the band was close. "
           "Measurement only; nothing ships."]
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(L) + "\n")
     print("\n".join(L))
     if not NO_PUSH:

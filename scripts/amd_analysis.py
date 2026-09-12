@@ -257,7 +257,7 @@ def main():
     a("")
 
     os.makedirs(DATA_DIR, exist_ok=True)
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(L) + "\n")
     print(f"\nReport → {REPORT}")
 

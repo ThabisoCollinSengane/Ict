@@ -526,7 +526,7 @@ def main():
     lines = report(results, a.years, covered, a.pairs, a.target, a.entry) + entries_section(trades)
     text = "\n".join(lines) + "\n"
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8") as f:
         f.write(text)
     # full per-entry log to CSV
     import csv

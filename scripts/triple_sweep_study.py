@@ -440,7 +440,7 @@ def _write(out, tf, window, horizon, mss_win, cover, deadband):
     L += ["---", "", "Measurement only. A GREEN earns an IS/OOS validation of a "
           "real lever; YELLOW/RED stands as the record of why nothing shipped."]
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    with open(REPORT, "w") as f:
+    with open(REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(L) + "\n")
     print("\n".join(L))
     print(f"\n  wrote {REPORT}")
