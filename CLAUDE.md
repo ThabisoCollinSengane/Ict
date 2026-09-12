@@ -388,35 +388,69 @@ pulling our way, nor a mitigated one — long side mirrored, flag-off respected.
 
 **Analytics only — gates nothing.** Read the two tables before proposing a lever.
 
-### P67/P68 IS RESULT (RAN 2026-09-12, 2022-23) — distance reads, but the far
-### bucket is almost entirely fib
+### P67/P68 IS+OOS RESULT (RAN 2026-09-12) — the rung PASSES, the PD-array
+### classification FAILS, and the variable is DISTANCE not family
 
-Baseline reproduced exactly (355 / 43.1% / 3.37 / -13.24%), `dxy_real_used`
-absent — clean run.
+Both splits reproduce baseline exactly (IS 355 / 43.1% / 3.37 / -13.24%;
+OOS 385 / 44.4% / 4.28 / -10.21%), `dxy_real_used` absent — clean runs.
 
-| Rung | Trades | WR | PF |   | PD array | Trades | WR | PF |
-|---|---|---|---|---|---|---|---|---|
-| near | 270 | 49.6% | **5.31** | | FVG | 212 | 44.8% | **4.41** |
-| d3 | 60 | 25.0% | 0.78 | | OB | 47 | 42.6% | 2.80 |
-| d30 | 8 | 25.0% | 0.80 | | none (projection) | 96 | 39.6% | 1.99 |
-| d60 | 17 | 11.8% | **0.23** | | | | | |
+**P67 target rung — a textbook not-curve-fit pass:**
 
-**The cross-tab settles what the rung table could not.** 60 of the 78 far-rung
-trades (77%) are `fib_extension`, so "far" and "fib" are nearly the same bucket —
-but fib is the ONE family with enough trades at both ends to compare WITHIN
-itself, and that comparison controls for family: fib PF runs **6.83 near → 0.59
-d3 → 0.84 d30 → 0.23 d60**. Distance is a real variable, not a proxy for family.
-The rung reading does NOT need retracting; it needs the qualifier that beyond
-`near` there is barely any non-fib data (far non-fib n=18 total: d3 equal_hl 7 at
-PF 21.38, d3 round_number 5, d3 swing 6 at PF 0.00).
+| Rung | IS trades / WR / PF | OOS trades / WR / PF |
+|---|---|---|
+| near | 270 / 49.6% / **5.31** | 236 / 55.5% / **9.15** |
+| d3 | 60 / 25.0% / 0.78 | 114 / 29.8% / 0.80 |
+| d30 | 8 / 25.0% / 0.80 | 19 / 15.8% / 0.32 |
+| d60 | 17 / 11.8% / 0.23 | 16 / 18.8% / 0.45 |
 
-Ordering supports the trader's draw hierarchy — real PD arrays beat projections
-(FVG 4.41 > OB 2.80 > projection 1.99) — but the projection bucket is still
-PF 1.99, so "nothing rests there" is not the same as "it does not work".
+Near clears PF 5 in both splits; **every** far rung is below 1.0 in **both**
+splits; magnitudes are the same ballpark. 234 of 740 trades (**32%**) aim at a
+rung that loses in both halves. This is the strongest IS/OOS-consistent result
+on the target side of the book.
 
-**⚠️ IS ONLY. The 2024-25 run has not arrived** — no lever may be proposed off
-this half. Path obstruction repeats its IS pattern (blocked 2.84 vs clear 3.78)
-with the H4/D split still inverted (240T 3.31 vs D 1.89).
+**The cross-tab answers the question the rung table could not — and the answer
+is the opposite of what P68 assumed.** The worry was that far rungs lose because
+they are fib PROJECTIONS, not because they are far. They do not:
+
+- **Within the fib family** (the only family with volume at both ends, so the
+  comparison controls for family): PF runs **6.83 / 11.09 near → 0.59 / 0.84 d3
+  → 0.84 / 0.36 d30 → 0.23 / 0.36 d60** (IS / OOS). Distance is the variable.
+- **At the near rung fib is among the strongest families and carries by far the
+  most volume** (160 tr PF 6.83 IS, 122 tr PF 11.09 OOS, vs pdh_pdl 3.81/3.82
+  and swing 4.12/4.30). "A fib extension is a projection, so nothing is pulled
+  to it" is **not** what the data says — a NEAR fib is an excellent target.
+- Far non-fib is mixed, not uniformly bad (OOS d3: round_number PF 5.92, pdh_pdl
+  1.85, swing 1.23 against equal_hl 0.53, pwh_pwl 0.00), which is what breaks the
+  far≡fib confound the IS half alone could not separate.
+
+**P68 PD-array classification — RED, fails criterion #3:**
+
+| target_pd | IS trades / PF | OOS trades / PF |
+|---|---|---|
+| FVG | 212 / 4.41 | 236 / 4.48 |
+| OB | 47 / 2.80 | 66 / 4.25 |
+| none (projection) | 96 / **1.99** | 83 / **3.81** |
+
+Ordering is right in IS and the direction survives, but the EDGE collapses:
+FVG-over-projection is **2.2× in IS and 1.18× in OOS** (WR +5.2pp → +0.7pp).
+That is the same failure shape as P48's HTF OB (+10.0pp → +0.9pp) — positive in
+both splits, magnitudes nowhere near each other. **No lever ships off `target_pd`.**
+The trader's ranking of the draws is directionally supported; it is not
+measurable enough here to gate or size on.
+
+**Path obstruction — consistent sign, worth keeping as analytics:** blocked
+2.84 / 3.05 vs clear 3.78 / 5.61. Blocked is worse in both splits (0.75× IS,
+0.54× OOS) on n=130/191. The D1-vs-H4 sub-split no longer inverts (IS 240T 3.31 /
+D 1.89; OOS 240T 3.16 / D 2.73) — both rungs sit below `clear` in both halves.
+
+**⚠️ The far-rung lever is NOT obvious, and the precedent is against it.** The
+instinct is to skip or downsize the 32% aiming at d3/d30/d60. But **P8's
+`breakout_eligible` was PF 0.13 IS / 0.16 OOS — far more clearly losing than
+these — and gating it still cost ~R31M of compounding**, because its wins landed
+at high-equity points. P10's 0.5× downsize failed the same way. A PF<1 bucket is
+not automatically safe to remove in a compounding path. Any far-rung lever must
+be measured on the FULL continuous run, not per-split PF, and the P8/P10 outcome
+is the base rate to expect.
 
 ### P68b — "the FVG calls price to it": FIRST RUN VOID, rebuilt with a control
 
