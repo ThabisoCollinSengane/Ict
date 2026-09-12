@@ -1218,6 +1218,12 @@ TARGET_RUNG_FAR = tuple(_os.environ.get("TARGET_RUNG_FAR", "d3,d30,d60").split("
 TARGET_RUNG_SKIP_FAR = bool(int(_os.environ.get("TARGET_RUNG_SKIP_FAR", "0")))
 TARGET_RUNG_FAR_MULT = float(_os.environ.get("TARGET_RUNG_FAR_MULT", "1.0"))
 TARGET_RUNG_NEAR_MULT = float(_os.environ.get("TARGET_RUNG_NEAR_MULT", "1.0"))
+# P72: when P20 escalation pushes a target onto a FAR rung, take the nearer
+# un-escalated target instead. Keeps the trade — a target-selection change, not a
+# removal. Measured motivation (full 4yr cross-tab): escalation helps at `near`
+# (PF 7.45 vs 6.45) and hurts at d3 (0.73 vs 1.39), and 68% of far-rung trades
+# were escalated. Default OFF so the shipped run stays byte-identical.
+TARGET_RUNG_DEESCALATE = bool(int(_os.environ.get("TARGET_RUNG_DEESCALATE", "0")))
 
 PATH_OBSTRUCTION_ENABLED = bool(int(_os.environ.get("PATH_OBSTRUCTION_ENABLED", "1")))
 PATH_OBSTRUCTION_TFS = tuple(_os.environ.get("PATH_OBSTRUCTION_TFS", "240T,D").split(","))

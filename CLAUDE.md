@@ -721,6 +721,68 @@ $env:TARGET_RUNG_FAR_MULT=$null;  $env:TARGET_RUNG_SKIP_FAR=1;    python run_bac
 Ship gate: full-4yr equity UP with MaxDD held, and both splits still positive.
 Baseline to beat: 736 / 43.9% / PF 4.01 / MaxDD −13.24%.
 
+### P70 DIAGNOSTIC RESULT (RAN 2026-09-12, full 4yr) — escalation is the culprit
+
+Baseline reproduced exactly (736 / 43.9% / PF 4.01 / −13.24%), so the P70 arms
+are byte-identical when off, as designed.
+
+| Rung | Trades | WR | P&L ZAR | PF |
+|---|---|---|---|---|
+| near | 505 | 52.5% | +146,234 | **7.20** |
+| 3-day | 168 | 28.0% | −2,258 | 0.84 |
+| 30-day | 27 | 22.2% | −923 | 0.71 |
+| 60-day | 36 | 13.9% | −3,477 | 0.32 |
+
+**The cross-tab is the result, and it says the lever is not what anyone expected:**
+
+| Rung | Escalated | Trades | WR% | PF |
+|---|---|---|---|---|
+| near | yes | 342 | 51.8% | **7.45** |
+| near | no | 163 | 54.0% | 6.45 |
+| d3 | yes | 106 | 24.5% | **0.73** |
+| d3 | no | 62 | 33.9% | **1.39** |
+| d30 | yes | 21 | 28.6% | 0.75 |
+| d60 | yes | 29 | 13.8% | 0.31 |
+
+**156 of 231 far-rung trades (68%) were escalated.** P20 escalation HELPS at the
+near rung (7.45 vs 6.45) and HURTS at d3 (0.73 vs 1.39). So P20 is not wrong —
+it is wrong **only when it pushes the target onto a rung price rarely delivers
+to**. Blanket-disabling it would throw away the near-rung benefit.
+
+**Scale check, so this is not oversold:** the whole far bucket is −R6,658 across
+4 years on a run that made R139,576 — about 4.8% of P&L, on 31% of trades. The
+prize is modest; the reason to pursue it is that it is a target-SELECTION fix,
+the only class of change that has ever worked here.
+
+### P72 — de-escalate a far-rung target (BUILT 2026-09-12, default OFF)
+
+When P20 escalation produces a target on a far rung, take the nearer
+**un-escalated** target instead. The trade is KEPT — this is target selection,
+not removal, and every removal tried here has failed the full continuous run.
+
+`TARGET_RUNG_DEESCALATE=1`. Counters `target_deescalated` /
+`target_deescalate_none`. The swap happens BEFORE the RR gate (asserted), so a
+nearer target is still validated against `MIN_PIPS_TARGET`; if it falls below the
+floor the existing gate skips the trade and `entry_blocked_min_target` records
+it. `_draw_ladder` is now computed once per entry and reused (asserted: exactly
+one call site).
+
+**⚠️ The cross-tab does NOT estimate this effect.** A de-escalated trade takes a
+nearer target, so it moves into the `near` bucket — it does not become a "d3
+not-escalated" trade. The 0.73-vs-1.39 gap says escalation CORRELATES with worse
+far-rung outcomes; only the run measures what de-escalating does.
+
+**RUN ORDER:**
+```
+python run_backtest_histdata.py --years 2022 2023      # 1. cross-tab, IS
+python run_backtest_histdata.py --years 2024 2025      # 2. cross-tab, OOS
+$env:TARGET_RUNG_DEESCALATE=1; python run_backtest_histdata.py   # 3. full 4yr
+$env:TARGET_RUNG_DEESCALATE=$null; $env:TARGET_RUNG_NEAR_MULT=1.25; python run_backtest_histdata.py
+```
+(1) and (2) decide whether the escalation split holds in BOTH halves before any
+lever is trusted — the full run alone cannot show that. Ship gate unchanged:
+full-4yr equity up with MaxDD held, both splits positive.
+
 ### P71 — What the DAILY timeframe does (BUILT 2026-09-12, measurement-only)
 
 Deliberately on the TARGET axis, where every validated result in this project

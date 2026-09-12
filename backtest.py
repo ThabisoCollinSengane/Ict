@@ -4248,11 +4248,44 @@ class Backtester:
                 _ms.get("minor_sweep", False)
             )
         )
+        # The cascade ladder depends only on pair/direction/price/time, never on
+        # the target, so it is computed once here and reused for the probe below
+        # and for the recorded rung further down.
+        _ladder = self._draw_ladder(pair, direction, cur_price, t)
         _tgt = self._find_target(pair, direction, t, entry, stop=stop, escalate=_escalate_tgt)
         if _tgt is None:
             return
         target, target_type, _target_score, _tgt_escalated = _tgt
         g["target_found"] += 1
+
+        # ── P72: de-escalate a target escalation pushed onto a FAR rung ────────
+        # The P70 cross-tab (full 4yr): escalation HELPS at the near rung (PF 7.45
+        # escalated vs 6.45 not, n=342/163) and HURTS at the far rungs — at d3,
+        # escalated PF 0.73 (n=106) against 1.39 un-escalated (n=62). And 68% of
+        # all far-rung trades were escalated. So P20 is not wrong, it is wrong
+        # ONLY when it pushes the target out to a rung price rarely delivers to.
+        #
+        # This keeps the trade and takes the nearer un-escalated target instead —
+        # a target-SELECTION change, not a removal. That distinction is the whole
+        # point: every removal tried here has failed the full continuous run
+        # (P8 −R31M on a PF 0.13/0.16 bucket, P10, P9's −20.15%), while target
+        # selection is the one axis that has validated.
+        #
+        # ⚠️ The cross-tab does NOT estimate this effect. A de-escalated trade
+        # takes a NEARER target, so it moves into the `near` bucket — it does not
+        # become a "d3 not-escalated" trade. The 0.73-vs-1.39 gap says escalation
+        # correlates with worse far-rung outcomes; only the run measures what
+        # de-escalating actually does.
+        if (config.TARGET_RUNG_DEESCALATE and _tgt_escalated
+                and self._target_rung(_ladder, abs(target - entry) / pip)
+                in config.TARGET_RUNG_FAR):
+            _alt = self._find_target(pair, direction, t, entry, stop=stop,
+                                     escalate=False)
+            if _alt is not None:
+                target, target_type, _target_score, _tgt_escalated = _alt
+                g["target_deescalated"] = g.get("target_deescalated", 0) + 1
+            else:
+                g["target_deescalate_none"] = g.get("target_deescalate_none", 0) + 1
         # Target confluence conviction: ≥3 independent source families agreeing on
         # the TP area adds +1 conviction; ≥4 adds +2 (max +2 from this signal).
         # Scores 1-2 are analytics-only — backtest shows PF<1 at those tiers.
@@ -4289,7 +4322,6 @@ class Backtester:
         # candidates; `target_rung × target_escalated` in the report says how much
         # of the far bucket that accounts for, and therefore whether de-escalating
         # is the surgical fix rather than skipping the trade.
-        _ladder   = self._draw_ladder(pair, direction, cur_price, t)
         _tgt_rung = self._target_rung(_ladder, reward_pips)
         _rung_far = _tgt_rung in config.TARGET_RUNG_FAR
         if _rung_far:
