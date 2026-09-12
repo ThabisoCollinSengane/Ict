@@ -388,6 +388,81 @@ pulling our way, nor a mitigated one — long side mirrored, flag-off respected.
 
 **Analytics only — gates nothing.** Read the two tables before proposing a lever.
 
+### P67/P68 IS RESULT (RAN 2026-09-12, 2022-23) — distance reads, but the far
+### bucket is almost entirely fib
+
+Baseline reproduced exactly (355 / 43.1% / 3.37 / -13.24%), `dxy_real_used`
+absent — clean run.
+
+| Rung | Trades | WR | PF |   | PD array | Trades | WR | PF |
+|---|---|---|---|---|---|---|---|---|
+| near | 270 | 49.6% | **5.31** | | FVG | 212 | 44.8% | **4.41** |
+| d3 | 60 | 25.0% | 0.78 | | OB | 47 | 42.6% | 2.80 |
+| d30 | 8 | 25.0% | 0.80 | | none (projection) | 96 | 39.6% | 1.99 |
+| d60 | 17 | 11.8% | **0.23** | | | | | |
+
+**The cross-tab settles what the rung table could not.** 60 of the 78 far-rung
+trades (77%) are `fib_extension`, so "far" and "fib" are nearly the same bucket —
+but fib is the ONE family with enough trades at both ends to compare WITHIN
+itself, and that comparison controls for family: fib PF runs **6.83 near → 0.59
+d3 → 0.84 d30 → 0.23 d60**. Distance is a real variable, not a proxy for family.
+The rung reading does NOT need retracting; it needs the qualifier that beyond
+`near` there is barely any non-fib data (far non-fib n=18 total: d3 equal_hl 7 at
+PF 21.38, d3 round_number 5, d3 swing 6 at PF 0.00).
+
+Ordering supports the trader's draw hierarchy — real PD arrays beat projections
+(FVG 4.41 > OB 2.80 > projection 1.99) — but the projection bucket is still
+PF 1.99, so "nothing rests there" is not the same as "it does not work".
+
+**⚠️ IS ONLY. The 2024-25 run has not arrived** — no lever may be proposed off
+this half. Path obstruction repeats its IS pattern (blocked 2.84 vs clear 3.78)
+with the H4/D split still inverted (240T 3.31 vs D 1.89).
+
+### P68b — "the FVG calls price to it": FIRST RUN VOID, rebuilt with a control
+
+The first run reported reach 90% D / 95% H4 and **MSS = 100.0% in every bucket
+and both splits**, and would have read GREEN. Both headline numbers were
+artifacts. Nothing was concluded from it; the study was rebuilt.
+
+**Defect 1 — the MSS confirmation contained its own outcome (3rd time).**
+`structure_shift_toward` took `ref = min(lows[start-3 .. start])`. For a bullish
+gap the gap's bottom edge IS `highs[start-2]`, and `lows[start-2] <= highs[start-2]`,
+so **ref <= the gap's bottom edge, always** — breaking it geometrically requires
+trading through the gap. Checked on 62,797 gaps: **zero exceptions.** The MSS
+bucket therefore read 100% reached by construction, exactly as in P65c (MSS over
+the same horizon as the excursion) and P66 (bias read off the manipulation leg).
+
+**Defect 2 — there was no control, and that alone invalidated the headline.**
+A band a few pips from price is traded into whether or not a gap is there. The
+demonstration: on a **random walk**, gaps are reached **93.5%** and an identical
+band on the other side of price is reached **93.6%**. The old method would have
+declared the random walk GREEN. A reach rate without a baseline is not evidence —
+the same lesson as P65's single-pair control, missed here.
+
+**The rebuild:**
+- `mirror_band(close, bottom, top)` — the placebo: same width, same distance,
+  opposite side of price, pooled over bullish and bearish gaps so drift cancels.
+  Reported as `control IS/OOS`, and the verdict is now **lift over control** (≥5pp
+  in BOTH splits), not the raw rate. A high rate with a flat lift now reads RED.
+- `mss_toward_gap` — the reference must be a swing price can break WITHOUT
+  entering the gap (for a gap below price, a swing LOW strictly above its top
+  edge). No such swing exists when the gap forms, so the reference is armed
+  FORWARD and re-armed on the most recent qualifying fractal (P65d dead-latch
+  lesson). The shift must strictly PRECEDE the arrival: gaps reached at or before
+  the shift bar are dropped — 37% of shifts on the fixture landed in the gap on
+  the shift bar itself, which is arrival, not prediction.
+- The MSS rows get their OWN control (`MSS ctrl`) — a conditioned number needs a
+  conditioned baseline, or the same mistake just moves one row down.
+- `fast%` now prints `n/a` on W: one weekly bar spans 5 days, so "reached within
+  2 days" could never fire and the honest 0.0% read as a finding.
+
+Post-fix on the random-walk null: all 93.5% vs control 93.6% (lift -0.1pp) → RED,
+and MSS falls from a forced 100% to 85.2%. **The study now reproduces "no edge"
+on data that has none** — which is the property the first version lacked.
+
+Verified by driving `run()` end-to-end on a stubbed data module (W, D and H4),
+per the project rule that pure-logic tests never exercise plumbing.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

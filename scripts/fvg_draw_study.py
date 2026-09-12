@@ -73,23 +73,49 @@ def first_touch(highs, lows, start, bottom, top, limit):
     return None
 
 
-def structure_shift_toward(highs, lows, start, gap_dir, window):
-    """Did structure break TOWARD the gap shortly after it formed?
+def mss_toward_gap(highs, lows, start, bottom, top, gap_dir, window):
+    """Bar where structure broke TOWARD the gap, or None. NOT circular.
 
-    A bullish gap sits BELOW price and is reached by trading down, so the shift
-    that sends price to it is a break of a recent LOW — and vice versa. This is
-    the trader's "after shift in market structure" confirmation.
+    ⚠️ The obvious reading — "did price break the recent low" — is circular. For
+    a bullish gap the recent lows include bar start-2, whose low sits at or below
+    the gap's BOTTOM edge, so ref <= bottom always and breaking it REQUIRES
+    trading through the gap. Verified on 62,797 synthetic gaps: zero exceptions.
+    That is why the first run reported MSS reach = 100.0% on every timeframe and
+    split — by construction, not by prediction. Same defect as P65c and P66.
+
+    A genuine precursor is the break of a swing price can take out WITHOUT
+    entering the gap. For a gap BELOW price that is a swing LOW sitting strictly
+    ABOVE the gap's top edge. No such swing exists when the gap forms (price has
+    just displaced away from it), so the reference is armed FORWARD, re-arming on
+    the most recent qualifying fractal — the P65d dead-latch lesson.
     """
-    look = 3
-    a = max(0, start - look)
     end = min(start + 1 + window, len(highs))
-    if end <= start + 1:
-        return False
-    if gap_dir > 0:                       # gap below -> need a break DOWN
-        ref = min(lows[a:start + 1])
-        return any(lows[j] < ref for j in range(start + 1, end))
-    ref = max(highs[a:start + 1])
-    return any(highs[j] > ref for j in range(start + 1, end))
+    pending = None
+    for i in range(start + 2, end):
+        c = i - 1                          # fractal confirmed by bar i
+        if gap_dir > 0:
+            if (lows[c] < lows[c - 1] and lows[c] < lows[i] and lows[c] > top):
+                pending = lows[c]
+            if pending is not None and lows[i] < pending:
+                return i
+        else:
+            if (highs[c] > highs[c - 1] and highs[c] > highs[i]
+                    and highs[c] < bottom):
+                pending = highs[c]
+            if pending is not None and highs[i] > pending:
+                return i
+    return None
+
+
+def mirror_band(close, bottom, top):
+    """The CONTROL: same width, same distance, opposite side of price.
+
+    A reach rate means nothing on its own — a band a few pips from price gets
+    traded into whether or not a gap is there. This is the placebo that decides
+    the question, the counterpart of P65's single-pair control. Pooled over
+    bullish and bearish gaps, directional drift cancels.
+    """
+    return (2.0 * close - top, 2.0 * close - bottom)
 
 
 def summarise(rows, max_days):
@@ -107,17 +133,29 @@ def summarise(rows, max_days):
     }
 
 
-def verdict(uncond_is, uncond_oos, min_reach=70.0):
-    """GREEN when the gap is reached at least `min_reach` in BOTH splits — the
-    'price always gravitates to it' claim, taken literally."""
+def verdict(uncond_is, uncond_oos, ctrl_is, ctrl_oos,
+            min_reach=70.0, min_lift=5.0):
+    """GREEN needs the gap to be reached often AND to beat its own control.
+
+    The raw reach rate cannot answer the question: an identical band on the
+    other side of price is reached too. What the trader's claim requires is that
+    the GAP is reached more than that placebo — in both splits.
+    """
     if not uncond_is.get("n") or not uncond_oos.get("n"):
         return "RED", "no gaps in one or both splits"
     a, b = uncond_is["reach"], uncond_oos["reach"]
-    if a >= min_reach and b >= min_reach:
-        return "GREEN", f"reached {a:.0f}% IS / {b:.0f}% OOS — the gap does call price"
-    if a >= 50 and b >= 50:
-        return "YELLOW", f"reached {a:.0f}% IS / {b:.0f}% OOS — better than a coin flip, not a law"
-    return "RED", f"reached only {a:.0f}% IS / {b:.0f}% OOS"
+    ca, cb = ctrl_is.get("reach"), ctrl_oos.get("reach")
+    if ca is None or cb is None:
+        return "RED", "control missing — result uninterpretable"
+    la, lb = a - ca, b - cb
+    tag = (f"reached {a:.0f}%/{b:.0f}% vs control {ca:.0f}%/{cb:.0f}% "
+           f"(lift {la:+.1f}pp IS / {lb:+.1f}pp OOS)")
+    if a >= min_reach and b >= min_reach and la >= min_lift and lb >= min_lift:
+        return "GREEN", f"{tag} — the gap pulls price harder than a plain band"
+    if la >= min_lift and lb >= min_lift:
+        return "YELLOW", f"{tag} — beats its control, but not reached often enough"
+    return "RED", (f"{tag} — no edge over an identical band on the other side; "
+                   f"the reach rate is what any nearby level scores")
 
 
 # ─────────────────────────────── data plumbing ────────────────────────────────
@@ -137,7 +175,8 @@ def run(tfs, max_days, mss_win):
 
     out = {}
     for tf in tfs:
-        buckets = {k: [] for k in ("IS", "OOS", "mssIS", "mssOOS",
+        buckets = {k: [] for k in ("IS", "OOS", "ctrlIS", "ctrlOOS",
+                                   "mssIS", "mssOOS", "msscIS", "msscOOS",
                                    "imIS", "imOOS", "bothIS", "bothOOS")}
         for pair in PAIRS:
             m1 = _load(pair)
@@ -146,6 +185,7 @@ def run(tfs, max_days, mss_win):
             bars = _resample(m1, tf)
             h = bars["h"].to_numpy()
             l = bars["l"].to_numpy()
+            c_ = bars["c"].to_numpy()
             years = bars.index.year.to_numpy()
             # how many BARS of this timeframe make up `max_days` of calendar time
             per_day = {"W": 1 / 5.0, "D": 1.0, "240T": 6.0, "60T": 24.0}.get(tf, 6.0)
@@ -155,20 +195,42 @@ def run(tfs, max_days, mss_win):
             for (i, bot, top, gdir) in find_fvgs(h, l):
                 if i >= len(h) - 2:
                     continue
-                days = first_touch(h, l, i, bot, top, limit)
-                days = None if days is None else days / per_day
+                raw = first_touch(h, l, i, bot, top, limit)
+                days = None if raw is None else raw / per_day
                 key = "IS" if years[i] in IS_YEARS else "OOS"
                 buckets[key].append(days)
-                mss = structure_shift_toward(h, l, i, gdir, mss_win)
+
+                # CONTROL: identical band, same distance, other side of price
+                cb, ct = mirror_band(c_[i], bot, top)
+                craw = first_touch(h, l, i, cb, ct, limit)
+                buckets["ctrl" + key].append(
+                    None if craw is None else craw / per_day)
+
                 # dollar support: a gap BELOW a X/USD pair is reached by the pair
                 # falling, which is the dollar RISING (+1).
                 im = (dd[i] == -gdir) and dd[i] != 0
-                if mss:
-                    buckets["mss" + key].append(days)
                 if im:
                     buckets["im" + key].append(days)
-                if mss and im:
-                    buckets["both" + key].append(days)
+
+                # The confirmation must PRECEDE the outcome, never share its
+                # window (P65c). Measure the reach strictly AFTER the shift bar,
+                # and drop gaps price had already reached at or before it — a
+                # shift bar that lands in the gap did not predict the arrival,
+                # it WAS the arrival (37% of shifts on a random-walk fixture).
+                mb = mss_toward_gap(h, l, i, bot, top, gdir, mss_win)
+                if mb is None or (raw is not None and i + raw <= mb):
+                    continue
+                mraw = first_touch(h, l, mb, bot, top, limit)
+                mdays = None if mraw is None else mraw / per_day
+                buckets["mss" + key].append(mdays)
+                # the shift needs its own control too — a number without a
+                # baseline is what put the first run wrong
+                mcb, mct = mirror_band(c_[mb], bot, top)
+                mcraw = first_touch(h, l, mb, mcb, mct, limit)
+                buckets["mssc" + key].append(
+                    None if mcraw is None else mcraw / per_day)
+                if im:
+                    buckets["both" + key].append(mdays)
         out[tf] = {k: summarise(v, max_days) for k, v in buckets.items()}
     _write(out, tfs, max_days, mss_win)
     return 0
@@ -183,30 +245,46 @@ def _write(out, tfs, max_days, mss_win):
          f"close favours the move; `both` = the trader's full condition. "
          f"Structure must shift within **{mss_win}** bars of the gap forming — if "
          f"an MSS bucket reads 0 on a timeframe, that window is too tight for it, "
-         f"not an absence of shifts.", ""]
+         f"not an absence of shifts.", "",
+         "**`control` is the row that decides the question.** It is a band of the "
+         "SAME width at the SAME distance on the OPPOSITE side of price. Price "
+         "trades into a nearby band whether or not a gap is there, so only the "
+         "gap's LIFT over its control is evidence that the gap itself calls "
+         "price. A high reach rate with a flat lift means the level was near, "
+         "not special.", "",
+         "MSS rows measure the reach FROM the shift bar forward, off a swing that "
+         "sits clear of the gap, and skip gaps already filled before the shift — "
+         "so the confirmation cannot contain its own outcome.", ""]
     for tf in tfs:
         st = out.get(tf, {})
         L += [f"## {tf}", "", "```",
-              f"{'bucket':<12} {'n':>6} {'reach%':>8} {'fast%':>7} {'med days':>9}",
-              "-" * 46]
+              f"{'bucket':<14} {'n':>6} {'reach%':>8} {'fast%':>7} {'med days':>9}",
+              "-" * 48]
         for key, name in (("IS", "all IS"), ("OOS", "all OOS"),
+                          ("ctrlIS", "control IS"), ("ctrlOOS", "control OOS"),
                           ("mssIS", "MSS IS"), ("mssOOS", "MSS OOS"),
+                          ("msscIS", "MSS ctrl IS"), ("msscOOS", "MSS ctrl OOS"),
                           ("imIS", "IM IS"), ("imOOS", "IM OOS"),
                           ("bothIS", "both IS"), ("bothOOS", "both OOS")):
             s = st.get(key, {})
             if not s.get("n"):
-                L.append(f"{name:<12} {0:>6}   —")
+                L.append(f"{name:<14} {0:>6}   —")
                 continue
             md = "—" if s["med_days"] is None else f"{s['med_days']:.1f}"
-            L.append(f"{name:<12} {s['n']:>6} {s['reach']:>7.1f}% "
-                     f"{s['fast']:>6.1f}% {md:>9}")
+            # one W bar spans 5 days, so "reached within 2 days" can never fire
+            fa = "   n/a" if tf == "W" else f"{s['fast']:>6.1f}%"
+            L.append(f"{name:<14} {s['n']:>6} {s['reach']:>7.1f}% "
+                     f"{fa} {md:>9}")
         L.append("```")
-        v, why = verdict(st.get("IS", {}), st.get("OOS", {}))
+        v, why = verdict(st.get("IS", {}), st.get("OOS", {}),
+                         st.get("ctrlIS", {}), st.get("ctrlOOS", {}))
         L += ["", f"**Verdict: {v}** — {why}", ""]
     L += ["---", "",
           "A high reach rate with a long median is a real magnet and a poor "
           "intraday target — which would argue for the gap as a BIAS held across "
-          "days, not as a take-profit. Measurement only; nothing ships."]
+          "days, not as a take-profit. But read the LIFT over the control first: "
+          "without it, a high reach rate only says the band was close. "
+          "Measurement only; nothing ships."]
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, "w") as f:
         f.write("\n".join(L) + "\n")
@@ -261,20 +339,40 @@ def selftest():
     assert first_touch(th, tl, 2, 0.50, 0.60, 10) is None
     assert first_touch(th, tl, 2, 1.00, 1.02, 2) is None      # inside the limit only
 
-    # structure_shift_toward: a gap BELOW needs a break DOWN to send price to it
-    sh = [1.10] * 8
-    sl = [1.05, 1.05, 1.05, 1.04, 1.03, 1.05, 1.05, 1.05]
-    assert structure_shift_toward(sh, sl, 2, +1, 3)
-    assert not structure_shift_toward(sh, [1.05] * 8, 2, +1, 3)
-    # a gap ABOVE needs a break UP
-    assert structure_shift_toward([1.1, 1.1, 1.1, 1.12, 1.13], [1.0] * 5, 2, -1, 3)
+    # mss_toward_gap: gap below price at [0.90, 0.95]. Price must first build a
+    # swing low ABOVE 0.95, then break it — a shift price can make without ever
+    # entering the gap.
+    #        idx  0     1     2     3     4     5     6     7
+    mh = [1.20, 1.20, 1.20, 1.20, 1.20, 1.20, 1.20, 1.20]
+    ml = [1.10, 1.10, 1.10, 1.00, 1.05, 1.05, 0.99, 0.99]
+    #   bar 3 is a fractal low (1.00 < 1.10 and < 1.05), confirmed by bar 4,
+    #   and 1.00 > top 0.95 -> a legal reference. Bar 6 breaks it.
+    assert mss_toward_gap(mh, ml, 2, 0.90, 0.95, +1, 8) == 6, \
+        mss_toward_gap(mh, ml, 2, 0.90, 0.95, +1, 8)
+    # no break -> None
+    assert mss_toward_gap(mh, [1.10, 1.10, 1.10, 1.00, 1.05, 1.05, 1.05, 1.05],
+                          2, 0.90, 0.95, +1, 8) is None
+    # a reference INSIDE the gap is illegal — that is the circular case, and the
+    # break of it must NOT be reported as a shift
+    assert mss_toward_gap(mh, [1.10, 1.10, 1.10, 0.93, 0.96, 0.96, 0.90, 0.90],
+                          2, 0.90, 0.95, +1, 8) is None
+    # mirror control: same width, same distance, other side of price
+    cb, ct = mirror_band(1.00, 0.90, 0.95)
+    assert abs(cb - 1.05) < 1e-9 and abs(ct - 1.10) < 1e-9, (cb, ct)
 
     s = summarise([1.0, 2.0, None, 8.0], 30)
     assert s["n"] == 4 and s["reach"] == 75.0 and s["fast"] == 50.0, s
-    assert verdict({"n": 50, "reach": 85.0}, {"n": 50, "reach": 80.0})[0] == "GREEN"
-    assert verdict({"n": 50, "reach": 60.0}, {"n": 50, "reach": 55.0})[0] == "YELLOW"
-    assert verdict({"n": 50, "reach": 30.0}, {"n": 50, "reach": 40.0})[0] == "RED"
-    print("selftest OK — gap detection, first touch, shift direction, verdict")
+    G = ({"n": 50, "reach": 85.0}, {"n": 50, "reach": 80.0})
+    assert verdict(*G, {"reach": 60.0}, {"reach": 55.0})[0] == "GREEN"
+    # high reach but the control matches it -> no edge, however big the number
+    assert verdict(*G, {"reach": 84.0}, {"reach": 79.0})[0] == "RED"
+    # beats its control but is not reached often enough
+    assert verdict({"n": 50, "reach": 40.0}, {"n": 50, "reach": 38.0},
+                   {"reach": 20.0}, {"reach": 18.0})[0] == "YELLOW"
+    # lift in one split only is not a result
+    assert verdict(*G, {"reach": 60.0}, {"reach": 79.0})[0] == "RED"
+    print("selftest OK — gap detection, first touch, non-circular shift, "
+          "mirror control, verdict")
     return 0
 
 
