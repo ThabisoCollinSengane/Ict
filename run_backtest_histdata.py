@@ -1264,6 +1264,42 @@ def _publish_backtest_report(results, backtester, years, df=None):
                              f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
                 L.append("```")
 
+                # P70: is the far bucket an ESCALATION artefact? `_find_target`
+                # already takes the nearest qualifying candidate, so a far rung
+                # normally means nothing nearer cleared the floors — nothing to
+                # fix but the trade itself. P20 escalation is the one thing that
+                # can PUSH a target further, by filtering out swing/round_number.
+                # If the far bucket is mostly escalated, de-escalating is the
+                # surgical lever and skipping the trade is the blunt one.
+                if "target_escalated" in _rg.columns:
+                    L += ["", "### Far rung × P20 escalation (P70)", "",
+                          "Does escalation CREATE the far bucket, or is it just "
+                          "where the nearest qualifying target happened to sit?",
+                          "```"]
+                    L.append(f"{'Rung':<8} {'Escalated':>10} {'Trades':>7} "
+                             f"{'Wins':>5} {'WR%':>6} {'PF':>6}")
+                    L.append("-" * 48)
+                    _esc = _rg["target_escalated"].fillna(False).astype(bool)
+                    for _r, _lbl in (("near", "near"), ("d3", "3-day"),
+                                     ("d30", "30-day"), ("d60", "60-day")):
+                        for _e, _elbl in ((True, "yes"), (False, "no")):
+                            grp = _rg[(_rg["target_rung"] == _r) & (_esc == _e)]
+                            if not len(grp):
+                                continue
+                            w = (grp.pnl > 0).sum()
+                            L.append(f"{_lbl:<8} {_elbl:>10} {len(grp):>7} {w:>5} "
+                                     f"{100*w/len(grp):>5.1f}% {_pf(grp):>6.2f}")
+                    L.append("```")
+                    _far = _rg[_rg["target_rung"].isin(("d3", "d30", "d60"))]
+                    if len(_far):
+                        _fe = _far["target_escalated"].fillna(False).astype(bool)
+                        L += ["", f"**{int(_fe.sum())} of {len(_far)} far-rung "
+                                  f"trades ({100*_fe.mean():.0f}%) were escalated.** "
+                                  f"High means P20 pushed them out there and "
+                                  f"de-escalation is the fix; low means the far "
+                                  f"target was simply the nearest one available, "
+                                  f"and only skipping or resizing can touch it."]
+
         # --- P68: is the target a real HTF DRAW, or a projection? ---
         if "target_pd" in df.columns:
             L += ["", "## Target on an HTF PD array (P68)", "",

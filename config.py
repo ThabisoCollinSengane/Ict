@@ -1204,6 +1204,21 @@ DXY_REV_LOOKBACK_TF = {"60T": 24, "D": 5}
 TARGET_PD_ENABLED = bool(int(_os.environ.get("TARGET_PD_ENABLED", "1")))
 TARGET_PD_TFS = tuple(_os.environ.get("TARGET_PD_TFS", "W,D,240T").split(","))
 
+# ── P70: target-rung lever (P67 measured, both splits) ────────────────────────
+# near PF 5.31/9.15 vs d3 0.78/0.80, d30 0.80/0.32, d60 0.23/0.45 — every far
+# rung below 1.0 in BOTH splits, on 234 of 740 trades. All three arms default to
+# OFF so the shipped run stays byte-identical; they are A/B'd one at a time.
+#   TARGET_RUNG_SKIP_FAR=1   skip the trade outright
+#   TARGET_RUNG_FAR_MULT     scale far-rung trades down (0.5 = half)
+#   TARGET_RUNG_NEAR_MULT    scale near-rung trades up (1.25 = the shipped idiom)
+# ⚠️ Skip and downsize both REMOVE risk, and no removal has ever survived the
+# full continuous run here (P8 −R31M, P10 equity down in all three, P9 reversal
+# filter −20.15% MaxDD). Measure every arm on the FULL 4yr run, never per-split PF.
+TARGET_RUNG_FAR = tuple(_os.environ.get("TARGET_RUNG_FAR", "d3,d30,d60").split(","))
+TARGET_RUNG_SKIP_FAR = bool(int(_os.environ.get("TARGET_RUNG_SKIP_FAR", "0")))
+TARGET_RUNG_FAR_MULT = float(_os.environ.get("TARGET_RUNG_FAR_MULT", "1.0"))
+TARGET_RUNG_NEAR_MULT = float(_os.environ.get("TARGET_RUNG_NEAR_MULT", "1.0"))
+
 PATH_OBSTRUCTION_ENABLED = bool(int(_os.environ.get("PATH_OBSTRUCTION_ENABLED", "1")))
 PATH_OBSTRUCTION_TFS = tuple(_os.environ.get("PATH_OBSTRUCTION_TFS", "240T,D").split(","))
 

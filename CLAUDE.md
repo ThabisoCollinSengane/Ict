@@ -653,6 +653,74 @@ on. Not more gap semantics.
 **Run:** `python scripts/fvg_reaction_study.py` (auto-pushes
 `data/fvg_reaction_report.md`).
 
+### P70 — the target-rung lever (BUILT 2026-09-12, all arms default OFF)
+
+**The finding it acts on (P67, the strongest IS/OOS-consistent result in the
+book):** near PF **5.31 / 9.15**, d3 0.78/0.80, d30 0.80/0.32, d60 0.23/0.45 —
+every far rung below 1.0 in BOTH splits, on **234 of 740 trades (32%)**.
+
+**What a far rung actually MEANS — read this before proposing a fix.**
+`_find_target` already takes the NEAREST qualifying candidate. So a far target is
+not the engine choosing to aim far; it means **nothing nearer cleared
+`MIN_PIPS_TARGET` (30) and the RR floor**. There is no nearer target to retarget
+to. The single exception is **P20 escalation**, which filters swing/round_number
+candidates out and can therefore push a target further. That is why the first
+thing to read is the new cross-tab, not a lever.
+
+**Built:**
+- `_draw_ladder` / `_target_rung` MOVED to just after `rr_ok`, before the sizing
+  block — previously computed after sizing purely for the report, which is why no
+  lever was possible. The later call site now reuses them, so the recorded rung is
+  guaranteed to be the one the lever acted on.
+- **Report: "Far rung × P20 escalation (P70)"** — rung × escalated × WR/PF, plus
+  the headline share. High escalation share in the far bucket ⇒ de-escalation is
+  the surgical fix. Low ⇒ the far target was simply the only one available, and
+  only skip or resize can touch it.
+- Three arms, each default a no-op (`TARGET_RUNG_SKIP_FAR=0`,
+  `TARGET_RUNG_FAR_MULT=1.0`, `TARGET_RUNG_NEAR_MULT=1.0`), so the shipped run is
+  byte-identical. Counters `target_rung_far` / `_skipped` / `_near_sized` /
+  `_far_sized` / `_far_floored`.
+
+**⚠️ The downsize arm is STRUCTURALLY UNABLE to fix the drawdown it targets.**
+`MIN_LOT_SIZE == PYRAMID_LOTS[0]` (0.02), so the broker floor and the tier floor
+coincide at 2,000 units. In the small-account phase — which is exactly where the
+worst drawdown lives — `units` is ALREADY at that floor, so a 0.5× multiplier
+changes nothing. Verified by driving the arithmetic: units 2,000 → floored,
+5,000 → 2,500, 20,000 → 10,000. `target_rung_far_floored` counts every trade
+where it could not bite, so "no effect" can never be misread as "no signal" (the
+MM standalone throttle died of exactly this and it took a run to notice).
+**Therefore only SKIP can touch the small-account phase — and skip has the worst
+precedent in the project.**
+
+**Precedent, stated plainly so the result is not a surprise:** no removal has
+ever survived the full continuous run here. P8 gated a PF **0.13/0.16** bucket —
+far more clearly losing than these far rungs — and it still cost **~R31M** of
+compounding, because those wins landed at low-equity points and compounded
+forward. P10's 0.5× downsize lost equity in all three runs while improving MaxDD
+in none. P9's reversal filter passed both splits on MaxDD and then hit **−20.15%**
+on the full run. **Per-split PF cannot see path dependency; only the full 4yr run
+can.** NEAR-UP is the arm this project's history actually supports — every shipped
+lever (P9/P18/P19/P41/P44) sizes UP a good bucket, and it removes nothing.
+
+**Verified:** static audit that `_ladder`/`_tgt_rung`/`_rung_far` are assigned
+before every use (the UnboundLocalError class), that `g` is `self.gate` inside
+`_maybe_open` (the `self.gate_counts` lesson), that all five counters and four
+config names resolve, that both sizing arms compute as designed against real
+config values including the floored case, and that the cross-tab renders on a stub
+frame — including a missing `target_escalated` column, an all-empty rung column,
+and a frame with no far rows.
+
+**RUN ORDER — diagnostic first, and every arm on the FULL 4yr run:**
+```
+$env:RANGE_BIAS_ENABLED=$null; $env:STRUCT_BIAS_ENABLED=$null; $env:MSS_REQUIRE_DXY=$null; $env:TARGET_RUNG_SKIP_FAR=$null; $env:TARGET_RUNG_FAR_MULT=$null; $env:TARGET_RUNG_NEAR_MULT=$null
+python run_backtest_histdata.py                      # 1. read the cross-tab
+$env:TARGET_RUNG_NEAR_MULT=1.25; python run_backtest_histdata.py   # 2. near-up
+$env:TARGET_RUNG_NEAR_MULT=$null; $env:TARGET_RUNG_FAR_MULT=0.5; python run_backtest_histdata.py
+$env:TARGET_RUNG_FAR_MULT=$null;  $env:TARGET_RUNG_SKIP_FAR=1;    python run_backtest_histdata.py
+```
+Ship gate: full-4yr equity UP with MaxDD held, and both splits still positive.
+Baseline to beat: 736 / 43.9% / PF 4.01 / MaxDD −13.24%.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

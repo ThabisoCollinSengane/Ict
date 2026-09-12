@@ -4275,6 +4275,32 @@ class Backtester:
             return
         g["rr_ok"] += 1
 
+        # ── P70: the target rung, computed HERE so it can gate and scale ───────
+        # P67 measured which cascade rung the engine actually aimed at, and the
+        # answer held in BOTH splits: near PF 5.31/9.15, d3 0.78/0.80, d30
+        # 0.80/0.32, d60 0.23/0.45 — every far rung below 1.0, on 234 of 740
+        # trades (32% of the book). The rung used to be computed after sizing,
+        # purely for the report; moving it up is what makes a lever possible.
+        #
+        # ⚠️ Note what a far target MEANS. `_find_target` already picks the
+        # NEAREST qualifying candidate, so a far rung is not a choice to aim far —
+        # it means nothing nearer cleared MIN_PIPS_TARGET and the RR floor. The
+        # only exception is P20 escalation, which filters out swing/round_number
+        # candidates; `target_rung × target_escalated` in the report says how much
+        # of the far bucket that accounts for, and therefore whether de-escalating
+        # is the surgical fix rather than skipping the trade.
+        _ladder   = self._draw_ladder(pair, direction, cur_price, t)
+        _tgt_rung = self._target_rung(_ladder, reward_pips)
+        _rung_far = _tgt_rung in config.TARGET_RUNG_FAR
+        if _rung_far:
+            g["target_rung_far"] = g.get("target_rung_far", 0) + 1
+        if _rung_far and config.TARGET_RUNG_SKIP_FAR:
+            g["target_rung_skipped"] = g.get("target_rung_skipped", 0) + 1
+            self._log_reject(t, pair, direction,
+                             f"target on the {_tgt_rung} rung "
+                             f"({reward_pips:.0f} pips) — skipped")
+            return
+
         # ZAR equity → USD for position sizing; floor at leg-1 lot for current tier.
         equity_usd = self._size_equity() / config.USD_ZAR
         risk_units = int(position_size(equity_usd, entry, stop, pair))
@@ -4374,6 +4400,30 @@ class Backtester:
             if config.LONDON_JUDAS_NY_BREAKOUT_DOWNSIZE != 1.0:
                 units = max(int(units * config.LONDON_JUDAS_NY_BREAKOUT_DOWNSIZE), min_units)
             g["london_judas_ny_echo"] = g.get("london_judas_ny_echo", 0) + 1
+        # ── P70 rung sizing. Two arms, both default 1.0 (no-op) ───────────────
+        # NEAR-UP is the arm this project's history actually supports: every
+        # shipped lever (P9/P18/P19/P41/P44) sizes UP a good bucket, and no
+        # removal has ever survived the full continuous run (P8 gating a PF
+        # 0.13/0.16 bucket still cost ~R31M; P10's 0.5x downsize lost equity in
+        # all three runs). Same DRAW_SIZE_MIN_EQUITY floor as its siblings.
+        if (_tgt_rung == "near" and config.TARGET_RUNG_NEAR_MULT != 1.0
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            units = max(int(units * config.TARGET_RUNG_NEAR_MULT), min_units)
+            g["target_rung_near_sized"] = g.get("target_rung_near_sized", 0) + 1
+        # FAR-DOWN sizes toward the true broker floor (MIN_LOT_SIZE), not the tier
+        # lot — the RISK_CAP_HALVE precedent. This matters: in the small-account
+        # phase, where the worst drawdown lives, units ALREADY sits at the floor,
+        # so the downsize cannot bite there at all. `target_rung_far_floored`
+        # counts exactly that, so "no effect" is never mistaken for "no signal"
+        # (the MM standalone throttle failed for precisely this reason).
+        if _rung_far and config.TARGET_RUNG_FAR_MULT != 1.0:
+            _rfloor = max(1, int(config.MIN_LOT_SIZE * self._contract_units(pair)))
+            _before = units
+            units = max(int(units * config.TARGET_RUNG_FAR_MULT), _rfloor)
+            if units < _before:
+                g["target_rung_far_sized"] = g.get("target_rung_far_sized", 0) + 1
+            else:
+                g["target_rung_far_floored"] = g.get("target_rung_far_floored", 0) + 1
         if units == 0:
             return
         g["units_nonzero"] += 1
@@ -4451,9 +4501,9 @@ class Backtester:
             "_units_tp2": (_r_units_2 if _runner_applies else _units_tp2),
             "runner_be_after_tp1": _runner_applies,
         }
-        _ladder = self._draw_ladder(pair, direction, cur_price, t)
-        # Where does this target sit on the cascade ladder, and is the path clear?
-        _tgt_rung = self._target_rung(_ladder, abs(target - entry) / pip)
+        # _ladder / _tgt_rung were computed before the sizing block (P70) so the
+        # rung could gate and scale; reuse them rather than recomputing, which
+        # also guarantees the recorded rung is the one the lever acted on.
         _path_blocked, _path_tf = self._path_obstruction(
             pair, direction, entry, target, t)
         _tgt_pd, _tgt_pd_tf = self._target_pd_array(pair, direction, target, t)
