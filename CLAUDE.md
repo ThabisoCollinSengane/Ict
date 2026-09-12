@@ -789,6 +789,46 @@ prior on the remaining broad arms (far-downsize, skip) and raises it on P72,
 which is surgical by construction: it changes the TARGET on ~156 trades and
 removes nothing.
 
+### P70 ARM 2 — far-rung downsize 0.5× (RAN 2026-09-12, full 4yr) — 🟢 PROMISING
+
+| Metric | Baseline | `TARGET_RUNG_FAR_MULT=0.5` |
+|---|---|---|
+| Trades | 736 | **767** |
+| WR | 43.9% | 43.8% |
+| PF | 4.01 | **4.81** ✓ |
+| Equity | R140,576 | **R148,861 (+5.9%)** ✓ |
+| Withdrawn | R132,020 | **R139,760 (+R7.7k)** ✓ |
+| MaxDD | −13.24% | −13.42% (+0.18pp) |
+| Working MaxDD | 21.89% | **18.24%** ✓ |
+
+**⚠️ NOT YET SHIPPABLE — one full run is not the protocol.** IS and OOS must both
+stay positive before this goes anywhere.
+
+**Two things I predicted wrong, corrected here so the record is accurate:**
+
+1. **"The downsize cannot bite — `units` is already at the floor."** Wrong in
+   practice: `target_rung_far_floored` is only **16 of 249** (6%). The
+   small-account phase is short, so by the time most far-rung trades occur the
+   risk-based size sits well above the min lot and a 0.5× has real room. The
+   counter existed precisely so this could be checked rather than assumed, and
+   it says the arm bit on 94% of the bucket.
+2. **"A downsize is a removal, and removals always fail here."** It is not a
+   removal, and the trade count went UP (736→767) — smaller positions clear
+   `MAX_RISK_PER_TRADE_PCT` more often, so `risk_cap_skip` fell to 131 (the
+   near-up arm's was 414). The far bucket is kept in full, just smaller.
+
+**What I predicted correctly:** it does NOT fix the drawdown. MaxDD went
+−13.24% → −13.42%, slightly worse, exactly as the floor argument implied — the
+worst drawdown is in the small-account phase where the multiplier has least room.
+**The gain is not risk control, it is losing less on a bucket that loses**
+(the far rungs are −R6,658 over 4yr, PF<1 in both splits). Working MaxDD, which
+measures the post-withdrawal trading balance, improved 21.89% → 18.24%.
+
+**Why this differs from P10's failed downsize.** P10 shrank the NY-echo bucket,
+which was net-POSITIVE to the compounding path — removing size from winners.
+This shrinks a bucket that is net-negative in both splits. *The distinction is
+not "sizing down is bad", it is "do not size down something that pays."*
+
 ### P72 — de-escalate a far-rung target (BUILT 2026-09-12, default OFF)
 
 When P20 escalation produces a target on a far rung, take the nearer
