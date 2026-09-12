@@ -754,6 +754,55 @@ to**. Blanket-disabling it would throw away the near-rung benefit.
 prize is modest; the reason to pursue it is that it is a target-SELECTION fix,
 the only class of change that has ever worked here.
 
+### ⛔ P67/P70/P72 ARE VOID — `_draw_ladder` read the still-FORMING daily bar
+
+**Found 2026-09-12 while auditing the skip arm's result. Every rung number in this
+file below P67 is contaminated and must be re-measured.**
+
+`_draw_ladder` sliced `d[-3:]` / `d[-30:]` / `d[-60:]` from `bars_up_to(pair,"D",t)`.
+`STRICT_BAR_CLOSE` is **off by design**, so `bars_up_to` returns the still-forming
+bar — and a forming DAILY bar carries the **whole day's High and Low, including the
+hours that have not happened yet.** So for a long, `lad_d3` was the highest high of
+the last two completed days **and today's eventual high**.
+
+**That makes the rung a function of the trade's own outcome.** Demonstrated on a
+fixture: identical entry, identical 40-pip target — if the day later ran 500 pips
+up, `lad_d3` = 500 and the target scores **`near`**; if the day went nowhere,
+`lad_d3` = 30 and the SAME target scores **`d3`**. **"near" was substantially a
+label for "today moved in my favour."**
+
+`_market_profile` had it right all along — `d_bars[-4:-1]`, commented *"last 3
+completed daily candles"*. `_draw_ladder` was the single place in the file that
+disagreed, and it is the one the rung lever was built on.
+
+**What this voids:**
+- **P67's headline** (near PF 5.31/9.15 vs every far rung <1.0, both splits). I
+  called this "the strongest IS/OOS-consistent result on the target side of the
+  book" — it is near-tautological, and its IS/OOS consistency is exactly what a
+  structural artifact looks like, not evidence against one.
+- **The P70 diagnostic cross-tab** and its escalation split.
+- **ARM 1 near-up (RED), ARM 2 far-downsize (PF 4.81), ARM 3 skip (PF 7.64,
+  MaxDD −6.83%).** The skip arm was skipping trades on days price did not move —
+  knowable only afterwards. That is why it looked extraordinary.
+- **P72's whole premise.**
+
+**Fixed:** `_draw_ladder` now takes `dc = d[:-1]` and slices completed bars only.
+Verified by AST (comments excluded) plus the fixture above. Weekly was already
+correct (`w[-2]` is the last completed week) and `_prev_session_hl` documents
+"only bars strictly before t".
+
+**The lesson, which is not the obvious one.** The documented `bars_up_to` lookahead
+was known and filed under "affects every HTF read, biases the backtest
+optimistically." That framing made it sound uniform and therefore ignorable. It is
+not: **a contaminated signal that is merely RECORDED costs nothing, but the moment
+it GATES entries the recording bias becomes a performance bias.** P67 recorded the
+rung for three builds and was harmless; P70 acted on it and manufactured a +3.6 PF.
+Before any future lever, check whether its signal touches a forming HTF bar.
+
+**Everything must be re-run after the fix** — the diagnostic and all three arms.
+Expect the near/far gap to shrink sharply; if it vanishes, P67 was never a finding
+and the far-rung work closes.
+
 ### P70 ARM 1 — near-rung upsize 1.25× (RAN 2026-09-12, full 4yr) — 🔴 RED
 
 | Metric | Baseline | `TARGET_RUNG_NEAR_MULT=1.25` |

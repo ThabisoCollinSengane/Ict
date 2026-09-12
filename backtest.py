@@ -1754,13 +1754,28 @@ class Backtester:
 
         d = self.bars_up_to(pair, "D", t)
         w = self.bars_up_to(pair, "W", t)
+        # ⚠️ COMPLETED bars only. `bars_up_to` returns the still-FORMING bar
+        # (STRICT_BAR_CLOSE is off by design), and a forming DAILY bar carries the
+        # whole day's High/Low — including hours that have not happened yet. This
+        # method used d[-3:], so `lad_d3` for a long was the highest high of the
+        # last 2 completed days AND TODAY'S EVENTUAL HIGH.
+        #
+        # That made the rung label a function of the trade's own outcome: on a day
+        # price ran far our way the level sat far off and the target scored "near";
+        # on a day it went nowhere the SAME target scored "d3". "near" was largely
+        # "today moved in my favour". `_market_profile` had it right all along at
+        # `d_bars[-4:-1]` ("last 3 completed daily candles") — this was the one
+        # place in the file that disagreed.
+        #
+        # Weekly was already correct: w[-2] is the last COMPLETED week.
+        dc = d[:-1]
         wk_lvl = (w[-2].High if direction > 0 else w[-2].Low) if len(w) >= 2 else None
         return {
             "lad_sess": ahead(self._prev_session_hl(pair, t, direction)),
-            "lad_d3":   ahead(ext(d[-3:]))  if len(d) >= 3  else None,
+            "lad_d3":   ahead(ext(dc[-3:]))  if len(dc) >= 3  else None,
             "lad_wk":   ahead(wk_lvl),
-            "lad_d30":  ahead(ext(d[-30:])) if len(d) >= 30 else None,
-            "lad_d60":  ahead(ext(d[-60:])) if len(d) >= 60 else None,
+            "lad_d30":  ahead(ext(dc[-30:])) if len(dc) >= 30 else None,
+            "lad_d60":  ahead(ext(dc[-60:])) if len(dc) >= 60 else None,
         }
 
     @staticmethod
