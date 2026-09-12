@@ -497,6 +497,48 @@ on data that has none** — which is the property the first version lacked.
 Verified by driving `run()` end-to-end on a stubbed data module (W, D and H4),
 per the project rule that pure-logic tests never exercise plumbing.
 
+**RESULT (RAN 2026-09-12, rebuilt study) — 🔴 RED on every timeframe and both
+splits. The reach rate is real; the PULL is not.**
+
+| TF | gap reach IS/OOS | control IS/OOS | **lift** |
+|---|---|---|---|
+| W | 69.7% / 78.8% | 71.2% / 80.3% | **−1.5pp / −1.5pp** |
+| D | 90.2% / 87.2% | 91.0% / 86.4% | **−0.7pp / +0.8pp** |
+| H4 | 95.2% / 95.3% | 95.0% / 95.3% | **+0.2pp / +0.0pp** |
+
+**An unfilled gap IS reached 90-95% of the time — and so is an identical band the
+same distance away on the OTHER side of price.** Six lift cells, none above
++0.8pp, two negative. No speed edge either: `fast%` is flat (H4 82.2/80.5 vs
+80.7/81.3) and `median days` is identical to the control on every rung (0.3 H4,
+1.0 D). The claim "price always gravitates to the FVG" is literally TRUE and
+carries **no directional information** — which is the one thing a draw must have.
+A bias held toward the gap is a coin flip on which side you were holding.
+
+**The two confirmations do not rescue it — the MSS reads NEGATIVE.** On H4, the
+only bucket with usable n (94 IS / 100 OOS), a structure shift toward the gap
+gives **85.1% / 86.0% against its own control's 92.6% / 96.0%** — worse in both
+splits — and it takes LONGER (median 0.7-0.8 vs 1.0). Intermarket support is flat
+(96.8% / 95.4% vs 95.2% / 95.3% unconditional). The trader's full condition
+(`both`) is 88.1% / 88.9% on n=42/54 — still under the plain control.
+
+**⚠️ SCOPE — this does NOT condemn the FVG.** It measures ONE claim: the gap as a
+MAGNET on raw price over 30 days. It says nothing about the gap as an ENTRY ZONE
+(how price behaves once it arrives), which is a different question and is what
+P9's shipped HTF-FVG 50% sizing lever actually rests on. Nor does it touch the
+IFVG's role as the MM model's precondition (P61) — an inverted gap that price
+returns into is a trigger, not a target.
+
+**What it does close:** "note the bias and trade toward the FVG until it is
+reached, for days if necessary" is not supported. The measured pull is zero, so
+holding that bias adds risk and time without adding expectancy — consistent with
+P67, where the near rung (PF 5.31/9.15) beats every far one and a multi-day draw
+is exactly the far rung. **Nothing shipped.**
+
+**Method note worth keeping:** the control is the whole result. The identical
+study without it read 90%/95% and GREEN. On a random walk it also reads 93.5%
+GREEN. Any future "does price go to X" study must carry a placebo at the same
+distance, or it measures proximity and calls it prediction.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
