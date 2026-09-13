@@ -1063,6 +1063,61 @@ python run_backtest_histdata.py
 python scripts/daily_anatomy_study.py
 ```
 
+### P73 — the ALGO measured against reachable zones (BUILT 2026-09-13, NOT run)
+
+**Premise correction, because the framing matters.** P68b is often remembered as
+"price is drawn to FVGs almost 100% of the time." What it found is that unfilled
+W/D/H4 gaps are reached 90-95% — **and that an identical band, same width, same
+distance, on the OPPOSITE side of price is reached 90-95% too** (six lift cells,
+none above +0.8pp). So the durable fact is **"price reaches nearby bands at that
+rate"**, not "gaps pull price." This study therefore treats a zone as a REACHABLE
+LEVEL, never a magnet.
+
+**The question that survives — and it is a good one.** If price reaches a nearby
+level ~95% of the time and the algo wins 43.9% of the time, **where are our trades
+sitting relative to levels price demonstrably gets to?** Nothing here has measured
+the engine against the price path that way.
+
+**`scripts/algo_vs_zones_study.py`** — joins `trades_dump.csv` to raw price:
+
+- **§1 Geometry** — at entry, distance to the nearest unfilled zone AHEAD (purely
+  positional: above price for a long, below for a short — whether the gap formed
+  bullish or bearish is irrelevant to whether price must travel to it), and
+  whether our TARGET sits `short of` / `at` / `beyond` it. WR/PF per bucket, plus
+  median zone distance for winners vs losers.
+- **§2/§3 EARLY vs WRONG — the headline**, and the direct test of the trader's
+  standing claim *"if our SL is hit then we entered early before the real move."*
+  From the bar after each trade CLOSED, which comes first: the zone we aimed at,
+  or a **MIRROR level the same distance on the other side of our exit**?
+
+**The mirror is the whole test.** "Price eventually got there" is worthless —
+price eventually gets everywhere, which is exactly what P68b proved. Against an
+equidistant mirror the reading is unambiguous:
+- **~50% → we were WRONG about direction.** No stop or entry tuning recovers it.
+- **>>50% → we were RIGHT and EARLY.** The thesis held and the timing did not —
+  and that would be the first result in this project pointing at a FIX rather than
+  a null.
+
+Bars touching BOTH levels are reported separately, never assigned (the `ran_both`
+lesson: folding ambiguity into one side is how a rate inflates).
+
+**Verified:** selftest covers `zone_ahead` on both sides plus the straddle and
+empty cases, the target bucket, first passage including the both-touched bar and
+horizon expiry, and the verdict thresholds. Driven end-to-end on a **random walk**,
+where the race reads **51.9% / 49.3% — coin flip, as it must.** A biased
+measurement would have shown its hand there.
+
+**One bug the null caught:** `itertuples` renames leading-underscore columns, so
+`r._open` was an AttributeError on the first row. That exact failure is documented
+three sections up in P71 and I reintroduced it anyway — which is precisely why the
+end-to-end drive is not optional.
+
+**Run (needs the dump, so the backtest first):**
+```
+python run_backtest_histdata.py
+python scripts/algo_vs_zones_study.py
+```
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
