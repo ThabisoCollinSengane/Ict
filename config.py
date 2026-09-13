@@ -1236,6 +1236,21 @@ PATH_OBSTRUCTION_TFS = tuple(_os.environ.get("PATH_OBSTRUCTION_TFS", "240T,D").s
 ENTRY_PD_ENABLED = bool(int(_os.environ.get("ENTRY_PD_ENABLED", "1")))
 ENTRY_PD_TF = _os.environ.get("ENTRY_PD_TF", "D")
 
+# P75 — make the FVG actually reachable as a TARGET (default OFF, byte-identical).
+# `fvg` and `ob` are registered target families that produced ZERO targets in 740
+# trades, for two stacked reasons in `_targets_in_series`:
+#   1. it marks a gap mitigated when a WICK touches its NEAR edge — contradicting
+#      the project's ICT Ep-9 rule (full body CLOSE through the FAR side) used by
+#      `_scan_htf_fvgs` everywhere else. Reaching a gap as a target requires
+#      travelling into it, which trips that rule by construction.
+#   2. `nearest_unmitigated` demands `g.direction == direction`: for a long, a
+#      BULLISH gap ABOVE price — the configuration P74 measured at 1 in 731.
+# ICT-wise this matters because the FVG is INTERNAL range liquidity; every family
+# the engine can currently select is EXTERNAL (equal_hl / pdh_pdl / pwh_pwl /
+# ith-itl / swing) or a projection (fib / round_number). With this ON the gap is
+# selected POSITIONALLY (unfilled and ahead of price), like any other draw.
+FVG_TARGET_FIX = bool(int(_os.environ.get("FVG_TARGET_FIX", "0")))
+
 MM_GOLDEN_OB_RAID_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_RAID_REQUIRED", "1")))
 MM_GOLDEN_OB_RAID_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_RAID_LOOKBACK", "60"))
 # The raided pool may be from the current day OR previous days — size the lookback per

@@ -2612,8 +2612,21 @@ class Backtester:
             g = detect_new_fvg(bars[: i + 1], pair)
             if g is not None:
                 fvgs.append(g)
+        _fix = config.FVG_TARGET_FIX
         for g in fvgs:
             for c in bars[g.bar_index + 1:]:
+                if _fix:
+                    # ICT Ep 9, as used by `_scan_htf_fvgs`: only a full body CLOSE
+                    # through the FAR side spends the gap. The near-edge wick rule
+                    # below is self-nullifying for a TARGET, since reaching a gap
+                    # means trading into it.
+                    if g.direction > 0 and c.Close <= g.bottom:
+                        g.mitigated = True
+                        break
+                    if g.direction < 0 and c.Close >= g.top:
+                        g.mitigated = True
+                        break
+                    continue
                 if g.direction > 0 and c.Low <= g.top:
                     g.mitigated = True
                     break
@@ -2621,7 +2634,18 @@ class Backtester:
                     g.mitigated = True
                     break
         out = []
-        tgt_fvg = nearest_unmitigated(fvgs, price, direction)
+        if _fix:
+            # Positional, not directional: a gap is a draw when it is UNFILLED and
+            # AHEAD of price. How it formed says nothing about whether price must
+            # travel to it (the `zone_ahead` reasoning from P73). The old
+            # `g.direction == direction` filter asked for a bullish gap above price
+            # on a long — 1 occurrence in 731 trades (P74).
+            _ahead = [g for g in fvgs if not g.mitigated and (
+                (direction > 0 and g.bottom > price) or
+                (direction < 0 and g.top < price))]
+            tgt_fvg = min(_ahead, key=lambda g: abs(g.mid - price)) if _ahead else None
+        else:
+            tgt_fvg = nearest_unmitigated(fvgs, price, direction)
         if tgt_fvg is not None:
             out.append((tgt_fvg.mid, "fvg"))
         tgt_ob = nearest_unmitigated_ob(detect_order_blocks(bars), price, direction)

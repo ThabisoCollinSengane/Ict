@@ -1548,6 +1548,84 @@ carries most of the volume (220 / 193) AND has the best OOS average P&L of any
 family with real n. Consistent with the (now-corrected) P67 finding that a NEAR fib
 is an excellent target.
 
+### P75 — THE FVG HAS NEVER BEEN A SELECTABLE TARGET (FOUND 2026-09-13, fix default OFF)
+### Raised by the trader: "nothing was said about fvg for internal liquidity."
+
+**The observation that found it:** the draw-on-liquidity target table has **no `fvg`
+row and no `ob` row** — in EITHER split. Not zero-win: ABSENT. Across all 740 trades
+the engine has never once selected a fair value gap as its target. I read that table
+twice and reported on the families that DID fire without noticing the one that
+didn't. The families are registered (`_targets_in_series`, backtest.py:2626/2629);
+they simply never survive.
+
+**Two independent bugs, stacked. Either alone is enough to starve it.**
+
+1. **Mitigation rule contradicts the project's own ICT Ep-9 rule.**
+
+| Scanner | Rule | Used by |
+|---|---|---|
+| `_scan_htf_fvgs` | full body **CLOSE through the FAR side** | P9, P74, `target_pd` |
+| `_targets_in_series` | a **WICK touching the NEAR edge** | target selection |
+
+   Verified on a fixture: a bar whose low kisses the top of a bullish gap and closes
+   well above it reads **mitigated=True** under the target rule and **False** under
+   Ep-9. **Reaching a gap as a target requires travelling INTO it**, which trips the
+   near-edge rule by construction — the rule is self-nullifying for its one purpose.
+
+2. **`nearest_unmitigated` requires `g.direction == direction`** — for a LONG, a
+   BULLISH gap ABOVE price. P74 measured that exact configuration at **1 occurrence
+   in 731 trades**: a bullish gap forms on up-displacement so it sits BELOW price,
+   and a close back under it marks it spent. For a TARGET the formation direction is
+   irrelevant — what matters is that the gap is UNFILLED and AHEAD (the `zone_ahead`
+   reasoning already validated in P73).
+
+**Why this is structural, not cosmetic.** In ICT the highs/lows are EXTERNAL range
+liquidity and the FVG is INTERNAL range liquidity; the draw alternates between them.
+Every family the engine can currently select is external (`equal_hl`, `pdh_pdl`,
+`pwh_pwl`, `ith/itl_liquidity`, `swing`) or a pure projection (`fib_extension`,
+`round_number`). **The one internal-liquidity family is silent, so the engine has
+only ever been able to aim at external liquidity.** No study in this book would have
+surfaced that, because every one of them read the families that fired.
+
+**The sharpest supporting number:** P68's `target_pd` classifier — which uses the
+CORRECT Ep-9 scanner and asks only whether the chosen price happens to LAND on a
+gap — puts FVG at **PF 4.64 vs 2.64 for a bare projection** on the honest 4yr run.
+So a gap is the best thing a target can coincide with, and the engine cannot
+deliberately choose one.
+
+**Built behind `FVG_TARGET_FIX=0` (default OFF → byte-identical).** When ON,
+`_targets_in_series` uses Ep-9 close-through-far-side mitigation AND selects the
+nearest unfilled gap POSITIONALLY ahead, regardless of how it formed. `ob` is left
+alone deliberately — `nearest_unmitigated_ob` carries the same `direction ==`
+constraint, but one variable at a time.
+
+**Verified:** fixture comparing both mitigation rules on the kiss and the
+trade-into cases; and an end-to-end drive of `_targets_in_series` where an unfilled
+gap below price yields `families: ['round_number']` with the flag off and
+`['fvg', 'round_number']` with it on (a BULLISH gap selected on a SHORT — exactly
+the case the direction filter excluded).
+
+**⚠️ This CHANGES THE TRADE SET — it is target SELECTION, not analytics.** Full
+protocol required; the nearest-qualifying rule still applies, so a gap only wins when
+it is the nearest candidate clearing `MIN_PIPS_TARGET` and the RR floor.
+
+```
+python run_backtest_histdata.py                              # baseline: must be 736 / 43.9% / 4.01 / -13.24%
+$env:FVG_TARGET_FIX=1; python run_backtest_histdata.py       # full 4yr
+python run_backtest_histdata.py --years 2022 2023
+python run_backtest_histdata.py --years 2024 2025
+$env:FVG_TARGET_FIX=$null
+```
+Read the `fvg` row in the draw-on-liquidity table (it should EXIST for the first
+time), and `risk_cap_skip` per the P70 ARM-1 lesson. Ship gate unchanged: full-4yr
+equity up with MaxDD held, both splits positive and same-ballpark.
+
+**⚠️ Precedent cuts both ways here.** Changing target selection toward FURTHER draws
+has failed repeatedly (`HTF_TARGET_PREF` −22% MaxDD, `TRAIL_AT_TP` −49%, TP-runner
+−75%). But this does NOT force a further target — it adds a candidate to the
+nearest-qualifying pool, which is how P17 added ITH/ITL successfully (+R4.86M, MaxDD
+unchanged). The gap may well be NEARER than the fib that currently wins.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
