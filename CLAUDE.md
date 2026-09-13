@@ -1626,6 +1626,69 @@ has failed repeatedly (`HTF_TARGET_PREF` −22% MaxDD, `TRAIL_AT_TP` −49%, TP-
 nearest-qualifying pool, which is how P17 added ITH/ITL successfully (+R4.86M, MaxDD
 unchanged). The gap may well be NEARER than the fib that currently wins.
 
+### P75 RESULT (RAN 2026-09-13, all three runs) — 🟡 PASSES THE GATE, MARGINALLY.
+### Decision pending: shipping it re-anchors the documented baseline.
+
+All runs clean (no arm counters, `dxy_real_used` absent). **The `fvg` row EXISTS in
+the draw-on-liquidity table for the first time in the project's history.**
+
+| Metric | Baseline full 4yr | `FVG_TARGET_FIX=1` | |
+|---|---|---|---|
+| Trades | 736 | 730 | −6 |
+| WR | 43.9% | 43.7% | −0.2pp |
+| **PF** | 4.01 | **4.01** | identical |
+| **MaxDD** | −13.24% | **−13.24%** | **identical to the decimal** ✓ |
+| **Equity** | R140,576 | **R142,283** | **+R1,707 (+1.2%)** ✓ |
+| Withdrawn | R132,020 | R133,793 | +R1,773 ✓ |
+| Working MaxDD | 21.89% | **21.58%** | improved ✓ |
+
+**Both splits positive:** IS equity R48,421 → R48,960 (+1.1%), MaxDD −13.24% held,
+PF 3.37 → 3.31. OOS equity R75,333 → R76,631 (+1.7%), MaxDD **−10.21% → −9.59%**,
+PF 4.28 → **4.33**. Equity up in ALL THREE runs with MaxDD held or improved — the
+clean-lever signature of P18/P19/P41.
+
+**NOT a silent removal** (the P70 ARM-1 failure mode): `risk_cap_skip` 304 → **310**
+full-4yr, 139 → 149 OOS. ARM 1's was 414 against a baseline of ~0 — that is what a
+lever converting into a mass skip looks like. This is +6.
+
+**⚠️ The magnitude is an order of magnitude below anything shipped on merit here.**
+P41 +57%, P23 +36%, P18 +135%, this **+1.2%** — well inside the range a slightly
+different trade set can produce by walking a slightly luckier compounding path.
+
+**And the FVG bucket is NOT the source of the gain.** It is the weakest-hit-rate
+family in all three runs:
+
+| | full 4yr | IS | OOS |
+|---|---|---|---|
+| fvg trades | 62 | 35 | 27 |
+| **WR** | **35.5%** | 34.3% | 37.0% |
+| vs book WR | −8.2pp | −8.4pp | −7.3pp |
+| avg P&L | R154 | R130 (fib R138) | **R97** (fib R250) |
+
+62 trades producing 8.5% of the book but only **6.8% of P&L** — slightly UNDER its
+weight. The low hit rate is the one thing consistent across all three runs and at
+the same magnitude: **gaps are materially harder to reach than what they displaced**,
+i.e. the gap tends to win selection by sitting FURTHER out, not nearer. So the +1.2%
+comes from the altered trade set's path, not from FVG targets being good — which is
+exactly the kind of gain that can flip on different data.
+
+**THE DECISION, stated because it is not mine to make.** Shipping means flipping the
+default, which changes the documented baseline from **736 / 43.9% / 4.01 / −13.24%**
+to **730 / 43.7% / 4.01 / −13.24%** — and the working agreement treats that baseline
+as the regression anchor for every future change. Re-anchoring the whole book for
++1.2% is a real cost.
+
+- **For shipping:** this is a CORRECTNESS fix, not a tuning knob. With the flag off,
+  internal range liquidity remains structurally invisible as a draw no matter what
+  future work is done on it, because of two bugs — a mitigation rule contradicting
+  the project's own ICT Ep-9 standard, and a direction filter demanding a
+  configuration that occurs once in 731 trades. It also passes all three gate
+  conditions on its own numbers.
+- **Against shipping:** +1.2% is not a demonstrated edge, the fvg bucket
+  under-performs its weight, and the anchor has value.
+
+`FVG_TARGET_FIX=0` remains the default until the trader decides.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
