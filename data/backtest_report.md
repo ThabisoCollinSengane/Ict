@@ -306,6 +306,56 @@ blocked          322   135  41.9%     45331.75   3.08
 clear            414   188  45.4%     94243.96   4.84
 ```
 
+## Entry vs the DAILY FVG / PD array (P74)
+
+Every entry measured against the day's draw: how far the fill sat from the nearest unmitigated DAILY FVG, and whether that gap points the way we are trading (`with`) or the other way (`against`). Completed daily candles only — the forming bar carries hours that have not happened yet.
+
+**Alignment with the daily FVG:** 287 of 731 (39.3%) entries traded WITH the gap, 444 (60.7%) against it; 5 entries had no daily gap on the chart.
+
+```
+Align         Trades  Wins    WR%      P&L ZAR     PF  medDist
+----------------------------------------------------------------
+with             287   121  42.2%     59699.77   4.09     44.5
+against          444   201  45.3%     80245.43   4.03     11.4
+```
+
+**Distance from the daily FVG**
+
+```
+Dist pips     Trades  Wins    WR%      P&L ZAR     PF
+--------------------------------------------------------
+inside           192    88  45.8%     38031.36   4.24
+0-10              76    30  39.5%     10473.41   2.66
+10-25            110    55  50.0%     23002.20   5.15
+25-50            134    62  46.3%     31375.16   6.54
+50-100           130    58  44.6%     26709.36   3.97
+>100              89    29  32.6%     10353.71   2.37
+```
+
+**Alignment x where the gap sits** (`ahead` = we travel toward it)
+
+```
+Align     Pos        Trades  Wins    WR%      P&L ZAR     PF
+------------------------------------------------------------
+with      inside         36    21  58.3%     15422.36  14.32
+with      ahead           1     0   0.0%       -10.41   0.00
+with      behind        250   100  40.0%     44287.82   3.44
+against   inside        156    67  42.9%     22609.00   3.14
+against   ahead         236   113  47.9%     52325.41   5.10
+against   behind         52    21  40.4%      5311.02   2.69
+```
+
+**Nearest daily PD array of any kind** (fvg / ifvg / ob)
+
+```
+Type     Align      Trades  Wins    WR%      P&L ZAR     PF  medDist
+--------------------------------------------------------------------
+fvg      with          225    92  40.9%     42357.56   3.57     38.9
+fvg      against       361   158  43.8%     59057.26   3.67      5.1
+ob       with           46    22  47.8%      6248.50   3.37     11.8
+ob       against       104    51  49.0%     31912.40   7.25      0.0
+```
+
 ## Dollar reversal day (P64)
 
 DXY swept an intermediate level and CLOSED BACK through it.
