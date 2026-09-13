@@ -158,11 +158,21 @@ def _load_utc(sym):
 
 
 def _unfilled_gaps_at(bars, upto_pos, lookback=400):
-    """Every gap confirmed before `upto_pos` and NOT yet traded into by then."""
+    """Every gap confirmed before `upto_pos` and NOT yet traded into by then.
+
+    ⚠️ COMPLETED bars only — `upto_pos - 1`. `searchsorted(t, "right")` lands
+    PAST the bar that CONTAINS t, so a plain `[:upto_pos]` slice ends on the
+    still-forming bar, which carries the whole period's High and Low including
+    the hours after t. That is precisely the `_draw_ladder` lookahead that
+    manufactured P67 and a +3.6 PF in P70: a big-range day fills nearby gaps and
+    pushes the nearest zone further away, so "our target is short of the zone"
+    becomes partly a label for "today moved a lot" — the outcome.
+    """
     from fvg_draw_study import find_fvgs
-    lo = max(0, upto_pos - lookback)
-    h = bars["h"].to_numpy()[lo:upto_pos]
-    l = bars["l"].to_numpy()[lo:upto_pos]
+    end = max(0, upto_pos - 1)
+    lo = max(0, end - lookback)
+    h = bars["h"].to_numpy()[lo:end]
+    l = bars["l"].to_numpy()[lo:end]
     out = []
     for (i, bot, top, _d) in find_fvgs(h, l):
         # untouched between confirmation and now

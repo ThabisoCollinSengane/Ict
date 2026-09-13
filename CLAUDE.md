@@ -1130,6 +1130,81 @@ python run_backtest_histdata.py
 python scripts/algo_vs_zones_study.py
 ```
 
+### P73 RESULT (RAN 2026-09-13) — 🔴 the losses were WRONG, not EARLY
+
+**§2 is the answer, and it is robust to the §1 problem below.** The race is
+between the zone and a mirror EQUIDISTANT FROM THE EXIT, so even a mis-measured
+distance leaves the contest symmetric — only which side wins matters.
+
+| split | outcome | ours | mirror | both | neither | ours% | verdict |
+|---|---|---|---|---|---|---|---|
+| IS | **lost** | 57 | 50 | 1 | 48 | **53.3%** | coin flip |
+| IS | won | 51 | 34 | 2 | 36 | 60.0% | (IS only) |
+| OOS | **lost** | 71 | 74 | 0 | 40 | **49.0%** | coin flip |
+| OOS | won | 61 | 55 | 4 | 32 | 52.6% | coin flip |
+
+**The losing rows are 53.3% and 49.0%.** At n=107/145 resolved the standard error
+is ~4.5pp, so both sit inside ±1 SE of a coin flip. **After a stop is hit, price
+is as likely to reach an equidistant level in the OPPOSITE direction as the zone
+we aimed at.**
+
+**This closes the standing claim that "if our SL is hit we entered early before
+the real move."** The losses are wrong-way trades, not early ones — so no stop
+placement, entry-timing or patience change recovers them. That is a real answer
+to a real question, and it is negative. (The IS-won row reads 60.0% but the
+OOS-won row is 52.6%, so it does not survive the split — not a finding.)
+
+**⚠️ §1 (target vs zone) IS CONTAMINATED — do not act on it.** It read a clean
+monotonic both-splits ordering — short-of-zone PF 4.36/6.54, at-zone 2.44/4.46,
+beyond-zone 0.69/1.01 — which is exactly what P67 looked like. `_unfilled_gaps_at`
+sliced `[lo:upto_pos]`, and `searchsorted(t,"right")` lands PAST the bar
+CONTAINING t, so the last bar in the scan was the still-forming one with the whole
+period's High/Low. Demonstrated on a fixture. **The mechanism is the P67
+mechanism**: a big-range day fills nearby gaps and pushes the nearest zone
+further, so "target short of zone" is partly a label for "today moved a lot".
+Fixed to `upto_pos - 1`; AST-verified with comments stripped; **§1 must be
+re-run**. §2 is unaffected and stands.
+
+**Seventh occurrence of this class.** The tell is the same every time: an
+unusually clean, monotonic, both-splits result.
+
+### P71 RESULT (RAN 2026-09-13) — one real finding, one RED, one useful table
+
+**§1 Shape — the finding, and it is not a pattern claim.** Daily ranges SHRANK
+~25% from IS to OOS: EURUSD median 81.0 → 61.9 pips, GBPUSD 99.9 → 77.3, NZDUSD
+64.1 → 46.6. `body/rng` is ~0.46 throughout — **the average day keeps under half
+its travel, i.e. it goes somewhere and comes back.** Pure descriptive statistics
+on completed daily candles; no lookahead is possible.
+
+**This matters for a fixed floor.** `MIN_PIPS_TARGET=30` asks for 37% of a median
+2022-23 EURUSD day and 48% of a 2024-25 one. The same parameter is a materially
+different demand across the two halves, which is a plausible mechanism for the
+shipped 20→30 change reading RED on the strict gate.
+
+**§3 Daily Judas vs the 00:00 UTC open — 🔴 RED.** Against the placebo level the
+lifts are +2.1/−4.4 (EURUSD ran_low), −3.2/+3.7 (GBPUSD ran_high), −5.9/+0.2
+(NZDUSD ran_low) — **every cell small and sign-unstable across splits.** The
+daily open is not a special level. Consistent with P68b/P69: a reference level
+carries no directional information a mirror does not.
+
+**§4 What is LEFT — the useful table.** Median pips price still travels from each
+ET hour (EURUSD IS): hour 3 (London KZ) **56.3**, hour 7 (NY AM open) **46.3**,
+hour 9 **41.1**, hour 11 **29.4**, hour 13 **17.7**, hour 16 **8.2**. Monotonic
+decay, resetting at 20:00 ET (00:00 UTC).
+
+**A 30-pip target at ET 11 asks for MORE than the median remaining daily travel** —
+and the NY AM killzone runs to 10:00 ET, so late-killzone entries are asking for
+nearly all of what a typical day has left. This is a reachability statement, not
+a quality one, and it is the mechanism P67 was reaching for before the lookahead
+destroyed it.
+
+**§5 Target demand — suggestive OOS, UNTESTABLE in IS.** OOS declines monotonically
+(≤1.0× WR 51.1% / PF 5.37 → 1.0-1.5× 37.4% / 4.13 → >1.5× 21.1% / **0.53**), but
+IS is non-monotonic on tiny cells (n=19/26/5) because **86% of IS trades sit in one
+bucket** — IS days were big enough that almost nothing was high-demand. One split
+with a pattern and one split with no variation is not a validated finding. The
+population shift IS the finding, and it is §1's.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
