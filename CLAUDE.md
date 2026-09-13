@@ -1689,6 +1689,62 @@ as the regression anchor for every future change. Re-anchoring the whole book fo
 
 `FVG_TARGET_FIX=0` remains the default until the trader decides.
 
+### P76 — the daily FVG as a STANDING DRAW (BUILT 2026-09-13, NOT run)
+### I measured the wrong unit in P75 and the trader had to say so twice.
+
+**The correction, stated plainly.** P75 reported that FVG-targeted trades win
+35.5% and called the gap "the weakest-hit-rate family". **That is arithmetic, not
+evidence.** A daily gap sits tens to hundreds of pips away and a single intraday
+trade carries a ~10-pip structural stop, so of course one trade rarely reaches it.
+Judging a multi-day objective by one intraday trade's hit rate answers a question
+nobody asked, and I presented it as though it counted against the gap.
+
+**What the trader actually asked for, twice:** treat the gap as a DRAW ON
+LIQUIDITY that persists until filled, and count **how many entries the algo made
+AIMING at it across that window**. The unit is the EPISODE, not the trade.
+
+**`scripts/fvg_draw_episodes.py`** — for every daily FVG, from formation to fill:
+- duration in days, and whether it was ever filled at all
+- `toward` entries (direction aims at the gap POSITIONALLY — gap above ⇒ a long
+  aims at it), `away` entries, `inside` entries (price within the gap, so no
+  direction aims at it)
+- **§2 is the headline:** episodes with ≥1 aimed entry, total/median/max toward
+  entries per episode — the number P75 never produced.
+
+**The control is internal and needs no mirror band.** `toward` vs `away` are both
+the algo's own entries, same pair, same episode, same gates. If aiming at the
+day's gap is worth anything, the two buckets separate. (A mirror band was the
+right control for P68b, which asked whether RAW price is pulled; it is the wrong
+one here, where the population is already the algo's filtered entries.)
+
+**⚠️ COMPLETED daily candles only**, and fill = full body CLOSE through the FAR
+side (ICT Ep 9) — the engine's `_scan_htf_fvgs` rule, NOT the near-edge wick rule
+P75 found in `_targets_in_series`. A forming daily bar would make both the gap and
+its fill a function of the outcome; that exact bug has appeared seven times here.
+
+**⚠️ RETROSPECTIVE BY CONSTRUCTION — and that IS the question.** "Until it was
+eventually reached" uses the fill date, unknowable at entry. So the episode
+framing DESCRIBES how entries distributed around a draw; it is not a tradeable
+signal by itself. The half that IS knowable live is the toward/away split at entry
+— the gap's existence and position are known then. **Any lever must be built on
+that half only.**
+
+**Scope limit worth stating:** this counts entries the algo TOOK, not opportunities
+it declined. Counting the latter needs `reject_log`, which is a separate build.
+
+**Verified:** selftest covers gap detection both directions plus the size floor,
+`fill_index` including the case that must NOT fill (a close INSIDE the gap), and
+`aim` on both gap sides × both trade directions × the inside/edge case. Driven
+end-to-end on synthetic M1 with a stubbed loader and dump, where the gap sits
+BELOW the entry so the shorts must land in `toward` and the longs in `away` — and
+they do, with the P&L splitting exactly as constructed.
+
+**Run (needs the dump, so the backtest first):**
+```
+python run_backtest_histdata.py
+python scripts/fvg_draw_episodes.py
+```
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
