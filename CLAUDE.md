@@ -1422,6 +1422,47 @@ per the ARM 1 lesson, on the FULL continuous run.
 all losers). That branch essentially never occurs — the daily gap is either live or
 mitigated, rarely inverted-and-nearest.
 
+### ⚠️ THE PUSHED REPORT WAS A SUBSET OF THE RUN (FOUND + FIXED 2026-09-13)
+
+**The user had to send a screenshot to show me tables the backtest had already
+measured.** That is a defect in the tooling, not in how they reported it.
+
+`data/backtest_report.md` is built by `_publish_backtest_report` from an explicit
+list of sections. But a large block of analytics in `main()` is **`print`-only** and
+was never written into it:
+
+- `=== Draw on liquidity (target type) — all trades ===`
+- `=== Draw on liquidity — initial vs pyramid legs (winners) ===`
+- `=== Winning trades — totals by session ===`
+- `=== Session-open side breakdown (above/below open) ===`
+- `=== P26 — Session-open + daily-open pattern ===`
+
+So every pushed report since these were added has been a SUBSET of what the run
+measured, and the only way to see the rest was the terminal. Same shape as the
+P47/P48 column bug and the P63 counter bug: **output that exists only at one call
+site is invisible until something forces it end-to-end.**
+
+**Fix — tee the whole run, don't enumerate sections.** `main()` now installs a
+`_Tee` on `sys.stdout` as its first action and delegates to `_main()`; the full
+transcript is written to **`data/backtest_console.txt`** and `git add -f`-ed
+alongside the report. Enumerating the missing tables would have fixed today's gap
+and re-opened it the next time someone adds a `print`. The tee carries every future
+block automatically. `_Tee.__getattr__` delegates to the real stdout so `isatty`,
+`encoding` and `fileno` still behave; the swap is in a `try/finally`.
+
+**Read `data/backtest_console.txt` alongside `data/backtest_report.md` from now on.**
+
+**Two things visible in that block for the first time (OOS 2024-25 only — single
+split, NOT findings):**
+- **Session-open side:** `below open` 33 tr / WR **54.5%** / avg R396 vs
+  `above open` 347 tr / WR 43.5% / avg R177. Large gap, tiny minority bucket.
+- **P26 SOJ inverts:** dual (+2) 100 tr / 41.0% / PF 3.71, single (+1) 246 tr /
+  45.1% / PF 4.24, **no SOJ pattern 39 tr / 48.7% / PF 6.46.** More session-open
+  confirmation reads WORSE, monotonically — the opposite of P26's premise.
+
+Both need the IS half before they mean anything, and both are now in the pushed
+transcript so the comparison is possible without a screenshot.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

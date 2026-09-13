@@ -11,6 +11,7 @@ Uses the actual DXY index (UDXUSD) directly for DXY bias instead of the
 """
 
 import argparse
+import io
 import os
 import sys
 from collections import namedtuple
@@ -123,7 +124,45 @@ class HistdataBacktester(bt_module.Backtester):
 # Main
 # ---------------------------------------------------------------------------
 
+# ── Console capture ─────────────────────────────────────────────────────────
+# Several analytics blocks (draw-on-liquidity, winners-by-session, session-open
+# side breakdown, the P26 SOJ table) are `print`-only and were NEVER written into
+# data/backtest_report.md — so the pushed report was a SUBSET of what the run
+# actually measured, and the only way to see the rest was a screenshot of the
+# terminal. Tee the whole run to data/backtest_console.txt and push it with the
+# report, so every future print block is carried automatically without anyone
+# having to remember to add it to the writer.
+_CONSOLE_BUF = io.StringIO()
+
+
+class _Tee:
+    """Write to the real stdout AND the capture buffer. Everything else (isatty,
+    encoding, fileno) delegates, so anything probing stdout still behaves."""
+
+    def __init__(self, real, buf):
+        self._real, self._buf = real, buf
+
+    def write(self, s):
+        self._buf.write(s)
+        return self._real.write(s)
+
+    def flush(self):
+        self._real.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
 def main():
+    _real_stdout = sys.stdout
+    sys.stdout = _Tee(_real_stdout, _CONSOLE_BUF)
+    try:
+        _main(_real_stdout)
+    finally:
+        sys.stdout = _real_stdout
+
+
+def _main(_real_stdout):
     parser = argparse.ArgumentParser(description="ICT Intermarket Backtest")
     parser.add_argument(
         "--years", nargs="+", default=["2022", "2023", "2024", "2025"],
@@ -1662,6 +1701,14 @@ def _publish_backtest_report(results, backtester, years, df=None):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     open(out, "w", encoding="utf-8").write("\n".join(L) + "\n")
 
+    # The full terminal transcript — the print-only tables the markdown lacks.
+    console = os.path.join(root, "data", "backtest_console.txt")
+    try:
+        open(console, "w", encoding="utf-8").write(_CONSOLE_BUF.getvalue())
+    except Exception as _e:
+        console = None
+        print(f"[console capture not written: {_e}]")
+
     if os.environ.get("NO_PUSH") == "1":
         print(f"report written (NO_PUSH=1, not committed) — {out}")
         return
@@ -1671,6 +1718,8 @@ def _publish_backtest_report(results, backtester, years, df=None):
     sha = _git("rev-parse", "--short", "HEAD").stdout.strip() or "unknown"
     branch = _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "HEAD"
     _git("add", "-f", out)
+    if console:
+        _git("add", "-f", console)
     _git("commit", "-q", "-m", f"HistData backtest {span} results (auto, {sha})")
     # Pull with rebase to avoid merge conflicts from code pushes
     _git("pull", "-q", "--rebase", "--no-edit", "origin", branch)
