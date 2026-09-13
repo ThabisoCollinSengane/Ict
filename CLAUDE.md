@@ -1356,6 +1356,72 @@ Read `with`/`against`, the align × pos cells, and the `ob`/`against` row in eac
 half. A bucket must hold PF > 1 in BOTH **and keep its magnitude** (criterion #3),
 or nothing comes of it.
 
+### P74 IS/OOS (RAN 2026-09-13) — alignment CLOSES null. The only structure that
+### survives is DISTANCE, and it was not the thing being tested.
+
+Both splits clean and exact: IS **355 / 43.1% / 3.37 / −13.24%**, OOS
+**385 / 44.4% / 4.28 / −10.21%**, no arm counters, `dxy_real_used` absent.
+
+**The alignment headline INVERTS across the halves:**
+
+| | IS (40.0% `with`) | OOS (41.5% `with`) |
+|---|---|---|
+| with | WR 43.0% / PF **3.72** | WR 40.5% / PF 4.07 |
+| against | WR 43.2% / PF 3.09 | WR **47.2%** / PF **4.63** |
+
+`with` wins on PF in IS, `against` wins in OOS, and the WR gap runs 0.2pp one way
+then 6.7pp the other. Sign-unstable — the P47 `narrative_rate` signature.
+**Daily-FVG alignment has no discriminating power. P74's question is answered null,
+the ninth on the analysis axis.**
+
+**Both full-run candidates failed, and the caveat that killed them was the right one
+(PF on the compounding run is path-weighted, not a bucket property):**
+
+| Bucket | Full 4yr | IS | OOS |
+|---|---|---|---|
+| `against`+`ahead` | PF 5.10 | PF **3.06** (BELOW its 3.37 baseline) | PF 7.43 |
+| `ob`/`against` | PF 7.25 | WR **30.4%** / PF 2.04 | WR **71.1%** / PF 22.00 |
+| `with`+`inside` | PF 14.32 | n=13, WR 53.8% | n=22, WR 54.5% |
+
+`ob`/`against` swings **30.4% -> 71.1% WR on comparable n (46 vs 45)**. That is not
+an edge degrading, it is a coin landing differently twice — and it was the
+highest-PF cell on the full run. `with`+`inside` keeps its win rate across halves
+but on 13 and 22 trades, where the standard error is ~14pp: unresolvable, exactly
+as predicted. **Nothing ships off `align`, `pos`, or `d1_pd_type`.**
+
+**⚠️ The one cell with structure that survives is DISTANCE — not alignment:**
+
+| Dist from daily FVG | IS WR / PF | OOS WR / PF |
+|---|---|---|
+| inside | 48.1% / 4.25 | 43.0% / 3.48 |
+| 0-10 | 31.0% / **2.15** | 44.7% / **2.45** |
+| 10-25 | 50.0% / 4.41 | 50.0% / 5.75 |
+| **25-50** | 44.0% / **6.62** | 50.8% / **7.46** |
+| 50-100 | 46.2% / 3.22 | 43.5% / 5.06 |
+| >100 | **28.6%** / 0.94 | **32.5%** / 3.96 |
+
+A sweet band at 10-50 pips with both extremes weaker, in BOTH halves: 25-50 is the
+top PF bucket in both (6.62 / 7.46, same ballpark), >100 the worst WR in both
+(−14.5pp / −11.9pp vs baseline), 0-10 near-worst PF in both. On its face that
+passes all three not-curve-fit criteria — the first cell in this study to do so.
+
+**Two reasons NOT to act on it yet, stated so a future session does not overread it:**
+1. **Multiple comparisons.** Roughly twenty cells were read across four tables and
+   two splits. One lining up is near what chance delivers, and **no hypothesis
+   predicted "25-50 pips" in advance** — it was found by looking. A pre-registered
+   band would be worth more than this one.
+2. **`>100` is NOT a skip candidate.** OOS PF is 3.96 — a profitable bucket with a
+   low win rate, not a losing one. P8 gated a PF 0.13/0.16 bucket and still cost
+   ~R31M of compounding; removing a PF-3.96 bucket has a far worse prior.
+
+If anything is tested here it is a SIZE-UP on 25-50 (134 trades, 18% of the book —
+the P19/P41 scale, not P70 ARM 1's 69%), and it must be read against `risk_cap_skip`
+per the ARM 1 lesson, on the FULL continuous run.
+
+**Minor:** `ifvg` as the nearest daily PD array fired 3 times in 4 years (all OOS,
+all losers). That branch essentially never occurs — the daily gap is either live or
+mitigated, rarely inverted-and-nearest.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
