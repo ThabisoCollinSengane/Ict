@@ -1508,6 +1508,46 @@ single-split ordering dissolved on the other half (P67's rung, P74's `ob`/`again
 now SOJ). A clean ordering in one split is worth roughly nothing on its own; the
 mirror-image case is the cheapest possible reminder of that.
 
+### ⚠️ TARGET-FAMILY CLAIM CORRECTED (RAN 2026-09-13, both splits, clean)
+### `pdh_pdl` is NOT the best target family — it is beaten by `fib_extension` OOS
+
+First per-split reading of the draw-on-liquidity family table, now that the console
+transcript is pushed. Both runs clean and exact (IS 355 / 43.1% / 3.37; OOS 385 /
+44.4% / 4.28), no arm counters. The OOS transcript's SOJ table matches the earlier
+screenshot to the decimal — the tee is faithful.
+
+| Target family | IS trades / WR / avg P&L | OOS trades / WR / avg P&L |
+|---|---|---|
+| fib_extension | 220 / 41.8% / R131 | 193 / **48.7%** / **R232** |
+| equal_hl | 25 / **60.0%** / R217 | 45 / 44.4% / R307 |
+| pdh_pdl | 28 / 42.9% / R176 | 54 / **37.0%** / R126 |
+| swing | 41 / 43.9% / R122 | 49 / **38.8%** / **R85** |
+| round_number | 30 / 43.3% / R108 | 21 / 52.4% / R156 |
+| pwh_pwl | 5 / 40.0% / R28 | 6 / **0.0%** / −R236 |
+| ith/itl_liquidity | 6 / 17% / negative | 17 / 41% / R175 |
+
+**The claim carried in the P49-P56 analytics note — "`pdh_pdl` is the best target
+family, 47 trades / 53.2% WR / +R261 avg, roughly triple `fib_extension`" — does
+NOT survive the split.** `pdh_pdl` runs 42.9% → **37.0%** and is beaten by
+`fib_extension` in OOS on BOTH win rate (48.7% vs 37.0%) and average P&L (R232 vs
+R126). The original figure came from the P26-era full-4yr table on a different
+config and trade population; **as a per-split claim it is false and should not be
+cited.** Nothing was ever built on it, so nothing needs reverting — but it was
+sitting in the brief as an established fact.
+
+**`equal_hl` behaved exactly as a 25-trade cell should:** 60.0% IS → 44.4% OOS.
+Flagged as unvalidated when first seen; confirmed unvalidated. Same lesson as P74's
+`with`+`inside` (36 tr) and `ob`/`against` (30.4% → 71.1%).
+
+**The one family claim that DOES hold in both halves:** `swing` is the weakest
+large bucket — lowest average P&L of the big families in both splits (R122 / R85),
+consistent with what the brief already said.
+
+**`fib_extension` is not the poor relation it is sometimes described as.** It
+carries most of the volume (220 / 193) AND has the best OOS average P&L of any
+family with real n. Consistent with the (now-corrected) P67 finding that a NEAR fib
+is an excellent target.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
