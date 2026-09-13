@@ -1745,6 +1745,68 @@ python run_backtest_histdata.py
 python scripts/fvg_draw_episodes.py
 ```
 
+### P76 RESULT (RAN 2026-09-13) — the algo BARELY TRADES the daily gap as a draw.
+### 4 of 5 episodes get ZERO aimed entries. That is the answer, and it is structural.
+
+**§1 — the gaps behave exactly as the trader's model says.**
+
+| split | gaps | filled | fill% | med days | p90 days |
+|---|---|---|---|---|---|
+| IS | 409 | 391 | **95.6%** | **9.0** | 151.0 |
+| OOS | 389 | 352 | **90.5%** | **5.5** | 63.8 |
+
+A daily FVG is a persistent objective: it fills ~90-96% of the time and takes a
+median 5.5-9 days, with a long tail.
+
+**§2 — THE HEADLINE, and it is the number P75 never produced:**
+
+| split | episodes | with ≥1 aimed entry | toward | med/ep | max/ep |
+|---|---|---|---|---|---|
+| IS | 409 | **93 (23%)** | 164 | **1.0** | 7 |
+| OOS | 389 | **79 (20%)** | 109 | **1.0** | 6 |
+
+**Roughly 4 of every 5 daily gaps form, live for days, fill — and the algo never
+once points at them.** Where an aimed entry does occur the MEDIAN is ONE, across an
+episode lasting 5-9 days. The engine is not trading the daily gap as a draw in any
+meaningful sense. That is a COVERAGE fact, not a verdict on the gap, and P75's
+"35.5% hit rate" obscured it completely by measuring the wrong unit.
+
+**§3 — toward vs away: WR is consistent, PF is not.**
+
+| split | bucket | trades | WR | PF |
+|---|---|---|---|---|
+| IS | toward | 126 | **45.2%** | 2.95 |
+| IS | away | 157 | 40.1% | **3.22** |
+| OOS | toward | 147 | **47.6%** | **4.73** |
+| OOS | away | 129 | 43.4% | 4.32 |
+
+**Win rate favours `toward` in BOTH splits at the same magnitude — +5.1pp and
++4.2pp.** Same sign, same ballpark: criteria 2 and 3 satisfied on WR, which very
+little in this book has managed. **But PF inverts** (toward worse in IS, better in
+OOS). Trades pointing at an unfilled daily gap win MORE OFTEN and do not make MORE
+MONEY — the direction is right, the payoff does not follow.
+
+**⚠️ CAVEAT 1, and it is serious: 605 of 736 entries (82%) were STRADDLED** — an
+unfilled daily gap above AND below. For four entries in five, "toward" is close to
+an arbitrary label, since the trade aims at one gap and away from another. The
++5pp WR is measured on a classification that is ambiguous most of the time.
+**The next cut is the UNAMBIGUOUS subset** — entries with a live gap on one side
+only, or where one gap is materially nearer than the other. Until that is run, §3
+is suggestive, not a finding.
+
+**⚠️ CAVEAT 2 — my own reporting inconsistency.** §2 splits episodes by when the
+GAP FORMED; §3 splits trades by TRADE DATE. An episode formed in Dec 2023 that
+receives entries in 2024 lands in IS in §2 and OOS in §3. Totals reconcile
+(431+305 = 355+381 = 736) but the two tables are NOT directly comparable, and the
+script should use one convention.
+
+**What this opens.** If the gap is a valid draw, the untapped population is large —
+~80% of episodes currently get nothing. But P68b measured the gap's pull on RAW
+price at zero lift against a mirror band, so "aim at more gaps" is NOT supported by
+that evidence. The one thing pointing the other way is §3's WR consistency, and it
+sits on an 82%-ambiguous classification. **Resolve the straddle before building
+anything.**
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
