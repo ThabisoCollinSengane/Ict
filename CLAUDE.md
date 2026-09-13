@@ -1807,6 +1807,57 @@ that evidence. The one thing pointing the other way is §3's WR consistency, and
 sits on an 82%-ambiguous classification. **Resolve the straddle before building
 anything.**
 
+### P76b — the UNAMBIGUOUS subset (BUILT 2026-09-13, NOT run)
+### The cut that decides whether P76 §3's +5pp win-rate gap is real
+
+**The problem it fixes.** P76 §3 found `toward` beating `away` on win rate in BOTH
+splits at the same magnitude (+5.1pp IS / +4.2pp OOS) — criteria 2 and 3 satisfied,
+which very little in this book has managed. But **605 of 736 entries (82%) were
+STRADDLED**: an unfilled daily gap above AND below. For four entries in five the
+trade aims at one gap and away from another, and which one counts as "the" draw is
+settled by a few pips of distance. A both-splits result measured on a label that is
+ambiguous most of the time is not a finding; it is a finding-shaped thing.
+
+**`ambiguity(d_above, d_below, dominance)`** — pure, unit-tested, classifies every
+entry by how trustworthy its `toward`/`away` label is:
+
+| bucket | meaning |
+|---|---|
+| `one_sided` | a live unfilled daily gap on ONE side only — no competing draw |
+| `dominant` | gaps both sides, but the near one is ≤ `DOMINANCE`× the far one's distance (default 0.5, i.e. at least 2× closer) |
+| `ambiguous` | two comparable draws — the label is a coin flip |
+| `inside` | price is within a gap; **excluded from both cuts** — no direction aims at a gap you are already in |
+
+**§4 reports all four, and `ambiguous` is the internal control.** If aiming at the
+day's gap carries information, the `one+dominant` cut should be SHARPER than §3 and
+`ambiguous` flatter. If the lift is flat everywhere — or lives only in the ambiguous
+bucket — §3 was the straddle, and the answer is null. A `WRlift` column makes the
+toward-minus-away gap readable per subset per split without arithmetic.
+
+**Caveat 2 from the first run is fixed: ONE split convention.** §2 previously dated
+episodes by GAP FORMATION while §3 dated trades by TRADE DATE, so the two tables
+could not be compared even though their totals reconciled. Now every table dates a
+thing by its own date — an episode by when its gap became knowable, a trade by its
+own open time — and §2 counts only entries from the episode's own half, printing
+how many cross-boundary entries that excludes.
+
+**Verified:** selftest covers the dominance threshold in both directions, exactly AT
+the threshold vs just over it, the symmetric case, a non-default threshold, the
+degenerate pair, and the split map. Then driven END-TO-END on a synthetic fixture
+whose gaps are asserted before the drive is trusted — one pair carrying exactly ONE
+gap (so every entry is genuinely one-sided) and one carrying a gap above AND below
+at controlled distances, producing hand-computed `dominant`, `ambiguous`, `inside`,
+`no_gap` and cross-boundary cases. **Every cell in the report matched the
+hand-computed answer**, including the distance tie and the cross-boundary count.
+Per the project rule that pure-logic tests never exercise plumbing.
+
+**Run (needs the dump, so the backtest first):**
+```
+python run_backtest_histdata.py
+python scripts/fvg_draw_episodes.py
+```
+Read §4's `WRlift` column in BOTH splits before anything else in the file.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
