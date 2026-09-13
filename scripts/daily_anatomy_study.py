@@ -48,12 +48,29 @@ sys.path.insert(0, ROOT)
 
 DATA = os.path.join(ROOT, "data", "histdata")
 REPORT = os.path.join(ROOT, "data", "daily_anatomy_report.md")
-DUMP = os.path.join(ROOT, "data", "trades_dump.csv")
+DUMP = None          # resolved at run time by _find_dump()
 PAIRS = ("EURUSD", "GBPUSD", "NZDUSD")
 IS_YEARS = (2022, 2023)
 OOS_YEARS = (2024, 2025)
 PIP = 0.0001
 NO_PUSH = False
+
+
+def _find_dump():
+    """Locate the backtest trade dump.
+
+    ⚠️ `run_backtest_histdata.py` writes it to `data/histdata/` (DATA_DIR is the
+    histdata folder), NOT `data/`. Six existing scripts — mm_analysis,
+    amd_analysis, amd_range_analysis, amd_tickvol_analysis, p39_volume_analysis,
+    pair_bias_analysis — already resolve it with exactly this candidate list.
+    Hardcoding `data/trades_dump.csv` made this study report MISSING after a
+    backtest that had written the dump perfectly well.
+    """
+    for p in (os.path.join(ROOT, "data", "histdata", "trades_dump.csv"),
+              os.path.join(ROOT, "data", "trades_dump.csv")):
+        if os.path.exists(p):
+            return p
+    return None
 
 
 # ─────────────────────────── pure logic (unit-testable) ────────────────────────
@@ -297,9 +314,10 @@ def run(min_judas_pips, early_hours):
 def _target_demand(left_lookup):
     """§5 — every real target as a fraction of what was typically left."""
     import pandas as pd
-    if not os.path.exists(DUMP) or not left_lookup:
+    dump = DUMP or _find_dump()
+    if dump is None or not left_lookup:
         return None
-    df = pd.read_csv(DUMP)
+    df = pd.read_csv(dump)
     need = {"opened_at", "entry", "target", "pair", "pnl"}
     if not need.issubset(df.columns):
         return {"error": f"trades_dump.csv lacks {sorted(need - set(df.columns))}"}

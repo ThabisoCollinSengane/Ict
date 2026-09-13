@@ -46,12 +46,29 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, ROOT)
 
 DATA = os.path.join(ROOT, "data", "histdata")
-DUMP = os.path.join(ROOT, "data", "trades_dump.csv")
+DUMP = None          # resolved at run time by _find_dump()
 REPORT = os.path.join(ROOT, "data", "algo_vs_zones_report.md")
 IS_YEARS = (2022, 2023)
 OOS_YEARS = (2024, 2025)
 PIP = 0.0001
 NO_PUSH = False
+
+
+def _find_dump():
+    """Locate the backtest trade dump.
+
+    ⚠️ `run_backtest_histdata.py` writes it to `data/histdata/` (DATA_DIR is the
+    histdata folder), NOT `data/`. Six existing scripts — mm_analysis,
+    amd_analysis, amd_range_analysis, amd_tickvol_analysis, p39_volume_analysis,
+    pair_bias_analysis — already resolve it with exactly this candidate list.
+    Hardcoding `data/trades_dump.csv` made this study report MISSING after a
+    backtest that had written the dump perfectly well.
+    """
+    for p in (os.path.join(ROOT, "data", "histdata", "trades_dump.csv"),
+              os.path.join(ROOT, "data", "trades_dump.csv")):
+        if os.path.exists(p):
+            return p
+    return None
 
 
 # ─────────────────────────── pure logic (unit-testable) ────────────────────────
@@ -158,10 +175,15 @@ def _unfilled_gaps_at(bars, upto_pos, lookback=400):
 def run(zone_tfs, horizon_h, lookback):
     import pandas as pd
 
-    if not os.path.exists(DUMP):
-        print(f"  MISSING {DUMP} — run `python run_backtest_histdata.py` first")
+    dump = DUMP or _find_dump()
+    if dump is None:
+        print("  MISSING trades_dump.csv — looked in:")
+        print(f"    {os.path.join(ROOT, 'data', 'histdata', 'trades_dump.csv')}")
+        print(f"    {os.path.join(ROOT, 'data', 'trades_dump.csv')}")
+        print("  Run `python run_backtest_histdata.py` first.")
         return 1
-    td = pd.read_csv(DUMP)
+    print(f"  trade dump: {dump}")
+    td = pd.read_csv(dump)
     need = {"opened_at", "closed_at", "pair", "direction", "entry", "exit",
             "target", "pnl"}
     miss = need - set(td.columns)

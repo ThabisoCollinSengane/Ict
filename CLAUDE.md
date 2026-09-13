@@ -1112,6 +1112,18 @@ measurement would have shown its hand there.
 three sections up in P71 and I reintroduced it anyway — which is precisely why the
 end-to-end drive is not optional.
 
+**⚠️ The trade dump lives in `data/histdata/`, not `data/`.**
+`run_backtest_histdata.py` writes it with `os.path.join(DATA_DIR, ...)` and
+`DATA_DIR` IS the histdata folder. Six existing scripts — `mm_analysis`,
+`amd_analysis`, `amd_range_analysis`, `amd_tickvol_analysis`,
+`p39_volume_analysis`, `pair_bias_analysis` — already resolve it with a candidate
+list covering both paths. P71 and P73 hardcoded `data/trades_dump.csv` and both
+reported **MISSING after a backtest that had written the dump perfectly well**.
+Fixed: both now use `_find_dump()` with the same candidate list, print which path
+they resolved, and name BOTH paths when genuinely absent. **When a project
+already has a convention for finding a file, use it — six call sites is a
+convention, not a coincidence.**
+
 **Run (needs the dump, so the backtest first):**
 ```
 python run_backtest_histdata.py
