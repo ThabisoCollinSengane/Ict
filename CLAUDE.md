@@ -1858,6 +1858,71 @@ python scripts/fvg_draw_episodes.py
 ```
 Read §4's `WRlift` column in BOTH splits before anything else in the file.
 
+### P76b RESULT (RAN 2026-09-13) — 🔴 NOT RESOLVED, and it CANNOT BE on this dataset.
+### The straddle was not the whole story, but nothing here clears one standard error.
+
+Dump is the clean 736-trade book (355 IS / 381 OOS). The split-convention fix behaved
+exactly as designed: **76 cross-boundary entries**, all of them OOS trades against
+IS-formed gaps (an OOS gap cannot receive an IS trade), so §2's IS `toward` fell
+164 → 126 and now reconciles to §3's IS `toward` of 126 exactly, with OOS 109 + 38 = 147.
+
+**§4, the cut that was supposed to decide it:**
+
+| subset | n | IS WRlift | OOS WRlift |
+|---|---|---|---|
+| `one_sided` | 116 | +9.1pp | +14.5pp |
+| `dominant` | 262 | **−3.2pp** | +7.1pp |
+| **`one+dominant`** | 378 | **+3.0pp** | **+7.7pp** |
+| `ambiguous` (control) | 181 | **+10.6pp** | −1.8pp |
+| §3 all entries | 736 | +5.1pp | +4.2pp |
+
+**Every single cell is under ~1 standard error.** Computed on the pooled-proportion SE
+of a difference: one+dominant 0.42 / 1.01 SE, dominant −0.34 / 0.87, one_sided 0.83 /
+0.67, ambiguous 0.95 / −0.18, and §3 itself 0.86 / 0.70. **Not one result in this study,
+including the original +5.1/+4.2 that motivated it, is distinguishable from zero.**
+
+**The cut failed its own pre-registered prediction.** The build said: if aiming at the
+gap is real, `one+dominant` should be SHARPER than §3 and `ambiguous` FLATTER. What
+happened:
+- IS got **weaker**, not sharper (+5.1 → +3.0), and the OOS/IS spread WIDENED
+  (§3 was +5.1/+4.2, tight; the clean cut is +3.0/+7.7, a 2.6× spread — criterion #3
+  is worse after the cut, not better).
+- The `ambiguous` control is the **LARGEST IS lift on the board (+10.6pp)** — the
+  opposite of flat, and by construction that bucket cannot be about aiming at the right
+  gap, because there isn't one.
+- `dominant`, the biggest clean bucket at 262 trades, **flips sign** (−3.2 / +7.1).
+
+**One thing did improve, and it is worth recording.** §3's PF inversion — the reason
+P76 stopped short of calling it a finding — DISAPPEARS in the clean cut. `toward` beats
+`away` on PF in BOTH halves (IS 3.14 vs 2.80, OOS 5.55 vs 4.12), where §3 had IS running
+the wrong way (2.95 vs 3.22). So the straddle WAS corrupting something. But PF on a
+compounding run is path-weighted (the P74 caveat), and the WR cells it sits beside are
+all sub-1-SE, so this is a coherence improvement, not evidence.
+
+**⚠️ THE REAL FINDING, and it closes the line: this question is unanswerable here.**
+For a 5pp win-rate difference at p≈0.44 to reach 2 SE you need **~790 trades per bucket,
+~1,580 in total.** The entire 4-year book is 736 trades and the clean cut is 378. **The
+measurement needs roughly four times the whole dataset.** No amount of re-cutting fixes
+that — every further subset makes it worse, which is exactly what §4 demonstrated by
+splitting 736 into cells of 10 to 115 trades. Do not spend another run narrowing this.
+
+**Verdict: nothing ships off `toward`/`away`.** P76 and P76b both close. The durable
+outputs are the two COVERAGE facts, which are large, unambiguous, and need no
+significance test:
+- **4 of 5 daily gap episodes receive ZERO aimed entries** (84/409 IS, 79/389 OOS), and
+  where one does fire the median is ONE across a 5-9 day episode.
+- **24% of all entries (177) are filled INSIDE a live daily gap** — a quarter of the
+  book, first measured here. They perform mid-pack (IS WR 45.8% / PF 4.53, OOS 41.9% /
+  4.39), so it is a description of where the algo trades, not a lever.
+
+**Method note.** The `ambiguous` bucket earned its keep: without it the clean cut's
++3.0/+7.7 reads as a survived result, and the tell that it is noise — a bigger lift in
+the bucket where the mechanism cannot operate — would have been invisible. A control
+built the same way as the condition, again (P65, P68b, P69, P71 §3). The new lesson is
+the arithmetic one: **check the n a hypothesis needs BEFORE building the cut that
+splits it.** Six cells of 10-115 trades was never going to resolve a 5pp effect, and
+that was computable in advance.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
