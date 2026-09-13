@@ -133,6 +133,20 @@ def main():
     args = parser.parse_args()
     requested_years = args.years
 
+    # Reject a malformed year list LOUDLY. `--years` takes nargs="+", so a stray
+    # shell word lands in it silently: a run on 2026-09-12 was invoked with
+    # `--years 2024 git pull`, printed the header "2024–pull (3 yr)", loaded only
+    # 2024, and produced a perfectly plausible 157-trade report that meant
+    # nothing. A backtest that silently measures the wrong span is worse than one
+    # that crashes.
+    _bad = [y for y in requested_years
+            if not (str(y).isdigit() and 2000 <= int(y) <= 2100)]
+    if _bad:
+        parser.error(
+            f"--years got non-year argument(s): {' '.join(map(str, _bad))}. "
+            f"Years must be 4-digit numbers like 2022 2023. If you meant to run "
+            f"another command, put it on its own line.")
+
     label = "–".join([requested_years[0], requested_years[-1]])
     print("=" * 60)
     print(f"ICT Intermarket Backtest — HistData.com M1 data ({label})")
