@@ -1,156 +1,158 @@
-# HistData backtest — 2024–2025 (2 yr)
+# HistData backtest — 2022–2025 (4 yr)
 
 ## Results
 
 ```
-trades                     384
-win_rate_pct               44.3
-profit_factor              4.33
+trades                     736
+win_rate_pct               43.9
+profit_factor              4.01
 starting_equity_ZAR        1000
-ending_equity_ZAR          76631.46
-pnl_ZAR                    75631.46
-pnl_pct                    7563.15
-max_drawdown_pct           -9.59
-avg_win_ZAR                578.31
-avg_loss_ZAR               -105.99
-withdrawn_total_ZAR        68141.8
-withdrawal_count           16
-working_balance_ZAR        8489.65
-working_max_drawdown_pct   17.12
+ending_equity_ZAR          140575.71
+pnl_ZAR                    139575.71
+pnl_pct                    13957.57
+max_drawdown_pct           -13.24
+avg_win_ZAR                575.74
+avg_loss_ZAR               -112.32
+withdrawn_total_ZAR        132020.5
+withdrawal_count           37
+working_balance_ZAR        8555.21
+working_max_drawdown_pct   21.89
 ```
 
 ## Gate funnel
 
 ```
-checks                         60936
-in_killzone                    60936
-news_clear                     58702
-nfp_fomc_ok                    50597
-intermarket_signal             2592
-pair_matches                   2592
-mss_h1_m15_m5_ok               922
-daily_bias_ok                  922
-h1_bias_ok                     922
-h4_bias_ok                     922
-dealing_range_ok               74
-consolidation_found            534
-manipulation_correct_dir       456
-m5_fvg_correct_dir             530
-target_found                   530
-rr_ok                          530
-units_nonzero                  530
+checks                         120773
+in_killzone                    120773
+news_clear                     115551
+nfp_fomc_ok                    99018
+intermarket_signal             5532
+pair_matches                   5532
+mss_h1_m15_m5_ok               1926
+daily_bias_ok                  1926
+h1_bias_ok                     1926
+h4_bias_ok                     1926
+dealing_range_ok               110
+consolidation_found            1030
+manipulation_correct_dir       904
+m5_fvg_correct_dir             1026
+target_found                   1026
+rr_ok                          1026
+units_nonzero                  1026
 limit_placed                   0
-entry_opened                   381
-pyramid_added                  3
-pyramid_blocked_min_target     682
-drawdown_halt                  1032
-daily_loss_halt                458
+entry_opened                   722
+pyramid_added                  14
+pyramid_blocked_min_target     995
+drawdown_halt                  2542
+daily_loss_halt                1212
 consec_loss_pause              0
 weekly_cap                     0
 weekly_pair_cap                0
-daily_cap                      316
-daily_pair_cap                 1180
-weekly_amd_confirmed           154
-session_handover_closed        0
-htf_draw_full_cascade          157
-htf_draw_partial               343
-htf_draw_counter               157
-htf_fvg_5050_hit               29
-ote_zone                       3
-choch_confirmed                30
+daily_cap                      529
+daily_pair_cap                 3141
+weekly_amd_confirmed           327
+session_handover_closed        2
+htf_draw_full_cascade          301
+htf_draw_partial               641
+htf_draw_counter               338
+htf_fvg_5050_hit               34
+ote_zone                       5
+choch_confirmed                39
 low_conviction                 0
-judas_divergence               0
-ny_continuation                226
+judas_divergence               2
+ny_continuation                417
 pm_gate_pair_news              0
-dxy_flat                       39206
-dxy_directional                9895
-eurgbp_directional             5103
-im_score_low                   3474
-breakout_confirmed             509
-soj_retest                     329
-soj_sweep                      486
-crt_turtle_soup                259
-golden_rule_no                 262
-mstruct_align                  501
-phase_ny_judas                 283
-gt_pool_sweep                  397
-gt_disp_wick                   388
-structure_stop_used            491
-stop_capped_10pip              345
-risk_cap_ok                    381
-pyramid_blocked_favour         3123
-eurgbp_flat                    2683
-eurgbp_flat_gbp_blocked        1938
-golden_rule_yes                229
-phase_london_judas             258
-gt_mp_discount                 85
-gt_mp_extreme                  21
-soj_judas                      157
-mstruct_minor_sweep            63
-london_judas_ny_echo           15
-pyramid_blocked_low_im         1640
-smt_pair_opposing              41
-target_rung_far                197
-sr_attempted                   43
-sr_prev_session_ok             43
-sr_enough_bars                 43
-sr_consol_found                43
-sr_breakout_found              30
-session_range_found            36
-gt_macro_window                69
-smt_pair_confirmed             139
-m1_stop_used                   39
-dxy_fvg_room                   91
-gt_judas_reversal              57
-sr_consol_no_sweep             8
-sr_fail_high_swept_no_close_back 2
-sr_pdliq_attempted             8
-target_score_sized             225
-golden_rule_sized              201
-crt_sweep_sized                96
-sr_fail_low_swept_no_close_back 4
-pdliq_sweep_sized              110
-risk_cap_skip                  149
+dxy_flat                       74750
+dxy_directional                20598
+eurgbp_flat                    4610
+eurgbp_flat_gbp_blocked        3314
+breakout_confirmed             1088
+sr_attempted                   84
+sr_prev_session_ok             84
+sr_enough_bars                 84
+sr_consol_found                83
+sr_breakout_found              51
+session_range_found            65
+soj_retest                     571
+soj_sweep                      934
+golden_rule_no                 498
+mstruct_align                  982
+phase_ny_judas                 531
+gt_pool_sweep                  788
+structure_stop_used            956
+stop_capped_10pip              752
+target_rung_far                326
+risk_cap_ok                    722
+pyramid_blocked_low_im         2617
+eurgbp_directional             11425
+soj_judas                      363
+crt_turtle_soup                489
+golden_rule_yes                473
+gt_disp_wick                   750
+m1_stop_used                   70
+pyramid_blocked_favour         4922
+dxy_fvg_room                   156
+phase_london_judas             518
+gt_macro_window                131
+im_score_low                   7597
+smt_pair_opposing              112
+gt_mp_discount                 180
+smt_pair_confirmed             288
+mstruct_minor_sweep            132
+gt_judas_reversal              114
+gt_mp_extreme                  40
+ny_continuation_gated          9
+london_judas_ny_echo           22
+sr_consol_no_sweep             20
+sr_fail_no_sweep               6
+sr_pdliq_attempted             21
+sr_fail_low_swept_no_close_back 9
+target_score_sized             384
+crt_sweep_sized                177
+risk_cap_skip                  304
+golden_rule_sized              426
+pdliq_sweep_sized              206
 htf_fvg_breakout_sized         15
+sr_pdliq_width_ok              2
+sr_pdliq_sweep                 2
+sr_fail_high_swept_no_close_back 4
+sr_fail_both_swept             1
 pyramid_blocked_no_pattern     6
-sr_pdliq_width_ok              1
-sr_pdliq_sweep                 1
-ny_continuation_gated          3
-sr_fail_no_sweep               2
 ```
 
-_income: R68,142 across 16 withdrawals · working balance R8,490_
+_income: R132,021 across 37 withdrawals · working balance R8,555_
 
 ## PD array setup type (FVG / OB / breaker)
 
 ```
 Setup       Trades  Wins    WR%      P&L ZAR     PF
 --------------------------------------------------
-FVG            222    92  41.4%     36201.16   3.43
-OB             148    69  46.6%     36061.19   5.92
-BREAKER         14     9  64.3%      3369.11   8.29
+FVG            484   202  41.7%     82696.09   3.54
+OB             228   106  46.5%     52625.47   5.17
+BREAKER         24    15  62.5%      4254.16   4.49
 
 Setup x TF        Trades  Wins    WR%     PF
 ------------------------------------------
-BREAKER M15            2     2 100.0%    inf
-BREAKER M5            12     7  58.3%   5.18
-FVG H1                52    25  48.1%   6.59
-FVG M15               40    16  40.0%   2.75
-FVG M5               130    51  39.2%   2.67
-OB M15                20    12  60.0%   6.70
-OB M5                128    57  44.5%   5.75
+BREAKER H1             1     1 100.0%    inf
+BREAKER M15            4     3  75.0%   4.00
+BREAKER M5            19    11  57.9%   4.79
+FVG H1                88    39  44.3%   5.70
+FVG M15               77    30  39.0%   4.33
+FVG M5               319   133  41.7%   2.84
+OB M15                32    19  59.4%   7.72
+OB M5                196    87  44.4%   4.88
 
 Setup x pair          Trades  Wins    WR%     PF
 ----------------------------------------------
-BREAKER EURUSD             7     5  71.4% 136.49
-BREAKER GBPUSD             3     2  66.7%   7.27
-BREAKER NZDUSD             4     2  50.0%   3.97
-FVG EURUSD               120    50  41.7%   3.83
-FVG GBPUSD                87    38  43.7%   3.40
-FVG NZDUSD                15     4  26.7%   1.03
-OB EURUSD                101    42  41.6%   4.89
-OB GBPUSD                 31    21  67.7%   6.72
-OB NZDUSD                 16     6  37.5%   9.73
+BREAKER EURUSD            15     9  60.0%   4.34
+BREAKER GBPUSD             5     4  80.0%   7.01
+BREAKER NZDUSD             4     2  50.0%   3.36
+FVG EURUSD               239    99  41.4%   3.86
+FVG GBPUSD               219    97  44.3%   3.56
+FVG NZDUSD                26     6  23.1%   1.08
+OB EURUSD                148    58  39.2%   3.36
+OB GBPUSD                 56    36  64.3%  10.71
+OB NZDUSD                 24    12  50.0%   9.80
 ```
 
 ## Entry-type breakdown
@@ -158,24 +160,30 @@ OB NZDUSD                 16     6  37.5%   9.73
 ```
 Entry type              Trades  Wins    WR%    Avg P&L     PF
 ------------------------------------------------------------
-amd_breaker_m15              1     1 100.0%    1238.34    inf
-amd_breaker_m5               9     6  66.7%     215.85   5.68
-amd_fvg_h1                  38    19  50.0%     255.42   6.58
-amd_fvg_m15                 31    11  35.5%     154.37   2.43
-amd_fvg_m5                 115    43  37.4%      94.42   2.48
-amd_ob_m15                  13     6  46.2%     237.23   3.44
-amd_ob_m5                  107    47  43.9%     202.50   5.20
-mss_breaker_m15              1     1 100.0%     199.80    inf
-mss_breaker_m5               3     1  33.3%      -3.89   0.75
-mss_fvg_h1                  14     6  42.9%     435.01   6.59
-mss_fvg_m15                  8     5  62.5%     273.48   6.84
-mss_fvg_m5                  12     6  50.0%     184.63   3.71
-mss_ob_m15                   7     6  85.7%     593.14 719.22
-mss_ob_m5                   21    10  47.6%     340.86   8.83
-news_fvg_m5                  1     1 100.0%     443.68    inf
-pyramid_im0.8_fvg_m5         1     0   0.0%      -1.48   0.00
+amd_breaker_m15              2     1  50.0%     224.77   1.83
+amd_breaker_m5              13     9  69.2%     195.24   6.88
+amd_fvg_h1                  69    32  46.4%     225.64   5.08
+amd_fvg_m15                 60    21  35.0%     192.28   3.43
+amd_fvg_m5                 282   119  42.2%     132.94   2.92
+amd_ob_m15                  21    12  57.1%     182.59   4.17
+amd_ob_m5                  158    69  43.7%     206.84   4.42
+mss_breaker_h1               1     1 100.0%      64.20    inf
+mss_breaker_m15              2     2 100.0%     587.03    inf
+mss_breaker_m5               6     2  33.3%       4.70   1.11
+mss_fvg_h1                  18     7  38.9%     486.20   7.49
+mss_fvg_m15                 14     8  57.1%     416.73  15.11
+mss_fvg_m5                  24    11  45.8%     122.87   2.43
+mss_ob_m15                  10     6  60.0%     468.55  58.40
+mss_ob_m5                   38    18  47.4%     296.46   7.32
+news_fvg_m15                 1     0   0.0%      -9.25   0.00
+news_fvg_m5                  3     1  33.3%     118.60   5.05
+pyramid_im0.8_fvg_m15        1     1 100.0%     603.06    inf
+pyramid_im0.8_fvg_m5         4     1  25.0%     -46.94   0.32
+pyramid_im0.8_ob_m15         1     1 100.0%     159.84    inf
 pyramid_im1.0_fvg_m15        1     0   0.0%    -173.16   0.00
-pyramid_im1.0_fvg_m5         1     1 100.0%      88.80    inf
+pyramid_im1.0_fvg_m5         3     1  33.3%      13.87   1.88
+pyramid_wamd1.0_fvg_h1       1     0   0.0%      -8.33   0.00
+pyramid_wamd1.0_fvg_m5       3     0   0.0%     -18.38   0.00
 ```
 
 ## AMD consolidation source
@@ -183,27 +191,27 @@ pyramid_im1.0_fvg_m5         1     1 100.0%      88.80    inf
 ```
 Source              Trades  Wins    WR%      P&L ZAR     PF
 --------------------------------------------------------
-m15_range              352   157  44.6%     73801.00   4.53
-session_range           25    12  48.0%      1953.99   2.34
-(no AMD)                 7     1  14.3%      -123.53   0.62
+m15_range              664   293  44.1%    128304.98   4.08
+session_range           54    24  44.4%     10450.94   3.92
+(no AMD)                18     6  33.3%       819.80   1.68
 ```
 
-_Session-range widths (n=43): median=28.6 p75=48.2 p90=52.7 pips (cap=35.0)_
+_Session-range widths (n=84): median=44.8 p75=61.5 p90=85.0 pips (cap=35.0)_
 
 ## Golden rule: SELL GBP / BUY EUR (P44)
 
 ```
 Rule          Trades  Wins    WR%      P&L ZAR     PF
 --------------------------------------------------
-golden           145    73  50.3%     33749.30   4.53
-against          204    85  41.7%     31941.30   4.03
+golden           284   140  49.3%     69515.05   4.66
+against          398   163  41.0%     58532.42   3.48
 
 Pair x dir x rule              Trades    WR%     PF
 --------------------------------------------------
-EURUSD LONG golden                85  47.1%   4.58
-EURUSD SHORT against             143  39.9%   4.23
-GBPUSD LONG against               61  45.9%   3.66
-GBPUSD SHORT golden               60  55.0%   4.47
+EURUSD LONG golden               140  45.7%   4.26
+EURUSD SHORT against             262  38.9%   3.37
+GBPUSD LONG against              136  44.9%   3.72
+GBPUSD SHORT golden              144  52.8%   5.04
 ```
 
 ## Intraday SMT pair preference (P44)
@@ -211,9 +219,9 @@ GBPUSD SHORT golden               60  55.0%   4.47
 ```
 SMT pref        Trades  Wins    WR%      P&L ZAR     PF
 ----------------------------------------------------
-confirmed           88    36  40.9%     16163.86   3.97
-opposing            40    24  60.0%     13113.27   8.27
-no divergence      221    98  44.3%     36413.47   3.84
+confirmed          197    85  43.1%     37846.49   4.02
+opposing            84    44  52.4%     16740.27   5.00
+no divergence      401   174  43.4%     73460.71   3.84
 ```
 
 ## Target rung on the cascade ladder (P67)
@@ -222,10 +230,10 @@ The pure-price cascade study measured how often price reaches each pool after a 
 ```
 Rung      Trades  Wins    WR%      P&L ZAR     PF
 --------------------------------------------------
-near         261   117  44.8%     44767.45   4.21
-3-day         91    42  46.2%     27921.01   5.94
-30-day        15     5  33.3%      -437.32   0.71
-60-day        17     6  35.3%      3380.32   3.13
+near         517   226  43.7%     84622.40   3.65
+3-day        151    69  45.7%     40053.17   5.72
+30-day        27    12  44.4%      8252.66   5.69
+60-day        41    16  39.0%      6647.48   2.60
 ```
 
 ### Far rung × P20 escalation (P70)
@@ -234,17 +242,17 @@ Does escalation CREATE the far bucket, or is it just where the nearest qualifyin
 ```
 Rung      Escalated  Trades  Wins    WR%     PF
 ------------------------------------------------
-near            yes     181    75  41.4%   3.68
-near             no      80    42  52.5%   6.64
-3-day           yes      61    30  49.2%   6.74
-3-day            no      30    12  40.0%   1.97
-30-day          yes      11     4  36.4%   0.69
-30-day           no       4     1  25.0%   0.88
-60-day          yes      14     5  35.7%   3.59
-60-day           no       3     1  33.3%   1.41
+near            yes     347   145  41.8%   3.37
+near             no     170    81  47.6%   4.72
+3-day           yes      96    44  45.8%   6.26
+3-day            no      55    25  45.5%   4.00
+30-day          yes      21    10  47.6%   5.49
+30-day           no       6     2  33.3%   7.82
+60-day          yes      34    14  41.2%   2.49
+60-day           no       7     2  28.6%   3.72
 ```
 
-**86 of 123 far-rung trades (70%) were escalated.** High means P20 pushed them out there and de-escalation is the fix; low means the far target was simply the nearest one available, and only skipping or resizing can touch it.
+**151 of 219 far-rung trades (69%) were escalated.** High means P20 pushed them out there and de-escalation is the fix; low means the far target was simply the nearest one available, and only skipping or resizing can touch it.
 
 ## Target on an HTF PD array (P68)
 
@@ -252,9 +260,9 @@ The trader's draw definition: the daily draws are the W1/D1/H4 PD arrays, and th
 ```
 PD array    Trades  Wins    WR%      P&L ZAR     PF
 ----------------------------------------------------
-FVG            238   107  45.0%     46920.42   4.45
-OB              64    26  40.6%     14402.97   4.38
-none (projection)      82    37  45.1%     14308.06   3.97
+FVG            468   212  45.3%     94020.95   4.64
+OB             114    47  41.2%     27176.25   3.91
+none (projection)     154    64  41.6%     18378.52   2.64
 ```
 
 ## Rung x target family (P68)
@@ -263,23 +271,27 @@ The question the rung table alone cannot answer: do the far rungs lose because t
 ```
 Rung    Family           Trades  Wins    WR%     PF
 ----------------------------------------------------
-near    equal_hl             20     7  35.0%   3.27
-near    fib_extension       118    58  49.2%   4.67
-near    fvg                  17     6  35.3%   4.48
-near    pdh_pdl              47    19  40.4%   4.40
-near    pwh_pwl               5     0   0.0%   0.00
-near    round_number         13     7  53.8%  14.87
-near    swing                37    17  45.9%   3.57
-d3      equal_hl             13     7  53.8%   9.35
-d3      fib_extension        41    23  56.1%   7.39
-d3      fvg                  10     4  40.0%   1.43
-d3      itl_liquidity         7     2  28.6%   4.47
-d3      round_number          7     4  57.1%   5.29
-d3      swing                12     2  16.7%   0.45
-d30     fib_extension        10     4  40.0%   0.61
-d30     itl_liquidity         3     1  33.3%  14.21
-d60     equal_hl              3     1  33.3%   0.51
-d60     fib_extension        12     4  33.3%   4.35
+near    equal_hl             47    21  44.7%   4.11
+near    fib_extension       270   122  45.2%   3.84
+near    ith_liquidity         5     1  20.0%   0.47
+near    itl_liquidity         3     2  66.7% 190.70
+near    pdh_pdl              78    31  39.7%   3.46
+near    pwh_pwl              10     1  10.0%   0.13
+near    round_number         34    16  47.1%   7.39
+near    swing                70    32  45.7%   3.79
+d3      equal_hl             30    17  56.7%  12.89
+d3      fib_extension        78    38  48.7%   5.35
+d3      itl_liquidity         5     1  20.0%   0.80
+d3      round_number          8     3  37.5%   2.12
+d3      swing                27     9  33.3%   2.69
+d30     equal_hl              3     2  66.7%   7.69
+d30     fib_extension        16     8  50.0%   5.29
+d30     itl_liquidity         4     0   0.0%   0.00
+d30     swing                 3     1  33.3%   7.50
+d60     equal_hl              5     2  40.0%   1.25
+d60     fib_extension        27    10  37.0%   2.82
+d60     itl_liquidity         3     1  33.3%   0.46
+d60     round_number          3     1  33.3%  50.30
 ```
 
 ## Path obstruction (P67)
@@ -288,23 +300,23 @@ An unmitigated OPPOSING HTF gap sitting BETWEEN entry and target — somewhere p
 ```
 Path          Trades  Wins    WR%      P&L ZAR     PF
 ------------------------------------------------------
-blocked          184    78  42.4%     25996.78   3.28
-  on 240T        143    57  39.9%     18694.92   3.19
-  on D            41    21  51.2%      7301.86   3.53
-clear            200    92  46.0%     49634.68   5.41
+blocked          322   135  41.9%     45331.75   3.08
+  on 240T        244   104  42.6%     36212.79   3.34
+  on D            78    31  39.7%      9118.97   2.43
+clear            414   188  45.4%     94243.96   4.84
 ```
 
 ## Entry vs the DAILY FVG / PD array (P74)
 
 Every entry measured against the day's draw: how far the fill sat from the nearest unmitigated DAILY FVG, and whether that gap points the way we are trading (`with`) or the other way (`against`). Completed daily candles only — the forming bar carries hours that have not happened yet.
 
-**Alignment with the daily FVG:** 153 of 368 (41.6%) entries traded WITH the gap, 215 (58.4%) against it; 16 entries had no daily gap on the chart.
+**Alignment with the daily FVG:** 287 of 731 (39.3%) entries traded WITH the gap, 444 (60.7%) against it; 5 entries had no daily gap on the chart.
 
 ```
 Align         Trades  Wins    WR%      P&L ZAR     PF  medDist
 ----------------------------------------------------------------
-with             153    61  39.9%     28831.90   4.10     47.2
-against          215   102  47.4%     46891.02   4.70      8.3
+with             287   121  42.2%     59699.77   4.09     44.5
+against          444   201  45.3%     80245.43   4.03     11.4
 ```
 
 **Distance from the daily FVG**
@@ -312,12 +324,12 @@ against          215   102  47.4%     46891.02   4.70      8.3
 ```
 Dist pips     Trades  Wins    WR%      P&L ZAR     PF
 --------------------------------------------------------
-inside            99    42  42.4%     15016.82   3.56
-0-10              46    21  45.7%      6973.19   2.54
-10-25             54    27  50.0%     14227.68   5.69
-25-50             60    30  50.0%     19533.19   7.30
-50-100            69    30  43.5%     13197.53   5.15
->100              40    13  32.5%      6774.51   3.95
+inside           192    88  45.8%     38031.36   4.24
+0-10              76    30  39.5%     10473.41   2.66
+10-25            110    55  50.0%     23002.20   5.15
+25-50            134    62  46.3%     31375.16   6.54
+50-100           130    58  44.6%     26709.36   3.97
+>100              89    29  32.6%     10353.71   2.37
 ```
 
 **Alignment x where the gap sits** (`ahead` = we travel toward it)
@@ -325,11 +337,12 @@ inside            99    42  42.4%     15016.82   3.56
 ```
 Align     Pos        Trades  Wins    WR%      P&L ZAR     PF
 ------------------------------------------------------------
-with      inside         21    11  52.4%      6202.40   8.51
-with      behind        132    50  37.9%     22629.49   3.67
-against   inside         78    31  39.7%      8814.41   2.75
-against   ahead         111    57  51.4%     34114.17   7.50
-against   behind         26    14  53.8%      3962.44   2.65
+with      inside         36    21  58.3%     15422.36  14.32
+with      ahead           1     0   0.0%       -10.41   0.00
+with      behind        250   100  40.0%     44287.82   3.44
+against   inside        156    67  42.9%     22609.00   3.14
+against   ahead         236   113  47.9%     52325.41   5.10
+against   behind         52    21  40.4%      5311.02   2.69
 ```
 
 **Nearest daily PD array of any kind** (fvg / ifvg / ob)
@@ -337,12 +350,10 @@ against   behind         26    14  53.8%      3962.44   2.65
 ```
 Type     Align      Trades  Wins    WR%      P&L ZAR     PF  medDist
 --------------------------------------------------------------------
-fvg      with          133    48  36.1%     19535.73   3.21     42.6
-fvg      against       176    74  42.0%     29573.78   3.52      5.0
-ifvg     with            2     0   0.0%        -2.96   0.00      6.0
-ifvg     against         1     0   0.0%        -4.27   0.00      0.0
-ob       with           22    13  59.1%      4452.16   5.47     23.6
-ob       against        45    32  71.1%     21934.57  22.08      0.0
+fvg      with          225    92  40.9%     42357.56   3.57     38.9
+fvg      against       361   158  43.8%     59057.26   3.67      5.1
+ob       with           46    22  47.8%      6248.50   3.37     11.8
+ob       against       104    51  49.0%     31912.40   7.25      0.0
 ```
 
 ## Dollar reversal day (P64)
@@ -354,16 +365,16 @@ intermediate level HOLDS. +1 = dollar reversed up (pairs down),
 ```
 DXY rev      TF      Trades  Wins    WR%      P&L ZAR     PF
 ------------------------------------------------------------
-up (+1)      all        112    57  50.9%     27584.62   5.09
-             60T         95    49  51.6%     21256.52   5.00
-             D           17     8  47.1%      6328.11   5.41
-down (-1)    all         86    39  45.3%     19314.59   5.00
-             60T         76    34  44.7%     17578.15   5.08
-             D           10     5  50.0%      1736.44   4.29
-none         all        186    74  39.8%     28732.25   3.59
+up (+1)      all        231   110  47.6%     56851.79   5.43
+             60T        194    92  47.4%     44313.11   5.34
+             D           37    18  48.6%     12538.68   5.76
+down (-1)    all        166    64  38.6%     25634.66   3.28
+             60T        147    54  36.7%     19887.82   2.93
+             D           19    10  52.6%      5746.83   7.18
+none         all        339   149  44.0%     57089.27   3.56
 
-with rev                151    74  49.0%     36197.07   5.40
-against                  47    22  46.8%     10702.14   4.19
+with rev                306   135  44.1%     68816.50   5.16
+against                  91    39  42.9%     13669.94   2.82
 ```
 
 ## Narrative context scoring (P47)
@@ -371,21 +382,22 @@ against                  47    22  46.8%     10702.14   4.19
 ```
 Score     Trades  Wins    WR%      P&L ZAR     PF
 ----------------------------------------------------
-1             14     7  50.0%      2194.61   3.35
-2             85    34  40.0%     13779.77   4.48
-3            182    83  45.6%     36916.63   4.65
-4             91    40  44.0%     17381.66   3.69
-5             12     6  50.0%      5358.79   5.40
+0              1     1 100.0%       116.62    inf
+1             39    13  33.3%       787.56   1.34
+2            176    75  42.6%     27363.43   3.71
+3            333   144  43.2%     67539.96   4.13
+4            165    75  45.5%     34520.55   4.14
+5             22    15  68.2%      9247.59   7.44
 
 Factor                 Fired    WR%     PF   Absent    WR%     PF
 --------------------------------------------------------------------
-Weekly Profile           278  45.3%   4.18      106  41.5%   4.93
-NFP week Mon/Tue          47  53.2%   6.56      337  43.0%   4.04
-Rate decision             28  53.6%  10.15      356  43.5%   4.16
-PD prov (sweep)          323  41.8%   3.72       61  57.4%   8.22
-Seasonal lean              0   0.0%   0.00      384  44.3%   4.33
-HTF OB Context           129  45.0%   4.86      255  43.9%   3.96
-D1 Draw                  349  44.4%   4.33       35  42.9%   4.34
+Weekly Profile           507  45.4%   4.39      229  40.6%   3.12
+NFP week Mon/Tue          81  56.8%   6.80      655  42.3%   3.73
+Rate decision             57  43.9%   3.69      679  43.9%   4.03
+PD prov (sweep)          639  42.7%   3.54       97  51.5%   7.97
+Seasonal lean              0   0.0%   0.00      736  43.9%   4.01
+HTF OB Context           213  47.9%   5.31      523  42.3%   3.39
+D1 Draw                  663  44.3%   4.08       73  39.7%   3.38
 ```
 
 ## HTF OB context breakdown (P48)
@@ -393,16 +405,17 @@ D1 Draw                  349  44.4%   4.33       35  42.9%   4.34
 ```
 Context           Trades  Wins    WR%      P&L ZAR     PF
 --------------------------------------------------------
-continuation         129    58  45.0%     36292.15   4.86
-(none)               255   112  43.9%     39339.31   3.96
+inside                 5     1  20.0%        73.77   1.36
+continuation         208   101  48.6%     64150.51   5.37
+(none)               523   221  42.3%     75351.44   3.39
 
 Liq type          Trades    WR%     PF
 ----------------------------------------
-breaker               17  41.2%   5.56
-d1_fvg                73  41.1%   4.88
-ob                     3 100.0%    inf
-pdhl                  16  56.2%   1.46
-w_fvg                 20  45.0%   6.73
+breaker               36  47.2%   3.64
+d1_fvg               120  45.8%   4.77
+ob                     9  66.7%  49.21
+pdhl                  16  37.5%   1.77
+w_fvg                 32  56.2%  12.08
 ```
 
 ## D1 narrative draw breakdown (P48)
@@ -410,7 +423,7 @@ w_fvg                 20  45.0%   6.73
 ```
 Draw type         Trades  Wins    WR%      P&L ZAR     PF
 --------------------------------------------------------
-d1_fvg                 2     0   0.0%      -191.89   0.00
-equal_hl             347   155  44.7%     70028.49   4.37
-(none)                35    15  42.9%      5794.86   4.34
+d1_fvg                 3     1  33.3%         5.83   1.03
+equal_hl             660   293  44.4%    128772.44   4.09
+(none)                73    29  39.7%     10797.45   3.38
 ```
