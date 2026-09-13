@@ -1463,6 +1463,51 @@ split, NOT findings):**
 Both need the IS half before they mean anything, and both are now in the pushed
 transcript so the comparison is possible without a screenshot.
 
+### P26 SOJ + session-open side, BOTH SPLITS (RAN 2026-09-13) — perfect mirror
+### images across the halves. NOISE, not an inversion. Nothing to revert.
+
+First reading made possible by the console transcript (see the fix above) — these
+tables have never been in a pushed report. IS run clean and exact: **355 / 43.1% /
+3.37**, no arm counters, `dxy_real_used` absent.
+
+| Bucket | IS trades / WR / PF | OOS trades / WR / PF |
+|---|---|---|
+| SOJ dual (+2) | 123 / **48.0%** / 3.35 | 100 / **41.0%** / 3.71 |
+| SOJ single (+1) | 188 / 41.5% / 3.07 | 246 / 45.1% / 4.24 |
+| no SOJ pattern | 44 / **36.4%** / 4.87 | 39 / **48.7%** / 6.46 |
+
+**IS is monotonically DOWN as confirmation decreases — exactly P26's premise. OOS
+is monotonically UP — exactly against it.** Both halves perfectly ordered, in
+opposite directions, on comparable n.
+
+**I flagged this as a possible inversion off the OOS half alone and that was
+wrong.** P26 is not inverted; it is NON-PREDICTIVE, and the OOS ordering was one
+side of a coin flip. Nothing to revert. It would have been operationally moot in
+any case: P26 is conviction-saturation-inert (`low_conviction: 0` in every run),
+so the factor changes no entries unless it is ever made a gate or a sizing lever —
+which this result says it must not be.
+
+**Session-open side breakdown — same shape:** `below open` is the WORSE bucket in
+IS (36 tr / 36.1% / avg R127) and the BETTER one in OOS (33 tr / 54.5% / avg R396);
+`above open` 300 / 45.3% IS vs 347 / 43.5% OOS. Sign-unstable on ~35 trades a side.
+
+**One thing that DOES hold: `no session` is the worst cell on the board** — IS
+19 tr / **WR 21.1%**, confirming the note carried from the P26 draw-on-liquidity
+tables. That label is consistently bad in both halves.
+
+**Draw-on-liquidity by target family (IS, first time in a pushed artifact):**
+`equal_hl` 25 tr / **60.0%** / avg R217 · `pdh_pdl` 28 / 42.9% / R176 ·
+`swing` 41 / 43.9% / R122 · `fib_extension` 220 / 41.8% / R131 (the volume) ·
+`ith/itl_liquidity` 6 trades, negative. The `equal_hl` cell is the standout but
+sits on 25 trades — treat it exactly like the 36-trade `with`+`inside` cell in P74:
+interesting, not validated. Pair it against the OOS transcript before reading
+anything into it.
+
+**Method note.** This is the third time in one session that a monotonic
+single-split ordering dissolved on the other half (P67's rung, P74's `ob`/`against`,
+now SOJ). A clean ordering in one split is worth roughly nothing on its own; the
+mirror-image case is the cheapest possible reminder of that.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
