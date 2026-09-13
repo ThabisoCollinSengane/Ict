@@ -1280,6 +1280,82 @@ question is only whether the two buckets separate, and whether they separate the
 same way in BOTH splits. The precedent here is unkind: eight studies on this axis
 have measured null, and every one that looked clean first turned out to be a bug.
 
+### P74 RESULT (RAN 2026-09-13, full 4yr) — the align split is NULL; `align` and `pos`
+### turn out to be COLLINEAR, which reframes what the columns actually measure
+
+Verified clean before reading: header `2022–2025 (4 yr)`, baseline exact at
+**736 / 43.9% / PF 4.01 / −13.24%**, `dxy_real_used` absent, no P70/P72 arm
+counters. 731 of 736 entries had a daily gap on the chart (5 did not), so the
+scan is working.
+
+**The headline, and it answers the question asked:**
+
+| Align | Trades | WR | PF | med dist |
+|---|---|---|---|---|
+| **with** the daily FVG | 287 (**39.3%**) | 42.2% | **4.09** | 44.5 pips |
+| **against** it | 444 (**60.7%**) | 45.3% | **4.03** | 11.4 pips |
+
+**PF 4.09 vs 4.03 and the WR runs the OTHER way (+3.1pp to `against`).** As a
+binary, daily-FVG alignment has no discriminating power. The 60.7%-against share
+is not a defect — this is a reversal model, so delivering into the day's opposing
+gap is what it is built to do.
+
+**⚠️ The build's own claim was wrong: `align` and `pos` are NOT independent.**
+They are logically independent and empirically COLLINEAR:
+
+| Align | Pos | Trades | WR% | PF |
+|---|---|---|---|---|
+| with | behind | 250 | 40.0% | 3.44 |
+| against | ahead | 236 | 47.9% | **5.10** |
+| against | inside | 156 | 42.9% | 3.14 |
+| with | inside | 36 | 58.3% | **14.32** |
+| against | behind | 52 | 40.4% | 2.69 |
+| with | ahead | **1** | — | — |
+
+The single `with`+`ahead` trade is GEOMETRY, not a bug. A bullish FVG forms on an
+up-displacement so it sits BELOW price, and a close back under it marks it
+mitigated — an unmitigated bullish gap ABOVE price is nearly impossible. So
+`with` ≈ `behind me` and `against` ≈ `ahead of me`, and the median-distance split
+(44.5 vs 11.4) follows from the same fact: a gap behind us has been travelled away
+from, one ahead is the one we are approaching. **Both columns mostly restate "did
+the last daily displacement go my way, or am I travelling into it."** Two
+"independent" readings of the same geometry is not two readings.
+
+**Distance is non-monotonic** — inside 4.24 / 0-10 **2.66** / 10-25 5.15 / 25-50
+6.54 / 50-100 3.97 / >100 **2.37**. The only clean read is that >100 pips from the
+day's gap is the worst cell (WR 32.6%). The 0-10 dip breaks any "closer is better"
+story.
+
+**Nearest PD array of any kind:** `ob`+`against` at median distance **0.0 pips**
+runs PF **7.25** on 104 trades — entering right at a daily order block that opposes
+us. `fvg` splits 3.57 / 3.67 with/against (null, as above).
+
+**Two buckets worth splitting — caveat FIRST.** PF on the full compounding run is
+PATH-WEIGHTED: a bucket that happens to fire at high equity looks better
+regardless of quality. Per-split PF is the test, and even that has failed here
+(P48's HTF OB: +10.0pp IS → +0.9pp OOS; P68's `target_pd`: 2.2× → 1.18×).
+
+1. **`with`+`inside`** — 36 tr, WR 58.3%, PF 14.32. Exactly the trader's idea:
+   filled INSIDE a daily gap pointing our way. Small, distinctive, high-PF — the
+   shape of every lever that ever shipped here (P9 fired 15×, P41 91×). But 36
+   trades splits to ~18 per half: **too few to validate.** Expect unresolvable,
+   not confirmed.
+2. **`against`+`ahead`** — 236 tr, PF 5.10 vs 4.01 overall. Large enough to split.
+   This is the reversal delivering INTO the opposing daily gap — the gap is the
+   draw, which is coherent with the model. But it is **32% of the book**, and P70
+   ARM 1 showed a multiplier on a bucket that size is leverage, not selection.
+   (`risk_cap_skip` is absent in this run — `risk_cap_ok` 722 = `entry_opened` 722
+   — so there IS headroom, but read that counter on any arm that sizes it.)
+
+**NEXT — the splits decide all of it:**
+```
+python run_backtest_histdata.py --years 2022 2023
+python run_backtest_histdata.py --years 2024 2025
+```
+Read `with`/`against`, the align × pos cells, and the `ob`/`against` row in each
+half. A bucket must hold PF > 1 in BOTH **and keep its magnitude** (criterion #3),
+or nothing comes of it.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
