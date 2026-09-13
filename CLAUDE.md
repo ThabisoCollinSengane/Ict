@@ -388,8 +388,14 @@ pulling our way, nor a mitigated one — long side mirrored, flag-off respected.
 
 **Analytics only — gates nothing.** Read the two tables before proposing a lever.
 
-### P67/P68 IS+OOS RESULT (RAN 2026-09-12) — the rung PASSES, the PD-array
-### classification FAILS, and the variable is DISTANCE not family
+### ⛔ P67/P68 IS+OOS RESULT (RAN 2026-09-12) — ***RETRACTED 2026-09-13.***
+### Every rung number below came from a LOOKAHEAD. See the retraction after it.
+
+**⛔ DO NOT ACT ON ANYTHING IN THIS SECTION.** `_draw_ladder` read the
+still-forming daily bar, so `near` was largely a label for "today moved in my
+favour." The corrected table is below under "THE HONEST RUNG TABLE". The numbers
+here are preserved only as the record of what a lookahead looks like when it is
+mistaken for a finding.
 
 Both splits reproduce baseline exactly (IS 355 / 43.1% / 3.37 / -13.24%;
 OOS 385 / 44.4% / 4.28 / -10.21%), `dxy_real_used` absent — clean runs.
@@ -839,6 +845,51 @@ silently selecting days that had already moved.
 **Still outstanding:** a CLEAN baseline run (every arm off) to see the honest
 four-rung table. That table decides whether `target_rung` retains any analytic
 value or should be dropped entirely. Expect near/far to be close.
+
+### ✅ THE HONEST RUNG TABLE (RAN 2026-09-13, full 4yr, post-fix, clean)
+### P67 IS DEAD — the finding did not shrink, it INVERTED
+
+Verified clean before reading: post-fix ladder (fix is an ancestor of the run's
+base), header `2022–2025 (4 yr)`, baseline exact at **736 / 43.9% / PF 4.01 /
+−13.24%**, and NO arm counters in the funnel.
+
+| Rung | Contaminated | **Honest** |
+|---|---|---|
+| near | 505 / 52.5% / PF **7.20** | 517 / 43.7% / PF **3.65** |
+| 3-day | 168 / 28.0% / PF **0.84** | 151 / 45.7% / PF **5.72** |
+| 30-day | 27 / 22.2% / PF 0.71 | 27 / 44.4% / PF **5.69** |
+| 60-day | 36 / 13.9% / PF **0.32** | 41 / 39.0% / PF **2.60** |
+
+**Every far rung is now PF > 1, and d3 (5.72) and d30 (5.69) BEAT near (3.65).**
+Win rate is flat across all four rungs — 43.7 / 45.7 / 44.4 / 39.0 — so there is
+no rung effect in WR at all. The PF ordering that remains runs the OPPOSITE way
+to the claim, on small n at d30 (27) and d60 (41), and is best read as noise plus
+path effects rather than a new finding in the other direction. **Do not build the
+mirror-image lever.**
+
+**`target_rung` has no discriminating power. P67 closes.** The entire "far rungs
+lose in both splits" result — which I called the strongest IS/OOS-consistent
+finding on the target side of the book — was the forming daily bar.
+
+**The escalation cross-tab inverts too**, which is what a dead variable looks
+like: d3 escalated 6.26 vs un-escalated 4.00 (was 0.73 vs 1.39), and at `near`
+escalated 3.37 vs 4.72 (was 7.45 vs 6.45). Nothing stable underneath. **P70's
+three arms and P72 are all closed** — every one is default-OFF, and their premise
+is gone. `TARGET_RUNG_*` and `TARGET_RUNG_DEESCALATE` stay at their no-op
+defaults.
+
+**The fix was surgical, as intended.** `target_pd` (FVG 4.64 / OB 3.91 /
+projection 2.64) and path obstruction (blocked 3.08 vs clear 4.84) are unchanged
+in character — neither reads `_draw_ladder`. Only the rung moved.
+
+**Scoreboard for this session, stated plainly.** Six studies were built; the
+count of them killed by a lookahead or circularity in my own measurement is
+**five** — P65c, P66, P68b, P69 (twice), P71 §3 (twice), and now P67/P70/P72. In
+every case the broken version produced a CLEANER, more publishable result than
+the truth. **An unusually clean result is evidence of a bug before it is evidence
+of an edge**, and the single most productive habit in this whole session was
+running each study against a random-walk null and asking why it did not read
+zero.
 
 ### P70 ARM 1 — near-rung upsize 1.25× (RAN 2026-09-12, full 4yr) — 🔴 RED
 
