@@ -1205,6 +1205,81 @@ bucket** — IS days were big enough that almost nothing was high-demand. One sp
 with a pattern and one split with no variation is not a validated finding. The
 population shift IS the finding, and it is §1's.
 
+### P74 — every ENTRY measured against the DAILY FVG / PD array (BUILT 2026-09-13)
+
+**The gap it fills.** Everything on the draw axis so far classified the TARGET
+(`_target_pd_array` — fvg/ob/projection) or the distance to price EXTREMES
+(`_target_rung`, now dead). Nothing ever asked the entry-side question: **at the
+moment we pull the trigger, how far is the fill from the DAY's gap, and are we
+trading WITH that daily draw or AGAINST it?**
+
+**`_entry_pd_context(pair, direction, entry, t)`** — scans the daily series for
+unmitigated FVGs (classifying inverted ones as `ifvg` via `latest_inversion`) and
+order blocks, and reports the NEAREST of each against the actual fill price:
+
+| Column | Meaning |
+|---|---|
+| `d1_fvg_dist_pips` | pips from entry to the nearest unmitigated daily FVG (**0.0 when inside it**) |
+| `d1_fvg_align` | `with` — the gap points the way we trade / `against` — it points the other way |
+| `d1_fvg_pos` | `inside` / `ahead` (we travel toward it) / `behind` |
+| `d1_pd_type` | nearest daily PD array of ANY kind: `fvg` \| `ifvg` \| `ob` (the gap wins a tie, per the trader's ranking) |
+| `d1_pd_dist_pips`, `d1_pd_align` | its distance and alignment |
+
+**`align` and `pos` are independent and both are reported.** A gap can point our
+way yet sit BEHIND us (a spent draw), or oppose us and sit AHEAD (the thing we are
+trading into). Collapsing them into one "aligned" flag would hide exactly the case
+the trader asked about.
+
+**⚠️ COMPLETED daily candles only — `d = bars[:-1]`.** `bars_up_to` returns the
+still-FORMING bar (`STRICT_BAR_CLOSE` is off by design) and a forming DAILY bar
+carries the whole day's High and Low, including hours that have not happened yet.
+A gap read off it — or worse, a MITIGATION judged by it — would make the column a
+function of the trade's own outcome. That is the lookahead that voided P67/P70/P72
+and P73 §1 (seven occurrences this session); `_market_profile`'s `d_bars[-4:-1]`
+is the convention that was always right. Verified by `ast.unparse` with comments
+stripped: the slice is code, and neither scanner is ever handed the raw series.
+
+**Analytics only — gates nothing, sizes nothing.** `ENTRY_PD_ENABLED=1`,
+`ENTRY_PD_TF="D"`. Computed once per opened trade, after the entry is committed.
+
+**Report: "Entry vs the DAILY FVG / PD array (P74)"** — four tables: the headline
+`with` vs `against` share ("how much we align") with WR/PF/median distance; WR/PF
+by distance bucket (inside / 0-10 / 10-25 / 25-50 / 50-100 / >100 pips);
+`align × pos`; and the nearest PD array of any kind split by type × alignment.
+
+**Verified:** fixture drive of the method (gap ahead / behind / inside, long and
+short, the empty case, and that appending a huge forming bar changes NOTHING);
+static audit that all six columns are plumbed **4×** each (base open, mm_golden
+open, BOTH `_close_leg` whitelists) per the P47/P48 column lesson; and the report
+block driven end-to-end on a stub frame — a build whose only output is a column
+is never exercised by `py_compile`.
+
+**⚠️ `_publish_backtest_report` did NOT honour `NO_PUSH=1`** though its docstring
+claimed it. Driving it on a stub frame to test the new table therefore **committed
+and pushed a fake 300-row report over the real one** (`c1c20a0`, reverted in
+`915c0a9`). Now fixed — the writer returns before the git block when `NO_PUSH=1`.
+Any future stub-drive of that function would have done the same thing.
+
+**NOT RUN — `data/histdata/` is empty in this session and `www.histdata.com` is
+blocked by the egress policy**, so the M1 series cannot be self-served here. Run
+where the data lives:
+
+```
+$env:RANGE_BIAS_ENABLED=$null; $env:STRUCT_BIAS_ENABLED=$null; $env:MSS_REQUIRE_DXY=$null; $env:TARGET_RUNG_SKIP_FAR=$null; $env:TARGET_RUNG_FAR_MULT=$null; $env:TARGET_RUNG_NEAR_MULT=$null
+python run_backtest_histdata.py                  # full 4yr — must reproduce 736 / 43.9% / PF 4.01 / -13.24%
+python run_backtest_histdata.py --years 2022 2023
+python run_backtest_histdata.py --years 2024 2025
+```
+
+Baseline must reproduce exactly (the build is analytics-only, so anything else is
+a regression) and `dxy_real_used` must be ABSENT from the gate funnel.
+
+**Read the LIFT between `with` and `against`, not the raw WR.** The base strategy
+is a REVERSAL model, so a large `against` share is expected, not a defect — the
+question is only whether the two buckets separate, and whether they separate the
+same way in BOTH splits. The precedent here is unkind: eight studies on this axis
+have measured null, and every one that looked clean first turned out to be a bug.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

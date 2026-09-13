@@ -1392,6 +1392,102 @@ def _publish_backtest_report(results, backtester, years, df=None):
                                      f"{sub.pnl.sum():>12.2f} {_pf(sub):>6.2f}")
                 L.append("```")
 
+        # --- P74: where the ENTRY sits vs the DAILY PD arrays ---
+        if "d1_fvg_align" in df.columns:
+            _ep = df[df["d1_fvg_align"].astype(str) != ""]
+            _tot = len(df)
+            if len(_ep):
+                _d = pd.to_numeric(_ep["d1_fvg_dist_pips"], errors="coerce")
+                L += ["", "## Entry vs the DAILY FVG / PD array (P74)", "",
+                      "Every entry measured against the day's draw: how far the fill "
+                      "sat from the nearest unmitigated DAILY FVG, and whether that "
+                      "gap points the way we are trading (`with`) or the other way "
+                      "(`against`). Completed daily candles only — the forming bar "
+                      "carries hours that have not happened yet.", ""]
+                _n_with = int((_ep["d1_fvg_align"] == "with").sum())
+                _n_ag   = int((_ep["d1_fvg_align"] == "against").sum())
+                _n_none = _tot - len(_ep)
+                _den = _n_with + _n_ag
+                L += [f"**Alignment with the daily FVG:** {_n_with} of {_den} "
+                      f"({100*_n_with/_den:.1f}%) entries traded WITH the gap, "
+                      f"{_n_ag} ({100*_n_ag/_den:.1f}%) against it"
+                      + (f"; {_n_none} entries had no daily gap on the chart." if _n_none
+                         else "."), ""]
+                L += ["```"]
+                L.append(f"{'Align':<12} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6} {'medDist':>8}")
+                L.append("-" * 64)
+                for _v in ("with", "against"):
+                    grp = _ep[_ep["d1_fvg_align"] == _v]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    _md = pd.to_numeric(grp["d1_fvg_dist_pips"], errors="coerce").median()
+                    L.append(f"{_v:<12} {len(grp):>7} {w:>5} {100*w/len(grp):>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f} {_md:>8.1f}")
+                L.append("```")
+
+                # distance buckets — how close to the day's gap we actually enter
+                _bk = [("inside", 0.0, 0.001), ("0-10", 0.001, 10.0),
+                       ("10-25", 10.0, 25.0), ("25-50", 25.0, 50.0),
+                       ("50-100", 50.0, 100.0), (">100", 100.0, 1e12)]
+                L += ["", "**Distance from the daily FVG**", "", "```"]
+                L.append(f"{'Dist pips':<12} {'Trades':>7} {'Wins':>5} {'WR%':>6} "
+                         f"{'P&L ZAR':>12} {'PF':>6}")
+                L.append("-" * 56)
+                for _lbl, _lo, _hi in _bk:
+                    m = (_d >= _lo) & (_d < _hi) if _lbl != "inside" else (_d <= 0.0)
+                    grp = _ep[m.fillna(False)]
+                    if not len(grp):
+                        continue
+                    w = (grp.pnl > 0).sum()
+                    L.append(f"{_lbl:<12} {len(grp):>7} {w:>5} {100*w/len(grp):>5.1f}% "
+                             f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f}")
+                L.append("```")
+
+                # align x position — a gap can point our way yet sit behind us
+                if "d1_fvg_pos" in _ep.columns:
+                    L += ["", "**Alignment x where the gap sits** "
+                          "(`ahead` = we travel toward it)", "", "```"]
+                    L.append(f"{'Align':<9} {'Pos':<9} {'Trades':>7} {'Wins':>5} "
+                             f"{'WR%':>6} {'P&L ZAR':>12} {'PF':>6}")
+                    L.append("-" * 60)
+                    for _v in ("with", "against"):
+                        for _ps in ("inside", "ahead", "behind"):
+                            grp = _ep[(_ep["d1_fvg_align"] == _v)
+                                      & (_ep["d1_fvg_pos"].astype(str) == _ps)]
+                            if not len(grp):
+                                continue
+                            w = (grp.pnl > 0).sum()
+                            L.append(f"{_v:<9} {_ps:<9} {len(grp):>7} {w:>5} "
+                                     f"{100*w/len(grp):>5.1f}% {grp.pnl.sum():>12.2f} "
+                                     f"{_pf(grp):>6.2f}")
+                    L.append("```")
+
+                # nearest PD array of ANY kind (gap wins a tie over the block)
+                if "d1_pd_type" in df.columns:
+                    _pd_ = df[df["d1_pd_type"].astype(str) != ""]
+                    if len(_pd_):
+                        L += ["", "**Nearest daily PD array of any kind** "
+                              "(fvg / ifvg / ob)", "", "```"]
+                        L.append(f"{'Type':<8} {'Align':<9} {'Trades':>7} {'Wins':>5} "
+                                 f"{'WR%':>6} {'P&L ZAR':>12} {'PF':>6} {'medDist':>8}")
+                        L.append("-" * 68)
+                        for _ty in ("fvg", "ifvg", "ob"):
+                            for _v in ("with", "against"):
+                                grp = _pd_[(_pd_["d1_pd_type"].astype(str) == _ty)
+                                           & (_pd_["d1_pd_align"].astype(str) == _v)]
+                                if not len(grp):
+                                    continue
+                                w = (grp.pnl > 0).sum()
+                                _md = pd.to_numeric(grp["d1_pd_dist_pips"],
+                                                    errors="coerce").median()
+                                L.append(f"{_ty:<8} {_v:<9} {len(grp):>7} {w:>5} "
+                                         f"{100*w/len(grp):>5.1f}% "
+                                         f"{grp.pnl.sum():>12.2f} {_pf(grp):>6.2f} "
+                                         f"{_md:>8.1f}")
+                        L.append("```")
+
         # --- Dollar reversal day (P64): DXY took an ITL/ITH and turned back ---
         if "dxy_rev_day" in df.columns:
             _rv = df[df["dxy_rev_day"].astype(str) != ""]
@@ -1565,6 +1661,10 @@ def _publish_backtest_report(results, backtester, years, df=None):
     out = os.path.join(root, "data", "backtest_report.md")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     open(out, "w", encoding="utf-8").write("\n".join(L) + "\n")
+
+    if os.environ.get("NO_PUSH") == "1":
+        print(f"report written (NO_PUSH=1, not committed) — {out}")
+        return
 
     def _git(*a):
         return subprocess.run(["git", *a], cwd=root, capture_output=True, text=True)

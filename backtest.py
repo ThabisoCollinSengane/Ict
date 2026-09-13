@@ -474,6 +474,12 @@ class Backtester:
             "target_pd_tf": st.get("target_pd_tf", ""),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
+            "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
+            "d1_fvg_align": st.get("d1_fvg_align", ""),
+            "d1_fvg_pos": st.get("d1_fvg_pos", ""),
+            "d1_pd_type": st.get("d1_pd_type", ""),
+            "d1_pd_dist_pips": st.get("d1_pd_dist_pips", ""),
+            "d1_pd_align": st.get("d1_pd_align", ""),
             "draw_score": st.get("draw_score", 0),
             "im_scenario": st.get("im_scenario", "?"),
             "entry_model": st.get("entry_model", "judas"),
@@ -593,6 +599,12 @@ class Backtester:
             "target_pd_tf": st.get("target_pd_tf", ""),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
+            "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
+            "d1_fvg_align": st.get("d1_fvg_align", ""),
+            "d1_fvg_pos": st.get("d1_fvg_pos", ""),
+            "d1_pd_type": st.get("d1_pd_type", ""),
+            "d1_pd_dist_pips": st.get("d1_pd_dist_pips", ""),
+            "d1_pd_align": st.get("d1_pd_align", ""),
             "draw_score": st.get("draw_score", 0),
             "im_scenario": st.get("im_scenario", "?"),
             "entry_model": st.get("entry_model", "judas"),
@@ -1854,6 +1866,96 @@ class Backtester:
                         ob_hit = ("ob", tf)
                         break
         return ob_hit
+
+    # P74 — the entry side of the same question.
+    _ENTRY_PD_EMPTY = {
+        "d1_fvg_dist_pips": "", "d1_fvg_align": "", "d1_fvg_pos": "",
+        "d1_pd_type": "", "d1_pd_dist_pips": "", "d1_pd_align": "",
+    }
+
+    def _entry_pd_context(self, pair, direction, entry, t):
+        """P74 — where does the ENTRY sit relative to the DAILY PD arrays?
+
+        Everything measured so far classified the TARGET (`_target_pd_array`) or the
+        distance to price EXTREMES (`_target_rung`). Neither asks the trader's actual
+        question: at the moment we pull the trigger, how far are we from the DAY's
+        FVG / order block, and are we trading WITH that daily draw or AGAINST it?
+
+        ⚠️ COMPLETED daily bars only. `bars_up_to` returns the still-FORMING bar
+        (STRICT_BAR_CLOSE is off by design) and a forming DAILY bar carries the whole
+        day's High and Low — including the hours that have not happened yet. A gap
+        read off it, or a mitigation judged by it, would be a function of the trade's
+        own outcome. That is the lookahead that voided P67/P70/P72 and P73 §1; it is
+        `_market_profile`'s `d_bars[-4:-1]` convention that is correct.
+
+        Analytics only — gates nothing, sizes nothing. Returns:
+          d1_fvg_dist_pips  pips from entry to the NEAREST unmitigated daily FVG
+                            (0.0 when the entry is INSIDE the gap), "" when none
+          d1_fvg_align      "with"    the gap points the way we are trading
+                            "against" the gap points the other way
+          d1_fvg_pos        "inside" / "ahead" (we travel toward it) / "behind"
+          d1_pd_type        nearest daily PD ARRAY of any kind: fvg | ifvg | ob
+          d1_pd_dist_pips   its distance in pips (0.0 when inside)
+          d1_pd_align       with | against
+
+        `align` and `pos` are independent readings and both are reported: a gap can
+        point our way yet sit behind us (spent draw), or oppose us and sit ahead
+        (the thing we are trading into).
+        """
+        if not config.ENTRY_PD_ENABLED:
+            return dict(self._ENTRY_PD_EMPTY)
+        from ict.ifvg import latest_inversion
+        from ict.order_block import detect_order_blocks
+        bars = self.bars_up_to(pair, config.ENTRY_PD_TF, t)
+        if bars is None or len(bars) < 6:
+            return dict(self._ENTRY_PD_EMPTY)
+        d = bars[:-1]                       # completed daily candles only
+        if len(d) < 5:
+            return dict(self._ENTRY_PD_EMPTY)
+        pip = pip_size(pair)
+
+        def _read(top, bottom, zdir):
+            if bottom <= entry <= top:
+                dist, pos = 0.0, "inside"
+            elif bottom > entry:            # zone sits ABOVE the entry
+                dist = (bottom - entry) / pip
+                pos = "ahead" if direction > 0 else "behind"
+            else:                           # zone sits BELOW the entry
+                dist = (entry - top) / pip
+                pos = "ahead" if direction < 0 else "behind"
+            return dist, pos, ("with" if zdir == direction else "against")
+
+        best_fvg = None
+        for g in self._scan_htf_fvgs(d, pair):
+            if g.mitigated:
+                continue                    # a filled gap no longer calls price
+            r = _read(g.top, g.bottom, g.direction)
+            kind = "ifvg" if latest_inversion(d, g.bottom, g.top) else "fvg"
+            if best_fvg is None or r[0] < best_fvg[0]:
+                best_fvg = (r[0], r[1], r[2], kind)
+
+        best_ob = None
+        for ob in detect_order_blocks(d):
+            if getattr(ob, "mitigated", False):
+                continue
+            r = _read(ob.top, ob.bottom, ob.direction)
+            if best_ob is None or r[0] < best_ob[0]:
+                best_ob = (r[0], r[1], r[2], "ob")
+
+        out = dict(self._ENTRY_PD_EMPTY)
+        if best_fvg is not None:
+            out["d1_fvg_dist_pips"] = round(best_fvg[0], 1)
+            out["d1_fvg_pos"] = best_fvg[1]
+            out["d1_fvg_align"] = best_fvg[2]
+        # Nearest PD array of ANY kind. The FVG is listed first so it wins a tie —
+        # the trader ranks the gap above the block as the draw that calls price.
+        cands = [c for c in (best_fvg, best_ob) if c is not None]
+        if cands:
+            best = min(cands, key=lambda c: c[0])
+            out["d1_pd_type"] = best[3]
+            out["d1_pd_dist_pips"] = round(best[0], 1)
+            out["d1_pd_align"] = best[2]
+        return out
 
     def _path_obstruction(self, pair, direction, entry, target, t):
         """Is an unmitigated OPPOSING HTF gap sitting between entry and target?
@@ -4554,6 +4656,7 @@ class Backtester:
         _path_blocked, _path_tf = self._path_obstruction(
             pair, direction, entry, target, t)
         _tgt_pd, _tgt_pd_tf = self._target_pd_array(pair, direction, target, t)
+        _entry_pd = self._entry_pd_context(pair, direction, entry, t)
         self.gate["entry_opened"] = self.gate.get("entry_opened", 0) + 1
         self.active[pair] = {
             "direction": direction,
@@ -4572,6 +4675,13 @@ class Backtester:
             "target_pd_tf": _tgt_pd_tf,
             "path_blocked": _path_blocked,
             "path_block_tf": _path_tf,
+            # P74 — entry-side daily PD-array distance + alignment (analytics).
+            "d1_fvg_dist_pips": _entry_pd["d1_fvg_dist_pips"],
+            "d1_fvg_align":     _entry_pd["d1_fvg_align"],
+            "d1_fvg_pos":       _entry_pd["d1_fvg_pos"],
+            "d1_pd_type":       _entry_pd["d1_pd_type"],
+            "d1_pd_dist_pips":  _entry_pd["d1_pd_dist_pips"],
+            "d1_pd_align":      _entry_pd["d1_pd_align"],
             "stop_reason": _stop_reason,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir,
@@ -5768,6 +5878,7 @@ class Backtester:
             "target_type": target_type,
             "target_rung": "", "path_blocked": False, "path_block_tf": "",
             "target_pd": "", "target_pd_tf": "",
+            **self._entry_pd_context(pair, direction, entry, t),   # P74
             "stop_reason": _stop_reason,
             "legs": [leg],
             "weekly_amd_dir": weekly_amd_dir_g,

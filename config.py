@@ -1228,6 +1228,14 @@ TARGET_RUNG_DEESCALATE = bool(int(_os.environ.get("TARGET_RUNG_DEESCALATE", "0")
 PATH_OBSTRUCTION_ENABLED = bool(int(_os.environ.get("PATH_OBSTRUCTION_ENABLED", "1")))
 PATH_OBSTRUCTION_TFS = tuple(_os.environ.get("PATH_OBSTRUCTION_TFS", "240T,D").split(","))
 
+# P74 — ENTRY-side daily PD-array context (analytics-only, gates nothing).
+# Everything before this classified the TARGET (`_target_pd_array`) or the distance
+# to price EXTREMES (`_target_rung`). This asks the trader's question instead: at the
+# moment we pull the trigger, how far is the entry from the DAY's FVG / order block,
+# and are we trading WITH that daily draw or AGAINST it?
+ENTRY_PD_ENABLED = bool(int(_os.environ.get("ENTRY_PD_ENABLED", "1")))
+ENTRY_PD_TF = _os.environ.get("ENTRY_PD_TF", "D")
+
 MM_GOLDEN_OB_RAID_REQUIRED = bool(int(_os.environ.get("MM_GOLDEN_OB_RAID_REQUIRED", "1")))
 MM_GOLDEN_OB_RAID_LOOKBACK = int(_os.environ.get("MM_GOLDEN_OB_RAID_LOOKBACK", "60"))
 # The raided pool may be from the current day OR previous days — size the lookback per
