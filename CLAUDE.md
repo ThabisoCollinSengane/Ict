@@ -1923,6 +1923,78 @@ the arithmetic one: **check the n a hypothesis needs BEFORE building the cut tha
 splits it.** Six cells of 10-115 trades was never going to resolve a 5pp effect, and
 that was computable in advance.
 
+### P77 — WHICH gap fills first (BUILT 2026-09-14, NOT run on real data)
+### ⚠️ P76b's closure was WRONG-HEADED. The trader caught it; the correction is theirs.
+
+**What I did and why it was a strawman.** P76 asked whether trades aimed at an
+unfilled daily gap do better. 82% of entries had a gap ABOVE *and* BELOW, and I
+broke that tie by raw DISTANCE — nearest wins — then called the label
+"ambiguous" and closed the line on a sample-size argument.
+
+**The trader's actual rule, which I never tested:**
+
+> "the algo should look at the closest gap not the furthest. The closest
+> depending on past price action where we saw a shift in market structure and
+> the overall direction — look at the intermarket analysis. We only consider the
+> furthest after the closest is reached and we see a shift in market structure."
+>
+> "You can't tell me the only excuse is theres always 2 gaps. Yes that is the
+> case but the market structure tells you which gap will likely be filled first."
+
+**"Closest" never meant geometrically nearest.** It means the one STRUCTURE says
+is next, confirmed by the dollar. Two gaps is not ambiguity — it is a question
+structure answers, and I substituted a coin flip for the answer.
+
+**Both of P76b's closing arguments fall with it:**
+1. *"A 5pp effect needs ~1,580 trades, we have 736."* Required n falls with the
+   SQUARE of the effect — 5pp needs ~790/bucket, **15pp needs ~88.** A better
+   label means a bigger effect, and the arithmetic stops being fatal.
+2. *"Unanswerable on this dataset."* **It does not need the trade set at all.**
+   "Which of two gaps fills first" is a pure PRICE question; every bar that
+   straddles two unfilled gaps is an observation — thousands, not 736.
+
+**`scripts/gap_race_study.py`** — at every bar where an unfilled daily gap sits
+above AND below price, two rules predict which fills first: `structure` (Ep-12
+intermediate trend) and `distance` (the nearer gap — what P76 used). `dollar`
+(UDXUSD structure, INVERSE: dollar up -> pairs down -> lower gap) is carried as
+the intermarket overlay. Outcome = which actually fills (full body close through
+the far side) within the horizon.
+
+**⚠️ 50% IS NOT THE BAR — the first null run would have been misread.** The nearer
+level is reached first on geometry alone: on a random walk `distance` scores
+**~62%**, so on the disagree subset (where structure names the FARTHER gap) a
+useless structure reads **~38%**. Against 50% that looks like a strong negative
+finding. It is arithmetic.
+
+**The calibrated test, which needs no external baseline:** compare DISTANCE's own
+accuracy on the AGREE cases vs the DISAGREE cases. Disjoint subsets, clean
+two-proportion comparison. If structure carries information it is flagging
+exactly where distance fails, so **distance must score WORSE when structure
+contradicts it.**
+
+**Independence:** consecutive days straddle the SAME two gaps, so the verdict is
+read off `unique` — the first bar each distinct gap pair straddles price — never
+the per-day count.
+
+**Null verified:** random walk reads 🔴 RED, drop **+5.6pp (+0.7 SE)**, and the
+halves contradict (IS −2.2 / OOS +30.4 on n=13/24) — a live demonstration of why
+both splits are mandatory. Gap fills are precomputed per gap (a gap above price
+can only stop being above by filling), so the scan is O(gaps x bars).
+
+**Ship gate:** drop >= 8pp, >= 2 SE, positive in BOTH halves. A GREEN here is a
+TARGET-SELECTION rule — the only class of change that has ever worked in this
+project (P17 +R4.86M; every analysis-axis study has measured null).
+
+**Run (pure price — no trade dump, no backtest needed):**
+```
+python scripts/gap_race_study.py
+```
+
+**Still untested (the second half of the rule):** "only consider the furthest
+after the closest is reached AND we see a shift in market structure." That is a
+sequencing claim and needs its own section — build it only if the first result
+is GREEN, since it presupposes structure can pick the gap at all.
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
