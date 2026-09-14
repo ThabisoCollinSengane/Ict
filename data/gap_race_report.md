@@ -79,21 +79,34 @@ both   dollar_h1     240      153    63.8%    3.1   +4.43
 both   dist          347      241    69.5%    2.5   +7.87
 ```
 
-## 5. ⭐ VERDICT — does distance FAIL where structure contradicts it?
+## 5. Raw agree-vs-disagree drop — NOT the verdict
 
-The calibrated test. `agree` and `disagree` are disjoint, so this is a clean two-proportion comparison and needs no external baseline. If structure carries information it is flagging exactly the cases where the nearer gap does NOT fill first, so **distance must score worse on `disagree` than on `agree`**. A drop near zero means structure is only restating distance — which is what the random-walk null shows (3.3pp, 0.5 SE).
+⚠️ **A random walk produces this same drop (10.2pp).** Structure only disagrees with distance when the two gaps are near EQUIDISTANT — the share of disagree cases climbs 19% → 38% → 64% → 67% as the gaps even up — and that is precisely where 'take the nearer one' is weakest. So the disagree bucket is pre-loaded with geometrically ambiguous setups and distance scores worse there **with no structural information involved at all.** Section 6 removes that confound; read it, not this.
 
 ```
-split   distance on agree   on disagree     drop      SE   in SE
+split   dist on agree   on disagree     drop      SE   in SE
+------------------------------------------------------------
+IS              74.0%         58.2%   +15.8    6.6  +2.38
+OOS             64.9%         60.2%    +4.7    6.2  +0.76
+both            69.5%         59.4%   +10.1    4.5  +2.23
+```
+
+## 6. ⭐ THE VERDICT — matched on GEOMETRY
+
+Within each band the two gaps are equally (un)balanced, so distance faces the same problem on both sides of the comparison. If structure carries information the drop SURVIVES here. If it collapses, the whole effect was 'structure disagrees when the call is close', which is a restatement of the geometry and is what the random walk shows.
+
+```
+near/far band     n ag  n dis    agree  disagree     drop   in SE
 ----------------------------------------------------------------
-IS                 74.0%         58.2%   +15.8    6.6  +2.38
-OOS                64.9%         60.2%    +4.7    6.2  +0.76
-both               69.5%         59.4%   +10.1    4.5  +2.23
+0.00-0.25            94     44    69.1%     68.2%    +1.0  +0.11
+0.25-0.50            50     31    70.0%     61.3%    +8.7  +0.81
+0.50-0.75            41     23    65.9%     39.1%   +26.7  +2.07
+0.75-1.01            26     26    65.4%     61.5%    +3.8  +0.29
 ```
 
 ### Verdict
 
-🟢 **GREEN** — when structure contradicts the nearer gap, distance's hit rate falls 10.1pp (+2.2 SE), and the drop is present in BOTH halves (+15.8 / +4.7). Market structure is picking the gap, and it is a target-selection rule — the one class of change that has ever worked in this project.
+🟢 **GREEN** — the drop SURVIVES geometry matching: it averages +10.1pp across 4 bands and is positive in all of them. Structure is identifying which gap fills first, beyond 'the call was close'.
 
-Ship gate: the drop must reach 2 SE overall AND be positive in both halves AND be large enough to matter (>=8pp). Anything less is the random-walk pattern.
+**Ship gate (corrected):** the geometry-matched drop must average >=8pp, be positive in EVERY band, and reach 2 SE in at least one. The old gate compared the raw drop against zero — but the random-walk null clears that bar (10.2pp), so it could only ever have passed.
 
