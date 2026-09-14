@@ -602,7 +602,13 @@ MM_TOI_REQUIRED     = bool(int(_os.environ.get("MM_TOI_REQUIRED", 0)))
 # Semi-auto MM: permanently armed directional preferences. The bot proactively
 # scans for these setups and alerts the trader; trader replies /go to execute.
 # No /mm arming required — these are always-on. {pair: direction} (+1=BUY, -1=SELL).
-MM_SEMI_AUTO_ENABLED = bool(int(_os.environ.get("MM_SEMI_AUTO_ENABLED", 0)))
+# ENABLED 2026-09-14 (pre-live). ALERT-ONLY — verified by AST that
+# _mm_semi_auto_scan contains no order-placing call of any kind; it only
+# reads bars and calls _notify. Execution requires an explicit "/go PAIR"
+# reply, handled in telegram_control.parse_command -> mm_semi_auto_execute.
+# This does NOT touch the autonomous strategy: MM_GOLDEN / MM_STANDALONE /
+# MM_CONTINUATION all stay OFF, so no MM trade is ever opened by the engine.
+MM_SEMI_AUTO_ENABLED = bool(int(_os.environ.get("MM_SEMI_AUTO_ENABLED", 1)))
 MM_SEMI_AUTO_PAIRS = {"GBPUSD": -1, "EURUSD": +1}  # SELL GU + BUY EU
 MM_SEMI_AUTO_MIN_CONFIRMS = int(_os.environ.get("MM_SEMI_AUTO_MIN_CONFIRMS", 2))
 MM_SEMI_AUTO_COOLDOWN_MIN = int(_os.environ.get("MM_SEMI_AUTO_COOLDOWN_MIN", 30))

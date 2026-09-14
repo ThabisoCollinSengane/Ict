@@ -108,6 +108,78 @@ Test it without starting the bot:
 
 A message saying "ICT Bot — test OK" should arrive on your phone within seconds.
 
+### What actually arrives on your phone
+
+Once `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set, these fire automatically:
+
+| Alert | When |
+|---|---|
+| **MM semi-auto read** | a SELL GBPUSD / BUY EURUSD setup reaches 2+ confirmations |
+| MM zone reached / broken | price hits or breaks an IFVG zone you armed with `/mm` |
+| Fast read | a pair sweeps its recent M15 high/low (advisory) |
+| Session brief | at each killzone open, with that session's plan |
+| Trade opened / closed | with P&L |
+| Circuit breaker | daily cap, consecutive losses, session kill, drawdown halt |
+| Restart notice | positions re-adopted after a restart |
+
+### The MM read — ENABLED 2026-09-14
+
+`MM_SEMI_AUTO_ENABLED=1`. Permanently watching **SELL GBPUSD** and **BUY EURUSD**
+— your golden rule, no `/mm` arming needed.
+
+It scores four confirmations and alerts at 2 or more:
+
+| | |
+|---|---|
+| **IFVG** | price retraced into an inverted fair value gap (H4→H1→M30→M15→M5 cascade) |
+| **MSS** | market structure shift on M5/M15 — the opposing swing was swept |
+| **SMT** | EURUSD↔GBPUSD divergence on H1/H4 — one sweeps, the other fails to confirm |
+| **FBC** | full body close through the IFVG — the inversion confirmation |
+
+3+ = **STRONG** · 2 = **MODERATE** · 1 = **WATCH** (not alerted)
+
+Throttles: **max 3 alerts per pair per day**, **30-minute cooldown** between
+alerts on the same pair, and only inside a killzone.
+
+What lands on your phone:
+
+```
+MM STRONG — SELL GBPUSD
+✅IFVG  ✅MSS  ✅SMT  ⬜FBC
+
+Entry:  1.33240
+Stop:   1.33340  (10.0 pips)
+Target: 1.32910  (33.0 pips, 3.3R)
+  <- pdh_pdl
+
+H1 IFVG 1.33210-1.33280 (inverted 2 bars ago)
+M15 MSS: prior swing high 1.33301 swept + reclaimed
+SMT: EU failed to confirm GU's high on H1
+
+/go gbpusd to EXECUTE  |  ignore to PASS
+```
+
+**⚠️ It never trades by itself.** Verified by AST that `_mm_semi_auto_scan`
+contains no order-placing call of any kind — it reads bars and sends a message,
+nothing else. A trade happens only when you reply `/go PAIR`. The three
+autonomous MM channels (`MM_GOLDEN`, `MM_STANDALONE`, `MM_CONTINUATION`) remain
+**off**, so the engine never opens an MM trade on its own.
+
+**Ignoring an alert is a valid answer** — and given the measured 21% win rate on
+MM setups when a machine picks them, ignoring most of them is the expected
+behaviour. The alert exists so you get to apply the judgement the classifier
+could not.
+
+### If no messages arrive
+
+`broadcast()` returns False and logs, but does **not** raise — a missing or wrong
+token silently disables alerts without touching the trading loop. So silence means
+check the credentials, not that the bot has stopped trading:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.notify     # should land within seconds
+```
+
 ---
 
 ## Keeping the bot alive on the VPS
