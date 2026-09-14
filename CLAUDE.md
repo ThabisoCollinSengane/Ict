@@ -2134,6 +2134,70 @@ effect SIZES rather than reading its verdict label — the null said RED and the
 real run said GREEN, and I nearly took that at face value. **Put the null's
 numbers in the same table as the real ones; do not just read its verdict.**
 
+### ✅ P77 FINAL (RAN 2026-09-14, geometry-matched + both halves) — 🔴 CLOSED
+### Not refuted as a trading rule. UNMEASURABLE on this dataset, and the one
+### surviving cell is exactly what chance delivers from four bands.
+
+Clean run: 3,157 straddle bars, 785 unique gap pairs, 774 resolved.
+
+| near/far band | pooled drop | in SE | IS | OOS | |
+|---|---|---|---|---|---|
+| 0.00-0.25 | +1.0 | +0.11 | +10.9 | **−6.4** | flips |
+| 0.25-0.50 | +8.7 | +0.81 | **−3.0** | +21.3 | flips |
+| **0.50-0.75** | **+26.7** | **+2.07** | **+33.9** | **+17.1** | **holds** |
+| 0.75-1.01 | +3.8 | +0.29 | +19.2 | **−5.1** | flips |
+| average | **+10.1** | | **+15.2** | **+6.7** | |
+
+**Three of four bands FLIP SIGN between the halves.** One holds in both — and it
+is the same band that carried the pooled result, at n=41/23 (≈20/12 per half).
+
+**⚠️ ONE BAND OF FOUR IS PRECISELY THE NULL EXPECTATION.** If each band's sign in
+each half were a coin flip, P(a band is positive in both) = 0.25, so across four
+bands the expected count is **exactly 1.0**, and P(at least one survives) = **68%**.
+We observed 1. **There is no excess over chance to explain.** This is the P74
+multiple-comparisons trap in its purest form — and unlike P74 I can state the
+expected count in advance rather than hand-wave "roughly twenty cells".
+
+**The other two reasons it does not stand:**
+1. **Only +3.7pp above noise.** Pooled +10.1pp against the random-walk null's
+   +6.4pp on comparable n. The bar was never zero.
+2. **Geometry matching did not move the split.** Raw §5 was +15.8 / +4.7; matched
+   §6 is +15.2 / +6.7. The confound §6 removes is real, but the IS-heavy
+   character survives it intact — so the split was never about geometry.
+
+**⚠️ What this does NOT say.** It does not refute the trader's rule as a trading
+method. The claim tested is narrow and mechanical: *does the Ep-12 intermediate
+structure read, on H1 as of the previous day's close, predict which of two
+straddling daily gaps fills first, beyond what raw distance already predicts.*
+A discretionary trader reading structure in context is doing something this
+classifier does not do. **The honest finding is UNMEASURABLE-HERE, not WRONG.**
+
+**Why it is unmeasurable, stated once so it is not re-litigated.** 774 resolved
+episodes is the entire population in four years of three pairs. §6 splits it four
+ways by geometry and then two ways by half — eight cells of ~15-60. At those
+sizes a real 10pp effect and pure noise are indistinguishable. Every refinement
+proposed from here SUBDIVIDES further and makes it worse. **This is the same wall
+P76b hit, reached now from the opposite direction and with the trader's own
+model properly tested rather than a strawman.**
+
+**Honourable mention — the timeframe claim is half-vindicated.** `struct_h1`
+(60.4%) beats `struct_d` (46.5%) on raw accuracy, and the fixture drive showed
+the daily read is often ABSENT entirely where H1 always has an opinion. But the
+random-walk null gives 58.8% vs 40.9% — a BIGGER gap — so H1 wins by tracking
+recent price direction (which correlates with which gap is nearer), not by
+carrying more information. **H1 is the better rung for AVAILABILITY; that is real
+and worth keeping. It is not demonstrated to be better for ACCURACY.**
+
+**Nothing ships. P77 closes.** `scripts/gap_race_study.py` is retained: it is the
+only tool here that measures structure against a calibrated baseline, and its §6
++ both-halves gate is the template for any future study on this axis.
+
+**Method note — the gate was wrong TWICE and the null caught both.** v1 compared
+the drop against zero, which the null clears (10.2pp). v2 pooled the halves,
+hiding a 2:1 split. Both were caught by putting the null's numbers in the same
+table as the real ones rather than reading its verdict label. **The verdict label
+is the least informative thing a null produces.**
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
