@@ -611,23 +611,40 @@ def run(min_gap_pips=3.0, horizon=60, window=120, h1_window=120,
           "effect was 'structure disagrees when the call is close', which is a "
           "restatement of the geometry and is what the random walk shows.", "",
           "```",
-          f"{'near/far band':<15} {'n ag':>6} {'n dis':>6} {'agree':>8} {'disagree':>9} {'drop':>8} {'in SE':>7}",
-          "-" * 64]
-    tot_h = tot_n = 0
-    pooled = []
+          f"{'near/far band':<15} {'n ag':>6} {'n dis':>6} {'agree':>8} "
+          f"{'disagree':>9} {'drop':>8} {'in SE':>7} {'IS':>7} {'OOS':>7}",
+          "-" * 80]
+    pooled, per_split = [], {"IS": [], "OOS": []}
     for lo_, hi_ in BANDS:
         ga = [r for r in agr if lo_ <= r.get("ratio", 0) < hi_]
         gd = [r for r in dis if lo_ <= r.get("ratio", 0) < hi_]
         r = _drop(ga, gd)
+        cells = []
+        for sp in ("IS", "OOS"):
+            rs = _drop([x for x in ga if x["split"] == sp],
+                       [x for x in gd if x["split"] == sp])
+            if rs and min(rs[0], rs[1]) >= 8:
+                per_split[sp].append(rs)
+                cells.append(f"{rs[4]:+.1f}")
+            else:
+                cells.append("—")
         if r is None or min(r[0], r[1]) < 10:
-            n_a = len(ga); n_d = len(gd)
-            L.append(f"{lo_:.2f}-{hi_:.2f}{'':<7} {n_a:>6} {n_d:>6} "
-                     f"{'—':>8} {'—':>9} {'too few':>8} {'—':>7}")
+            L.append(f"{lo_:.2f}-{hi_:.2f}{'':<7} {len(ga):>6} {len(gd):>6} "
+                     f"{'—':>8} {'—':>9} {'too few':>8} {'—':>7} "
+                     f"{cells[0]:>7} {cells[1]:>7}")
             continue
         pooled.append(r)
         L.append(f"{lo_:.2f}-{hi_:.2f}{'':<7} {r[0]:>6} {r[1]:>6} {r[2]:>7.1f}% "
-                 f"{r[3]:>8.1f}% {r[4]:>+7.1f} {r[6]:>+6.2f}")
+                 f"{r[3]:>8.1f}% {r[4]:>+7.1f} {r[6]:>+6.2f} "
+                 f"{cells[0]:>7} {cells[1]:>7}")
     L.append("```")
+
+    L += ["", "**The last two columns are the hardest test in this project "
+          "(criterion #2).** A drop that is real holds in BOTH halves at a "
+          "similar size. One that lives in the first half and fades in the "
+          "second is the signature that has killed nearly everything here — "
+          "P48's HTF OB (+10.0pp -> +0.9pp), P68's `target_pd` (2.2x -> 1.18x), "
+          "P69's D1 respect (+9.7 -> +3.5).", ""]
 
     L += ["", "### Verdict", ""]
     if not pooled:
@@ -637,17 +654,39 @@ def run(min_gap_pips=3.0, horizon=60, window=120, h1_window=120,
         avg = sum(r[4] for r in pooled) / len(pooled)
         pos = sum(1 for r in pooled if r[4] > 0)
         sig = sum(1 for r in pooled if r[6] >= 2.0)
-        if avg >= 8.0 and pos == len(pooled) and sig >= 1:
-            L.append(f"🟢 **GREEN** — the drop SURVIVES geometry matching: it "
-                     f"averages {avg:+.1f}pp across {len(pooled)} bands and is "
-                     f"positive in all of them. Structure is identifying which gap "
-                     f"fills first, beyond 'the call was close'.")
+        is_ok = per_split["IS"] and all(r[4] > 0 for r in per_split["IS"])
+        oos_ok = per_split["OOS"] and all(r[4] > 0 for r in per_split["OOS"])
+        is_avg = (sum(r[4] for r in per_split["IS"]) / len(per_split["IS"])
+                  if per_split["IS"] else float("nan"))
+        oos_avg = (sum(r[4] for r in per_split["OOS"]) / len(per_split["OOS"])
+                   if per_split["OOS"] else float("nan"))
+        def _fmt(v, cells):
+            # The enlarged null spans years past 2025, so every band lands in OOS
+            # and IS is empty. Print n/a rather than nan so an absent half is not
+            # mistaken for a computed zero.
+            return f"{v:+.1f}pp" if cells else "n/a (no band with enough cases)"
+        L.append(f"Matched drop **{avg:+.1f}pp** across {len(pooled)} bands, "
+                 f"positive in {pos}. Per half: IS **{_fmt(is_avg, per_split['IS'])}**, "
+                 f"OOS **{_fmt(oos_avg, per_split['OOS'])}**.")
+        L.append("")
+        L.append("⚠️ Compare against the RANDOM-WALK null, which on comparable n "
+                 "gives a matched average of **+6.4pp** — the bar is not zero.")
+        L.append("")
+        if (avg >= 8.0 and pos == len(pooled) and sig >= 1
+                and is_ok and oos_ok and min(is_avg, oos_avg) >= 5.0):
+            L.append(f"🟢 **GREEN** — survives geometry matching AND holds in "
+                     f"both halves ({is_avg:+.1f} / {oos_avg:+.1f}). Structure "
+                     f"identifies which gap fills first.")
+        elif avg >= 8.0 and pos == len(pooled) and sig >= 1:
+            L.append(f"🟡 **SUGGESTIVE, NOT CONFIRMED** — the pooled drop clears "
+                     f"the bar, but the halves are {is_avg:+.1f} / {oos_avg:+.1f}. "
+                     f"An effect that lives in one half is the failure signature "
+                     f"of P48 / P68 / P69. Criterion #2 is not met.")
         else:
             L.append(f"🔴 **RED** — matched on geometry the drop averages "
-                     f"{avg:+.1f}pp and is positive in {pos} of {len(pooled)} "
-                     f"bands. The raw effect in section 5 was the confound: "
-                     f"structure disagrees when the two gaps are near "
-                     f"equidistant, and distance is weak there anyway.")
+                     f"{avg:+.1f}pp, positive in {pos} of {len(pooled)} bands. "
+                     f"The raw effect in section 5 was the confound.")
+
     L += ["", "**Ship gate (corrected):** the geometry-matched drop must average "
           ">=8pp, be positive in EVERY band, and reach 2 SE in at least one. The "
           "old gate compared the raw drop against zero — but the random-walk null "
