@@ -2018,6 +2018,38 @@ reason the trader's timeframe is the right one, independent of any result.
    pullbacks has no intermediate swings. **Before blaming the classifier, print
    the swing counts.**
 
+**⚠️ THIRD BUG — crashed the real run, and the null could not have caught it.**
+`_load_h1` used `df.resample("60T")`. **pandas 3.x REMOVED the "T" minute alias**
+(`ValueError: Invalid frequency: T ... Did you mean min?`), so the first real run
+died before producing anything. Two separate failures, both mine:
+
+1. **The repo already had the answer and I did not use it.**
+   `triple_sweep_study._freq` exists precisely for this and its docstring says so:
+   *"pandas removed the 'T' minute alias in favour of 'min', so a bare '60T'
+   raises"*. `backtest.py` and `run_backtest_histdata.py` both carry explicit
+   `("60T", "60min")` mappings. I wrote `"60T"` anyway. **Second occurrence of
+   this exact class** after P73's hardcoded dump path against six existing
+   `_find_dump` call sites. Now `H1_RULE = "60min"` / `DAY_RULE = "1D"` module
+   constants with the reason pinned in a comment.
+2. **The null SKIPPED the broken path entirely.** `--null` synthesised DAILY bars
+   directly, so `_load_h1` was never called and neither `struct_h1` nor
+   `dollar_h1` was ever computed under the null — the very rules the second
+   correction added. **A null that does not execute a code path cannot vouch for
+   it**, and mine had been reporting RED on a study that could not run.
+   Fixed: the null now generates H1 bars, derives the daily series from them via
+   `_daily_from_h1`, and runs `_h1_dir_per_day` for both the pair and an
+   INDEPENDENT second walk standing in for the dollar (seed 99, so the overlay is
+   exercised without being correlated to the pair by construction). The null run
+   now prints `[dollar_h1, struct_d, struct_h1]` — all three rules live.
+
+Belt and braces: the SELFTEST now calls `.resample()` with both rules on a
+one-row frame. That is a plumbing assertion inside a pure-logic test on purpose —
+`"60T"` passed every logic test and still killed the real run.
+
+**Post-fix null:** 🔴 RED, drop **10.2pp (+1.1 SE)**, halves contradicting
+(IS −2.2 / OOS +29.6) — correct behaviour on data with no edge, now measured
+through the full H1 path.
+
 **Ship gate:** drop >= 8pp, >= 2 SE, positive in BOTH halves. A GREEN here is a
 TARGET-SELECTION rule — the only class of change that has ever worked in this
 project (P17 +R4.86M; every analysis-axis study has measured null).

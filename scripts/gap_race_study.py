@@ -76,7 +76,8 @@ The self-calibrating test avoids needing any external baseline: compare
 DISAGREE cases.** The two subsets are disjoint, so it is a clean two-proportion
 comparison. If structure carries information it is flagging precisely the cases
 where distance fails, so distance must score WORSE when structure contradicts
-it. On the random-walk null that drop is 3.3pp (0.5 SE) — nothing, as it must be.
+it. On the random-walk null that drop is 10.2pp (1.1 SE) with the two halves
+contradicting each other (-2.2 / +29.6) — i.e. RED, as it must be.
 
 INDEPENDENCE — why the headline uses EPISODES, not days
 -------------------------------------------------------
@@ -116,6 +117,15 @@ PAIRS = ("EURUSD", "GBPUSD", "NZDUSD")
 DOLLAR = "UDXUSD"
 
 Bar = namedtuple("Bar", "Open High Low Close")
+
+# ⚠️ "60min", NOT "60T". pandas 3.x REMOVED the "T" minute alias — a bare "60T"
+# raises ValueError("Invalid frequency: T ... Did you mean min?"). The project
+# already knew this: `triple_sweep_study._freq` documents it, and backtest.py /
+# run_backtest_histdata.py both carry ("60T", "60min") mappings. I wrote "60T"
+# anyway. When the repo already has a convention, use it (the P73 `_find_dump`
+# lesson, second occurrence).
+H1_RULE = "60min"
+DAY_RULE = "1D"
 
 
 # ─────────────────────────── pure logic (unit-testable) ────────────────────────
@@ -226,6 +236,15 @@ def _selftest():
     assert dollar_side(-1) == "above"
     assert dollar_side(0) is None
 
+    # The resample aliases must parse on the pandas actually installed. This is
+    # a plumbing assertion in a pure-logic selftest on purpose: "60T" passed
+    # every logic test here and still crashed the real run on pandas 3.x.
+    import pandas as _pd
+    _f = _pd.DataFrame({"o": [1.0], "h": [1.0], "l": [1.0], "c": [1.0]},
+                       index=_pd.date_range("2022-01-03", periods=1, tz="UTC"))
+    for _rule in (H1_RULE, DAY_RULE):
+        _f.resample(_rule).agg({"o": "first", "h": "max", "l": "min", "c": "last"})
+
     assert abs(_rate(1, 2) - 50.0) < 1e-9
     assert _se_pp(50, 100) > 4.9 and _se_pp(50, 100) < 5.1
     print("selftest OK")
@@ -248,7 +267,7 @@ def _load_daily(sym, pandas):
     df["dt"] = pd.to_datetime(df["dt"], format="%Y%m%d %H%M%S")
     df = df.drop_duplicates("dt").sort_values("dt").set_index("dt")
     df.index = (df.index + pd.Timedelta(hours=5)).tz_localize("UTC")
-    d = df.resample("1D").agg({"o": "first", "h": "max",
+    d = df.resample(DAY_RULE).agg({"o": "first", "h": "max",
                                "l": "min", "c": "last"}).dropna()
     return d
 
@@ -268,7 +287,7 @@ def _load_h1(sym, pandas):
     df["dt"] = pd.to_datetime(df["dt"], format="%Y%m%d %H%M%S")
     df = df.drop_duplicates("dt").sort_values("dt").set_index("dt")
     df.index = (df.index + pd.Timedelta(hours=5)).tz_localize("UTC")
-    return df.resample("60T").agg({"o": "first", "h": "max",
+    return df.resample(H1_RULE).agg({"o": "first", "h": "max",
                                    "l": "min", "c": "last"}).dropna()
 
 
@@ -292,21 +311,36 @@ def _h1_dir_per_day(h1, daily_index, window, mstruct, pandas):
     return out
 
 
-def _random_walk_daily(pandas, n=1040, seed=7):
-    """The null: no structure, no draws, nothing to find. Deterministic."""
+def _random_walk_h1(pandas, n_days=1040, seed=7):
+    """The null: no structure, no draws, nothing to find. Deterministic.
+
+    Built at H1 so the null exercises the SAME code path as a real run —
+    `_h1_dir_per_day` and the daily aggregation. The first version generated
+    daily bars directly, which meant `--null` never touched the H1 loader at
+    all, and a crash there ("60T" on pandas 3.x) sailed straight past it into
+    the real run. A null that skips a code path cannot vouch for it.
+    """
     import random
     pd = pandas
     rnd = random.Random(seed)
-    px, rows = 1.1000, []
-    for _ in range(n):
+    px, rows, idx = 1.1000, [], []
+    ts = pd.Timestamp("2022-01-03 00:00", tz="UTC")
+    for _ in range(n_days * 24):
         o = px
         hi = lo = o
-        for _ in range(24):
-            px += rnd.gauss(0, 0.0009)
+        for _ in range(12):
+            px += rnd.gauss(0, 0.00038)
             hi, lo = max(hi, px), min(lo, px)
         rows.append((o, hi, lo, px))
-    idx = pd.date_range("2022-01-03", periods=n, freq="D", tz="UTC")
-    return pd.DataFrame(rows, columns=["o", "h", "l", "c"], index=idx)
+        idx.append(ts)
+        ts += pd.Timedelta(hours=1)
+    return pd.DataFrame(rows, columns=["o", "h", "l", "c"],
+                        index=pd.DatetimeIndex(idx))
+
+
+def _daily_from_h1(h1):
+    return h1.resample(DAY_RULE).agg({"o": "first", "h": "max",
+                                      "l": "min", "c": "last"}).dropna()
 
 
 def _pip(pair):
@@ -423,25 +457,26 @@ def run(min_gap_pips=3.0, horizon=60, window=120, h1_window=120,
     import pandas as pd
     from ict import market_structure as mstruct
 
-    dxy_h1 = None if null else _load_h1(DOLLAR, pd)
+    # A second, INDEPENDENT walk stands in for the dollar under --null, so the
+    # overlay is exercised without being correlated to the pair by construction.
+    dxy_h1 = _random_walk_h1(pd, seed=99) if null else _load_h1(DOLLAR, pd)
     if not null and dxy_h1 is None:
         print(f"  {DOLLAR}: no data — dollar overlay unavailable")
 
     per_pair, universe = {}, (["NULL"] if null else list(PAIRS))
     for pair in universe:
-        d = _random_walk_daily(pd) if null else _load_daily(pair, pd)
+        h1 = _random_walk_h1(pd) if null else _load_h1(pair, pd)
+        d = _daily_from_h1(h1) if null else _load_daily(pair, pd)
         if d is None or len(d) < 40:
             print(f"  {pair}: no daily data, skipped")
             continue
         dirs = {"struct_d": _struct_dir_series(d, window, mstruct)}
-        if not null:
-            h1 = _load_h1(pair, pd)
-            if h1 is not None:
-                dirs["struct_h1"] = _h1_dir_per_day(h1, d.index, h1_window,
-                                                    mstruct, pd)
-            if dxy_h1 is not None:
-                dirs["dollar_h1"] = _h1_dir_per_day(dxy_h1, d.index, h1_window,
-                                                    mstruct, pd)
+        if h1 is not None:
+            dirs["struct_h1"] = _h1_dir_per_day(h1, d.index, h1_window,
+                                                mstruct, pd)
+        if dxy_h1 is not None:
+            dirs["dollar_h1"] = _h1_dir_per_day(dxy_h1, d.index, h1_window,
+                                                mstruct, pd)
         per_pair[pair] = _observations(d, _pip(pair) if not null else 0.0001,
                                        min_gap_pips, horizon, dirs)
         print(f"  {pair}: {len(per_pair[pair])} straddle bars "
