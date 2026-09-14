@@ -2064,6 +2064,76 @@ after the closest is reached AND we see a shift in market structure." That is a
 sequencing claim and needs its own section — build it only if the first result
 is GREEN, since it presupposes structure can pick the gap at all.
 
+### ⛔ P77 FIRST RUN (2026-09-14) — read 🟢 GREEN. IT IS AN ARTIFACT.
+### My own null produced the SAME effect size. The gate was miscalibrated, not the market.
+
+The run completed clean (3,157 straddle bars, 785 unique gap pairs, 774 resolved)
+and §5 reported **GREEN: drop 10.1pp, +2.2 SE, positive in both halves
+(+15.8 / +4.7)**. It is not a finding. Placing the real numbers beside the
+random-walk null settles it:
+
+| | REAL | NULL (random walk) |
+|---|---|---|
+| agree-vs-disagree drop | **10.1pp** | **10.2pp** |
+| in SE | +2.23 | +1.13 |
+| n agree / disagree | 347 / 160 | 75 / 44 |
+| `struct_h1` accuracy | 60.4% | 58.8% |
+| `struct_d` accuracy | 46.5% | 40.9% |
+| `dollar_h1` accuracy | 56.7% | 52.4% |
+| `distance` accuracy | 67.7% | 66.8% |
+
+**Every cell reproduces on data with no structure in it.** The effect SIZE is
+identical (10.1 vs 10.2); the real run only cleared 2 SE because it has ~4x the
+observations. My gate tested the drop against ZERO — and the null clears that
+bar — so it could only ever have passed. **A threshold that the null exceeds is
+not a threshold.**
+
+**⚠️ THE MECHANISM — a selection artifact, diagnosed not guessed.** Structure
+only disagrees with distance when the two gaps are near EQUIDISTANT. Measured on
+the null, the share of disagree cases by near/far ratio:
+
+| near/far ratio | 0.00-0.25 | 0.25-0.50 | 0.50-0.75 | 0.75-1.01 |
+|---|---|---|---|---|
+| share DISAGREE | **19.4%** | 37.5% | 64.3% | **66.7%** |
+
+Median ratio is 0.07 on agree vs 0.11 on disagree. So the disagree bucket is
+pre-loaded with geometrically balanced setups — exactly where "take the nearer
+one" is weakest — and distance scores worse there **with no structural
+information involved at all.** The raw drop measures how OFTEN structure
+disagrees, not whether it is RIGHT.
+
+**This also deflates §2's timeframe result.** `struct_h1` 60.4% vs `struct_d`
+46.5% looks like a clean confirmation of the trader's H1 claim — but the null
+gives 58.8% vs 40.9%, an even BIGGER gap. The H1 read tracks recent price
+direction more closely than the daily read, and recent direction correlates with
+which gap is nearer. H1 beats daily because it agrees with DISTANCE more often,
+not because it carries more information. (The separate, real point from the
+fixture drive still stands: on a month of daily candles `structure_direction`
+often has no opinion at all, while H1 always does. Availability, not accuracy.)
+
+**FIX — §6, matched on geometry.** Within each near/far band the two gaps are
+equally balanced, so distance faces the same problem on both sides. A real effect
+survives; a selection artifact collapses. `ratio` is now carried on every
+observation. **Corrected ship gate: the matched drop must average >=8pp, be
+positive in EVERY band, and reach 2 SE in at least one.**
+
+**The null was enlarged to ~4,200 days** because §6 splits the sample four ways
+and at real-run size the null landed on INCONCLUSIVE — which cannot demonstrate
+anything. **A null must be big enough to FAIL, not merely to abstain.** Post-fix
+it reads 🔴 RED: matched drop +6.4pp, positive in 3 of 4 bands (−6.3 / +12.4 /
++16.1 / +3.6), correctly rejected.
+
+**P77 must be RE-RUN.** Read §6 only; §5 is retained solely as the record of what
+the confound looks like.
+
+**The lesson, and it is a new one for this book.** Every previous trap here was a
+lookahead or a circular confirmation. This one is neither: the windows never
+overlap and nothing reads a forming bar. It is **CONDITIONING ON A VARIABLE THAT
+IS ITSELF SELECTED BY THE GEOMETRY.** The null caught it only because I compared
+effect SIZES rather than reading its verdict label — the null said RED and the
+real run said GREEN, and I nearly took that at face value. **Put the null's
+numbers in the same table as the real ones; do not just read its verdict.**
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

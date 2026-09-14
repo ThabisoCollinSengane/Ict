@@ -311,8 +311,13 @@ def _h1_dir_per_day(h1, daily_index, window, mstruct, pandas):
     return out
 
 
-def _random_walk_h1(pandas, n_days=1040, seed=7):
+def _random_walk_h1(pandas, n_days=4200, seed=7):
     """The null: no structure, no draws, nothing to find. Deterministic.
+
+    Sized ~4x the real series on purpose: the geometry-matched verdict (§6)
+    splits the sample four ways, and at real-run size the null lands on
+    INCONCLUSIVE — which cannot demonstrate the study reports RED on data with no
+    edge. A null must be big enough to FAIL, not merely to abstain.
 
     Built at H1 so the null exercises the SAME code path as a real run —
     `_h1_dir_per_day` and the daily aggregation. The first version generated
@@ -425,9 +430,16 @@ def _observations(d, pip, min_gap_pips, horizon, dirs):
             actual = "above" if f_ab < f_be else "below"
 
         key = (round(ab[0], 6), round(ab[1], 6), round(be[0], 6), round(be[1], 6))
+        _near, _far = min(d_ab, d_be), max(d_ab, d_be)
         row = {"t": idx[i], "split": _split_of(idx[i]),
                "first": key not in seen,
                "dist": distance_side(d_ab, d_be),
+               # near/far distance ratio. 0 = one gap far nearer, 1 = equidistant.
+               # THE confound: structure only disagrees with distance when the two
+               # are close to equidistant, which is exactly where distance is
+               # weakest anyway. Without matching on this, the agree-vs-disagree
+               # drop is a selection artifact — a random walk reproduces it.
+               "ratio": (_near / _far) if _far else 1.0,
                "actual": actual}
         for name, series in dirs.items():
             row[name] = (dollar_side(series[i]) if name.startswith("dollar")
@@ -551,67 +563,87 @@ def run(min_gap_pips=3.0, horizon=60, window=120, h1_window=120,
                "Shown to confirm the setup detects a real effect at all: if this "
                "is also ~50%, neither rule works and section 3 is moot.")
 
-    L += ["", "## 5. ⭐ VERDICT — does distance FAIL where structure contradicts it?", "",
-          "The calibrated test. `agree` and `disagree` are disjoint, so this is a "
-          "clean two-proportion comparison and needs no external baseline. If "
-          "structure carries information it is flagging exactly the cases where "
-          "the nearer gap does NOT fill first, so **distance must score worse on "
-          "`disagree` than on `agree`**. A drop near zero means structure is only "
-          "restating distance — which is what the random-walk null shows (3.3pp, "
-          "0.5 SE).", "", "```",
-          f"{'split':<6} {'distance on agree':>18} {'on disagree':>13} {'drop':>8} {'SE':>7} {'in SE':>7}",
-          "-" * 64]
-
-    def _drop(sp):
-        ga = agr if sp == "both" else [r for r in agr if r["split"] == sp]
-        gd = dis if sp == "both" else [r for r in dis if r["split"] == sp]
-        ha, na = _acc(ga, "dist")
-        hd, nd = _acc(gd, "dist")
+    def _drop(rs_a, rs_d):
+        ha, na = _acc(rs_a, "dist")
+        hd, nd = _acc(rs_d, "dist")
         if not na or not nd:
             return None
-        pa, pd_ = ha / na, hd / nd
+        pa, pdd = ha / na, hd / nd
         pool = (ha + hd) / (na + nd)
         se = 100.0 * (pool * (1 - pool) * (1 / na + 1 / nd)) ** 0.5
-        drop = 100.0 * (pa - pd_)
-        return na, nd, 100 * pa, 100 * pd_, drop, se, (drop / se if se else 0.0)
+        drop = 100.0 * (pa - pdd)
+        return na, nd, 100 * pa, 100 * pdd, drop, se, (drop / se if se else 0.0)
 
+    L += ["", "## 5. Raw agree-vs-disagree drop — NOT the verdict", "",
+          "⚠️ **A random walk produces this same drop (10.2pp).** Structure only "
+          "disagrees with distance when the two gaps are near EQUIDISTANT — the "
+          "share of disagree cases climbs 19% → 38% → 64% → 67% as the gaps even "
+          "up — and that is precisely where 'take the nearer one' is weakest. So "
+          "the disagree bucket is pre-loaded with geometrically ambiguous setups "
+          "and distance scores worse there **with no structural information "
+          "involved at all.** Section 6 removes that confound; read it, not this.",
+          "", "```",
+          f"{'split':<6} {'dist on agree':>14} {'on disagree':>13} {'drop':>8} {'SE':>7} {'in SE':>7}",
+          "-" * 60]
     for sp in ("IS", "OOS", "both"):
-        r = _drop(sp)
-        if r is None:
-            continue
-        na, nd, pa, pd_, drop, se, sig = r
-        L.append(f"{sp:<6} {pa:>16.1f}% {pd_:>12.1f}% {drop:>+7.1f} "
-                 f"{se:>6.1f} {sig:>+6.2f}")
+        ga = agr if sp == "both" else [r for r in agr if r["split"] == sp]
+        gd = dis if sp == "both" else [r for r in dis if r["split"] == sp]
+        r = _drop(ga, gd)
+        if r:
+            L.append(f"{sp:<6} {r[2]:>13.1f}% {r[3]:>12.1f}% {r[4]:>+7.1f} "
+                     f"{r[5]:>6.1f} {r[6]:>+6.2f}")
     L.append("```")
 
-    tot = _drop("both")
-    isr, oosr = _drop("IS"), _drop("OOS")
+    # ── §6 — matched on geometry ────────────────────────────────────────────
+    BANDS = [(0.0, 0.25), (0.25, 0.50), (0.50, 0.75), (0.75, 1.01)]
+    L += ["", "## 6. ⭐ THE VERDICT — matched on GEOMETRY", "",
+          "Within each band the two gaps are equally (un)balanced, so distance "
+          "faces the same problem on both sides of the comparison. If structure "
+          "carries information the drop SURVIVES here. If it collapses, the whole "
+          "effect was 'structure disagrees when the call is close', which is a "
+          "restatement of the geometry and is what the random walk shows.", "",
+          "```",
+          f"{'near/far band':<15} {'n ag':>6} {'n dis':>6} {'agree':>8} {'disagree':>9} {'drop':>8} {'in SE':>7}",
+          "-" * 64]
+    tot_h = tot_n = 0
+    pooled = []
+    for lo_, hi_ in BANDS:
+        ga = [r for r in agr if lo_ <= r.get("ratio", 0) < hi_]
+        gd = [r for r in dis if lo_ <= r.get("ratio", 0) < hi_]
+        r = _drop(ga, gd)
+        if r is None or min(r[0], r[1]) < 10:
+            n_a = len(ga); n_d = len(gd)
+            L.append(f"{lo_:.2f}-{hi_:.2f}{'':<7} {n_a:>6} {n_d:>6} "
+                     f"{'—':>8} {'—':>9} {'too few':>8} {'—':>7}")
+            continue
+        pooled.append(r)
+        L.append(f"{lo_:.2f}-{hi_:.2f}{'':<7} {r[0]:>6} {r[1]:>6} {r[2]:>7.1f}% "
+                 f"{r[3]:>8.1f}% {r[4]:>+7.1f} {r[6]:>+6.2f}")
+    L.append("```")
+
     L += ["", "### Verdict", ""]
-    if tot is None or min(tot[0], tot[1]) < 30:
-        L.append("**INCONCLUSIVE** — too few disagree cases to read.")
+    if not pooled:
+        L.append("**INCONCLUSIVE** — no geometry band has enough cases on both "
+                 "sides to compare.")
     else:
-        drop, sig = tot[4], tot[6]
-        both_pos = (isr and oosr and isr[4] > 0 and oosr[4] > 0)
-        if sig >= 2.0 and drop >= 8.0 and both_pos:
-            L.append(f"🟢 **GREEN** — when structure contradicts the nearer gap, "
-                     f"distance's hit rate falls {drop:.1f}pp ({sig:+.1f} SE), and "
-                     f"the drop is present in BOTH halves "
-                     f"({isr[4]:+.1f} / {oosr[4]:+.1f}). Market structure is "
-                     f"picking the gap, and it is a target-selection rule — the "
-                     f"one class of change that has ever worked in this project.")
-        elif sig >= 2.0:
-            L.append(f"🟡 **MIXED** — a {drop:.1f}pp drop ({sig:+.1f} SE) overall, "
-                     f"but the halves disagree ({isr[4]:+.1f} / {oosr[4]:+.1f}). "
-                     f"Not validated; criterion #2 fails.")
+        avg = sum(r[4] for r in pooled) / len(pooled)
+        pos = sum(1 for r in pooled if r[4] > 0)
+        sig = sum(1 for r in pooled if r[6] >= 2.0)
+        if avg >= 8.0 and pos == len(pooled) and sig >= 1:
+            L.append(f"🟢 **GREEN** — the drop SURVIVES geometry matching: it "
+                     f"averages {avg:+.1f}pp across {len(pooled)} bands and is "
+                     f"positive in all of them. Structure is identifying which gap "
+                     f"fills first, beyond 'the call was close'.")
         else:
-            L.append(f"🔴 **RED** — the drop is {drop:.1f}pp ({sig:+.1f} SE) on "
-                     f"n={tot[0]}/{tot[1]}. Distance does no worse when structure "
-                     f"contradicts it, so structure is not identifying which gap "
-                     f"fills first — on this data the tie-break really is "
-                     f"geometric.")
-    L += ["", "Ship gate: the drop must reach 2 SE overall AND be positive in both "
-          "halves AND be large enough to matter (>=8pp). Anything less is the "
-          "random-walk pattern.", ""]
+            L.append(f"🔴 **RED** — matched on geometry the drop averages "
+                     f"{avg:+.1f}pp and is positive in {pos} of {len(pooled)} "
+                     f"bands. The raw effect in section 5 was the confound: "
+                     f"structure disagrees when the two gaps are near "
+                     f"equidistant, and distance is weak there anyway.")
+    L += ["", "**Ship gate (corrected):** the geometry-matched drop must average "
+          ">=8pp, be positive in EVERY band, and reach 2 SE in at least one. The "
+          "old gate compared the raw drop against zero — but the random-walk null "
+          "clears that bar (10.2pp), so it could only ever have passed.", ""]
 
     txt = "\n".join(L) + "\n"
     print(txt)
