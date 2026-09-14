@@ -96,17 +96,24 @@ both            69.5%         59.4%   +10.1    4.5  +2.23
 Within each band the two gaps are equally (un)balanced, so distance faces the same problem on both sides of the comparison. If structure carries information the drop SURVIVES here. If it collapses, the whole effect was 'structure disagrees when the call is close', which is a restatement of the geometry and is what the random walk shows.
 
 ```
-near/far band     n ag  n dis    agree  disagree     drop   in SE
-----------------------------------------------------------------
-0.00-0.25            94     44    69.1%     68.2%    +1.0  +0.11
-0.25-0.50            50     31    70.0%     61.3%    +8.7  +0.81
-0.50-0.75            41     23    65.9%     39.1%   +26.7  +2.07
-0.75-1.01            26     26    65.4%     61.5%    +3.8  +0.29
+near/far band     n ag  n dis    agree  disagree     drop   in SE      IS     OOS
+--------------------------------------------------------------------------------
+0.00-0.25            94     44    69.1%     68.2%    +1.0  +0.11   +10.9    -6.4
+0.25-0.50            50     31    70.0%     61.3%    +8.7  +0.81    -3.0   +21.3
+0.50-0.75            41     23    65.9%     39.1%   +26.7  +2.07   +33.9   +17.1
+0.75-1.01            26     26    65.4%     61.5%    +3.8  +0.29   +19.2    -5.1
 ```
+
+**The last two columns are the hardest test in this project (criterion #2).** A drop that is real holds in BOTH halves at a similar size. One that lives in the first half and fades in the second is the signature that has killed nearly everything here — P48's HTF OB (+10.0pp -> +0.9pp), P68's `target_pd` (2.2x -> 1.18x), P69's D1 respect (+9.7 -> +3.5).
+
 
 ### Verdict
 
-🟢 **GREEN** — the drop SURVIVES geometry matching: it averages +10.1pp across 4 bands and is positive in all of them. Structure is identifying which gap fills first, beyond 'the call was close'.
+Matched drop **+10.1pp** across 4 bands, positive in 4. Per half: IS **+15.2pp**, OOS **+6.7pp**.
+
+⚠️ Compare against the RANDOM-WALK null, which on comparable n gives a matched average of **+6.4pp** — the bar is not zero.
+
+🟡 **SUGGESTIVE, NOT CONFIRMED** — the pooled drop clears the bar, but the halves are +15.2 / +6.7. An effect that lives in one half is the failure signature of P48 / P68 / P69. Criterion #2 is not met.
 
 **Ship gate (corrected):** the geometry-matched drop must average >=8pp, be positive in EVERY band, and reach 2 SE in at least one. The old gate compared the raw drop against zero — but the random-walk null clears that bar (10.2pp), so it could only ever have passed.
 
