@@ -21,6 +21,19 @@ STRUCTURE says is next, confirmed by the dollar. Two gaps is not ambiguity —
 it is a question structure answers. I tested a strawman and called the model
 unresolvable.
 
+⚠️ **WHICH TIMEFRAME — the second correction, 2026-09-14.** The first build read
+structure on DAILY candles. The trader:
+
+    "The shift in market structure matters more on the H1 for the daily
+     sentiment. The previous days price action always tells the story."
+
+So the daily SENTIMENT is read from H1 structure as of the previous day's close,
+not from the daily candle sequence. This is consistent with what the brief
+already records twice — P64 uses H1 first as "the trader's timeframe for DAILY
+dollar structure", and P66's bias is the PREVIOUS completed day. The study now
+carries BOTH reads as separate rules (`struct_h1`, `struct_d`) so the claim is
+measured rather than assumed, and the dollar overlay is read on H1 too.
+
 WHY THE SAMPLE-SIZE OBJECTION DIES HERE
 ---------------------------------------
 P76b's closing argument was arithmetic: a 5pp effect needs ~1,580 trades and we
@@ -36,8 +49,12 @@ have 736. Two things kill that objection:
 THE DESIGN, AND THE ONE CELL THAT DECIDES IT
 --------------------------------------------
 At every bar where an unfilled daily gap sits above AND below price:
-  - `structure` predicts the side the Ep-12 intermediate trend points to
-    (higher intermediate lows -> the gap ABOVE; lower intermediate highs -> BELOW)
+  - `struct_h1` predicts the side the Ep-12 intermediate trend points to, read on
+    H1 bars as of the PREVIOUS day's close (higher intermediate lows -> the gap
+    ABOVE; lower intermediate highs -> BELOW).  <- the trader's timeframe
+  - `struct_d`  the same read on DAILY candles — kept to measure whether H1
+    really is the right rung, rather than taking it on faith
+  - `dollar_h1` UDXUSD H1 structure, INVERSE (dollar up -> pairs down -> lower gap)
   - `distance`  predicts the nearer gap  — the naive rule, and the one P76 used
   - outcome     is which gap actually fills first (full body close through the
                 far side, ICT Ep 9), within `--horizon` days
@@ -236,6 +253,45 @@ def _load_daily(sym, pandas):
     return d
 
 
+def _load_h1(sym, pandas):
+    """HistData M1 -> completed UTC H1 bars, same EST +5h convention."""
+    pd = pandas
+    frames = []
+    for y in IS_YEARS + OOS_YEARS:
+        p = os.path.join(DATA, f"{sym}_{y}.csv")
+        if os.path.exists(p):
+            frames.append(pd.read_csv(p, sep=";", header=None,
+                                      names=["dt", "o", "h", "l", "c", "v"]))
+    if not frames:
+        return None
+    df = pd.concat(frames, ignore_index=True)
+    df["dt"] = pd.to_datetime(df["dt"], format="%Y%m%d %H%M%S")
+    df = df.drop_duplicates("dt").sort_values("dt").set_index("dt")
+    df.index = (df.index + pd.Timedelta(hours=5)).tz_localize("UTC")
+    return df.resample("60T").agg({"o": "first", "h": "max",
+                                   "l": "min", "c": "last"}).dropna()
+
+
+def _h1_dir_per_day(h1, daily_index, window, mstruct, pandas):
+    """Ep-12 intermediate direction from H1 bars, one read per DAILY bar.
+
+    The read for daily bar i uses H1 bars up to the CLOSE of day i — i.e. the
+    previous day's price action, which is what the trader says tells the story.
+    The outcome is measured from day i+1 onward, so the two windows never touch.
+    """
+    pd = pandas
+    bars = [Bar(o, h, l, c) for o, h, l, c
+            in zip(h1["o"], h1["h"], h1["l"], h1["c"])]
+    hidx = h1.index
+    out = []
+    for ts in daily_index:
+        end = hidx.searchsorted(ts + pd.Timedelta(days=1), side="left")
+        seg = bars[max(0, end - window):end]
+        out.append(mstruct.structure_direction(mstruct.classify(seg))
+                   if len(seg) >= 12 else 0)
+    return out
+
+
 def _random_walk_daily(pandas, n=1040, seed=7):
     """The null: no structure, no draws, nothing to find. Deterministic."""
     import random
@@ -280,11 +336,15 @@ def _struct_dir_series(d, window, mstruct):
     return out
 
 
-def _observations(d, pip, min_gap_pips, horizon, window, mstruct, dxy_dir=None):
-    """Every bar where an unfilled gap sits ABOVE and BELOW price."""
+def _observations(d, pip, min_gap_pips, horizon, dirs):
+    """Every bar where an unfilled gap sits ABOVE and BELOW price.
+
+    `dirs` maps rule name -> per-daily-bar direction series (+1/-1/0). Each is
+    converted to a side by its own mapping: the dollar is INVERSE, everything
+    else reads straight.
+    """
     hi, lo, cl = d["h"].tolist(), d["l"].tolist(), d["c"].tolist()
     idx = list(d.index)
-    sdir = _struct_dir_series(d, window, mstruct)
 
     # Each gap's SIDE is fixed for its whole life: a gap above price can only
     # stop being above by price closing through its top -- which is its fill.
@@ -331,14 +391,14 @@ def _observations(d, pip, min_gap_pips, horizon, window, mstruct, dxy_dir=None):
             actual = "above" if f_ab < f_be else "below"
 
         key = (round(ab[0], 6), round(ab[1], 6), round(be[0], 6), round(be[1], 6))
-        obs.append({
-            "t": idx[i], "split": _split_of(idx[i]),
-            "first": key not in seen,
-            "struct": structure_side(sdir[i]),
-            "dist": distance_side(d_ab, d_be),
-            "dollar": dollar_side(dxy_dir[i]) if dxy_dir else None,
-            "actual": actual,
-        })
+        row = {"t": idx[i], "split": _split_of(idx[i]),
+               "first": key not in seen,
+               "dist": distance_side(d_ab, d_be),
+               "actual": actual}
+        for name, series in dirs.items():
+            row[name] = (dollar_side(series[i]) if name.startswith("dollar")
+                         else structure_side(series[i]))
+        obs.append(row)
         seen.add(key)
     return obs
 
@@ -347,7 +407,10 @@ def _acc(rows, pred_key):
     """(hits, n) for a predictor over resolved observations."""
     hits = n = 0
     for r in rows:
-        p, a = r[pred_key], r["actual"]
+        # .get, not [] — a rule is absent when its series could not be built
+        # for that pair (no H1 file, no UDXUSD). Indexing raised KeyError on the
+        # null run, where only struct_d exists.
+        p, a = r.get(pred_key), r["actual"]
         if p is None or a is None:
             continue
         n += 1
@@ -355,15 +418,14 @@ def _acc(rows, pred_key):
     return hits, n
 
 
-def run(min_gap_pips=3.0, horizon=60, window=120, null=False):
+def run(min_gap_pips=3.0, horizon=60, window=120, h1_window=120,
+        primary="struct_h1", null=False):
     import pandas as pd
     from ict import market_structure as mstruct
 
-    dxy = None
-    if not null:
-        dd = _load_daily(DOLLAR, pd)
-        if dd is not None:
-            dxy = (dd, _struct_dir_series(dd, window, mstruct))
+    dxy_h1 = None if null else _load_h1(DOLLAR, pd)
+    if not null and dxy_h1 is None:
+        print(f"  {DOLLAR}: no data — dollar overlay unavailable")
 
     per_pair, universe = {}, (["NULL"] if null else list(PAIRS))
     for pair in universe:
@@ -371,15 +433,19 @@ def run(min_gap_pips=3.0, horizon=60, window=120, null=False):
         if d is None or len(d) < 40:
             print(f"  {pair}: no daily data, skipped")
             continue
-        ddir = None
-        if dxy is not None:
-            aligned = pd.Series(dxy[1], index=dxy[0].index).reindex(
-                d.index, method="ffill").fillna(0)
-            ddir = [int(v) for v in aligned.tolist()]
+        dirs = {"struct_d": _struct_dir_series(d, window, mstruct)}
+        if not null:
+            h1 = _load_h1(pair, pd)
+            if h1 is not None:
+                dirs["struct_h1"] = _h1_dir_per_day(h1, d.index, h1_window,
+                                                    mstruct, pd)
+            if dxy_h1 is not None:
+                dirs["dollar_h1"] = _h1_dir_per_day(dxy_h1, d.index, h1_window,
+                                                    mstruct, pd)
         per_pair[pair] = _observations(d, _pip(pair) if not null else 0.0001,
-                                       min_gap_pips, horizon, window,
-                                       mstruct, ddir)
-        print(f"  {pair}: {len(per_pair[pair])} straddle bars")
+                                       min_gap_pips, horizon, dirs)
+        print(f"  {pair}: {len(per_pair[pair])} straddle bars "
+              f"[{', '.join(sorted(dirs))}]")
 
     rows = [r for v in per_pair.values() for r in v]
     if not rows:
@@ -423,7 +489,7 @@ def run(min_gap_pips=3.0, horizon=60, window=120, null=False):
                 "-" * 58]
         for sp in ("IS", "OOS", "both"):
             sub = rs if sp == "both" else [r for r in rs if r["split"] == sp]
-            for rule in ("struct", "dist", "dollar"):
+            for rule in ("struct_h1", "struct_d", "dollar_h1", "dist"):
                 h, n = _acc(sub, rule)
                 if not n:
                     continue
@@ -435,9 +501,12 @@ def run(min_gap_pips=3.0, horizon=60, window=120, null=False):
         return out
 
     L += block("2. All straddle cases (unique gap pairs)", uniq)
-    dis = [r for r in uniq if r["struct"] and r["dist"] and r["struct"] != r["dist"]]
-    agr = [r for r in uniq if r["struct"] and r["dist"] and r["struct"] == r["dist"]]
-    L += block("3. ⭐ THE DECIDER — structure and distance DISAGREE", dis,
+    key = primary if any(primary in r for r in uniq) else "struct_d"
+    if key != primary:
+        print(f"  NOTE: '{primary}' unavailable — decider falls back to '{key}'")
+    dis = [r for r in uniq if r.get(key) and r["dist"] and r[key] != r["dist"]]
+    agr = [r for r in uniq if r.get(key) and r["dist"] and r[key] == r["dist"]]
+    L += block(f"3. ⭐ THE DECIDER — `{key}` and distance DISAGREE", dis,
                "Structure is pointing at the FARTHER gap. **Do not read this "
                "against 50%** -- the nearer level wins on geometry alone (~62% "
                "even on a random walk), so a useless structure reads ~38% here. "
@@ -539,11 +608,17 @@ if __name__ == "__main__":
     ap.add_argument("--null", action="store_true",
                     help="random-walk sanity check; must read ~50%%")
     ap.add_argument("--horizon", type=int, default=60)
-    ap.add_argument("--window", type=int, default=120)
+    ap.add_argument("--window", type=int, default=120,
+                    help="daily bars used for the struct_d read")
+    ap.add_argument("--h1-window", type=int, default=120,
+                    help="H1 bars (~5 days) used for the struct_h1 read")
+    ap.add_argument("--primary", default="struct_h1",
+                    choices=("struct_h1", "struct_d", "dollar_h1"),
+                    help="which rule the agree/disagree decider is built on")
     ap.add_argument("--min-gap", type=float, default=3.0)
     a = ap.parse_args()
     if a.selftest:
         _selftest()
         sys.exit(0)
-    sys.exit(run(min_gap_pips=a.min_gap, horizon=a.horizon,
-                 window=a.window, null=a.null))
+    sys.exit(run(min_gap_pips=a.min_gap, horizon=a.horizon, window=a.window,
+                 h1_window=a.h1_window, primary=a.primary, null=a.null))

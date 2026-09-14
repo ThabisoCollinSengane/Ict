@@ -1981,6 +1981,43 @@ halves contradict (IS −2.2 / OOS +30.4 on n=13/24) — a live demonstration of
 both splits are mandatory. Gap fills are precomputed per gap (a gap above price
 can only stop being above by filling), so the scan is O(gaps x bars).
 
+**⚠️ SECOND CORRECTION — WHICH TIMEFRAME (trader, 2026-09-14).** The first build
+read structure on DAILY candles. The trader:
+
+> "The shift in market structure matters more on the H1 for the daily sentiment.
+> The previous days price action always tells the story."
+
+So the daily SENTIMENT is read from **H1** structure as of the previous day's
+close, not from the daily candle sequence. The brief already said this twice and
+I did not apply it — P64 uses H1 first as "the trader's timeframe for DAILY
+dollar structure", and P66's bias is the PREVIOUS completed day. The study now
+carries `struct_h1` (primary), `struct_d` (kept so the timeframe claim is
+MEASURED, not assumed) and `dollar_h1` (UDXUSD H1, inverse). `--primary` selects
+which drives the decider.
+
+**The fixture drive vindicated the correction before any real run.** On 30 days
+of synthetic two-scale zigzag the H1 read is +1 on every day and **the DAILY read
+is 0 on every day** — a month of daily candles does not produce enough
+intermediate swings for `structure_direction` to have an opinion at all. On the
+daily rung the read is frequently absent; on H1 it is live. That is a mechanical
+reason the trader's timeframe is the right one, independent of any result.
+
+**Two plumbing bugs caught by driving it, neither by the pure-logic tests:**
+1. `_acc` indexed `r[rule]` for a rule whose series could not be built for that
+   pair (no H1 file, no UDXUSD) -> `KeyError` mid-report. Now `.get`. Found by
+   the null run, where only `struct_d` exists. Fourth bug of this shape in the
+   project after the `_dxy_bias` override, the P47/P48 close-record whitelist and
+   the P63 counter.
+2. **A fixture bug that masqueraded as a code bug.** The first two fixtures read
+   0 and I nearly went looking in `market_structure`. Cause: bars built with
+   `High = max(prev_close, close) + k` make `High[j] == High[j+1]` at every
+   turning point, and the 3-bar fractal needs a STRICT `>`, so **zero** STH/STL
+   formed. Envelope on the CLOSE only and all three tiers appear (sth 40 / stl 39
+   / ith 5 / itl 4, dir +1 / -1 / 0 across up, down and flat drift). Related but
+   distinct: a perfectly MONOTONE ramp also reads 0, correctly — a trend with no
+   pullbacks has no intermediate swings. **Before blaming the classifier, print
+   the swing counts.**
+
 **Ship gate:** drop >= 8pp, >= 2 SE, positive in BOTH halves. A GREEN here is a
 TARGET-SELECTION rule — the only class of change that has ever worked in this
 project (P17 +R4.86M; every analysis-axis study has measured null).
