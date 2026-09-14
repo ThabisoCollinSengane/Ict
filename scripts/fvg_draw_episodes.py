@@ -485,7 +485,18 @@ def run(min_gap_pips=3.0, dominance=DOMINANCE):
             return subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True)
         br = _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "HEAD"
         _git("add", "-f", OUT)
-        _git("commit", "-q", "-m", "fvg draw-episode report (auto)")
+        # ⚠️ CHECK the commit. When the report is byte-identical `git commit` does
+        # nothing and returns non-zero, then `git push` returns 0 because there is
+        # nothing to push — and the old code printed "REPORT PUSHED" having sent
+        # NOTHING. That is exactly what re-running stale code looks like, and it
+        # reported success. Never infer "pushed" from the push alone.
+        if _git("commit", "-q", "-m", "fvg draw-episode report (auto)").returncode != 0:
+            print("\nREPORT UNCHANGED — nothing committed, nothing pushed.")
+            print("  Byte-identical to the copy already in git. If you expected a")
+            print("  change you are probably running STALE CODE:")
+            print("      git pull --rebase     <-- do this FIRST")
+            print("      python scripts/fvg_draw_episodes.py")
+            return 0
         _git("pull", "-q", "--rebase", "--no-edit", "origin", br)
         if _git("push", "origin", br).returncode == 0:
             print("REPORT PUSHED")

@@ -471,6 +471,14 @@ def run(min_gap_pips=3.0, horizon=60, window=120, h1_window=120,
 
     # A second, INDEPENDENT walk stands in for the dollar under --null, so the
     # overlay is exercised without being correlated to the pair by construction.
+    # Which build is actually running? A stale checkout is the single most common
+    # way to waste a run here, and the section list makes it obvious at a glance.
+    import subprocess
+    _sha = subprocess.run(["git", "log", "-1", "--format=%h %ci", "--",
+                           os.path.relpath(__file__, ROOT)],
+                          cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    print(f"  build: {_sha or 'unknown'}  |  sections 1-6 (§6 = geometry-matched verdict)")
+
     dxy_h1 = _random_walk_h1(pd, seed=99) if null else _load_h1(DOLLAR, pd)
     if not null and dxy_h1 is None:
         print(f"  {DOLLAR}: no data — dollar overlay unavailable")
@@ -660,7 +668,19 @@ def run(min_gap_pips=3.0, horizon=60, window=120, h1_window=120,
             return subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True)
         br = _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() or "HEAD"
         _git("add", "-f", OUT)
-        _git("commit", "-q", "-m", "gap race report (auto)")
+        # ⚠️ CHECK the commit. When the report is byte-identical `git commit` does
+        # nothing and returns non-zero, then `git push` returns 0 because there is
+        # nothing to push — and the old code printed "REPORT PUSHED" having sent
+        # NOTHING. That is exactly what a re-run of stale code looks like, and it
+        # reports success. Never infer "pushed" from the push alone.
+        committed = _git("commit", "-q", "-m", "gap race report (auto)").returncode == 0
+        if not committed:
+            print("\nREPORT UNCHANGED — nothing committed, nothing pushed.")
+            print("  The output is byte-identical to the copy already in git.")
+            print("  If you expected a change, you are probably running STALE CODE:")
+            print("      git pull --rebase     <-- do this FIRST")
+            print("      python " + os.path.relpath(__file__, ROOT).replace("\\", "/"))
+            return 0
         _git("pull", "-q", "--rebase", "--no-edit", "origin", br)
         if _git("push", "origin", br).returncode == 0:
             print("REPORT PUSHED")
