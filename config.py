@@ -1144,7 +1144,15 @@ MSS_REQUIRE_DXY = bool(int(_os.environ.get("MSS_REQUIRE_DXY", "0")))
 # hard enough to keep breaking out; the real dollar ranges.
 # The FVGs forming INSIDE the consolidation are the read while it is still
 # ranging -- _range_fvg_lean, built in P52b and left unwired until now.
-RANGE_BIAS_USE_LEAN = bool(int(_os.environ.get("RANGE_BIAS_USE_LEAN", "1")))
+# ⚠️ DEFAULT FLIPPED TO 0 (2026-09-14, pre-live audit). This lean produced
+# WR 15.2% / PF 0.64 / MaxDD -51.99% when it last ran, and the record is
+# explicit that its polarity "was guessed, never specified, and is probably
+# inverted". It is UNREACHABLE in the shipped config -- every call path sits
+# behind RANGE_BIAS_ENABLED (off) or the MM golden channel (off), verified by
+# tracing the call graph -- so this change is inert for the live run. It exists
+# so that anyone who later flips RANGE_BIAS_ENABLED=1 to experiment does NOT
+# silently inherit the untested lean along with it.
+RANGE_BIAS_USE_LEAN = bool(int(_os.environ.get("RANGE_BIAS_USE_LEAN", "0")))
 
 # --- P56: read the REAL dollar index, not a 2-of-6 synthetic ---
 # _dxy_bias built a synthetic DXY from DXY_CONSTITUENTS, but the HistData set
