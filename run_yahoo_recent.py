@@ -114,10 +114,61 @@ def _entry_breakdown(trades):
     return L
 
 
+def _warmup_note(data):
+    """W/D/H4 bar counts vs what draw_cascade_score actually wants.
+
+    Every timeframe is resampled from the SAME 5m window, so a short fetch
+    starves the HTF legs. draw_score == 0 is a HARD SKIP, so a thin weekly
+    series silently suppresses entries — the replay then under-counts and
+    looks like "the algo barely trades".
+    """
+    df = data.get("EURUSD")
+    if df is None or df.empty:
+        return []
+    have = {"W": len(df.resample("1W").agg({"Close": "last"}).dropna()),
+            "D": len(df.resample("1D").agg({"Close": "last"}).dropna()),
+            "H4": len(df.resample("240min").agg({"Close": "last"}).dropna())}
+    want = {"W": 20, "D": 30, "H4": 20}          # draw_cascade_score lookbacks
+    L = ["| timeframe | bars available | cascade wants | |", "|---|---|---|---|"]
+    thin = []
+    for tf in ("W", "D", "H4"):
+        ok = have[tf] >= want[tf]
+        L.append(f"| {tf} | {have[tf]} | {want[tf]} | {'ok' if ok else '**THIN**'} |")
+        if not ok:
+            thin.append(tf)
+    if thin:
+        L += ["", f"> ⚠️ **{', '.join(thin)} under-warmed.** The draw cascade is a "
+                  "hard 0/3 gate, so entries are SUPPRESSED and this count is a "
+                  "FLOOR, not an estimate. Fetch a longer period and use "
+                  "`--since` to report a short window off a warm context."]
+    return L
+
+
+def _filter_since(trades, days, data):
+    """Keep trades opened within the last `days` of the data span."""
+    import pandas as pd
+    if not days:
+        return trades, None
+    end = None
+    for df in data.values():
+        if df is not None and not df.empty:
+            end = df.index.max() if end is None else max(end, df.index.max())
+    if end is None:
+        return trades, None
+    cutoff = end - pd.Timedelta(days=days)
+    kept = [t for t in trades
+            if t.get("opened_at") is not None and pd.Timestamp(t["opened_at"]) >= cutoff]
+    return kept, cutoff
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("period", nargs="?", default="7d")
+    ap.add_argument("--since", type=int, default=None, metavar="DAYS",
+                    help="report only trades opened in the last DAYS; everything "
+                         "before that is HTF warm-up. Use with a long period, "
+                         "e.g. `60d --full --since 14`.")
     ap.add_argument("--full", action="store_true",
                     help="single run of the WHOLE algo as configured by env (base + "
                          "MM if MM_*_ENABLED set), instead of the consolidation A/B")
@@ -145,9 +196,20 @@ def main():
                  f"MM_standalone={int(config.MM_STANDALONE_ENABLED)} · "
                  f"MM_continuation={int(config.MM_CONTINUATION_ENABLED)} · "
                  f"SMT_req={int(config.MM_HTF_SMT_REQUIRED)} · withdraw={int(bool(wd))}")
-        L = [f"# Yahoo replay — WHOLE algo (base + MM), last {period}", "",
-             f"_data span: {span}_", f"_{flags}_", "",
-             "## Trades by model", ""] + _entry_breakdown(trades)
+        all_n = len(trades)
+        trades, cutoff = _filter_since(trades, a.since, data)
+        hdr = (f"# Yahoo replay — WHOLE algo (base + MM), last {period}"
+               + (f", reporting last {a.since}d" if a.since else ""))
+        L = [hdr, "", f"_data span: {span}_", f"_{flags}_"]
+        if a.since:
+            L += ["", f"_reporting window: trades opened at/after **{cutoff}** "
+                      f"— {len(trades)} of {all_n} trades in the fetched span; "
+                      "the earlier part is HTF warm-up._"]
+        L += ["", "## HTF warm-up check", ""] + _warmup_note(data)
+        L += ["", "## HOW MANY TRADES", "",
+              f"**{len(trades)} entries" + (f" in the last {a.since} days"
+              if a.since else f" over {period}") + ".**", "",
+              "## Trades by model", ""] + _entry_breakdown(trades)
         L += ["", "## Gate funnel", ""] + _funnel_block(gate)
         # MM-specific counters
         mm = sorted(((k, v) for k, v in gate.items()
