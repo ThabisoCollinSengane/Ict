@@ -1,0 +1,2659 @@
+r"""Phase 2 live strategy loop — drives backtest signal logic on live MT5 bars.
+
+Architecture
+------------
+LiveTrader subclasses Backtester to reuse every ICT signal method unchanged
+(conviction scoring, find_target, structure_stop, P9/P18/draw-cascade sizing).
+Three thin overrides wire the live data + execution layer in:
+
+  bars_up_to()    → MT5 get_bars instead of historical dicts
+  _maybe_open()   → after parent creates self.active[pair], place real MT5 order
+  _maybe_pyramid()→ same pattern for pyramid legs
+
+Live position management (vs backtest simulation):
+  _sync_closed_positions()  — detect legs closed by MT5 (SL/TP hit by broker)
+  _update_live_positions()  — trail stops via modify_sl_tp, trigger pyramid check
+  _force_close()            — close via MT5 (session handover, kill switch)
+
+Usage on the VPS (DEMO account first — see LIVE_SETUP.md):
+    $env:MT5_LOGIN="12345678"
+    $env:MT5_PASSWORD="yourpassword"
+    $env:MT5_SERVER="Exness-MT5Trial14"
+    .\.venv\\Scripts\\python.exe -m live.run_live
+
+Credentials via env vars only — NEVER hardcode them.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sys
+import threading
+import time
+import urllib.request
+from collections import defaultdict, namedtuple
+from datetime import datetime, timezone, timedelta
+
+# Add repo root to path so imports work when run as a module from the VPS.
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+import config
+from backtest import Backtester   # reuse all ICT signal logic
+from intermarket import (
+    resolve_pair_direction,
+    resolve_index_direction,
+    resolve_gold_direction,
+)
+from ict import market_structure as mstruct
+from ict.killzones import can_open_new_trade
+from news_filter import NewsCalendar
+from risk import pip_size
+from trade_log import TradeLog
+import live.mt5_connector as mt
+from live.session_inputs import SessionInputs
+from live import telegram_control
+
+def _notify(msg):
+    """Broadcast an alert to every authorised Telegram user (owner + admins +
+    viewers) via the trading bot's token."""
+    try:
+        return telegram_control.broadcast(msg)
+    except Exception:
+        return False
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("data/live.log", encoding="utf-8"),
+    ],
+)
+log = logging.getLogger("ict.live")
+
+# Per-ticket trade reasoning (target idea + stop basis + model), persisted so a
+# restart can restore the "why" onto re-adopted positions.
+_POS_META_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "data", "positions_meta.json")
+
+# Backtest Bar is namedtuple("Bar", "Open High Low Close").
+# MT5 Bar has (time, open, high, low, close, volume) with lowercase fields.
+# _BBar matches the uppercase convention the ict/ modules expect.
+_BBar = namedtuple("_BBar", "Open High Low Close")
+
+
+def _to_bars(mt_bars: list) -> list[_BBar]:
+    return [_BBar(b.open, b.high, b.low, b.close) for b in mt_bars]
+
+
+# ---------------------------------------------------------------------------
+# LiveTrader
+# ---------------------------------------------------------------------------
+
+class LiveTrader(Backtester):
+    """Live trading engine.
+
+    Inherits all ICT signal logic from Backtester; overrides data access and
+    order execution to use the MT5 broker layer.  Call connect() + run().
+    """
+
+    def __init__(self):
+        # Do NOT call super().__init__() — it expects pre-loaded historical dicts.
+        # Initialise all the state variables _maybe_open / _maybe_pyramid read.
+
+        acc = mt.account()
+        if acc is None:
+            raise RuntimeError("MT5 not connected — call mt.connect() before LiveTrader()")
+
+        self.equity       = self._zar(acc.balance)
+        self.start_equity = self.equity
+        self._peak_equity = self.equity
+
+        # active positions: pair → {direction, target, legs:[{entry,stop,units,ticket,…}],…}
+        self.active = {}
+        self.trades = []
+        self.reject_log = []   # near-misses (setups that hit a gate); used by _log_reject
+
+        # Semi-auto manual overrides (Telegram). Per-day, per-pair: base lot,
+        # direction filter, buy/sell-side levels for full manual AMD.
+        self.inputs = SessionInputs()
+        self._current_pair = None       # set before super()._maybe_open so
+        self._templated = set()         # _pyramid_lots knows which pair it sizes
+        self._manual_halt = False       # /halt: pause new entries + pyramid adds
+        self._mm_state = {}             # Market Maker model: per-pair IFVG alert state
+        self._mm_last_entry = {}        # per-pair timestamp of last MM semi-auto entry
+        self._fast_state = {}           # fast-read: last sweep side per pair (alert dedup)
+
+        # Circuit-breaker state
+        self._consec_losses     = 0
+        self._day_open_eq       = {}   # date → equity at day open
+        self._drawdown_halt_until = None
+
+        # Stale-feed guard state: True while the MT5 feed is detected frozen, so
+        # the STALE / RECOVERED alerts fire once per transition (not every loop).
+        self._feed_stale = False
+
+        # Weekly / daily trade budgets
+        self._week_total   = {}
+        self._week_pair    = {}
+        self._day_total    = {}
+        self._day_pair     = {}
+        self._day_pair_ny  = {}
+        self._day_pair_pm  = {}
+
+        # Session phase tracking
+        self._judas_seen       = {}
+        self._london_judas_open = {}
+        self._london_dir       = {}
+
+        # Caches (same keys as backtest; reused by inherited methods)
+        self._mp_cache   = {}
+        self._weekly_amd = {}
+        self._draw_cache = {}
+
+        # Backtest-only data structures the inherited methods may touch. LiveTrader
+        # overrides the methods that really use these, but empty defaults prevent an
+        # AttributeError if any inherited code path references them.
+        self._tickvol = {}
+        self.tf_bars = {}
+        self.tf_dfs = {}
+        self.tf_index = {}
+        self.tf_pos = {}
+
+        # Diagnostic counters
+        self.gate = {
+            "checks": 0, "in_killzone": 0, "news_clear": 0,
+            "nfp_fomc_ok": 0, "intermarket_signal": 0, "pair_matches": 0,
+            "mss_h1_m15_m5_ok": 0,
+            "daily_bias_ok": 0, "h1_bias_ok": 0, "h4_bias_ok": 0,
+            "dealing_range_ok": 0, "consolidation_found": 0,
+            "manipulation_correct_dir": 0,
+            "m5_fvg_correct_dir": 0, "target_found": 0,
+            "rr_ok": 0, "units_nonzero": 0, "limit_placed": 0,
+            "drawdown_halt": 0, "daily_loss_halt": 0, "consec_loss_pause": 0,
+            "weekly_cap": 0, "weekly_pair_cap": 0,
+            "daily_cap": 0, "daily_pair_cap": 0,
+            "weekly_amd_confirmed": 0, "session_handover_closed": 0,
+            "htf_draw_full_cascade": 0, "htf_draw_partial": 0, "htf_draw_counter": 0,
+            "htf_fvg_5050_hit": 0,
+            "ote_zone": 0, "choch_confirmed": 0, "low_conviction": 0,
+            "judas_divergence": 0, "ny_continuation": 0,
+        }
+
+        # News calendar: try live XML, fall back to CSV
+        self.news = NewsCalendar()
+        self._load_news()
+
+        self.log = TradeLog()
+        log.info("LiveTrader initialised — equity %.2f ZAR (acct: %.2f %s lev 1:%s)",
+                 self.equity, acc.balance, acc.currency, acc.leverage)
+
+        # Re-adopt any open MT5 positions (our magic) so a restart/reboot doesn't
+        # orphan live trades — they stay visible (/positions) and managed (trail/close).
+        self._adopt_open_positions()
+
+    def _save_pos_meta(self):
+        """Persist each open ticket's reasoning (target idea / stop basis / model)
+        so it survives a restart. Only current tickets are kept (prunes closed)."""
+        meta = {}
+        for st in self.active.values():
+            for leg in st["legs"]:
+                tk = leg.get("ticket")
+                if tk:
+                    meta[str(tk)] = {
+                        "target_type": st.get("target_type"),
+                        "stop_reason": st.get("stop_reason"),
+                        "entry_model": st.get("entry_model"),
+                        "im_scenario": st.get("im_scenario"),
+                        "draw_score": st.get("draw_score", 0),
+                    }
+        try:
+            os.makedirs(os.path.dirname(_POS_META_PATH), exist_ok=True)
+            with open(_POS_META_PATH, "w") as f:
+                json.dump(meta, f)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _load_pos_meta() -> dict:
+        try:
+            with open(_POS_META_PATH) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _adopt_open_positions(self):
+        """Rebuild self.active from open MT5 positions stamped with our magic, and
+        restore each one's saved reasoning (target idea / stop basis / model)."""
+        try:
+            allpos = mt.positions() or []
+        except Exception:
+            return
+        saved = self._load_pos_meta()
+        adopted = 0
+        for pos in allpos:
+            if getattr(pos, "magic", 0) != mt.MT5_MAGIC:
+                continue
+            pair = next((b for b in config.PAIRS if mt.resolve_symbol(b) == pos.symbol), None)
+            if pair is None:
+                continue
+            d = 1 if getattr(pos, "type", 0) == 0 else -1     # POSITION_TYPE_BUY == 0
+            leg = {"entry": pos.price_open,
+                   "stop": pos.sl or pos.price_open,
+                   "units": int(round(pos.volume * config.LOT_UNITS)),
+                   "ticket": pos.ticket, "leg_idx": 0}
+            m = saved.get(str(pos.ticket), {})
+            st = self.active.get(pair)
+            if st is None:
+                self.active[pair] = {
+                    "direction": d, "target": pos.tp or pos.price_open, "legs": [leg],
+                    "entry_model": m.get("entry_model") or "adopted",
+                    "im_scenario": m.get("im_scenario") or "adopted",
+                    "draw_score": m.get("draw_score", 0),
+                    "target_type": m.get("target_type") or "adopted (pre-restart)",
+                    "stop_reason": m.get("stop_reason") or "adopted (pre-restart)",
+                }
+            else:
+                leg["leg_idx"] = len(st["legs"])
+                st["legs"].append(leg)
+            adopted += 1
+        if adopted:
+            self._save_pos_meta()
+            log.info("Re-adopted %d open MT5 position(s) on restart", adopted)
+            _notify(f"Re-adopted {adopted} open position(s) after restart — "
+                    f"still managed. Send /positions to view.")
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _zar(amount_in_acct_ccy: float) -> float:
+        """Convert account-currency amount to ZAR."""
+        acc = mt.account()
+        if acc and acc.currency == "ZAR":
+            return amount_in_acct_ccy
+        return amount_in_acct_ccy * config.USD_ZAR
+
+    def _load_news(self):
+        try:
+            url = config.FOREXFACTORY_XML_URL
+            with urllib.request.urlopen(url, timeout=10) as r:
+                xml = r.read().decode("utf-8")
+            n = self.news.load(xml)
+            log.info("News: %d events from ForexFactory XML", n)
+        except Exception as exc:
+            log.warning("FF XML fetch failed (%s) — trying CSV fallback", exc)
+            for path in ("data/news_events.csv", "./data/news_events.csv"):
+                try:
+                    with open(path) as f:
+                        n = self.news.load_csv(f.read())
+                    log.info("News: %d events from %s (may be stale)", n, path)
+                    return
+                except Exception:
+                    continue
+            log.warning("No news calendar loaded — news filter disabled")
+
+    def _refresh_news(self):
+        """Reload news calendar (call at start of each trading day)."""
+        self._load_news()
+
+    # ── Data access — MT5 bars ────────────────────────────────────────────────
+
+    def bars_up_to(self, sym, tf, t, max_bars=None):
+        """Fetch completed bars from MT5 and return in backtest Bar format.
+
+        `t` is ignored — in live mode all bars are up to now.
+        `max_bars` caps fetch count; 0 or None = up to 3000 (safe for H4/D/W full history).
+        """
+        count = max_bars if (max_bars and max_bars < 3000) else 3000
+        return _to_bars(mt.get_bars(sym, tf, count))
+
+    def _bar_at(self, sym, tf, t):
+        bars = self.bars_up_to(sym, tf, t, max_bars=2)
+        return bars[-1] if bars else None
+
+    # ── Market profile overrides (uses tf_dfs/tf_index in backtest) ───────────
+    # These are conviction bonuses only — returning safe approximations or None
+    # means the hard gates and sizing levers still work correctly.
+
+    def _daily_open(self, pair, t):
+        bars = self.bars_up_to(pair, "D", t, max_bars=3)
+        return bars[-1].Open if bars else None
+
+    def _weekly_open(self, pair, t):
+        bars = self.bars_up_to(pair, "W", t, max_bars=3)
+        return bars[-1].Open if bars else None
+
+    def _session_open(self, pair, sess_name, t):
+        return None   # skip (needs intraday session-open tracking)
+
+    def _get_weekly_amd(self, pair, t):
+        return None   # skip (uses tf_bars DatetimeIndex not available in live)
+
+    def _market_profile(self, pair, t):
+        return None   # skip (uses tf_dfs not available in live)
+
+    # ── Semi-auto manual overrides ───────────────────────────────────────────
+
+    def _pyramid_lots(self):
+        """Base lot for the current pair. When the trader set a day lot via
+        Telegram, that becomes the 1x base — the P18/P19/P41/draw multipliers
+        still stack on top of it (per the trader's 'base lot' choice)."""
+        lot = self.inputs.day_lot(self._current_pair) if self._current_pair else None
+        if lot:
+            return (lot, lot, lot)
+        return super()._pyramid_lots()
+
+    def _levels_amd_dir(self, pair, t) -> int:
+        """Full manual AMD from the trader's levels: which side was swept?
+
+        sell-side (below) swept + price reclaimed above it → +1 (hunt LONG toward
+        buy-side). buy-side (above) swept + price back below → -1 (hunt SHORT
+        toward sell-side). 0 = manipulation not done yet → wait. Uses the last 12
+        completed M15 bars; the most recent sweep wins if both fired.
+        """
+        buy  = self.inputs.buy_levels(pair)
+        sell = self.inputs.sell_levels(pair)
+        if not buy and not sell:
+            return 0
+        bars = self.bars_up_to(pair, "15T", t, max_bars=60)
+        look = bars[-12:] if bars else []
+        if not look:
+            return 0
+        price = look[-1].Close
+        tol = pip_size(pair)                       # 1-pip buffer beyond the level
+        sell_sweep = buy_sweep = None              # (recency_index, level)
+        for i, b in enumerate(look):
+            for lv in sell:
+                if b.Low < lv - tol and (sell_sweep is None or i >= sell_sweep[0]):
+                    sell_sweep = (i, lv)
+            for lv in buy:
+                if b.High > lv + tol and (buy_sweep is None or i >= buy_sweep[0]):
+                    buy_sweep = (i, lv)
+        sell_ok = sell_sweep is not None and price > sell_sweep[1]   # reclaimed up
+        buy_ok  = buy_sweep  is not None and price < buy_sweep[1]    # reclaimed down
+        if sell_ok and buy_ok:
+            return 1 if sell_sweep[0] >= buy_sweep[0] else -1
+        if sell_ok:
+            return 1
+        if buy_ok:
+            return -1
+        return 0
+
+    def _handover_exempt(self, pair) -> bool:
+        """Live override: the trader's /hold keeps a pair open across the session
+        handover (London->NY, NY AM->PM) - it then runs on stop/target/trail only."""
+        return bool(self.inputs.hold(pair))
+
+    # ── Manual actions (Telegram /close, /halt, /resume) ─────────────────────
+
+    def manual_close(self, pair, leg=None) -> str:
+        """Close a pair at market. `leg` None = the whole position; a 1-based leg
+        number closes just that pyramid leg and leaves the rest running."""
+        st = self.active.get(pair)
+        if st is None:
+            return f"no open {pair} position"
+        if leg is None:
+            self._force_close(pair, 0, datetime.now(timezone.utc), "manual_close")
+            log.warning("MANUAL CLOSE %s all legs (Telegram)", pair)
+            return f"{pair}: closing all {len(st['legs'])} leg(s) at market"
+        try:
+            idx = int(leg) - 1
+        except (TypeError, ValueError):
+            return "usage: /close EURUSD   (whole)   or   /close EURUSD 2   (leg 2 only)"
+        if idx < 0 or idx >= len(st["legs"]):
+            return f"{pair} has {len(st['legs'])} leg(s); leg {leg} doesn't exist."
+        tk = st["legs"][idx].get("ticket")
+        if not tk:
+            return f"{pair} leg {leg} has no ticket to close."
+        mt.close_position(tk)      # _sync_closed_positions removes just this leg next tick
+        log.warning("MANUAL CLOSE %s leg %s ticket=%s (Telegram)", pair, leg, tk)
+        return f"{pair}: closing leg {leg} (ticket {tk}). The other leg(s) keep running."
+
+    def manual_close_all(self) -> int:
+        """Close every open position across all pairs. Returns how many pairs."""
+        pairs = list(self.active.keys())
+        for p in pairs:
+            self._force_close(p, 0, datetime.now(timezone.utc), "manual_close")
+        if pairs:
+            log.warning("MANUAL CLOSE ALL %s (Telegram)", ", ".join(pairs))
+        return len(pairs)
+
+    def manual_halt(self) -> None:
+        """Pause all new risk (entries + pyramid adds). Open trades keep running."""
+        self._manual_halt = True
+        log.warning("MANUAL HALT (Telegram) — no new entries/adds until /resume")
+
+    def manual_resume(self) -> None:
+        self._manual_halt = False
+        log.info("Manual halt cleared (Telegram) — entries re-enabled")
+
+    def manual_test_trade(self, pair, direction, lot=None) -> str:
+        """Open a TEST market order NOW on the connected account, using the bot's
+        OWN structural stop (fractal ITL/ITH, capped ~10 pips) and a 2R target.
+        Fully managed afterwards — trailing + /close work. For demo verification;
+        places a real order on whatever account is connected."""
+        if pair not in config.PAIRS:
+            return f"unknown pair '{pair}' (have: {', '.join(config.PAIRS)})"
+        if pair in self.active:
+            return f"{pair} already has an open position — /close {pair} first."
+        q = mt.tick(pair)
+        if not q:
+            return f"no live tick for {pair} — is the MT5 terminal up?"
+        now = datetime.now(timezone.utc)
+        entry = (q[0] + q[1]) / 2
+        pip = pip_size(pair)
+        stop = None
+        stop_reason = "structural swing (intact ITL/ITH)"
+        try:
+            stop = self._structure_stop(pair, direction, entry, pip, now)
+        except Exception:
+            stop = None
+        if not stop or abs(entry - stop) < pip:
+            stop = entry - 10 * pip * direction          # bot's default 10-pip stop
+            stop_reason = "fixed 10-pip (default)"
+        stop_dist = abs(entry - stop)
+        target = entry + 2 * stop_dist * direction        # 2R test target
+        lots = lot or self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
+        try:
+            lots = max(round(float(lots), 2), config.MIN_LOT_SIZE)
+        except (TypeError, ValueError):
+            return f"bad lot '{lot}' — use e.g. 0.01 .. 0.05"
+
+        res = mt.market_order(pair, lots, direction, sl=stop, tp=target, comment="ict_test")
+        if not (res and res.get("ok")):
+            return f"TEST order FAILED for {pair}: {res}"
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st = {
+            "direction": direction, "target": target,
+            "legs": [{"entry": entry, "stop": stop,
+                      "units": int(lots * config.LOT_UNITS),
+                      "ticket": ticket, "leg_idx": 0}],
+            "entry_model": "test", "im_scenario": "test", "draw_score": 0,
+            "target_type": "fixed 2R (test)", "stop_reason": stop_reason,
+        }
+        self.active[pair] = st
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        self._save_pos_meta()
+        d = "LONG" if direction > 0 else "SHORT"
+        log.warning("MANUAL TEST TRADE %s %s %.2f lots (Telegram)", d, pair, lots)
+        return (f"TEST TRADE OPENED\n"
+                f"{pair} {d}  {lots} lots\n"
+                f"Entry:  {entry:.5f}\n"
+                f"Stop:   {stop:.5f}  ({stop_dist / pip:.1f} pips — bot's structural stop)\n"
+                f"Target: {target:.5f}  (2R)\n"
+                f"Now managed live — it trails and /close works. (Demo account.)")
+
+    def manual_pyramid(self, pair, level=None) -> str:
+        """Add a leg to a WINNING open position. Exits at the same TP as the
+        position by default, or at `level` if given. Stop = the bot's structural
+        stop. /pyramid PAIR   or   /pyramid PAIR 1.1600"""
+        st = self.active.get(pair)
+        if st is None:
+            return f"no open {pair} position to add to."
+        if len(st["legs"]) >= config.MAX_LEGS:
+            return f"{pair} is already at max legs ({config.MAX_LEGS})."
+        d = st["direction"]
+        q = mt.tick(pair)
+        if not q:
+            return f"no live tick for {pair} — is MT5 up?"
+        price = (q[0] + q[1]) / 2
+        pip = pip_size(pair)
+
+        # Only add to a position that is IN PROFIT (a winner).
+        u = sum(l["units"] for l in st["legs"]) or 1
+        avg_entry = sum(l["entry"] * l["units"] for l in st["legs"]) / u
+        if (price - avg_entry) * d <= 0:
+            return (f"{pair} is not in profit yet — pyramid adds only to a winning "
+                    f"position (price {price:.5f} vs avg entry {avg_entry:.5f}).")
+
+        # Target: same TP as the position, or the level the trader gave.
+        if level is not None:
+            try:
+                level = float(level)
+            except (TypeError, ValueError):
+                return f"bad target level '{level}'"
+            if (level - price) * d <= 0:
+                return f"target {level} is not beyond current price in the trade direction."
+            target = level
+        else:
+            target = st["target"]
+
+        stop = None
+        try:
+            stop = self._structure_stop(pair, d, price, pip, datetime.now(timezone.utc))
+        except Exception:
+            stop = None
+        if not stop or abs(price - stop) < pip:
+            stop = price - 10 * pip * d
+        lots = self.inputs.day_lot(pair) or round(st["legs"][0]["units"] / config.LOT_UNITS, 2)
+        lots = max(round(float(lots or config.MIN_LOT_SIZE), 2), config.MIN_LOT_SIZE)
+
+        res = mt.market_order(pair, lots, d, sl=stop, tp=target, comment=f"ict_pyr{len(st['legs'])}")
+        if not (res and res.get("ok")):
+            return f"pyramid add FAILED for {pair}: {res}"
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st["legs"].append({"entry": price, "stop": stop,
+                           "units": int(lots * config.LOT_UNITS),
+                           "ticket": ticket, "leg_idx": len(st["legs"])})
+        # If a new level was given, make the whole position exit there.
+        note = "same TP as the position"
+        if level is not None and target != st["target"]:
+            st["target"] = target
+            note = "new shared level"
+            for lg in st["legs"][:-1]:
+                if lg.get("ticket"):
+                    mt.modify_sl_tp(lg["ticket"], sl=lg["stop"], tp=target)
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        self._save_pos_meta()
+        log.warning("MANUAL PYRAMID %s +%.2f lots (leg %d, Telegram)", pair, lots, len(st["legs"]))
+        return (f"PYRAMID ADDED\n"
+                f"{pair} {'LONG' if d > 0 else 'SHORT'}  +{lots} lots (leg {len(st['legs'])})\n"
+                f"Entry:  {price:.5f}\n"
+                f"Stop:   {stop:.5f}  ({abs(price - stop) / pip:.1f} pips — structural)\n"
+                f"Target: {target:.5f}  ({note})")
+
+    def _legs_for(self, st, leg):
+        """Resolve `leg` (1-based, or None=all) to a list of leg dicts, or a str error."""
+        if leg is None:
+            return st["legs"]
+        try:
+            idx = int(leg) - 1
+        except (TypeError, ValueError):
+            return "bad leg number"
+        if idx < 0 or idx >= len(st["legs"]):
+            return f"leg {leg} doesn't exist ({len(st['legs'])} open)"
+        return [st["legs"][idx]]
+
+    def manual_move_stop(self, pair, level, leg=None) -> str:
+        """Move the stop of a pair (all legs, or one leg) to `level`."""
+        st = self.active.get(pair)
+        if st is None:
+            return f"no open {pair} position"
+        try:
+            level = float(level)
+        except (TypeError, ValueError):
+            return "usage: /sl EURUSD 1.15550   (or /sl EURUSD 2 1.15550 for one leg)"
+        legs = self._legs_for(st, leg)
+        if isinstance(legs, str):
+            return legs
+        moved = 0
+        for l in legs:
+            if l.get("ticket") and mt.modify_sl_tp(l["ticket"], sl=level, tp=st["target"]):
+                l["stop"] = level
+                moved += 1
+        if not moved:
+            return (f"couldn't move stop — the broker rejected it (a stop must be on "
+                    f"the correct side of price: below for longs, above for shorts).")
+        log.warning("MANUAL SL %s -> %.5f on %d leg(s) (Telegram)", pair, level, moved)
+        return f"{pair}: stop moved to {level:.5f} on {moved} leg(s)."
+
+    def manual_breakeven(self, pair, leg=None) -> str:
+        """Move the stop to breakeven (each leg's own entry)."""
+        st = self.active.get(pair)
+        if st is None:
+            return f"no open {pair} position"
+        legs = self._legs_for(st, leg)
+        if isinstance(legs, str):
+            return legs
+        moved = 0
+        for l in legs:
+            be = l["entry"]
+            if l.get("ticket") and mt.modify_sl_tp(l["ticket"], sl=be, tp=st["target"]):
+                l["stop"] = be
+                moved += 1
+        if not moved:
+            return "couldn't move to breakeven (broker rejected — price may be too close)."
+        log.warning("MANUAL BE %s on %d leg(s) (Telegram)", pair, moved)
+        return f"{pair}: stop -> breakeven on {moved} leg(s)."
+
+    # ── Telegram read / query commands (read-only; never raise) ──────────────
+
+    @staticmethod
+    def _dir_word(d) -> str:
+        return "bullish" if d > 0 else ("bearish" if d < 0 else "flat")
+
+    def read_dxy_value(self):
+        """Synthetic DXY from live constituent ticks (same math as the smoke test)."""
+        try:
+            from ict.dxy_synthetic import compute_dxy
+            prices = {}
+            for base in mt.DXY_CONSTITUENTS:
+                q = mt.tick(base)
+                if q:
+                    prices[base] = (q[0] + q[1]) / 2.0
+            return compute_dxy(prices)
+        except Exception:
+            return None
+
+    def _pair_structure(self, pair):
+        """Per-TF fractal structure + the intact ITH/ITL draws for one pair."""
+        now = datetime.now(timezone.utc)
+        q = mt.tick(pair)
+        out = {"price": round((q[0] + q[1]) / 2, 5) if q else None}
+        for tf, lbl in (("240T", "H4"), ("60T", "H1"), ("15T", "M15")):
+            try:
+                res = mstruct.classify(self.bars_up_to(pair, tf, now, max_bars=200))
+                ith = mstruct.last_intact(res, "ITH")
+                itl = mstruct.last_intact(res, "ITL")
+                out[lbl] = {
+                    "dir": mstruct.structure_direction(res),
+                    "ith": round(ith.price, 5) if ith else None,
+                    "itl": round(itl.price, 5) if itl else None,
+                }
+            except Exception:
+                out[lbl] = {"dir": 0, "ith": None, "itl": None}
+        return out
+
+    def _plan_str(self, pair) -> str:
+        bits = []
+        if self.inputs.day_lot(pair) is not None:
+            bits.append(f"lot {self.inputs.day_lot(pair):.2f}")
+        if self.inputs.bias(pair):
+            bits.append(f"{self.inputs.bias(pair)} only")
+        if self.inputs.hold(pair):
+            bits.append("HOLD")
+        if self.inputs.has_levels(pair):
+            bits.append("levels set")
+        return ", ".join(bits) if bits else "auto"
+
+    # Multi-timeframe structure ladder for the top-down (HTF -> LTF) read.
+    _MTF = (("D", "D1"), ("240T", "H4"), ("60T", "H1"), ("15T", "M15"), ("5T", "M5"))
+
+    def read_mtf(self, pair=None) -> str:
+        """Event-driven, top-down market-structure read (D1 -> M5) per pair, using
+        the fractal STH/STL -> ITH/ITL engine. Shows each TF's structure direction,
+        flags the swing that was just TAKEN OUT (the structural event), and marks
+        HTF-vs-LTF alignment (continuation) or divergence (pullback/reversal). This
+        is the same per-swing method that drives intermarket + SMT. Advisory."""
+        from ict import market_structure as mstruct
+        now = datetime.now(timezone.utc)
+        sess = self._current_session(now) or "outside killzone"
+        pairs = [pair] if pair else [p for p in config.PAIRS
+                                     if p in ("EURUSD", "GBPUSD", "NZDUSD")]
+        out = [f"STRUCTURE (HTF -> LTF)  session: {sess}"]
+        if sess != "outside killzone":
+            out.append("(in a killzone - read the HTF bias first, then drop to the LTF sweep)")
+        dword = {1: "bullish", -1: "bearish", 0: "flat"}
+        for p in pairs:
+            out.append("")
+            out.append(f"{p}:")
+            htf_dir = ltf_dir = 0
+            for tf, lbl in self._MTF:
+                try:
+                    bars = self.bars_up_to(p, tf, now, max_bars=200)
+                except Exception:
+                    bars = []
+                if len(bars) < 6:
+                    out.append(f"  {lbl:3}: -")
+                    continue
+                res = mstruct.classify(bars)
+                d = mstruct.structure_direction(res)
+                sth = mstruct.last_swing(res, "STH")
+                stl = mstruct.last_swing(res, "STL")
+                ev = []
+                if sth is not None and sth.swept:
+                    ev.append("STH taken")
+                if stl is not None and stl.swept:
+                    ev.append("STL taken")
+                judas = mstruct.is_minor_sweep(res, d) if d else False
+                tag = "  [Judas: STH/STL swept, ITH/ITL intact]" if judas else ""
+                evs = ("  <- " + " & ".join(ev)) if ev else ""
+                out.append(f"  {lbl:3}: {dword[d]}{tag}{evs}")
+                if lbl in ("D1", "H4"):
+                    htf_dir = htf_dir or d
+                if lbl in ("M15", "M5") and d:
+                    ltf_dir = d
+            # synthesis
+            if htf_dir and ltf_dir:
+                if htf_dir == ltf_dir:
+                    out.append(f"  => HTF {dword[htf_dir]}, LTF aligned -> CONTINUATION side")
+                else:
+                    out.append(f"  => HTF {dword[htf_dir]}, LTF {dword[ltf_dir]} -> "
+                               f"pullback/reversal (LTF swept against HTF - discount/premium)")
+            elif htf_dir:
+                out.append(f"  => HTF {dword[htf_dir]}; LTF not yet shifted")
+        out.append("")
+        out.append("(advisory - structure updates when a swing is taken out; the auto "
+                   "engine still trades confirmed setups)")
+        return "\n".join(out)
+
+    _SEASONAL_PATH = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "data", "seasonal_bias.json")
+    _MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    _DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    def _load_seasonal(self):
+        if getattr(self, "_seasonal_cache", None) is not None:
+            return self._seasonal_cache
+        try:
+            with open(self._SEASONAL_PATH) as f:
+                self._seasonal_cache = json.load(f)
+        except Exception:
+            self._seasonal_cache = {}
+        return self._seasonal_cache
+
+    def _seasonal_lean(self, pair, now):
+        """Advisory seasonal lean for this month + weekday (from build_seasonal.py).
+        Graded — shows 'neutral' when the sample says noise, so it's never over-
+        trusted. FX seasonality is weak: a tiebreaker, not a signal."""
+        data = self._load_seasonal()
+        if not data or pair not in data:
+            return ""
+        parts = []
+        m = data[pair].get("month", {}).get(str(now.month))
+        if m and m.get("grade") != "noise":
+            dirn = "SHORT" if m["avg_pct"] < 0 else "LONG"
+            parts.append(f"{self._MONTHS[now.month]} {m['avg_pct']:+.1f}% "
+                         f"({int(m['up_rate'] * 100)}% up-yrs, {m['grade']}) -> {dirn} lean")
+        wd = now.weekday()
+        d = data[pair].get("dow", {}).get(str(wd))
+        if d and d.get("grade") != "noise" and wd < 5:
+            dirn = "up" if d["avg_pct"] > 0 else "down"
+            parts.append(f"{self._DOW[wd]} {dirn} ({int(d['up_rate'] * 100)}%, {d['grade']})")
+        return "  seasonal: " + (" | ".join(parts) if parts else "neutral this month")
+
+    def read_structure(self, pair=None) -> str:
+        """The market-structure read template (one pair, or all when pair=None).
+        Always leads with the gate drivers (DXY + EURGBP), then rates each pair's
+        directional lean %."""
+        now = datetime.now(timezone.utc)
+        sess = self._current_session(now) or "outside killzone"
+        dxy_dir, hdr = self._bias_header(now)
+        lines = [f"MARKET READ - {now:%H:%M} UTC", f"Session: {sess}", "",
+                 "BIAS (gate drivers):"] + hdr + [""]
+        try:
+            lines += self._fast_block(now)
+        except Exception:
+            pass
+        pairs = [pair] if pair else list(config.PAIRS)
+        for p in pairs:
+            s = self._pair_structure(p)
+            h4 = s.get("H4", {})
+            lines.append(f"{p}  {s.get('price', '?')}   {self._pair_lean(s, dxy_dir)}")
+            lines.append(f"  H4 {self._dir_word(h4.get('dir', 0))} | "
+                         f"H1 {self._dir_word(s.get('H1', {}).get('dir', 0))} | "
+                         f"M15 {self._dir_word(s.get('M15', {}).get('dir', 0))}")
+            lines.append(f"  buy-side draw (ITH): {h4.get('ith') or '-'}")
+            lines.append(f"  sell-side draw (ITL): {h4.get('itl') or '-'}")
+            lines.append(f"  bot would: {self._intended_direction(p, now, dxy_dir)}")
+            lines += self._mm_block(p)
+            lines.append(f"  your plan: {self._plan_str(p)}")
+            try:
+                _sl = self._seasonal_lean(p, now)
+                if _sl:
+                    lines.append(_sl)
+            except Exception:
+                pass
+            lines.append("")
+        return "\n".join(lines).strip()
+
+    # Plain-English names for the target's source family (what the TP is drawn to).
+    _TGT_WORDS = {
+        "fib_extension": "Fibonacci extension", "fib": "Fibonacci extension",
+        "fvg": "fair-value gap (FVG)", "fvg_h1": "H1 FVG", "fvg_m15": "M15 FVG",
+        "fvg_m5": "M5 FVG", "ob": "order block (OB)",
+        "equal_hl": "equal highs/lows", "round_number": "round number",
+        "swing": "prior swing high/low",
+        "pdh_pdl": "previous day high/low (PDH/PDL)",
+        "pwh_pwl": "previous week high/low (PWH/PWL)",
+        "ith_liquidity": "intermediate-high liquidity (ITH draw)",
+        "itl_liquidity": "intermediate-low liquidity (ITL draw)",
+    }
+
+    # Plain-English names for the entry model that produced the trade.
+    _MODEL_WORDS = {
+        "judas": "Judas reversal", "breakout": "Breakout continuation",
+        "draw_cont": "Draw continuation", "test": "Manual test",
+        "adopted": "Adopted (pre-restart)",
+    }
+
+    def _why_target(self, tt) -> str:
+        if not tt or tt == "unknown":
+            return "nearest institutional draw"
+        return self._TGT_WORDS.get(str(tt), str(tt))
+
+    def _model_word(self, m) -> str:
+        return self._MODEL_WORDS.get(str(m), str(m) if m else "?")
+
+    def _live_price(self, sym):
+        q = mt.tick(sym)
+        return (q[0] + q[1]) / 2 if q else None
+
+    def _fast_bias(self, sym, tf, now, price=None, lookback=None):
+        """FAST, no-lag bias — reacts to the CURRENT price taking out the recent
+        swing range, WITHOUT waiting for the candle to close. Returns (dir, swept):
+          +1 = live price broke ABOVE the recent range high (fast bullish),
+          -1 = broke BELOW the recent range low (fast bearish), 0 = still inside.
+        `swept` is 'high' / 'low' / '' for display. ADVISORY only — the auto engine
+        still trades confirmed (closed-bar) structure; this is the live sweep read."""
+        lb = lookback or getattr(config, "SWING_LOOKBACK_STH", 8)
+        bars = self.bars_up_to(sym, tf, now)
+        if len(bars) < lb + 1:
+            return 0, ""
+        window = bars[-lb - 1:-1]                 # recent completed bars
+        hi = max(b.High for b in window)
+        lo = min(b.Low for b in window)
+        px = price if price is not None else (self._live_price(sym) or bars[-1].Close)
+        if px > hi:
+            return 1, "high"
+        if px < lo:
+            return -1, "low"
+        return 0, ""
+
+    def _fast_driver(self, now, lb):
+        """Fast DXY + fast EURGBP (with H4 escalation) + fast AUDNZD — the live gate
+        drivers. Returns (fdxy, feg, feg_tf, fan)."""
+        fdxy, _ = self._fast_bias("UDXUSD", "60T", now,
+                                  price=self.read_dxy_value(), lookback=lb)
+        feg, _ = self._fast_bias(config.REF_EURGBP, "60T", now, lookback=lb)
+        feg_tf = "H1"
+        if feg == 0:
+            feg_h4, _ = self._fast_bias(config.REF_EURGBP, "240T", now, lookback=lb)
+            if feg_h4 != 0:
+                feg, feg_tf = feg_h4, "H4"
+        fan, _ = self._fast_bias(config.REF_AUDNZD, "60T", now, lookback=lb)
+        return fdxy, feg, feg_tf, fan
+
+    def _fast_block(self, now):
+        """Live/fast advisory read for the currencies: what each pair's gate says
+        RIGHT NOW off live price, and whether it just swept a high/low. Updates
+        every time you /read — no lag, reacts the moment a level is taken out."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        fdxy, feg, feg_tf, fan = self._fast_driver(now, lb)
+        dword = {1: "UP", -1: "DOWN", 0: "flat"}
+        egword = {1: "EUR>GBP", -1: "GBP>EUR", 0: "flat"}
+        tag = " [via H4]" if (feg != 0 and feg_tf == "H4") else ""
+        lines = ["FAST read (live, advisory - not auto-traded):",
+                 f"  DXY {dword[fdxy]} | EURGBP {egword[feg]}{tag}"]
+        try:
+            _bs_line, _ = self._breakout_smt(now)
+            lines.append(f"  {_bs_line}")
+        except Exception:
+            pass
+        for p in config.PAIRS:
+            if p not in ("EURUSD", "GBPUSD", "NZDUSD"):
+                continue                              # currencies only
+            _, swept = self._fast_bias(p, "15T", now, lookback=lb)
+            sw = f"swept {swept.upper()}" if swept else "inside range"
+            lines.append(f"  {p}: {sw} -> gate {self._fast_pair_gate(p, fdxy, feg, fan)}")
+        return lines + [""]
+
+    def _fast_pair_gate(self, p, fdxy, feg, fan):
+        """The fast intermarket gate direction for a currency pair, off live
+        drivers. Mirrors _intended_direction's scenario logic. Advisory."""
+        smap = {(1, 1): "1a", (1, -1): "1b", (-1, 1): "2a",
+                (-1, -1): "2b", (1, 0): "3a", (-1, 0): "3b"}
+        if fdxy == 0:
+            return "no-trade (DXY flat)"
+        if p in ("EURUSD", "GBPUSD"):
+            gd, gsc = resolve_pair_direction(fdxy, feg, p, "EURUSD")
+            scen = smap.get((fdxy, feg), "?")
+            bad = (gd is None or gsc < 0.75 or (feg == 0 and p == "GBPUSD"))
+        else:   # NZDUSD
+            gd, gsc = resolve_pair_direction(fdxy, fan, "NZDUSD", "AUDUSD")
+            scen = ("N-long" if (gd or 0) > 0 else "N-short")
+            bad = (gd is None or gsc < 1.0)
+        return "no gate signal" if bad else f"{'LONG' if gd > 0 else 'SHORT'} ({scen})"
+
+    def _breakout_smt(self, now):
+        """Read the USD triad (EURUSD + GBPUSD + DXY) as a SET off live price:
+          - all break the SAME way + DXY confirms inverse  -> ALIGNED breakout
+            (continuation): anticipate the M15/H1 retest swing and go with it.
+          - EURUSD vs GBPUSD DISAGREE (one swept, other held) -> SMT divergence
+            (reversal): fade the sweep.
+          - one alone / DXY not confirming -> single-pair break / weak (fakeout risk).
+        Returns (one-line verdict, state_key). Advisory."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        eu, _ = self._fast_bias("EURUSD", "15T", now, lookback=lb)
+        gu, _ = self._fast_bias("GBPUSD", "15T", now, lookback=lb)
+        dxy, _ = self._fast_bias("UDXUSD", "60T", now,
+                                 price=self.read_dxy_value(), lookback=lb)
+        dw = {1: "UP", -1: "DOWN", 0: "flat"}
+        if eu == 0 and gu == 0:
+            return "SET (EU+GU+DXY): inside ranges - no break", "inside"
+        if eu != 0 and eu == gu:                    # both USD pairs broke the same way
+            if dxy == -eu:                          # DXY confirms (inverse)
+                side = "LONG" if eu > 0 else "SHORT"
+                return (f"SET: ALIGNED BREAKOUT -> {side} continuation (EU+GU+DXY all "
+                        f"confirm) - anticipate the M15/H1 retest swing (AMD) then go with it",
+                        f"aligned_{side}")
+            return (f"SET: EU+GU broke {dw[eu]} but DXY not confirming - weak break, "
+                    f"watch for reversal", "weak")
+        if eu != 0 and gu != 0 and eu == -gu:       # USD pairs disagree = SMT
+            return (f"SET: SMT DIVERGENCE - EURUSD {dw[eu]} vs GBPUSD {dw[gu]} "
+                    f"(one swept, the other held) -> reversal signal", "smt")
+        broke = "EURUSD" if eu != 0 else "GBPUSD"   # only one broke
+        d = eu if eu != 0 else gu
+        return (f"SET: single-pair break ({broke} {dw[d]}) - likely fakeout, "
+                f"wait for the other + DXY", "single")
+
+    def _fast_scan(self):
+        """Push a FAST alert the moment a currency takes out its recent M15 high/low
+        (a live liquidity sweep), with the updated gate read. Advisory — the auto
+        engine still trades confirmed structure. Fires once per new sweep side."""
+        if not self.inputs:
+            return
+        now = datetime.now(timezone.utc)
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        try:
+            fdxy, feg, _tf, fan = self._fast_driver(now, lb)
+        except Exception:
+            return
+        for p in ("EURUSD", "GBPUSD", "NZDUSD"):
+            if p not in config.PAIRS:
+                continue
+            try:
+                _, swept = self._fast_bias(p, "15T", now, lookback=lb)
+            except Exception:
+                continue
+            if swept and self._fast_state.get(p) != swept:
+                gate = self._fast_pair_gate(p, fdxy, feg, fan)
+                _notify(f"FAST {p}: swept {swept.upper()} -> gate {gate}\n"
+                        f"(advisory - /read for the full picture; /bias or /test to act)")
+            self._fast_state[p] = swept
+        # Set-level breakout-vs-SMT call: alert when the triad flips into an
+        # ALIGNED breakout or an SMT divergence (the two actionable states).
+        try:
+            bs_line, bs_state = self._breakout_smt(now)
+            if bs_state.startswith("aligned") or bs_state == "smt":
+                if self._fast_state.get("_set") != bs_state:
+                    _notify(f"FAST {bs_line}")
+            self._fast_state["_set"] = bs_state
+        except Exception:
+            pass
+
+    def _bias_header(self, now):
+        """The two intermarket gate drivers, shown at the top of every read:
+        DXY (dollar direction) and EURGBP (EUR-vs-GBP family). Returns
+        (dxy_dir, [lines])."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        dxy_val = self.read_dxy_value()
+        try:
+            dxy_dir = self._dxy_bias("60T", now, lookback=lb)
+        except Exception:
+            dxy_dir = 0
+        # Mirror the gate's escalation cascade: H1 EURGBP, and if flat fall back to
+        # H4 (what the gate actually uses) — so the header reflects the REAL read,
+        # not a "flat" H1 while the gate is escalated to a clear H4 direction.
+        eg_tf = "H1"
+        try:
+            eg_dir = self._sym_bias(config.REF_EURGBP, "60T", now, lookback=lb)
+            if eg_dir == 0:
+                eg_h4 = self._sym_bias(config.REF_EURGBP, "240T", now, lookback=lb)
+                if eg_h4 != 0:
+                    eg_dir, eg_tf = eg_h4, "H4"
+        except Exception:
+            eg_dir = 0
+        dxy_word = {1: "UP (USD strong)", -1: "DOWN (USD weak)", 0: "FLAT"}[dxy_dir]
+        eg_word = {1: "EUR > GBP (EUR family)", -1: "GBP > EUR (GBP family)",
+                   0: "flat (EUR~GBP)"}[eg_dir]
+        if eg_dir != 0 and eg_tf == "H4":
+            eg_word += " [via H4]"
+        dv = f"{dxy_val:.2f}" if dxy_val else "n/a"
+        return dxy_dir, [f"DXY: {dxy_word}  [{dv}]", f"EURGBP: {eg_word}"]
+
+    def _intended_direction(self, pair, now, dxy_dir):
+        """What the intermarket GATE would trade on this pair right now — the bot's
+        intended direction + scenario (a setup + killzone must still fire to act).
+        Mirrors _maybe_open's gate (H1 + H4 escalation). Returns 'LONG (3b)' etc."""
+        lb = getattr(config, "SWING_LOOKBACK_STH", 8)
+        if dxy_dir == 0:
+            return "no trade (DXY flat)"
+        if pair in ("EURUSD", "GBPUSD"):
+            eg = self._sym_bias(config.REF_EURGBP, "60T", now, lookback=lb)
+            esc = ""
+            if eg == 0:
+                eg_h4 = self._sym_bias(config.REF_EURGBP, "240T", now, lookback=lb)
+                if eg_h4 != 0:
+                    eg, esc = eg_h4, "_h4"
+            d, sc = resolve_pair_direction(dxy_dir, eg, pair, "EURUSD")
+            if d is None or sc < 0.75 or (eg == 0 and pair == "GBPUSD"):
+                return "no gate signal"
+            smap = {(1, 1): "1a", (1, -1): "1b", (-1, 1): "2a",
+                    (-1, -1): "2b", (1, 0): "3a", (-1, 0): "3b"}
+            scen = smap.get((dxy_dir, eg), "?") + esc
+        elif getattr(config, "INDICES_ENABLED", False) and pair in config.INDEX_PAIRS:
+            # Indices are SEMI-AUTO: the trader supplies the direction via /bias;
+            # the algo hunts its setup on that side and manages it.
+            if getattr(config, "INDEX_SEMI_AUTO_ONLY", True):
+                b = self.inputs.bias(pair) if self.inputs else None
+                if b not in ("long", "short"):
+                    return "semi-auto: set /bias to trade"
+                return f"{b.upper()} (IDX-man, your bias)"
+            # (auto mode) DXY inverse + sibling + US30 breadth.
+            sib = next((p for p in config.INDEX_PAIRS if p != pair), None)
+            sb = self._sym_bias(sib, "60T", now, lookback=lb) if sib else 0
+            rb = self._sym_bias(config.INDEX_REF, "60T", now, lookback=lb)
+            d, sc = resolve_index_direction(dxy_dir, sb, rb)
+            if d is None or sc < config.INDEX_MIN_IMSCORE:
+                return "no gate signal"
+            scen = "IDX-long" if d > 0 else "IDX-short"
+        elif getattr(config, "GOLD_ENABLED", False) and pair == config.GOLD_PAIR:
+            # Gold gate: DXY (inverse) + silver + AUDUSD breadth.
+            sb = self._sym_bias(config.GOLD_REF_SILVER, "60T", now, lookback=lb)
+            ab = self._sym_bias(config.GOLD_REF_AUD, "60T", now, lookback=lb)
+            d, sc = resolve_gold_direction(dxy_dir, sb, ab)
+            if d is None or sc < config.GOLD_MIN_IMSCORE:
+                return "no gate signal"
+            scen = "G-long" if d > 0 else "G-short"
+        else:   # NZDUSD
+            an = self._sym_bias(config.REF_AUDNZD, "60T", now, lookback=lb)
+            esc = ""
+            if an == 0:
+                an_h4 = self._sym_bias(config.REF_AUDNZD, "240T", now, lookback=lb)
+                if an_h4 != 0:
+                    an, esc = an_h4, "_h4"
+            d, sc = resolve_pair_direction(dxy_dir, an, "NZDUSD", "AUDUSD")
+            if d is None or sc < 1.0:
+                return "no gate signal"
+            scen = ("N-long" if d > 0 else "N-short") + esc
+        return f"{'LONG' if d > 0 else 'SHORT'} ({scen})"
+
+    # ── Market Maker model (IFVG watcher) ────────────────────────────────────
+    _MM_TFS = (("D", "D1"), ("240T", "H4"), ("60T", "H1"))
+
+    def _mm_zones(self, pair, model_dir):
+        """Inversion FVGs on D1/H4/H1 in the model direction (buy -> demand/support
+        +1, sell -> supply/resistance -1). Each dict tagged with its TF label."""
+        from ict.ifvg import find_inversion_fvgs
+        now = datetime.now(timezone.utc)
+        out = []
+        for tf, lbl in self._MM_TFS:
+            try:
+                bars = self.bars_up_to(pair, tf, now, max_bars=200)
+                for z in find_inversion_fvgs(bars, direction=model_dir, max_zones=2):
+                    out.append({"tf": lbl, "tf_key": tf, **z})
+            except Exception:
+                continue
+        return out
+
+    def _mm_block(self, pair):
+        """Template lines for an armed Market Maker model: each IFVG zone, how far
+        price is from it (pips + % of the way from where the model was armed), and
+        which BEAT of the setup it's on:
+          [1] approaching NN%      — price still travelling toward the zone
+          [2] TAGGED               — price inside the zone; waiting on the swing
+          [3] CONFIRMED            — a fresh LTF swing has formed → entry trigger
+          [x] BROKEN               — a full body closed through it; zone spent
+        """
+        model = self.inputs.mm(pair) if self.inputs else None
+        if not model:
+            return []
+        model_dir = 1 if model == "buy" else -1
+        now = datetime.now(timezone.utc)
+        q = mt.tick(pair)
+        price = (q[0] + q[1]) / 2 if q else None
+        pip = pip_size(pair)
+        st = self._mm_state.get(pair, {})
+        arm = st.get("arm_price") or price
+        zones = self._mm_zones(pair, model_dir)
+        armed = self.inputs.mm_auto(pair) if self.inputs else False
+        head = f"  MM {model.upper()} model - IFVG watch (D1/H4/H1)"
+        head += "  [AUTO-ARMED]:" if armed else ":"
+        lines = [head]
+        try:
+            _smt_ok = self._htf_pair_smt(pair, model_dir, now)
+        except Exception:
+            _smt_ok = False
+        lines.append("    SMT: " + ("✅ H1 EU/GU confirms reversal" if _smt_ok
+                                    else "⚠️ unconfirmed (no H1 EU/GU divergence yet)"))
+        if not zones:
+            lines.append("    (no qualifying inversion FVGs yet)")
+            return lines
+        for z in zones:
+            lo, hi, mid = z["lo"], z["hi"], z["mid"]
+            key = f"{z['tf']}:{round(mid, 5)}"
+            inside = price is not None and lo <= price <= hi
+            if price is None:
+                dist, pct = "?", 0
+            elif inside:
+                dist, pct = "0", 100
+            else:
+                dist = f"{abs(price - mid) / pip:.0f}"
+                total = abs(mid - arm)
+                pct = min(100, round(abs(price - arm) / total * 100)) if total > 0 else 0
+            # which beat of the setup this zone is on
+            if key in st.get("broke", set()):
+                beat = "[x] BROKEN - spent, watch next"
+            elif inside:
+                confirmed = False
+                try:
+                    confirmed = self._structure_entry_confirmed(pair, model_dir, now)
+                except Exception:
+                    confirmed = False
+                beat = "[3] CONFIRMED - entry trigger" if confirmed \
+                    else "[2] TAGGED - waiting on swing"
+            else:
+                beat = f"[1] approaching {pct}%"
+            lines.append(f"    {z['tf']} IFVG {lo:.5f}-{hi:.5f}   {dist}p  {beat}")
+        return lines
+
+    def _mm_scan(self):
+        """Alert on reach + break-and-close of armed MM IFVG zones (once each),
+        and — when the trader pre-permitted it with `/mm PAIR buy|sell auto` —
+        auto-enter the model on a confirmed retracement into an IFVG."""
+        if not self.inputs:
+            return
+        now = datetime.now(timezone.utc)
+        for pair in config.PAIRS:
+            model = self.inputs.mm(pair)
+            if not model:
+                self._mm_state.pop(pair, None)
+                continue
+            q = mt.tick(pair)
+            if not q:
+                continue
+            price = (q[0] + q[1]) / 2
+            st = self._mm_state.setdefault(
+                pair, {"arm_price": price, "reached": set(), "broke": set()})
+            model_dir = 1 if model == "buy" else -1
+            zones = self._mm_zones(pair, model_dir)   # compute once; reuse for auto-entry
+            # Reversal confirmations (WR-refined, chart-validated): H1 EU/GU SMT on the
+            # BIGGER timeframe only (MM_SMT_HTF_TFS — H1/H4/D, not M5/M1 noise) and the
+            # M5 structure shift (MSS). Computed once per pair per scan; surfaced in the
+            # alerts so a manual/semi-auto placement has the same confirmations the
+            # refined backtest requires before it would take the trade.
+            try:
+                _smt_ok = self._htf_pair_smt(pair, model_dir, now, tfs=config.MM_SMT_HTF_TFS)
+            except Exception:
+                _smt_ok = False
+            try:
+                _mss_ok = self._mm_mss_confirm(pair, model_dir, now)
+            except Exception:
+                _mss_ok = False
+            _smt_line = ("✅ H1 EU/GU SMT confirms the reversal"
+                         if _smt_ok else
+                         "⚠️ no H1 EU/GU SMT yet — reversal unconfirmed")
+            _mss_line = ("✅ M5 MSS — structure has shifted"
+                         if _mss_ok else
+                         "⚠️ no M5 MSS yet — structure hasn't shifted")
+            # Session-draw target (MMXM time rule): London -> Asia H/L, NY -> London
+            # H/L. Shown so a manual placement uses the same draw the refined model
+            # prefers; falls back to _mm_target's own preference order when unavailable.
+            _sd_line = ""
+            try:
+                _sd = self._prev_session_hl(pair, now, model_dir)
+                if _sd is not None:
+                    _sd_line = f"\nSession draw target: {_sd:.5f} (prev session H/L)"
+            except Exception:
+                pass
+            for z in zones:
+                lo, hi = z["lo"], z["hi"]
+                key = f"{z['tf']}:{round(z['mid'], 5)}"
+                if lo <= price <= hi and key not in st["reached"]:
+                    st["reached"].add(key)
+                    _notify(f"MM {model.upper()} {pair}\nprice REACHED {z['tf']} IFVG "
+                            f"{lo:.5f}-{hi:.5f}\n{_smt_line}\n{_mss_line}{_sd_line}\n"
+                            f"Watch for a swing-formation retracement entry.")
+                bars = self.bars_up_to(pair, z["tf_key"], now, max_bars=2)
+                if bars:
+                    c = bars[-1]
+                    if ((c.Open > hi and c.Close > hi) or (c.Open < lo and c.Close < lo)) \
+                            and key not in st["broke"]:
+                        st["broke"].add(key)
+                        side = "above" if c.Close > hi else "below"
+                        _notify(f"MM {model.upper()} {pair}\n{z['tf']} IFVG BROKEN - "
+                                f"closed {side} {lo:.5f}-{hi:.5f}\nRetracement-entry window "
+                                f"(swing formation).")
+            # Auto-enter the model on a confirmed retracement — only if the trader
+            # pre-armed it (one-shot; disarmed on entry).
+            if self.inputs.mm_auto(pair):
+                try:
+                    self._mm_auto_entry(pair, model, zones, price, now)
+                except Exception:
+                    log.exception("MM auto-entry failed for %s", pair)
+
+    def _mm_target(self, pair, d, price, stop_dist, now):
+        """Target for an MM auto-entry, in preference order:
+          (a) the trader's own /levels opposite-side liquidity (buy model targets
+              the buy-side above; sell model targets the sell-side below);
+          (b) the session draw (MMXM time rule): London -> Asia H/L, NY -> London
+              H/L — the opposing pool of the PREVIOUS session block;
+          (c) the nearest H4 ITH (buy) / ITL (sell) liquidity draw beyond the RR
+              floor — the same institutional draw the bot targets normally;
+          (d) a 2R fallback off the structural stop.
+        All candidates must clear max(MIN_PIPS_TARGET, stop_dist * MIN_RR)."""
+        pip = pip_size(pair)
+        floor = max(self._min_pips_target() * pip, stop_dist * config.MIN_RR)
+        # (a) trader's own opposite-side liquidity level
+        if self.inputs:
+            lvls = self.inputs.buy_levels(pair) if d > 0 else self.inputs.sell_levels(pair)
+            cand = [lv for lv in lvls if (lv - price) * d >= floor]
+            if cand:
+                return (min(cand, key=lambda lv: abs(lv - price)),
+                        "manual level (opposite-side liquidity)")
+        # (b) session draw — previous session block's opposing H/L
+        if config.MM_SESSION_DRAW:
+            try:
+                sd = self._prev_session_hl(pair, now, d)
+            except Exception:
+                sd = None
+            if sd is not None and (sd - price) * d >= floor:
+                return (sd, "session draw (prev session H/L)")
+        # (c) nearest H4 ITH/ITL institutional draw beyond the RR floor
+        try:
+            bars = self.bars_up_to(pair, "240T", now,
+                                   max_bars=(config.ITHL_TARGET_MAX_BARS or None))
+            draws = self._ithl_targets(bars, d, price, pair, "240T")
+            cand = [c for c in draws if (c[0] - price) * d >= floor]
+            if cand:
+                best = min(cand, key=lambda c: abs(c[0] - price))
+                return (best[0], "H4 " + ("ITH" if d > 0 else "ITL") + " liquidity draw")
+        except Exception:
+            pass
+        # (c) 2R fallback
+        return (price + 2 * stop_dist * d, "fixed 2R (fallback)")
+
+    def _mm_auto_entry(self, pair, model, zones, price, now):
+        """Auto-enter/hunt the armed Market Maker model using the VALIDATED engine.
+
+        When the trader arms `/mm PAIR buy|sell auto`, they've supplied the top-down
+        bias — so this BYPASSES the autonomous bias-gates (MSS/draw-cascade/DXY/
+        intermarket) and just executes the entry mechanics in the armed direction:
+          1. price retraced INTO an M30->M1 IFVG (the intraday cascade, not just HTF);
+          2. the retracement swing on the IFVG-proportional TF confirms;
+          3. a PD array (FVG/OB/breaker) INSIDE the gap triggers the fill;
+          4. stop just beyond the internal mini-AMD manipulation (tight, structural);
+          5. target = the trader's /levels draw, else nearest liquidity.
+        PERSISTENT: stays armed until `/mm PAIR off` — takes the first entry, then
+        adds down the distribution (up to MAX_LEGS), and re-enters after a close.
+        A per-pair cooldown prevents same-bar spam. Full risk mgmt + circuit breakers.
+        """
+        if self._manual_halt:
+            return
+        d = 1 if model == "buy" else -1
+        pip = pip_size(pair)
+
+        # cooldown: don't fire again within MM_LIVE_COOLDOWN_MIN of the last MM entry
+        cd = getattr(config, "MM_LIVE_COOLDOWN_MIN", 15)
+        last = self._mm_last_entry.get(pair)
+        if last is not None and (now - last).total_seconds() < cd * 60:
+            return
+
+        # (1) intraday IFVG the price is retraced into, in the armed direction
+        try:
+            zone = self._mm_ifvg_zone(pair, d, price, now)
+        except Exception:
+            log.exception("MM _mm_ifvg_zone failed %s", pair); return
+        if zone is None:
+            return
+        # (2) retracement swing on the IFVG-proportional TF
+        try:
+            if not self._mm_structure_confirm(pair, d, zone[0], now):
+                return
+        except Exception:
+            return
+        # (3) PD array inside the gap (FVG/OB/breaker), M15->M5->M1
+        try:
+            pat = self._mm_entry_pattern(pair, d, zone, price, now)
+        except Exception:
+            return
+        if pat is None:
+            return
+        el, _pat_stop, pat_tag, _etf = pat
+        # (4) structural stop beyond the internal mini-AMD manipulation
+        try:
+            stop = self._mm_structural_stop(zone, d, el, pip, t=now, pair=pair)
+        except Exception:
+            stop = None
+        if stop is None:
+            return                         # wide gap, no internal manipulation -> skip
+        stop_dist = abs(el - stop)
+        smt_ok = False
+        try:                                   # HTF SMT on the bigger timeframe (H1/H4/D)
+            smt_ok = self._htf_pair_smt(pair, d, now, tfs=config.MM_SMT_HTF_TFS)
+        except Exception:
+            pass
+        mss_ok = False
+        try:                                   # M5 structure shift (advisory here)
+            mss_ok = self._mm_mss_confirm(pair, d, now)
+        except Exception:
+            pass
+
+        # position management: fresh entry, or add down the distribution
+        st_open = self.active.get(pair)
+        if st_open is not None:
+            if st_open["direction"] != d:
+                return                     # never fight an open opposite position
+            u = sum(l["units"] for l in st_open["legs"]) or 1
+            avg = sum(l["entry"] * l["units"] for l in st_open["legs"]) / u
+            if len(st_open["legs"]) >= config.MAX_LEGS or (price - avg) * d <= 0:
+                return
+            msg = self.manual_pyramid(pair)
+            self._mm_last_entry[pair] = now
+            _notify(f"MM {model.upper()} ADD {pair} ({zone[0]} IFVG {pat_tag}"
+                    f"{' +SMT' if smt_ok else ''})\n{msg}")
+            return
+
+        target, target_type = self._mm_target(pair, d, el, stop_dist, now)
+        lots = max(round(float(self.inputs.day_lot(pair) or config.MIN_LOT_SIZE), 2),
+                   config.MIN_LOT_SIZE)
+        res = mt.market_order(pair, lots, d, sl=stop, tp=target, comment="ict_mm")
+        if not (res and res.get("ok")):
+            _notify(f"MM {model.upper()} ENTRY FAILED {pair}: {res}")
+            return
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st = {
+            "direction": d, "target": target,
+            "legs": [{"entry": el, "stop": stop,
+                      "units": int(lots * config.LOT_UNITS),
+                      "ticket": ticket, "leg_idx": 0}],
+            "entry_model": f"mm_{model}", "im_scenario": "MM", "draw_score": 0,
+            "target_type": target_type, "stop_reason": f"mm_internal_amd ({zone[0]} IFVG)",
+        }
+        self.active[pair] = st
+        self._mm_last_entry[pair] = now
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        self._save_pos_meta()
+        # PERSISTENT: stay armed (do NOT clear mm_auto) — keep hunting the distribution.
+        dstr = "LONG" if d > 0 else "SHORT"
+        tgt_pips = abs(target - el) / pip
+        log.warning("MM ENTRY %s %s %.2f lots (%s IFVG %s)", dstr, pair, lots,
+                    zone[0], pat_tag)
+        _notify(
+            f"MM {model.upper()} ENTRY {pair} {dstr}"
+            f"{'  ✅SMT' if smt_ok else '  ⚠️no-SMT'}"
+            f"{'  ✅MSS' if mss_ok else '  ⚠️no-MSS'}\n"
+            f"{zone[0]} IFVG {zone[1]:.5f}-{zone[2]:.5f}  entry via {pat_tag}\n"
+            f"Entry:  {el:.5f}   {lots} lots\n"
+            f"Stop:   {stop:.5f}  ({stop_dist / pip:.1f} pips) <- internal AMD\n"
+            f"Target: {target:.5f}  ({tgt_pips:.1f} pips) <- {target_type}\n"
+            f"Still ARMED — hunting the distribution. /mm {pair} off to stop."
+        )
+
+    # ── Semi-auto MM scan (always-on preferred directions) ───────────────────
+
+    def _mm_semi_auto_scan(self):
+        """Proactively scan for MM setups in the trader's preferred directions.
+
+        Unlike _mm_scan (requires manual /mm arming), this runs continuously
+        when MM_SEMI_AUTO_ENABLED=1 and alerts the trader when a setup reaches
+        the confirmation threshold. The trader replies /go PAIR to execute.
+        No arming needed — SELL GBPUSD and BUY EURUSD are permanently watched.
+        """
+        if not getattr(config, "MM_SEMI_AUTO_ENABLED", False):
+            return
+        now = datetime.now(timezone.utc)
+        if not can_open_new_trade(now):
+            return
+        pip_fn = pip_size
+        prefs = getattr(config, "MM_SEMI_AUTO_PAIRS", {})
+        min_conf = getattr(config, "MM_SEMI_AUTO_MIN_CONFIRMS", 2)
+        cooldown = getattr(config, "MM_SEMI_AUTO_COOLDOWN_MIN", 30)
+        max_day = getattr(config, "MM_SEMI_AUTO_MAX_PER_DAY", 3)
+        day_key = now.strftime("%Y-%m-%d")
+
+        if not hasattr(self, "_mmsemi_state"):
+            self._mmsemi_state = {}
+        if not hasattr(self, "_mmsemi_alerts_today"):
+            self._mmsemi_alerts_today = {}
+        if not hasattr(self, "_mmsemi_pending"):
+            self._mmsemi_pending = {}
+        if not hasattr(self, "_mmsemi_session_counts"):
+            self._mmsemi_session_counts = defaultdict(int)
+
+        # Identify current killzone session for session-level dedup
+        from ict.killzones import current_killzone
+        kz_label = current_killzone(now)
+        if kz_label is None:
+            kz_label = "outside"
+
+        for pair, d in prefs.items():
+            if pair not in config.PAIRS:
+                continue
+            if pair in self.active:
+                continue
+            day_count = self._mmsemi_alerts_today.get((day_key, pair), 0)
+            if day_count >= max_day:
+                continue
+            # Max 2 alerts per pair per killzone session
+            session_key = (day_key, pair, kz_label)
+            if self._mmsemi_session_counts[session_key] >= 2:
+                continue
+
+            try:
+                q = mt.tick(pair)
+                if not q:
+                    continue
+                price = (q[0] + q[1]) / 2
+            except Exception:
+                continue
+
+            pip = pip_fn(pair)
+            confirms = []
+            details = []
+            ifvg_tf = ""
+            ifvg_lo = ifvg_hi = 0.0
+
+            # (1) IFVG zone — price inside or approaching an inverted FVG
+            try:
+                zone = self._mm_ifvg_zone(pair, d, price, now)
+                if zone is not None:
+                    confirms.append("IFVG")
+                    ifvg_tf, ifvg_lo, ifvg_hi = zone[0], zone[1], zone[2]
+                    details.append(f"IFVG: {zone[0]} zone {zone[1]:.5f}-{zone[2]:.5f}")
+            except Exception:
+                pass
+
+            # (2) MSS — M5 market structure shift
+            try:
+                mss_ok = self._mm_mss_confirm(pair, d, now)
+                if mss_ok:
+                    confirms.append("MSS")
+                    details.append("MSS: M5 structure shifted in trade direction")
+            except Exception:
+                pass
+
+            # (3) SMT — EU/GU divergence on HTF
+            try:
+                smt_ok = self._htf_pair_smt(pair, d, now,
+                                            tfs=config.MM_SMT_HTF_TFS)
+                if smt_ok:
+                    confirms.append("SMT")
+                    details.append("SMT: EU/GU divergence confirms reversal")
+            except Exception:
+                pass
+
+            # (4) Full body close through IFVG (inversion confirmed)
+            if ifvg_tf:
+                try:
+                    from ict.ifvg import latest_inversion
+                    tf_key = {"D1": "D", "H4": "240T", "H1": "60T",
+                              "M30": "30T", "M15": "15T"}.get(ifvg_tf, ifvg_tf)
+                    bars = self.bars_up_to(pair, tf_key, now, max_bars=5)
+                    inv = latest_inversion(bars, ifvg_lo, ifvg_hi) if bars else 0
+                    if inv == d:
+                        confirms.append("FBC")
+                        details.append("FBC: full body close confirms inversion")
+                except Exception:
+                    pass
+
+            n_conf = len(confirms)
+            if n_conf < min_conf:
+                continue
+
+            # IFVG mandatory — pure MSS+FBC is noise
+            if "IFVG" not in confirms:
+                continue
+
+            # BUY EURUSD gate: require STRONG (3+) with IFVG
+            if pair == "EURUSD" and d > 0:
+                if n_conf < 3:
+                    continue
+
+            # Build the signal strength label
+            if n_conf >= 3:
+                strength = "STRONG"
+            elif n_conf >= 2:
+                strength = "MODERATE"
+            else:
+                strength = "WATCH"
+
+            # Compute entry/stop/target for the alert
+            entry_price = price
+            stop_price = None
+            target_price = None
+            try:
+                pat = self._mm_entry_pattern(pair, d, (ifvg_tf, ifvg_lo, ifvg_hi),
+                                             price, now)
+                if pat:
+                    entry_price = pat[0]
+                    stop_price = pat[1] if pat[1] else None
+            except Exception:
+                pass
+            if stop_price is None:
+                stop_price = price - d * config.FIXED_STOP_PIPS * pip
+            stop_dist = abs(entry_price - stop_price)
+            try:
+                tgt, tgt_type = self._mm_target(pair, d, entry_price, stop_dist, now)
+                target_price = tgt
+            except Exception:
+                target_price = entry_price + d * 2 * stop_dist
+                tgt_type = "2R fallback"
+
+            # Store as pending (for /go command)
+            self._mmsemi_pending[pair] = {
+                "direction": d, "confirms": confirms, "strength": strength,
+                "entry": entry_price, "stop": stop_price, "target": target_price,
+                "target_type": tgt_type, "ifvg": (ifvg_tf, ifvg_lo, ifvg_hi),
+                "time": now,
+            }
+
+            dir_word = "LONG" if d > 0 else "SHORT"
+            conf_str = "  ".join(f"✅{c}" for c in confirms)
+            missing = [c for c in ("IFVG", "MSS", "SMT", "FBC")
+                       if c not in confirms]
+            miss_str = "  ".join(f"⚠️{c}" for c in missing) if missing else ""
+            stop_pips = stop_dist / pip
+            tgt_pips = abs(target_price - entry_price) / pip
+            rr = tgt_pips / stop_pips if stop_pips > 0 else 0
+
+            alert = (
+                f"MM {strength} — {dir_word} {pair}\n"
+                f"{conf_str}"
+                f"{'  ' + miss_str if miss_str else ''}\n"
+                f"\n"
+                f"Entry:  {entry_price:.5f}\n"
+                f"Stop:   {stop_price:.5f}  ({stop_pips:.1f} pips)\n"
+                f"Target: {target_price:.5f}  ({tgt_pips:.1f} pips, {rr:.1f}R)\n"
+                f"  <- {tgt_type}\n"
+            )
+            if details:
+                alert += "\n" + "\n".join(details) + "\n"
+            alert += f"\n/go {pair.lower()} to EXECUTE  |  ignore to PASS"
+
+            _notify(alert)
+            log.info("MM semi-auto alert: %s %s %s (%d confirms)",
+                     strength, dir_word, pair, n_conf)
+
+            self._mmsemi_session_counts[session_key] += 1
+            self._mmsemi_state.setdefault(pair, {})["last_alert"] = now
+            self._mmsemi_alerts_today[(day_key, pair)] = day_count + 1
+
+    def mm_semi_auto_execute(self, pair):
+        """Execute a pending semi-auto MM setup (called from /go command)."""
+        pending = getattr(self, "_mmsemi_pending", {}).get(pair)
+        if not pending:
+            return f"No pending MM setup for {pair}. Wait for an alert."
+        age = (datetime.now(timezone.utc) - pending["time"]).total_seconds()
+        if age > 600:
+            del self._mmsemi_pending[pair]
+            return f"Setup expired ({age / 60:.0f} min old). Wait for a fresh alert."
+        if pair in self.active:
+            return f"{pair} already has an open position."
+        d = pending["direction"]
+        el = pending["entry"]
+        stop = pending["stop"]
+        target = pending["target"]
+        tgt_type = pending["target_type"]
+        pip = pip_size(pair)
+        lots = max(round(float(
+            self.inputs.day_lot(pair) or config.MIN_LOT_SIZE
+        ) if self.inputs else config.MIN_LOT_SIZE, 2), config.MIN_LOT_SIZE)
+
+        res = mt.market_order(pair, lots, d, sl=stop, tp=target, comment="ict_mm_semi")
+        if not (res and res.get("ok")):
+            return f"MM ENTRY FAILED {pair}: {res}"
+        ticket = res.get("ticket") or self._recover_ticket(pair)
+        st = {
+            "direction": d, "target": target,
+            "legs": [{"entry": el, "stop": stop,
+                      "units": int(lots * config.LOT_UNITS),
+                      "ticket": ticket, "leg_idx": 0}],
+            "entry_model": "mm_semi", "im_scenario": "MM-semi",
+            "draw_score": 0, "target_type": tgt_type,
+            "stop_reason": f"mm_semi ({pending['ifvg'][0]} IFVG)",
+        }
+        self.active[pair] = st
+        try:
+            self.log.upsert_position(pair, st)
+        except Exception:
+            pass
+        self._save_pos_meta()
+        del self._mmsemi_pending[pair]
+        dir_word = "LONG" if d > 0 else "SHORT"
+        stop_pips = abs(el - stop) / pip
+        tgt_pips = abs(target - el) / pip
+        _notify(
+            f"MM ENTRY {dir_word} {pair}  ({pending['strength']})\n"
+            f"  {' '.join('✅' + c for c in pending['confirms'])}\n"
+            f"Entry:  {el:.5f}   {lots} lots\n"
+            f"Stop:   {stop:.5f}  ({stop_pips:.1f} pips)\n"
+            f"Target: {target:.5f}  ({tgt_pips:.1f} pips) <- {tgt_type}\n"
+            f"Trade is LIVE — bot manages risk from here."
+        )
+        return (f"EXECUTED: {dir_word} {pair} {lots} lots\n"
+                f"Stop {stop:.5f} | Target {target:.5f}\n"
+                f"Bot manages trail + exit. /close {pair.lower()} to override.")
+
+    def _pair_lean(self, s, dxy_dir):
+        """A directional lean % for a pair from H4/H1/M15 structure + the dollar.
+        USD-quote pairs move inverse to DXY, so DXY-up votes short."""
+        votes = [s.get("H4", {}).get("dir", 0), s.get("H1", {}).get("dir", 0),
+                 s.get("M15", {}).get("dir", 0), -dxy_dir]
+        score = sum(1 if v > 0 else -1 if v < 0 else 0 for v in votes)
+        pct = round(abs(score) / len(votes) * 100)
+        if score > 0:
+            return f"LONG lean {pct}%"
+        if score < 0:
+            return f"SHORT lean {pct}%"
+        return "no clear lean"
+
+    def read_positions(self) -> str:
+        if not self.active:
+            return "No open positions."
+        lines = ["OPEN POSITIONS"]
+        for p, st in self.active.items():
+            q = mt.tick(p)
+            price = (q[0] + q[1]) / 2 if q else None
+            pip = pip_size(p)
+            d = st["direction"]
+            legs = st["legs"]
+            tgt = st["target"]
+            units = sum(l["units"] for l in legs) or 1
+            avg_entry = sum(l["entry"] * l["units"] for l in legs) / units
+            lots_total = round(units / config.LOT_UNITS, 2)
+            n = len(legs)
+            lines.append(f"{p} {'LONG' if d > 0 else 'SHORT'}  {lots_total} lots  ({n} leg{'s' if n != 1 else ''})")
+            if price is not None:
+                pips = (price - avg_entry) * d / pip
+                zar = sum((price - l["entry"]) * l["units"] for l in legs) * d * config.USD_ZAR
+                lines.append(f"  now {price:.5f}   {pips:+.1f} pips avg  (R{zar:+,.2f})")
+                if tgt != avg_entry:
+                    prog = max(0.0, min(100.0, (price - avg_entry) / (tgt - avg_entry) * 100))
+                    lines.append(f"  {prog:.0f}% of the way to target")
+            # per-leg breakdown so you can close one pyramid without the whole stack
+            for i, l in enumerate(legs, 1):
+                lp = f"{(price - l['entry']) * d / pip:+.1f}p" if price is not None else "-"
+                lines.append(f"  leg {i}: {round(l['units'] / config.LOT_UNITS, 2)} @ {l['entry']:.5f}"
+                             f"  {lp}  SL {l['stop']:.5f}  (#{l.get('ticket', '?')})")
+            lines.append(f"  TP {tgt:.5f}  <- {self._why_target(st.get('target_type'))}")
+            scen = st.get("im_scenario", "?")
+            scen = "" if scen in ("?", "adopted", "test") else f" (scenario {scen})"
+            lines.append(f"  Model: {self._model_word(st.get('entry_model'))}{scen}")
+            if n > 1:
+                lines.append(f"  close one leg: /close {p} <leg#>   ·   whole: /close {p}")
+        return "\n".join(lines)
+
+    def read_account(self) -> str:
+        self._update_equity()
+        day = datetime.now(timezone.utc).date()
+        dopen = self._day_open_eq.get(day, self.equity)
+        dpl = self.equity - dopen
+        dd = ((self._peak_equity - self.equity) / self._peak_equity * 100) if self._peak_equity else 0.0
+        return ("ACCOUNT\n"
+                f"equity: R{self.equity:,.2f}\n"
+                f"day open: R{dopen:,.2f}  (P&L R{dpl:+,.2f})\n"
+                f"peak: R{self._peak_equity:,.2f}  (drawdown {dd:.1f}%)\n"
+                f"open positions: {len(self.active)}\n"
+                f"consecutive losses: {self._consec_losses}\n"
+                f"trading: {'HALTED — /resume' if self._manual_halt else 'active'}")
+
+    # Full daily ICT session timeline (New York time). Killzones + silver bullets
+    # + afternoon + the NY close/after window, for the /session read-out.
+    _SESSION_SCHED = (
+        ("London KZ",        "03:00", "05:00", "kz"),
+        ("London bullet",    "03:00", "04:00", "bullet"),
+        ("NY AM KZ",         "07:00", "10:00", "kz"),
+        ("NY AM bullet",     "10:00", "11:00", "bullet"),
+        ("Lunch (no-trade)", "12:00", "13:00", "block"),
+        ("NY PM KZ",         "13:30", "16:00", "kz"),
+        ("NY PM bullet",     "14:00", "15:00", "bullet"),
+        ("NY close/after",   "16:00", "17:00", "close"),
+    )
+
+    def read_session(self) -> str:
+        import pytz
+        NY = pytz.timezone("America/New_York")
+        SAST = pytz.timezone("Africa/Johannesburg")   # SAST = UTC+2, no DST
+        now = datetime.now(timezone.utc)
+        ny = now.astimezone(NY)
+        sa = now.astimezone(SAST)
+        lines = ["SESSION",
+                 f"now: {sa:%H:%M} SAST / {ny:%H:%M} ET  ({ny:%a})",
+                 f"new entries allowed: {'yes' if can_open_new_trade(now) else 'no'}",
+                 "",
+                 "Today (SAST | ET):"]
+
+        def _et(hhmm):
+            h, m = map(int, hhmm.split(":"))
+            return ny.replace(hour=h, minute=m, second=0, microsecond=0)
+
+        active, upcoming = [], []
+        for name, s, e, _kind in self._SESSION_SCHED:
+            st, en = _et(s), _et(e)
+            if en <= st:
+                en += timedelta(days=1)
+            st_sa, en_sa = st.astimezone(SAST), en.astimezone(SAST)
+            if st <= ny < en:
+                mark, _ = "> NOW", active.append(name)
+            elif ny >= en:
+                mark = " done"
+            else:
+                mark, _ = " soon", upcoming.append((st, name))
+            lines.append(f"  {mark} {name:15} {st_sa:%H:%M}-{en_sa:%H:%M} | "
+                         f"{st:%H:%M}-{en:%H:%M} ET")
+
+        lines.append("")
+        lines.append("active: " + (", ".join(active) if active else "between sessions"))
+        upcoming.sort()
+        if upcoming:
+            nxt_t, nxt_n = upcoming[0]
+            mins = max(0, int((nxt_t - ny).total_seconds() // 60))
+            lines.append(f"next: {nxt_n} in {mins // 60}h{mins % 60:02d}m")
+        else:
+            lines.append("next: tomorrow's London KZ")
+
+        try:
+            lines += self._session_recap(now)
+        except Exception:
+            pass
+        try:
+            lines += self._pd_arrays_near(now)
+        except Exception:
+            pass
+        return "\n".join(lines)
+
+    def read_session_handover(self) -> str:
+        """Human-readable handover: what happened in the last session in plain
+        language — accumulation, manipulation, distribution — per pair on M15."""
+        import pytz, pandas as pd
+        NY = pytz.timezone("America/New_York")
+        SAST = pytz.timezone("Africa/Johannesburg")
+        now = datetime.now(timezone.utc)
+        ny = now.astimezone(NY)
+        sa = now.astimezone(SAST)
+
+        sessions = [
+            ("London", "03:00", "05:00"),
+            ("NY AM", "07:00", "10:00"),
+            ("NY PM", "13:30", "16:00"),
+        ]
+
+        def _et(hhmm):
+            h, m = map(int, hhmm.split(":"))
+            return ny.replace(hour=h, minute=m, second=0, microsecond=0)
+
+        last_done = None
+        for nm, s, e in reversed(sessions):
+            en = _et(e)
+            if now.astimezone(NY) >= en:
+                last_done = (nm, s, e)
+                break
+
+        if last_done is None:
+            return ("SESSION HANDOVER\n"
+                    f"Time: {sa:%H:%M} SAST / {ny:%H:%M} ET\n\n"
+                    "No session has completed today yet.\n"
+                    "Wait for London (03:00 ET) to finish.")
+
+        nm, s_str, e_str = last_done
+        st_et = _et(s_str)
+        en_et = _et(e_str)
+        st_utc = st_et.astimezone(pytz.utc)
+        en_utc = en_et.astimezone(pytz.utc)
+
+        lines = [f"SESSION HANDOVER — what {nm} did",
+                 f"Time: {sa:%H:%M} SAST / {ny:%H:%M} ET", ""]
+
+        for pair in config.PAIRS:
+            ts_15 = self.tf_index.get((pair, "15T"))
+            bars_15 = self.tf_bars.get((pair, "15T"))
+            ts_5 = self.tf_index.get((pair, "5T"))
+            bars_5 = self.tf_bars.get((pair, "5T"))
+            if ts_15 is None or bars_15 is None or len(bars_15) == 0:
+                lines.append(f"{pair}: no data")
+                continue
+
+            i0 = int(ts_15.searchsorted(pd.Timestamp(st_utc)))
+            i1 = int(ts_15.searchsorted(pd.Timestamp(en_utc)))
+            seg = bars_15[i0:i1]
+            if not seg:
+                lines.append(f"{pair}: no bars in {nm}")
+                continue
+
+            pip = pip_size(pair)
+            sess_open = seg[0].Open
+            sess_close = seg[-1].Close
+            sess_hi = max(b.High for b in seg)
+            sess_lo = min(b.Low for b in seg)
+            rng_pips = (sess_hi - sess_lo) / pip
+
+            hi_idx = next(i for i, b in enumerate(seg) if b.High == sess_hi)
+            lo_idx = next(i for i, b in enumerate(seg) if b.Low == sess_lo)
+
+            up_move = sess_close > sess_open
+            direction = "bullish" if up_move else "bearish"
+
+            half = len(seg) // 2
+            first_half = seg[:max(half, 1)]
+            second_half = seg[max(half, 1):]
+
+            first_rng = max(b.High for b in first_half) - min(b.Low for b in first_half)
+            second_rng = (max(b.High for b in second_half) - min(b.Low for b in second_half)) if second_half else 0
+
+            swept_hi = any(b.High >= sess_hi and b.Close < sess_hi for b in seg)
+            swept_lo = any(b.Low <= sess_lo and b.Close > sess_lo for b in seg)
+
+            if up_move:
+                if lo_idx < hi_idx and swept_lo:
+                    phase = "Manipulation DOWN then Distribution UP"
+                    story = (f"Price swept the low ({sess_lo:.5f}), then reversed "
+                             f"and delivered up to {sess_hi:.5f}.")
+                elif first_rng < second_rng * 0.6:
+                    phase = "Accumulation then Distribution UP"
+                    story = (f"Price consolidated in a tight range early on, "
+                             f"then broke out and delivered up to {sess_hi:.5f}.")
+                else:
+                    phase = "Distribution UP"
+                    story = f"Price moved up from {sess_open:.5f} to {sess_close:.5f}."
+            else:
+                if hi_idx < lo_idx and swept_hi:
+                    phase = "Manipulation UP then Distribution DOWN"
+                    story = (f"Price swept the high ({sess_hi:.5f}), then reversed "
+                             f"and delivered down to {sess_lo:.5f}.")
+                elif first_rng < second_rng * 0.6:
+                    phase = "Accumulation then Distribution DOWN"
+                    story = (f"Price consolidated early, then broke down "
+                             f"and delivered to {sess_lo:.5f}.")
+                else:
+                    phase = "Distribution DOWN"
+                    story = f"Price moved down from {sess_open:.5f} to {sess_close:.5f}."
+
+            judas = ""
+            if up_move and lo_idx <= 2 and swept_lo:
+                judas = " (Judas swing down — classic stop hunt below the open)"
+            elif not up_move and hi_idx <= 2 and swept_hi:
+                judas = " (Judas swing up — classic stop hunt above the open)"
+
+            lines.append(f"{pair} — {direction.upper()}")
+            lines.append(f"  Phase: {phase}{judas}")
+            lines.append(f"  {story}")
+            lines.append(f"  Range: {rng_pips:.0f} pips ({sess_lo:.5f} — {sess_hi:.5f})")
+            lines.append(f"  Open {sess_open:.5f} → Close {sess_close:.5f}")
+
+            if bars_5 and ts_5 is not None:
+                i5_end = int(ts_5.searchsorted(pd.Timestamp(en_utc)))
+                last_bars = bars_5[max(0, i5_end - 6):i5_end]
+                if last_bars:
+                    closing_dir = "up" if last_bars[-1].Close > last_bars[0].Open else "down"
+                    lines.append(f"  Closing momentum: finishing {closing_dir}")
+
+            q = mt.tick(pair)
+            if q:
+                cur = (q[0] + q[1]) / 2
+                from_hi = (sess_hi - cur) / pip
+                from_lo = (cur - sess_lo) / pip
+                lines.append(f"  Now {cur:.5f} — {from_hi:.0f}p from session high, "
+                             f"{from_lo:.0f}p from session low")
+            lines.append("")
+
+        next_sess = None
+        for snm, ss, se in sessions:
+            if now.astimezone(NY) < _et(ss):
+                next_sess = (snm, ss)
+                break
+
+        if next_sess:
+            mins = max(0, int((_et(next_sess[1]) - ny).total_seconds() // 60))
+            lines.append(f"Next up: {next_sess[0]} in {mins // 60}h{mins % 60:02d}m")
+            if nm == "London":
+                lines.append("NY should continue the London direction — "
+                             "watch for a pullback to the London range for re-entry.")
+            elif nm == "NY AM":
+                lines.append("NY PM is position-squaring — expect mean reversion, "
+                             "not fresh directional moves.")
+        else:
+            lines.append("Done for today. Review the daily candle close.")
+
+        return "\n".join(lines)
+
+    def _session_recap(self, now):
+        """What the completed sessions did today: range + delivery direction."""
+        import pytz, pandas as pd
+        NY = pytz.timezone("America/New_York")
+        ny = now.astimezone(NY)
+        ref = "EURUSD" if "EURUSD" in config.PAIRS else config.PAIRS[0]
+        ts = self.tf_index.get((ref, "5T"))
+        bars = self.tf_bars.get((ref, "5T"))
+        if ts is None or bars is None or len(bars) == 0:
+            return []
+        done = []
+        for nm, s, e in (("London", "03:00", "05:00"),
+                         ("NY AM", "07:00", "10:00"),
+                         ("NY PM", "13:30", "16:00")):
+            h, m = map(int, s.split(":"))
+            h2, m2 = map(int, e.split(":"))
+            st = ny.replace(hour=h, minute=m, second=0, microsecond=0).astimezone(pytz.utc)
+            en = ny.replace(hour=h2, minute=m2, second=0, microsecond=0).astimezone(pytz.utc)
+            if now < en:
+                continue                        # not finished yet
+            i0 = int(ts.searchsorted(pd.Timestamp(st)))
+            i1 = int(ts.searchsorted(pd.Timestamp(en)))
+            seg = bars[i0:i1]
+            if not seg:
+                continue
+            hi = max(b.High for b in seg)
+            lo = min(b.Low for b in seg)
+            deliv = "delivered UP" if seg[-1].Close > seg[0].Open else "delivered DOWN"
+            done.append(f"  {nm}: {lo:.5f}-{hi:.5f}, {deliv}")
+        return (["", f"Earlier sessions today ({ref}):"] + done) if done else []
+
+    def _pd_arrays_near(self, now):
+        """Nearest PD arrays (PDH/PDL + unmitigated H4/H1 FVGs) per traded pair."""
+        out, any_near = ["", "PD arrays near price:"], False
+        for p in config.PAIRS:
+            q = mt.tick(p)
+            if not q:
+                continue
+            price = (q[0] + q[1]) / 2
+            pip = pip_size(p)
+            thr = max(1.0, price * 0.006 / pip)    # ~0.6% of price, in pips/points
+            lv = []
+            d = self.bars_up_to(p, "D", now)
+            if len(d) >= 2:
+                lv += [("PDH", d[-2].High), ("PDL", d[-2].Low)]
+            for tf, lbl in (("240T", "H4fvg"), ("60T", "H1fvg")):
+                try:
+                    for fvg in self._scan_htf_fvgs(self.bars_up_to(p, tf, now), p):
+                        if not fvg.mitigated:
+                            lv.append((lbl, fvg.mid))
+                except Exception:
+                    continue
+            near = sorted(((nm, abs(v - price) / pip) for nm, v in lv
+                           if abs(v - price) / pip <= thr), key=lambda x: x[1])
+            if near:
+                any_near = True
+                out.append(f"  {p}: " + ", ".join(f"{nm} {dst:.0f}p" for nm, dst in near[:3]))
+        return out if any_near else []
+
+    def read_news(self) -> str:
+        try:
+            now = datetime.now(timezone.utc)
+            evs = sorted((e for e in getattr(self.news, "events", []) if e[0] >= now),
+                         key=lambda e: e[0])[:6]
+            if not evs:
+                return "No upcoming news events in the calendar."
+            lines = ["UPCOMING NEWS (UTC)"]
+            for dt, ccy, impact, name in evs:
+                lines.append(f"{dt:%m-%d %H:%M} {ccy} [{impact}] {name}")
+            return "\n".join(lines)
+        except Exception as exc:  # noqa: BLE001
+            return f"news unavailable: {exc}"
+
+    def read_brief(self, header=None) -> str:
+        """Full session brief: account line + per-pair structure + open positions
+        + a command hint. Used on demand (/brief) and as the session template."""
+        now = datetime.now(timezone.utc)
+        self._update_equity()
+        dopen = self._day_open_eq.get(now.date(), self.equity)
+        sess = self._current_session(now) or "outside killzone"
+        dxy_dir, hdr = self._bias_header(now)
+
+        def w(x):
+            return {1: "bull", -1: "bear", 0: "flat"}[x.get("dir", 0)]
+
+        lines = [header or f"BRIEF - {now:%Y-%m-%d %H:%M} UTC",
+                 f"Equity R{self.equity:,.0f} | day P&L R{self.equity - dopen:+,.0f} | "
+                 f"{len(self.active)} open | {sess}"] + hdr + [""]
+        for p in config.PAIRS:
+            s = self._pair_structure(p)
+            h4 = s.get("H4", {})
+            lines.append(
+                f"{p} {s.get('price', '?')}  {self._pair_lean(s, dxy_dir)} | "
+                f"H4 {w(h4)} H1 {w(s.get('H1', {}))} M15 {w(s.get('M15', {}))} | "
+                f"ITH {h4.get('ith') or '-'} ITL {h4.get('itl') or '-'} | "
+                f"bot: {self._intended_direction(p, now, dxy_dir)} | {self._plan_str(p)}")
+        if self.active:
+            lines += ["", self.read_positions()]
+        lines += ["", "Reply — read: /read /positions /account /news | "
+                  "plan: /lot /bias /levels /hold | act: /close /halt | /help"]
+        return "\n".join(lines)
+
+    def _direction_allowed(self, pair, direction, t) -> bool:
+        """Live override of the backtest hook: apply the Telegram filters."""
+        b = self.inputs.bias(pair)
+        if b == "long" and direction != 1:
+            return False
+        if b == "short" and direction != -1:
+            return False
+        if self.inputs.has_levels(pair):
+            amd = self._levels_amd_dir(pair, t)
+            if amd == 0:                 # neither side swept yet — wait for the sweep
+                return False
+            if direction != amd:         # setup fights the manual AMD
+                return False
+        return True
+
+    def _apply_manual_target(self, pair, st) -> None:
+        """Full manual AMD target: aim the TP at the opposite-side level (the
+        distribution draw). Uses the nearest qualifying level (RR>=1 and >=
+        MIN_PIPS_TARGET); leaves the engine target if none qualifies."""
+        if not self.inputs.has_levels(pair):
+            return
+        leg = st["legs"][0]
+        entry, stop, d = leg["entry"], leg["stop"], st["direction"]
+        pip = pip_size(pair)
+        min_dist = max(config.MIN_PIPS_TARGET * pip, abs(entry - stop))
+        if d > 0:
+            cands = [l for l in self.inputs.buy_levels(pair) if l - entry >= min_dist]
+            tgt = min(cands) if cands else None
+        else:
+            cands = [l for l in self.inputs.sell_levels(pair) if entry - l >= min_dist]
+            tgt = max(cands) if cands else None
+        if tgt is not None and tgt != st["target"]:
+            log.info("Manual-AMD target %s: %.5f → %.5f (opposite-side draw)",
+                     pair, st["target"], tgt)
+            st["target"] = tgt
+
+    # ── Trade entry — wrap parent + place real MT5 order ─────────────────────
+
+    def _maybe_open(self, pair, t):
+        was_active = pair in self.active
+        self._current_pair = pair            # so _pyramid_lots sizes THIS pair
+        super()._maybe_open(pair, t)
+
+        if was_active or pair not in self.active:
+            return   # nothing new opened
+
+        st  = self.active[pair]
+        self._apply_manual_target(pair, st)  # full-manual-AMD TP override (if set)
+        leg = st["legs"][0]
+        lots = round(leg["units"] / config.LOT_UNITS, 2)
+        lots = max(lots, config.MIN_LOT_SIZE)
+
+        res = mt.market_order(
+            pair, lots, st["direction"],
+            sl=leg["stop"], tp=st["target"],
+            comment=f"ict_{st.get('im_scenario', '')}",
+        )
+        if res and res["ok"]:
+            ticket = res.get("ticket") or self._recover_ticket(pair)
+            if not ticket:
+                # Broker accepted the order but returned no id and we can't match
+                # an open position — we cannot manage what we can't reference.
+                # Drop our tracking (so the pair isn't frozen) and warn: there may
+                # be an untracked position with a broker-side SL/TP still on it.
+                log.error("Order for %s reported OK but no ticket — possible untracked position", pair)
+                _notify(
+                    f"⚠️ ORDER UNCERTAIN\n"
+                    f"{pair} order was accepted but MT5 returned no ticket.\n"
+                    f"There may be an UNTRACKED position (its SL/TP are still set) —\n"
+                    f"check the terminal manually. Bot dropped it from tracking."
+                )
+                del self.active[pair]
+                return
+            leg["ticket"] = ticket
+            _dir_str   = "LONG" if st["direction"] > 0 else "SHORT"
+            _stop_pips = abs(leg["entry"] - leg["stop"]) / pip_size(pair)
+            _rwd_pips  = abs(st["target"] - leg["entry"]) / pip_size(pair)
+            log.info(
+                "OPEN %s %s %.2f lots  entry≈%.5f  SL=%.5f  TP=%.5f  [%s %s]",
+                "BUY" if st["direction"] > 0 else "SELL", pair, lots,
+                leg["entry"], leg["stop"], st["target"],
+                st.get("im_scenario", "?"), st.get("entry_model", "?"),
+            )
+            _notify(
+                f"TRADE OPENED\n"
+                f"{pair} {_dir_str} | {st.get('entry_model','?').upper()}\n"
+                f"Entry:  {leg['entry']:.5f}\n"
+                f"Stop:   {leg['stop']:.5f} ({_stop_pips:.1f} pips) <- {st.get('stop_reason','structural swing')}\n"
+                f"Target: {st['target']:.5f} ({_rwd_pips:.1f} pips) <- {self._why_target(st.get('target_type'))}\n"
+                f"Scenario: {st.get('im_scenario','?')} | Draw: {st.get('draw_score','?')}/3\n"
+                f"Equity: R{self.equity:,.2f}"
+            )
+            self.log.upsert_position(pair, st)
+            self._save_pos_meta()
+        else:
+            log.error("MT5 order FAILED for %s: %s", pair, res)
+            del self.active[pair]
+
+    def _maybe_pyramid(self, pair, t):
+        if pair not in self.active:
+            return
+        if self._manual_halt:
+            return                           # /halt pauses new risk (adds too)
+        self._current_pair = pair            # so _pyramid_lots sizes THIS pair
+        st = self.active[pair]
+        n_before   = len(st["legs"])
+        prior_stop = st["legs"][-1]["stop"] if st["legs"] else None
+
+        super()._maybe_pyramid(pair, t)
+
+        if pair not in self.active:
+            return
+        st = self.active[pair]
+        if len(st["legs"]) <= n_before:
+            return   # no new leg added
+
+        # _maybe_pyramid promotes the prior leg's stop to BE — sync it to MT5.
+        if n_before > 0 and prior_stop is not None:
+            prior = st["legs"][n_before - 1]
+            if prior["stop"] != prior_stop and prior.get("ticket"):
+                mt.modify_sl_tp(prior["ticket"], sl=prior["stop"], tp=st["target"])
+
+        new_leg = st["legs"][-1]
+        lots = round(new_leg["units"] / config.LOT_UNITS, 2)
+        lots = max(lots, config.MIN_LOT_SIZE)
+
+        res = mt.market_order(
+            pair, lots, st["direction"],
+            sl=new_leg["stop"], tp=st["target"],
+            comment=f"ict_pyr{new_leg['leg_idx']}",
+        )
+        if res and res["ok"]:
+            ticket = res.get("ticket") or self._recover_ticket(pair)
+            if not ticket:
+                # No ticket to manage the add by — revert the leg rather than
+                # keep a phantom. Any real broker fill keeps its own SL/TP.
+                log.error("Pyramid %s leg %d reported OK but no ticket — reverting leg",
+                          pair, new_leg["leg_idx"])
+                st["legs"].pop()
+                return
+            new_leg["ticket"] = ticket
+            log.info("PYRAMID %s leg %d  %.2f lots  entry≈%.5f",
+                     pair, new_leg["leg_idx"], lots, new_leg["entry"])
+            self.log.upsert_position(pair, st)
+            self._save_pos_meta()
+        else:
+            log.error("Pyramid order FAILED for %s leg %d: %s",
+                      pair, new_leg["leg_idx"], res)
+            st["legs"].pop()   # revert the leg
+
+    def _force_close(self, pair, price, t, reason):
+        """Close all MT5 positions for a pair (session handover, kill switch)."""
+        st = self.active.get(pair)
+        if st is None:
+            return
+        for leg in list(st["legs"]):
+            ticket = leg.get("ticket")
+            if ticket:
+                mt.close_position(ticket)
+        log.info("Force-closed %s (%s)", pair, reason)
+        # State cleanup happens on next _sync_closed_positions call.
+
+    # ── Live position management ──────────────────────────────────────────────
+
+    def _tracked_tickets(self) -> set:
+        """Every broker ticket currently tracked across all active legs."""
+        return {leg.get("ticket")
+                for st in self.active.values()
+                for leg in st["legs"]
+                if leg.get("ticket")}
+
+    def _recover_ticket(self, pair: str):
+        """Best-effort recovery of a just-opened position's ticket.
+
+        MT5's order_send can return TRADE_RETCODE_DONE while `res.order` comes
+        back 0/None. Without a ticket the leg is unmanageable (can't trail,
+        close, or detect broker-close) and would otherwise be kept forever as a
+        phantom. Here we look for an open position on this symbol stamped with
+        our magic number that we're not already tracking — very likely the fill
+        we just placed. Returns its ticket, or None if none can be matched.
+        """
+        tracked = self._tracked_tickets()
+        candidates = [p for p in (mt.positions(pair) or [])
+                      if getattr(p, "magic", 0) == mt.MT5_MAGIC
+                      and p.ticket not in tracked]
+        if not candidates:
+            return None
+        # Most recently opened wins (fallback: highest ticket id).
+        best = max(candidates, key=lambda p: (getattr(p, "time", 0), p.ticket))
+        return best.ticket
+
+    def _sync_closed_positions(self, now):
+        """Remove legs that MT5 has already closed (SL or TP hit by broker)."""
+        for pair in list(self.active.keys()):
+            st = self.active[pair]
+            open_tickets = {p.ticket for p in (mt.positions(pair) or [])}
+
+            live_legs = []
+            for leg in st["legs"]:
+                ticket = leg.get("ticket")
+                if ticket is None:
+                    # Phantom leg with no broker ticket — try one last recovery,
+                    # else drop it. Keeping it (the old behaviour) froze the pair
+                    # forever: it never matched an open ticket AND was never
+                    # counted as closed. Prevented at source in _maybe_open /
+                    # _maybe_pyramid; this is the defensive backstop.
+                    recovered = self._recover_ticket(pair)
+                    if recovered:
+                        leg["ticket"] = recovered
+                        live_legs.append(leg)
+                        log.info("Recovered phantom %s leg → ticket %s", pair, recovered)
+                    else:
+                        log.warning("Dropping phantom %s leg (no ticket, unrecoverable)", pair)
+                    continue
+                if ticket in open_tickets:
+                    live_legs.append(leg)
+                else:
+                    pnl_zar = self._deal_pnl_zar(ticket)
+                    sign = "+" if (pnl_zar or 0) >= 0 else ""
+                    log.info("MT5 closed %s ticket=%s  pnl=%s%.2f ZAR",
+                             pair, ticket, sign, pnl_zar or 0)
+                    if pnl_zar is not None:
+                        if pnl_zar > 0:
+                            self._consec_losses = 0
+                        else:
+                            self._consec_losses += 1
+                    _dir_str = "LONG" if st["direction"] > 0 else "SHORT"
+                    _pnl_str = f"{sign}R{abs(pnl_zar or 0):,.2f}"
+                    _notify(
+                        f"TRADE CLOSED\n"
+                        f"{pair} {_dir_str} | ticket {ticket}\n"
+                        f"P&L: {_pnl_str}\n"
+                        f"Equity: R{self.equity:,.2f}"
+                    )
+                    self.trades.append({
+                        "pair": pair, "direction": st["direction"],
+                        "ticket": ticket, "closed_at": now,
+                        "reason": "mt5_close", "pnl_zar": pnl_zar,
+                    })
+
+            st["legs"] = live_legs
+            if not st["legs"]:
+                del self.active[pair]
+                self.log.delete_position(pair)
+        self._save_pos_meta()   # prune closed tickets from the reasoning store
+
+    def _deal_pnl_zar(self, ticket: int) -> float | None:
+        """Retrieve realised P&L for a closed position from MT5 deal history."""
+        try:
+            mt5mod = mt._mt5()
+            deals = mt5mod.history_deals_get(position=int(ticket))
+            if not deals:
+                return None
+            profit = sum(d.profit for d in deals)
+            acc = mt.account()
+            if acc and acc.currency == "ZAR":
+                return profit
+            return profit * config.USD_ZAR
+        except Exception:
+            return None
+
+    def _trail_stops(self, pair, cur_price, now):
+        """Apply BE / lock / P23 milestone trailing and push updated SL to MT5.
+
+        +10 pips → stop to break-even.
+        +20 pips → stop locked at entry + 10 pips.
+        +40/60/80… pips → milestone trail: stop at entry + (milestone − 10) pips.
+        """
+        st = self.active.get(pair)
+        if st is None:
+            return
+        direction = st["direction"]
+        target    = st["target"]
+        pip       = pip_size(pair)
+
+        # Semi-auto structure trail (opt-in via /trail): one level for all legs,
+        # computed once. Folds into new_stop below with the same only-tighten rule.
+        struct_stop = self._structure_trail_level(pair, direction, cur_price, now)
+
+        for leg in st["legs"]:
+            old_stop    = leg["stop"]
+            entry       = leg["entry"]
+            pips_profit = (cur_price - entry) * direction / pip
+            new_stop    = old_stop
+
+            # TRAIL_BE: move stop to entry at +TRAIL_BE_PIPS
+            if pips_profit >= config.TRAIL_BE_PIPS:
+                if direction > 0:
+                    new_stop = max(new_stop, entry)
+                else:
+                    new_stop = min(new_stop, entry)
+
+            # TRAIL_LOCK: lock +10 pips at +TRAIL_LOCK_PIPS
+            if pips_profit >= config.TRAIL_LOCK_PIPS:
+                locked = entry + 10 * pip * direction
+                if direction > 0:
+                    new_stop = max(new_stop, locked)
+                else:
+                    new_stop = min(new_stop, locked)
+
+            # P23 milestone trail: every MILESTONE_TRAIL_STEP pips of additional
+            # progress, ratchet stop to (milestone - MILESTONE_TRAIL_BUFFER) pips.
+            if (config.MILESTONE_TRAIL_ENABLED
+                    and pips_profit >= config.TRAIL_LOCK_PIPS + config.MILESTONE_TRAIL_STEP):
+                _step      = config.MILESTONE_TRAIL_STEP
+                _buf       = config.MILESTONE_TRAIL_BUFFER
+                _milestone = int(pips_profit / _step) * _step
+                _lock_ms   = entry + (_milestone - _buf) * pip * direction
+                if direction > 0:
+                    new_stop = max(new_stop, _lock_ms)
+                else:
+                    new_stop = min(new_stop, _lock_ms)
+
+            # Structure trail (/trail): ratchet to just beyond the latest intact
+            # M15/M5/M1 swing. Only-tighten via max/min, same as the other trails.
+            if struct_stop is not None:
+                if direction > 0:
+                    new_stop = max(new_stop, struct_stop)
+                else:
+                    new_stop = min(new_stop, struct_stop)
+
+            if new_stop != old_stop:
+                leg["stop"] = new_stop
+                if leg.get("ticket"):
+                    mt.modify_sl_tp(leg["ticket"], sl=new_stop, tp=target)
+                    log.info("Trail %s %s  stop %.5f → %.5f  (+%.1f pips profit)",
+                             "long" if direction > 0 else "short", pair,
+                             old_stop, new_stop, pips_profit)
+
+    def _structure_trail_level(self, pair, direction, cur_price, now):
+        """Structural trailing-stop candidate for a /trail-armed pair, or None.
+
+        Reads the trader's /trail config (M15/M5/M1 · short-term STH/STL or
+        intermediate ITH/ITL · pip buffer), classifies that timeframe's fractal
+        structure and returns the level just beyond the latest INTACT swing:
+        (STL/ITL − buffer) for longs, (STH/ITH + buffer) for shorts. The caller
+        applies it only when it TIGHTENS the current stop."""
+        cfg = self.inputs.trail(pair) if self.inputs else None
+        if not cfg:
+            return None
+        try:
+            bars = self.bars_up_to(pair, cfg["tf"], now,
+                                   max_bars=config.STRUCT_TRAIL_LOOKBACK)
+        except Exception:
+            return None
+        if not bars or len(bars) < 5:
+            return None
+        return mstruct.trail_stop_level(
+            bars, direction, cfg.get("tier", "st"),
+            float(cfg.get("buf", config.STRUCT_TRAIL_DEFAULT_BUFFER)),
+            pip_size(pair), cur_price)
+
+    def _update_live_positions(self, now):
+        """Trail stops and attempt pyramid adds for all open positions."""
+        for pair in list(self.active.keys()):
+            q = mt.tick(pair)
+            if q is None:
+                continue
+            cur_price = (q[0] + q[1]) / 2
+            self._trail_stops(pair, cur_price, now)
+            # Pyramid check: inherits parent's _maybe_pyramid logic.
+            self._maybe_pyramid(pair, now)
+
+    def _update_equity(self):
+        """Sync self.equity from MT5 balance (realised P&L only, stable for sizing)."""
+        acc = mt.account()
+        if acc:
+            self.equity = self._zar(acc.balance)
+            self._peak_equity = max(self._peak_equity, self.equity)
+
+    def _check_session_kill(self, now):
+        """Close all positions if session equity drops > SESSION_DRAWDOWN_PCT."""
+        if config.SESSION_DRAWDOWN_PCT <= 0 or not self.active:
+            return
+        day_key = now.date()
+        session_eq = self._day_open_eq.get(day_key)
+        if not session_eq:
+            return
+        acc = mt.account()
+        if acc is None:
+            return
+        live_eq = self._zar(acc.equity)   # floating equity for the kill switch
+        dd = (session_eq - live_eq) / session_eq * 100
+        if dd >= config.SESSION_DRAWDOWN_PCT:
+            log.warning("Session kill switch: %.1f%% floating DD — closing all", dd)
+            _notify(
+                f"CIRCUIT BREAKER: SESSION KILL SWITCH\n"
+                f"Session loss: {dd:.1f}%\n"
+                f"Equity: R{self._zar(acc.equity):,.2f}\n"
+                f"All positions closing — halted for the day"
+            )
+            for pair in list(self.active.keys()):
+                self._force_close(pair, 0, now, "session_kill")
+
+    # ── Stale-feed guard ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _forex_market_open(now: datetime) -> bool:
+        """Rough forex market hours in UTC. Closed over the weekend gap.
+
+        Week opens Sunday ~21:00 UTC and closes Friday ~21:00 UTC. During that
+        gap bars legitimately don't advance, so the stale-feed alert is suppressed.
+        """
+        wd = now.weekday()          # Mon=0 … Sat=5, Sun=6
+        h  = now.hour
+        if wd == 5:                 # Saturday: closed all day
+            return False
+        if wd == 6 and h < 21:      # Sunday before 21:00 UTC: still closed
+            return False
+        if wd == 4 and h >= 21:     # Friday after 21:00 UTC: closed
+            return False
+        return True
+
+    def _feed_fresh(self, now: datetime) -> bool:
+        """Return True if the MT5 feed is live; alert + return False if stale.
+
+        Compares the age of the latest completed EURUSD M5 bar against
+        STALE_FEED_MAX_MINUTES. Alerts on Telegram once when the feed goes stale
+        and once when it recovers. Suppressed entirely over the weekend gap.
+        """
+        if not config.STALE_FEED_GUARD_ENABLED:
+            return True
+        if not self._forex_market_open(now):
+            self._feed_stale = False    # weekend gap — reset, no alert
+            return True
+
+        bars = mt.get_bars("EURUSD", "5T", 1)
+        if not bars:
+            age_min = None              # no bars at all → treat as stale
+        else:
+            # bar.time is the bar OPEN epoch (UTC); +300s = its close.
+            last_close = bars[-1].time + 300
+            age_min = (now.timestamp() - last_close) / 60.0
+
+        stale = (age_min is None) or (age_min > config.STALE_FEED_MAX_MINUTES)
+
+        if stale and not self._feed_stale:
+            self._feed_stale = True
+            detail = "no bars returned" if age_min is None else f"last bar {age_min:.0f} min old"
+            log.warning("FEED STALE — %s — holding, no trades until recovery", detail)
+            _notify(
+                f"⚠️ FEED STALE\n"
+                f"MT5 data has stopped updating ({detail}).\n"
+                f"Bot is HOLDING — no new trades until the feed recovers.\n"
+                f"Check the VPS terminal + broker connection."
+            )
+        elif not stale and self._feed_stale:
+            self._feed_stale = False
+            log.info("Feed recovered (last bar %.0f min old) — resuming", age_min or 0)
+            _notify(
+                "✅ FEED RECOVERED\n"
+                "MT5 data is flowing again. Bot resuming normal operation."
+            )
+        return not stale
+
+    @staticmethod
+    def _current_session(now: datetime):
+        """Which session are we in, by New York time? (mirrors the engine's
+        _is_london / _is_ny / _is_pm windows). Returns london / ny / ny_pm / None."""
+        import pytz
+        ny = now.astimezone(pytz.timezone("America/New_York"))
+        h = ny.hour
+        if 2 <= h < 5:
+            return "london"
+        if 7 <= h < 10:
+            return "ny"
+        if config.NY_PM_ENABLED and 13 <= h < 16:
+            return "ny_pm"
+        return None
+
+    def _session_template(self, day_key, sess) -> str:
+        """Start-of-session brief, fired at the top of each session (London / NY
+        AM / NY PM): account + per-pair structure + open positions + commands."""
+        head = {"london": "LONDON", "ny": "NEW YORK AM", "ny_pm": "NEW YORK PM"}.get(
+            sess, str(sess).upper())
+        return self.read_brief(header=f"{head} SESSION START - {day_key}")
+
+    # ── Main loop ─────────────────────────────────────────────────────────────
+
+    def run(self):
+        """Block until interrupted: wake on each M5 bar close, run strategy."""
+        log.info("=" * 60)
+        log.info("ICT live loop started — pairs: %s", ", ".join(config.PAIRS))
+        log.info("Account: %.2f ZAR  leverage 1:%s", self.equity,
+                 mt.account().leverage if mt.account() else "?")
+        log.info("DEMO mode until smoke test confirmed — see LIVE_SETUP.md")
+        log.info("=" * 60)
+
+        # Poll Telegram in the background every ~2s so commands feel instant,
+        # independent of the M5 strategy cadence. Only ONE poller runs (this
+        # thread) — the per-bar poll was removed from _run_once to avoid a 409.
+        threading.Thread(target=self._telegram_loop, daemon=True).start()
+
+        _feed_timeout = (config.STALE_FEED_MAX_MINUTES * 60
+                         if config.STALE_FEED_GUARD_ENABLED else None)
+        while True:
+            try:
+                # Timeout so a frozen feed wakes us to run the stale check instead
+                # of blocking forever inside wait_for_bar.
+                mt.wait_for_bar("5T", timeout_seconds=_feed_timeout)
+                now = datetime.now(timezone.utc)
+                if not self._feed_fresh(now):
+                    continue   # feed stale — alerted, skip this cycle (no trading)
+                self._run_once(now)
+            except KeyboardInterrupt:
+                log.info("KeyboardInterrupt — shutting down gracefully")
+                break
+            except Exception:
+                log.exception("Unhandled exception in live loop — continuing")
+
+        mt.shutdown()
+        log.info("Live loop stopped. Open positions left in MT5 if any.")
+
+    def _telegram_loop(self):
+        """Background: poll Telegram every ~2s for commands. Never dies."""
+        while True:
+            try:
+                telegram_control.poll(self.inputs, trader=self)
+            except Exception:
+                log.exception("telegram poll thread — continuing")
+            time.sleep(2)
+
+    def _run_once(self, now: datetime):
+        """One M5 bar: sync state → trail → new entries."""
+        day_key = now.date()
+
+        # Refresh news calendar once per day at midnight UTC.
+        if day_key not in self._day_open_eq:
+            self._refresh_news()
+
+        # Sync equity from MT5 (uses balance = realised P&L).
+        self._update_equity()
+
+        # (Telegram is polled by the background _telegram_loop thread, not here —
+        # a second poller on the same bot token would 409.)
+
+        # Record day-open equity for daily-loss and session-kill checks.
+        if day_key not in self._day_open_eq:
+            self._day_open_eq[day_key] = self.equity
+            self._consec_losses = 0
+            log.info("New day %s — equity %.2f ZAR", day_key, self.equity)
+            _notify(
+                f"NEW DAY — {day_key}\n"
+                f"Equity: R{self.equity:,.2f}\n"
+                f"Open positions: {len(self.active)}"
+            )
+
+        # Detect positions closed by broker (SL/TP hit).
+        self._sync_closed_positions(now)
+
+        # Session kill switch (floating equity).
+        self._check_session_kill(now)
+
+        # Trail stops on open positions + try pyramid adds.
+        self._update_live_positions(now)
+
+        # Session handover: close positions fighting the weekly AMD.
+        if can_open_new_trade(now):
+            self._check_session_handover(now)
+
+        # Market Maker model: alert on reach / break of armed IFVG zones.
+        try:
+            self._mm_scan()
+        except Exception:
+            log.exception("mm_scan failed — continuing")
+
+        # Semi-auto MM: proactively scan preferred directions (SELL GU / BUY EU).
+        try:
+            self._mm_semi_auto_scan()
+        except Exception:
+            log.exception("mm_semi_auto_scan failed — continuing")
+
+        # Fast read: alert when a currency sweeps its recent M15 high/low (advisory).
+        try:
+            self._fast_scan()
+        except Exception:
+            log.exception("fast_scan failed — continuing")
+
+        # Session-start template: fire once at the start of EACH session
+        # (London / NY AM / NY PM), prompting the trader for that session's plan.
+        sess = self._current_session(now)
+        if sess and (day_key, sess) not in self._templated:
+            self._templated.add((day_key, sess))
+            _notify(self._session_template(day_key, sess))
+
+        # New entry checks for each tradeable pair (skipped entirely while halted).
+        if not self._manual_halt:
+            for pair in config.PAIRS:
+                if pair not in self.active:
+                    if can_open_new_trade(now, pair):
+                        self._maybe_open(pair, now)
+
+        # Gate-funnel HEARTBEAT — once per calendar day, log the FULL funnel so a
+        # quiet stretch self-explains: is the loop even evaluating (checks climbing)?
+        # which gate is the bottleneck (where the count collapses)? A Telegram line
+        # goes out too so "why no trades" is answerable without SSH-ing the VPS.
+        hb_key = now.date()
+        if getattr(self, "_last_heartbeat_day", None) != hb_key:
+            self._last_heartbeat_day = hb_key
+            g = self.gate
+            checks = g.get("checks", 0)
+            # funnel in pipeline order, most-passed first; the drop-off = the blocker
+            order = ["checks", "in_killzone", "nfp_fomc_ok", "news_clear",
+                     "consolidation_found", "mss_h1_m15_m5_ok", "draw_cascade_ok",
+                     "target_found", "units_nonzero", "risk_cap_ok", "entry_opened"]
+            funnel = [f"{k}={g.get(k, 0)}" for k in order if k in g]
+            extra = sorted(((k, v) for k, v in g.items() if k not in order),
+                           key=lambda kv: kv[1], reverse=True)[:6]
+            line = (f"💓 heartbeat {hb_key} — {checks} checks / {len(self.trades)} "
+                    f"trades / equity R{self.equity:.0f}\n" + " → ".join(funnel))
+            if extra:
+                line += "\n gates: " + ", ".join(f"{k}={v}" for k, v in extra)
+            if checks == 0:
+                line += ("\n⚠️ 0 evaluations today — NOT in a killzone yet, or the "
+                         "feed is stale (check FEED STALE alerts).")
+            log.info(line.replace("\n", " | "))
+            try:
+                _notify(line)
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    login    = os.environ.get("MT5_LOGIN")
+    password = os.environ.get("MT5_PASSWORD")
+    server   = os.environ.get("MT5_SERVER")
+    path     = os.environ.get("MT5_TERMINAL_PATH")
+
+    log.info("Connecting to MT5…")
+    ok = mt.connect(
+        login=int(login) if login else None,
+        password=password, server=server, terminal_path=path,
+    )
+    if not ok:
+        log.error("MT5 connect failed — check terminal is running + credentials")
+        return 1
+
+    log.info("Resolving symbols…")
+    resolved = mt.resolve_all()
+    missing = [b for b in mt.ALL_SYMBOLS if b not in resolved]
+    if missing:
+        log.warning("Symbols not available on this account: %s", ", ".join(missing))
+
+    trader = LiveTrader()
+    trader.run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
