@@ -192,8 +192,16 @@ Each leg carries its **own** stop, placed structurally, capped at 10 pips.
 | **2 stop-outs in a day** | Same — I close the laptop |
 | **5 losses in a row** | Done for the day |
 | **−10% from session open** | Close everything, day over |
-| **−15% from equity peak** | **10 calendar days off.** No exceptions, no "just one" |
+| **−15% from equity peak** | **10 calendar days off.** No exceptions, no "just one" — ⚠️ **MANUAL below R3,000** (see note) |
 | Just stopped out | **No new trade in that same dollar direction** |
+
+> ⚠️ **The −15% halt is mine to enforce until R3,000.** The engine swaps the
+> percentage breaker for a hard floor at R500 while the account is small
+> (`GROWTH_PHASE_EQUITY = 3000`), because −15% at R1,000 is four losses and it
+> would halt almost permanently. Sensible for the machine — but it means
+> **nothing automatic stops me at −15%; the next automatic stop is at R500,
+> a 51.8% loss.** At R850 I close the laptop for ten days because I said I
+> would, not because anything made me.
 
 **On that last one:** EURUSD, GBPUSD and NZDUSD are one dollar bet wearing three
 names. A long EURUSD and a short GBPUSD is the same position twice with two

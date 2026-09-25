@@ -110,10 +110,38 @@ At R1,000 on 0.02 lots, **one stop is R37 — that's 3.7% of the account.**
 | **2** | R926 | −7.4% | **daily −6% cap → day over** |
 | 3 | R889 | −11.1% | daily cap |
 | 4 | R852 | −14.8% | daily cap |
-| **5** | R815 | **−18.5%** | **10-DAY HALT** + 5-loss rule |
+| **5** | R815 | **−18.5%** | daily cap + 5-loss rule (**no 10-day halt**) |
+| 10 | R630 | −37.0% | daily cap + 5-loss rule |
+| **14** | R482 | **−51.8%** | **10-DAY HALT — the R500 floor** |
 
-**Two losses ends most of your days.** Five consecutive losses triggers the
-10-day halt — and 5-in-a-row happens about ten times a year.
+**Two losses ends most of your days.** Five in a row ends the day too, and
+that happens about ten times a year.
+
+### ⚠️ CORRECTION — the −15% 10-day halt does NOT protect you yet
+
+I told you five losses triggers the 10-day halt. **That is wrong below
+R3,000**, and it is the one thing this audit changed.
+
+`GROWTH_PHASE_EQUITY = 3000`. Under that, the engine deliberately *replaces*
+the −15%-from-peak breaker with a **hard floor at R500** — half your funding.
+The reasoning in the code is sound: at R1,000, −15% is four losses, and halting
+for ten days every time you lose four in a row (≈18× a year) would mean the
+system is switched off more than it is on.
+
+**So on the live path below R3,000:**
+
+| breaker | active? |
+|---|---|
+| Daily −6% cap | ✅ yes — after 2 losses |
+| 5 consecutive losses | ✅ yes — rest of day |
+| −10% session kill | ✅ yes |
+| **−15% peak → 10 days off** | ❌ **NO — replaced by an R500 floor (−51.8%, ~14 losses)** |
+
+This is a design decision, not a bug, and it flips back on automatically at
+R3,000. But you must know it, because **Rule 5 of your trading plan says
+"−15% from equity peak → 10 calendar days off" and the machine will not do
+that for you yet.** Below R3,000 that rule is *yours to enforce by hand*.
+Nothing stops you at −15%. The next automatic stop is at half your account.
 
 The backtest's −13.24% was measured across a four-year curve that spent most of
 its life far above R1,000, where a single stop is a rounding error. **At R1,000

@@ -48,6 +48,8 @@ MBUF      = C.MILESTONE_TRAIL_BUFFER
 PYR_FAV   = C.PYRAMID_MIN_FAVOUR_PIPS
 MAX_LEGS  = C.MAX_LEGS
 DD_HALT   = C.MAX_DRAWDOWN_HALT_PCT
+GROWTH_EQ = C.GROWTH_PHASE_EQUITY        # below this the % breaker is REPLACED
+GROWTH_FL = C.GROWTH_PHASE_FLOOR_ZAR     # ...by this hard ZAR floor
 DD_DAYS   = C.DRAWDOWN_PAUSE_DAYS
 DAILY_CAP = C.MAX_DAILY_LOSS_PCT
 CONSEC    = C.MAX_CONSECUTIVE_LOSSES
@@ -211,7 +213,8 @@ def build():
     F += [big_rule(5, "The breakers are mine and they are not negotiable.",
         f"<b>2 stop-outs, or −{DAILY_CAP:.0f}% on the day → I am done for the day.</b> "
         f"{CONSEC} losses in a row → done. −{SESS_KILL:.0f}% from session open → flat, day over. "
-        f"−{DD_HALT:.0f}% from my equity peak → <b>{DD_DAYS} calendar days off.</b> "
+        f"−{DD_HALT:.0f}% from my equity peak → <b>{DD_DAYS} calendar days off</b> "
+        f"(<b>mine to enforce by hand below R{GROWTH_EQ:,.0f}</b>). "
         f"<b>Never a new trade in the same dollar direction as one that just stopped out.</b>",
         "Because revenge and tilt are the only things that can actually end the account — and "
         "blocking correlated exposure alone lifted profit factor from 2.47 to 2.98 in testing.", RED)]
@@ -322,9 +325,15 @@ def build():
               ["<b>2 stop-outs in a day</b>", "Same — I close the laptop"],
               [f"<b>{CONSEC} losses in a row</b>", "Done for the day"],
               [f"<b>−{SESS_KILL:.0f}% from session open</b>", "Close everything, day over"],
-              [f"<b>−{DD_HALT:.0f}% from equity peak</b>", f"<b>{DD_DAYS} calendar days off.</b> No exceptions, no “just one”"],
+              [f"<b>−{DD_HALT:.0f}% from equity peak</b>", f"<b>{DD_DAYS} calendar days off.</b> No exceptions — but ⚠️ MANUAL below R{GROWTH_EQ:,.0f}"],
               ["<b>Just stopped out</b>", "<b>No new trade in that same dollar direction</b>"],
           ], [5.4*cm, 10.8*cm], ["L", "L"]),
+          note(f"<b>⚠️ The −{DD_HALT:.0f}% halt is MINE to enforce until R{GROWTH_EQ:,.0f}.</b> The engine swaps "
+               f"the percentage breaker for a hard floor at R{GROWTH_FL:,.0f} while the account is small, "
+               f"because −{DD_HALT:.0f}% at R1,000 is four losses and it would halt almost permanently. "
+               f"Sensible for the machine — but nothing automatic stops me at "
+               f"−{DD_HALT:.0f}%; the next automatic stop is R{GROWTH_FL:,.0f}, a 51.8% loss. At R850 I close "
+               "the laptop for ten days because I said I would.", RED),
           note("<b>On that last one:</b> EURUSD, GBPUSD and NZDUSD are one dollar bet wearing three "
                "names. A long EURUSD and a short GBPUSD is the same position twice, with two spreads. "
                "Blocking that is measured to be worth roughly half a point of profit factor.", NAVY),
