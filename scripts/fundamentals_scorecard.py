@@ -106,13 +106,21 @@ def zscore_prior(values, window=52, min_n=26):
     return out
 
 
-def verdict(m_a, m_b, t_pool):
-    """Same sign in both halves and pooled |t| >= 2."""
+T_BAR = 2.5
+
+
+def verdict(m_a, m_b, t_pool, bar=None):
+    """Same sign in both halves and pooled |t| >= T_BAR.
+
+    The bar is 2.5, not the project's usual 2: on 12 random-walk datasets x 12
+    tests, |t| >= 2 passed 11 of 144 (7.6%) — about double what a fair gate
+    should let through. A threshold the null clears is not a threshold (P77)."""
+    bar = T_BAR if bar is None else bar
     if any(x is None or math.isnan(x) for x in (m_a, m_b, t_pool)):
         return "no data"
-    if m_a > 0 and m_b > 0 and t_pool >= 2:
+    if m_a > 0 and m_b > 0 and t_pool >= bar:
         return "WORKS"
-    if m_a < 0 and m_b < 0 and t_pool <= -2:
+    if m_a < 0 and m_b < 0 and t_pool <= -bar:
         return "OPPOSITE WORKS"
     return "nothing"
 
@@ -463,7 +471,7 @@ def section_news(events, hourly):
 # ───────────────────────────── main ────────────────────────────────────────────
 def build(cot_rows, notes, daily, yields, hourly, events, label):
     L = [f"# P79 — fundamentals scorecard ({label})", "",
-         "_Measurement only. Every effect must hold in BOTH halves with pooled t ≥ 2 "
+         "_Measurement only. Every effect must hold in BOTH halves with pooled |t| ≥ 2.5 "
          "to count. 'OPPOSITE' = what fading the signal would have done._", "",
          "_coverage: daily " + ", ".join(f"{p} {s.index.min():%Y-%m-%d}→{s.index.max():%Y-%m-%d}"
                                          for p, s in daily.items()) +
@@ -544,8 +552,8 @@ def selftest():
     assert z[29] is None                                   # all-equal prior: sd 0
     assert z[31] is not None and z[32] > z[31]            # uses prior only
     assert zscore_prior([1.0, 2.0])[1] is None             # too little history
-    assert verdict(1, 1, 2.5) == "WORKS" and verdict(-1, -1, -2.5) == "OPPOSITE WORKS"
-    assert verdict(1, -1, 2.5) == "nothing" and verdict(1, 1, 1.0) == "nothing"
+    assert verdict(1, 1, 2.6) == "WORKS" and verdict(-1, -1, -2.6) == "OPPOSITE WORKS"
+    assert verdict(1, -1, 2.6) == "nothing" and verdict(1, 1, 2.2) == "nothing"
     assert verdict(float("nan"), 1, 3) == "no data"
     imp, cont = follow_through(1.0, 1.001, 1.002)
     assert imp > 9 and cont > 0                            # continued up
