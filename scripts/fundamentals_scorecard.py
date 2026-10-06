@@ -188,6 +188,34 @@ def follow_through(p0, p2, p5):
     return abs(first), math.copysign(1.0, first) * nxt
 
 
+def detect_daily_shift(daily_close, hourly_close, shifts=(-1, 0, 1)):
+    """Which UTC day does a Yahoo daily bar labelled D actually close?
+
+    Compares each daily close with the hourly price at the END of UTC day D+s
+    (00:00 UTC of D+s+1) and returns the s with the smallest median gap. This
+    uses timestamps only — never the yield/FX relationship being tested — so
+    the alignment cannot be tuned toward the answer.
+
+    Why it exists: the first real run showed same-day yield/FX correlation ~0
+    and NEXT-day -0.33 (t -10), in every pair and both halves. That is a
+    one-day label offset between the two feeds, not a predictor."""
+    import pandas as pd
+    best = None
+    for sh in shifts:
+        ends = [pd.Timestamp(d).tz_localize("UTC") + pd.Timedelta(days=sh + 1)
+                for d in daily_close.index]
+        h = hourly_close.reindex(pd.DatetimeIndex(ends), method="ffill",
+                                 tolerance=pd.Timedelta("3h")).to_numpy()
+        gaps = sorted(abs(math.log(c / v)) for c, v in zip(daily_close.to_numpy(), h)
+                      if v == v and v > 0)
+        if len(gaps) < 20:
+            continue
+        med = gaps[len(gaps) // 2]
+        if best is None or med < best[1]:
+            best = (sh, med, len(gaps))
+    return best      # (shift_days, median_gap, n) or None
+
+
 def half_of(d, cut):
     return "A" if d < cut else "B"
 
@@ -328,6 +356,7 @@ def section_rates(yields, daily):
          "Halves: 2022-23 / 2024-26.", "",
          "| pair | yield | same-day corr IS / OOS | next-day corr IS / OOS (t) |",
          "|---|---|---|---|"]
+    suspect = 0
     for pair, px in daily.items():
         pr = (px.apply(math.log).diff() * 1e4).rename("p")
         for k, y in yields.items():
@@ -342,7 +371,17 @@ def section_rates(yields, daily):
                 cells.append((r0, t0, r1, t1))
             L.append(f"| {pair} | {k} | {_f(cells[0][0],2)} / {_f(cells[1][0],2)} | "
                      f"{_f(cells[0][2],2)} ({_f(cells[0][3])}) / {_f(cells[1][2],2)} ({_f(cells[1][3])}) |")
+            if k == "5y":
+                same = abs(cells[0][0]) + abs(cells[1][0])
+                nxt = abs(cells[0][2]) + abs(cells[1][2])
+                # fires only on a STRONG reversed pattern (the void run had
+                # next ~0.66 vs same ~0.06); noise has both near 0 and must not trip it
+                suspect += (nxt > 0.2 and nxt > 2 * same)
     # the brief's lean rule on the 5y
+    if suspect:
+        L += ["", f"> ⛔ **ALIGNMENT SUSPECT on {suspect} pair(s):** next-day correlation "
+              "is stronger than same-day. Real markets do the opposite, so the FX and "
+              "yield dates are offset and every verdict below is void."]
     L += ["", "**The brief's own rule** (5-day US yield change beyond ±5bp → lean the "
           "pairs the OTHER way), scored on the next day and the next 5 days:", "",
           "| pair | horizon | split | signals | FOLLOW bp (hit%) | OPPOSITE bp (hit%) |",
@@ -373,6 +412,8 @@ def section_rates(yields, daily):
                          f"{_f(-ms[0] if not math.isnan(ms[0]) else ms[0])} ({100-hit:.0f}%) |")
             allg = list((dh[dh.lean != 0].lean * dh[dh.lean != 0][f"f{h}"]).dropna())
             rule_v.append((pair, h, verdict(per["IS"][0], per["OOS"][0], tstat(mean_se(allg)))))
+    if suspect:
+        rule_v = [(p, h, "VOID (alignment)") for p, h, _ in rule_v]
     L += ["", "**Verdict (brief's yield lean):** " +
           " · ".join(f"{p} +{h}d {v}" for p, h, v in rule_v) +
           ". +5d uses non-overlapping 5-day blocks.", ""]
@@ -531,8 +572,23 @@ def main():
     daily = load_daily()
     yields = load_yields()
     hourly = load_hourly()
+    import pandas as pd
+    align_notes = []
+    for p in list(daily):
+        if p not in hourly:
+            continue
+        best = detect_daily_shift(daily[p], hourly[p])
+        if best is None:
+            align_notes.append(f"{p}: alignment undetermined")
+            continue
+        sh, med, n = best
+        daily[p].index = daily[p].index + pd.Timedelta(days=sh)
+        align_notes.append(f"{p}: daily label shifted {sh:+d}d (median gap {med*1e4:.1f}bp, n={n})")
+    print("ALIGNMENT:", "; ".join(align_notes))
     cot, notes = load_cot(range(2021, datetime.utcnow().year + 1))
     text = build(cot, notes, daily, yields, hourly, load_news(), "real data")
+    text = text.replace("## §A COT", "_FX daily alignment (vs hourly timestamps): "
+                        + "; ".join(align_notes) + "_\n\n## §A COT", 1)
     print(text)
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     open(REPORT, "w", encoding="utf-8").write(text)
@@ -586,6 +642,16 @@ def selftest():
                        "NonComm_Positions_Short_All": [7]})
     got2 = parse_cot_table(v2)
     assert got2 == [("NZDUSD", date(2024, 1, 2), -50.0)], got2
+    # alignment detector: daily closes planted at a known 1-day offset
+    import numpy as np
+    hidx = pd.date_range("2024-01-01", "2024-06-30", freq=H1_RULE, tz="UTC")
+    hs = pd.Series(np.exp(np.cumsum(np.random.default_rng(1).normal(0, 1e-3, len(hidx)))), index=hidx)
+    days = pd.bdate_range("2024-01-02", "2024-06-27")
+    for true_sh in (0, 1, -1):
+        vals = [float(hs.asof(pd.Timestamp(d).tz_localize("UTC") + pd.Timedelta(days=true_sh + 1)))
+                for d in days]
+        got = detect_daily_shift(pd.Series(vals, index=days), hs)
+        assert got and got[0] == true_sh, (true_sh, got)
     print("selftest OK")
     return 0
 
