@@ -154,6 +154,15 @@ def fix_verdict(r_is, t_pool, pct_is, r_oos, pct_oos, pct_bar=95.0):
     return "RED"
 
 
+def giveback(pre: float, post: float):
+    """Direction-free reversal: bp the after-window gives BACK against the
+    before-window's move. > 0 = price reversed at the anchor, whichever way it
+    had been going. None when there was no before-move to reverse."""
+    if pre is None or post is None or pre == 0 or math.isnan(pre) or math.isnan(post):
+        return None
+    return -math.copysign(1.0, pre) * post
+
+
 def percentile_rank(value: float, others) -> float:
     others = [o for o in others if not math.isnan(o)]
     if not others or math.isnan(value):
@@ -312,23 +321,36 @@ def hourly_profile(series):
     return out
 
 
-def _reversal_by_day(series, days, anchor_fn, window_h):
-    """Per-day USD-basket reversal R at the anchor returned by anchor_fn(day)."""
+def _prepost_by_day(series, days, anchor_fn, window_h):
+    """Per-day USD-basket (dollar_before, dollar_after) around anchor_fn(day), bp."""
     import numpy as np
     import pandas as pd
     w = pd.Timedelta(hours=window_h)
     anchors = [anchor_fn(d) for d in days]
-    per_pair = []
+    pres, posts = [], []
     for c in series.values():
         a = _px_at(c, [x - w for x in anchors])
         b = _px_at(c, anchors)
         e = _px_at(c, [x + w for x in anchors])
         with np.errstate(invalid="ignore", divide="ignore"):
-            pre = -np.log(b / a) * 1e4
-            post = -np.log(e / b) * 1e4
-        per_pair.append(pre - post)
-    R = np.nanmean(np.vstack(per_pair), axis=0)
-    return {d: (None if np.isnan(r) else float(r)) for d, r in zip(days, R)}
+            pres.append(-np.log(b / a) * 1e4)
+            posts.append(-np.log(e / b) * 1e4)
+    with np.errstate(invalid="ignore"):
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            PRE = np.nanmean(np.vstack(pres), axis=0)
+            POST = np.nanmean(np.vstack(posts), axis=0)
+    out = {}
+    for d, a, b in zip(days, PRE, POST):
+        out[d] = (None, None) if (np.isnan(a) or np.isnan(b)) else (float(a), float(b))
+    return out
+
+
+def _reversal_by_day(series, days, anchor_fn, window_h):
+    """Per-day USD-basket reversal R = before - after at anchor_fn(day)."""
+    pp = _prepost_by_day(series, days, anchor_fn, window_h)
+    return {d: (None if a is None else a - b) for d, (a, b) in pp.items()}
 
 
 def _by_split(day_vals):
@@ -350,19 +372,28 @@ def _placebo_anchors():
 
 
 def fix_study(series, days, window_h):
-    """§2 — real fix R per split, against placebo ET clock times."""
-    res = {}
+    """§2 — real fix R per split vs placebo clock times, plus the before/after
+    legs separately and the direction-free giveback (also vs placebo)."""
+    res, extra = {}, {}
     for name, (tz, hh, mm) in FIXES.items():
-        vals = _reversal_by_day(series, days, lambda d: fix_utc(d, tz, hh, mm), window_h)
-        res[name] = _by_split(vals)
+        pp = _prepost_by_day(series, days, lambda d: fix_utc(d, tz, hh, mm), window_h)
+        res[name] = _by_split({d: (None if a is None else a - b) for d, (a, b) in pp.items()})
+        extra[name] = {
+            "pre": _by_split({d: a for d, (a, b) in pp.items()}),
+            "post": _by_split({d: b for d, (a, b) in pp.items()}),
+            "give": _by_split({d: giveback(a, b) for d, (a, b) in pp.items()}),
+        }
     plac = {"IS": [], "OOS": []}
+    plac_give = {"IS": [], "OOS": []}
     for m in _placebo_anchors():
-        vals = _reversal_by_day(series, days,
-                                lambda d, m=m: fix_utc(d, ET_TZ, m // 60, m % 60), window_h)
-        s = _by_split(vals)
+        pp = _prepost_by_day(series, days,
+                             lambda d, m=m: fix_utc(d, ET_TZ, m // 60, m % 60), window_h)
+        sR = _by_split({d: (None if a is None else a - b) for d, (a, b) in pp.items()})
+        sG = _by_split({d: giveback(a, b) for d, (a, b) in pp.items()})
         for split in ("IS", "OOS"):
-            plac[split].append(s[split][0])
-    return res, plac
+            plac[split].append(sR[split][0])
+            plac_give[split].append(sG[split][0])
+    return res, plac, extra, plac_give
 
 
 def dst_study(series, days, window_h):
@@ -434,7 +465,7 @@ def build_report(series, window_h, label, coverage, with_trades=True):
          f"window ±{window_h:g}h around each anchor_", ""]
 
     # §2 first — it carries the verdict
-    res, plac = fix_study(series, days, window_h)
+    res, plac, extra, plac_give = fix_study(series, days, window_h)
     verdicts = {}
     L += ["## §2 The fix reversal — the verdict", "",
           "R = dollar move into the anchor minus dollar move after it, USD basket, "
@@ -470,6 +501,38 @@ def build_report(series, window_h, label, coverage, with_trades=True):
               "reported but not counted; it is outside every killzone).", "",
           f"_placebo: {len(plac['IS'])} clock times, every 15 min ET, excluding "
           f"±{PLACEBO_EXCLUDE_MIN} min around the real fixes._", ""]
+
+    def _t(ms):
+        m, se_, _ = ms
+        return m / se_ if se_ and not math.isnan(se_) else float("nan")
+
+    L += ["### §2a The two legs separately — did the dollar rise INTO the fix, fall AFTER?",
+          "", "USD basket bp per day, `+` = dollar up. The research says BEFORE > 0 and "
+          "AFTER < 0. R above is simply BEFORE − AFTER.", "",
+          "| fix | before IS (t) | after IS (t) | before OOS (t) | after OOS (t) |",
+          "|---|---|---|---|---|"]
+    for name, x in extra.items():
+        L.append(f"| {name} | {_f(x['pre']['IS'][0])} ({_f(_t(x['pre']['IS']),1)}) "
+                 f"| {_f(x['post']['IS'][0])} ({_f(_t(x['post']['IS']),1)}) "
+                 f"| {_f(x['pre']['OOS'][0])} ({_f(_t(x['pre']['OOS']),1)}) "
+                 f"| {_f(x['post']['OOS'][0])} ({_f(_t(x['post']['OOS']),1)}) |")
+    L += ["", "### §2b Direction-free: does price REVERSE at the fix, whichever way it was going?",
+          "", "giveback = bp the after-window gives back against the before-window's move "
+          "(> 0 = reversal). A dollar that ran UP into the fix one day and DOWN the next "
+          "cancels out in R but counts here both times. Same 52-placebo control.", "",
+          "| fix | giveback IS (t) | pctl IS | giveback OOS (t) | pctl OOS | pooled t | verdict |",
+          "|---|---|---|---|---|---|---|"]
+    for name, x in extra.items():
+        g = x["give"]
+        pi = percentile_rank(g["IS"][0], plac_give["IS"])
+        po = percentile_rank(g["OOS"][0], plac_give["OOS"])
+        tp = _t(g["ALL"])
+        v = fix_verdict(g["IS"][0], tp, pi, g["OOS"][0], po)
+        L.append(f"| {name} | {_f(g['IS'][0])} ({_f(_t(g['IS']),1)}) | {pi:.0f} "
+                 f"| {_f(g['OOS'][0])} ({_f(_t(g['OOS']),1)}) | {po:.0f} | {_f(tp,1)} "
+                 f"| **{v}** |")
+    L += ["", "_Real FX mean-reverts a little at ANY time of day; the placebo percentile is "
+          "what separates 'the fix' from 'any two-hour window'._", ""]
 
     # §1
     prof = hourly_profile(series)
@@ -664,6 +727,9 @@ def selftest():
     assert fix_verdict(1.0, 3.0, 99, -0.1, 99) == "RED"        # sign flips
     assert fix_verdict(float("nan"), 3, 99, 1, 99) == "NO DATA"
     assert percentile_rank(5, [1, 2, 3, 10]) == 75.0
+    assert giveback(3.0, -2.0) == 2.0 and giveback(-3.0, 2.0) == 2.0     # reversals
+    assert giveback(3.0, 2.0) == -2.0                                     # continuation
+    assert giveback(0.0, 5.0) is None and giveback(None, 1.0) is None
     # clock flow: 07:00 ET on a normal day is inside the 2h BEFORE the 08:15 ECB fix
     t = pd.Timestamp("2026-03-02 07:00", tz=ET_TZ).tz_convert("UTC")
     assert clock_flow_dir(t, 2.0) == -1

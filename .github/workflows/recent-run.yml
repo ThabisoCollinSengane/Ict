@@ -11,8 +11,11 @@ on:
   workflow_dispatch:
     inputs:
       days:
-        description: "days to report (max ~58; Yahoo caps 5m data at 60d)"
+        description: "replay: days of trades to report (60d warm-up behind it)"
         default: "20"
+      clock_days:
+        description: "fix-clock window (max 58; Yahoo caps 5m data at 60d)"
+        default: "58"
   push:
     branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
     paths:
@@ -33,6 +36,8 @@ jobs:
     env:
       NO_PUSH: "1"
       DAYS: ${{ github.event.inputs.days || '20' }}
+      # The clock needs every day it can get — 20 days cannot resolve ~2bp/day.
+      CLOCK_DAYS: ${{ github.event.inputs.clock_days || '58' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,7 +56,7 @@ jobs:
 
       - name: 2) Institutional clock on the recent window
         continue-on-error: true
-        run: python scripts/fx_clock_study.py --yahoo "$DAYS" 2>&1 | tee data/fx_clock_recent_console.txt
+        run: python scripts/fx_clock_study.py --yahoo "$CLOCK_DAYS" 2>&1 | tee data/fx_clock_recent_console.txt
 
       - name: 3a) US 2-year yield from FRED
         continue-on-error: true
