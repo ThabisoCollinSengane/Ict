@@ -95,14 +95,46 @@ def yield_lean(series: list[tuple[str, float]], days: int = 5) -> tuple[int, str
 
 
 def combine(rate: int, yld: int) -> tuple[str, int]:
-    """Agreement of the two independent reads → label + net direction."""
+    """Agreement of the two FUNDAMENTAL reads with each other → the DRAW.
+
+    Compares rate differential against US-2Y direction. It says NOTHING about
+    what price is doing — see amd_reading(). The output is a DRAW: where price
+    is likely to go once liquidity has been taken, which for a REVERSAL model is
+    the direction we expect to ENTER, not the direction price is moving now.
+    """
     if rate == 0 and yld == 0:
-        return "NO STORY", 0
+        return "NO READ", 0
     if rate != 0 and yld != 0:
         if rate == yld:
-            return "ALIGNED", rate
-        return "CONFLICTED", 0
+            return "AGREED", rate
+        return "SPLIT", 0
     return "PARTIAL", (rate or yld)
+
+
+def amd_reading(draw: int) -> list[str]:
+    """How to read the draw against whatever price is actually doing.
+
+    The correction that produced this (trader, 2026-10-06): fundamentals
+    opposing the current move is NOT a stay-out signal. Price running against
+    the draw is usually price going FOR LIQUIDITY first, and it then continues
+    toward the draw. The opposition is the MANIPULATION leg — the setup
+    forming — not a warning. Treating it as a veto (which the first version of
+    this file did) throws away the most informative state the two layers
+    produce together.
+    """
+    if draw == 0:
+        return ["- No draw read today. Price action alone, as normal."]
+    toward  = "SHORT" if draw < 0 else "LONG"
+    against = "rallying" if draw < 0 else "selling off"
+    withit  = "selling off" if draw < 0 else "rallying"
+    return [
+        f"- **Price {against} — AGAINST the draw** → likely the manipulation leg "
+        f"taking liquidity. A reversal entry back toward the draw ({toward}) is the "
+        "cleanest case this model has. **The opposition IS the setup.**",
+        f"- **Price already {withit} — WITH the draw** → distribution may already be "
+        "underway. A reversal entry here fades the draw, which is weaker; a "
+        "continuation is breakout territory and late in the move.",
+    ]
 
 
 def golden_note(pair: str, lean: int) -> str:
@@ -240,6 +272,7 @@ def build(day, stance, stance_w, us2y, us2y_w, cal, cal_w):
             d.append("- ⚠️ NZD is driven more by RISK APPETITE, China data and dairy "
                      "than by rate differentials. Treat the rate lean here as the "
                      "weakest of the three, and check equity futures yourself.")
+        d += ["", "_Read against price:_"] + amd_reading(net)
         detail += d + [""]
 
     L += ["| pair | story | lean | vs golden rule |", "|---|---|---|---|"]
@@ -277,26 +310,51 @@ def build(day, stance, stance_w, us2y, us2y_w, cal, cal_w):
               "are already gated as low-probability.", ""]
 
     # the card
-    best = [r for r in rows if r[1] == "ALIGNED" and "OPPOSES" not in (r[3] or "")]
+    best = [r for r in rows if r[1] == "AGREED" and "OPPOSES" not in (r[3] or "")]
     L += ["## How to use this", ""]
     if best:
-        L.append("**Fundamentally cleanest today: " +
+        L.append("**Clearest draw today: " +
                  ", ".join(f"{p} {ar}" for p, _, ar, _ in best) + ".** "
-                 "That is where to LOOK first — not permission to trade.")
+                 "That is where to LOOK — not permission to trade.")
     else:
-        L.append("**No pair has an aligned story today.** That is a normal and "
-                 "common result. Trade the price-action card as usual, or not at all.")
+        L.append("**No pair has an agreed draw today.** Normal and common. "
+                 "Trade the price-action card as usual, or not at all.")
     L += ["",
-          "1. Fundamentals pick **which pair and which side** has a story.",
-          "2. Price action picks the **entry** — full card, every box, as always.",
-          "3. A story with no setup is **not a trade**. Ever.",
-          "4. A setup against an ALIGNED story: take it only if every quality box "
-          "ticks, or skip it. Conflict is a reason to do less, never more.",
-          "5. A CONFLICTED or NO-STORY day changes nothing — the algo's edge was "
-          "measured without any of this.", "",
-          "_Log the story alongside each trade. After 50 trades you can test "
-          "whether your fundamental read predicted anything — the same way "
-          "everything else here was tested, controls and both halves included._"]
+          "**The draw is not a filter on today’s move.** It is where price is "
+          "likely to go AFTER the liquidity is taken. This is a REVERSAL model, so "
+          "the two things that should agree are the **draw** and the **trade "
+          "direction** — never the draw and whatever price is doing right now. "
+          "Price running the other way is the manipulation leg: that is the setup "
+          "forming, not a warning.", "",
+          "| what you see | how to read it |", "|---|---|",
+          "| price running **against** the draw | the liquidity raid. A reversal "
+          "entry back toward the draw is the cleanest case here. |",
+          "| price running **with** the draw already | distribution may be underway "
+          "— a reversal entry now fades the draw, and a continuation is late. |",
+          "| **no** draw read | price action alone. Normal. |", "",
+          "1. The draw says which pair and which way to **look**.",
+          "2. Price action says **when** — full card, every box, as always.",
+          "3. A draw with no setup is **not a trade**. Ever.",
+          "4. The thing to question is a setup whose **trade direction** opposes an "
+          "AGREED draw. A setup entered against the recent **move** is normal and "
+          "expected — that is what this model does.",
+          "5. **Two things lining up is not a signal.** Nine measured-null "
+          "combinations in this project say so. Nothing here outranks the card.", "",
+          "### ⚠️ The honest limit of this framing", "",
+          "“Price went against the fundamentals, so it was going for liquidity "
+          "first” can explain **every** outcome after the fact — including the ones "
+          "where the fundamentals were simply wrong and price just kept going. A "
+          "story that cannot be wrong predicts nothing.", "",
+          "So record the state instead of feeling it. Per trade, log four fields:", "",
+          "```",
+          "draw_dir      LONG / SHORT / none      (from this brief, before the session)",
+          "price_vs_draw against / with / flat    (what price was doing at entry)",
+          "trade_dir     LONG / SHORT             (the side actually taken)",
+          "outcome       R                        (not rands)",
+          "```", "",
+          "_After 50 trades that table answers it directly: did `against` + "
+          "reversal-toward-the-draw actually beat `with`? Same test as everything "
+          "else here — controls, and both halves._"]
     return "\n".join(L) + "\n"
 
 
@@ -348,10 +406,20 @@ def _selftest():
     assert yield_lean(dn)[0] == +1
     assert yield_lean(flat)[0] == 0              # 2bp < 5bp threshold
     assert yield_lean([])[0] == 0
-    assert combine(-1, -1) == ("ALIGNED", -1)
-    assert combine(-1, +1) == ("CONFLICTED", 0)
+    assert combine(-1, -1) == ("AGREED", -1)
+    assert combine(-1, +1) == ("SPLIT", 0)
     assert combine(0, -1) == ("PARTIAL", -1)
-    assert combine(0, 0) == ("NO STORY", 0)
+    assert combine(0, 0) == ("NO READ", 0)
+    # amd_reading: opposition must read as the SETUP, never as a veto
+    sh = " ".join(amd_reading(-1)); lo = " ".join(amd_reading(+1))
+    assert "opposition IS the setup" in sh and "opposition IS the setup" in lo
+    assert "rallying \u2014 AGAINST the draw" in sh      # draw short -> rally is the raid
+    assert "selling off \u2014 AGAINST the draw" in lo   # draw long  -> selloff is the raid
+    assert "SHORT" in sh and "LONG" in lo
+    assert len(amd_reading(0)) == 1 and "alone" in amd_reading(0)[0]
+    for d in (-1, 0, 1):
+        assert not any("skip" in x.lower() or "stay out" in x.lower()
+                       for x in amd_reading(d)), "amd_reading must not veto"
     assert "OPPOSES" in golden_note("EURUSD", -1)      # golden EURUSD is LONG only
     assert "agrees" in golden_note("EURUSD", +1)
     assert "OPPOSES" in golden_note("GBPUSD", +1)
