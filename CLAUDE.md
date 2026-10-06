@@ -2247,6 +2247,43 @@ never armed — but it feeds the P47 `narrative_rate` factor. Decide, then re-ru
 python scripts/fx_clock_study.py          # auto-pushes data/fx_clock_report.md
 ```
 
+### P79 — fundamentals scorecard: COT, US yields, news (RAN 2026-10-06) — 🔴 nothing tradeable
+
+**Where it runs:** this container is blocked from every market-data host, so
+`.github/workflows/recent-run.yml` runs the studies on GitHub's runner and commits
+the reports back (`data/fundamentals_scorecard.md`, `data/fx_clock_recent_report.md`,
+`data/yahoo_recent_report.md`, `data/fundamental_brief.md` + consoles). Re-run by
+pushing `.github/recent-run.trigger` or Actions → "Run workflow".
+
+**Gate raised to pooled |t| >= 2.5** (same sign both halves). At 2.0 the random-walk
+null passed 11/144 (7.6%); at 2.5, 6/144 (4.2%) — so ~1 false WORKS per two real
+runs of 12 verdicts. A lone pass needs a second look.
+
+| | result |
+|---|---|
+| **COT** (CFTC legacy, spec net % OI, z vs prior 52w, Mon→Mon after release) | nothing. Closest: FADING specs on NZDUSD +32/+34 bp/wk, 60%/67% hit, t ~1.9. EUR/GBP flip sign. |
+| **US yields, same day** | real and as expected: corr -0.25..-0.40 on 5y/10y, both halves, all pairs |
+| **US yields, next day** | none: corr within ±0.10, t <= 2 |
+| **Brief's 5-day/5bp yield lean** | nothing at +1d or +5d. +5d leans positive for EUR/GBP both halves (+9.5/+12.9, +21.4/+10.4 bp) but under the bar |
+| **News size** | Critical (NFP/CPI/FOMC) 1.8-2.2x a normal hour (17-25 bp/2h); High 1.8-2.2x; **Medium 1.0-1.1x — barely moves price** |
+| **News follow-through** | nothing: neither riding nor fading the first move pays over the next 3h, either half |
+
+**⚠️ NINTH lookahead/alignment bug — the first rates run was void.** Same-day
+yield/FX corr read ~-0.05 and NEXT-day -0.33 (t to -10) in every pair and half —
+impossible in a real market. Yahoo's FX daily bars are labelled one day LATE
+relative to its yield bars, so "yesterday's yield" was today's, and the brief's
+yield lean "WORKS +1d" was reading the same-day move. Fixed by
+`detect_daily_shift()` (aligns each daily close to the UTC day it closes using
+hourly TIMESTAMPS only, never the relationship under test; found -1d on all three
+pairs, median gap 0.4-2.3bp) plus a guard that voids the section if next-day
+correlation ever dominates same-day (silent on 6 null datasets). Tell, as always:
+an unusually clean, both-halves, every-pair result.
+
+**Practical read for the trader:** yields CONFIRM the dollar on the same day
+(useful as an SMT-style cross-check) but do not PREDICT tomorrow. Fundamentals
+here describe the move; none forecasts it. Medium-impact news windows barely move
+price — noted, not acted on (the block is +/-15 min).
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.
