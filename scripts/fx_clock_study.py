@@ -70,6 +70,17 @@ PLACEBO_EXCLUDE_MIN = 90
 
 
 # ─────────────────────────── pure logic (unit-tested) ───────────────────────────
+_CUT = None   # Yahoo mode: date splitting the window into first/second half
+
+
+def split_of_day(d):
+    """IS/OOS for a calendar date. Normally by year; in --yahoo mode the two
+    halves of the short window stand in for IS/OOS (labelled as such)."""
+    if _CUT is not None:
+        return "IS" if d < _CUT else "OOS"
+    return split_of(d.year)
+
+
 def split_of(year: int):
     if year in IS_YEARS:
         return "IS"
@@ -240,6 +251,29 @@ def _synthetic(plant_bp: float, seed: int = 11):
     return out
 
 
+def _load_yahoo(days: int):
+    """Yahoo 5-min closes for PAIRS over the last `days` (Yahoo caps 5m at 60d).
+    Yahoo labels a bar at its START; shift +5min so price "at" T is as of T —
+    the same no-lookahead convention as the HistData path."""
+    import pandas as pd
+    import yfinance as yf
+    tick = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "NZDUSD": "NZDUSD=X"}
+    out = {}
+    for p in PAIRS:
+        df = yf.download(tick[p], period=f"{min(days, 60)}d", interval="5m",
+                         progress=False, auto_adjust=False)
+        if df is None or df.empty:
+            print(f"  WARN: no Yahoo data for {p}")
+            continue
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        c = df["Close"].dropna()
+        c.index = (c.index.tz_localize("UTC") if c.index.tz is None
+                   else c.index.tz_convert("UTC")) + pd.Timedelta(BAR_RULE)
+        out[p] = c
+    return out
+
+
 def _px_at(closes, times):
     """Last close at or before each time (tolerance 15 min), as a numpy array."""
     import pandas as pd
@@ -268,11 +302,12 @@ def hourly_profile(series):
     basket = pd.concat(rets, axis=1).mean(axis=1).dropna()
     start_et = (basket.index - pd.Timedelta(H1_RULE)).tz_convert(ET_TZ)
     df = pd.DataFrame({"r": basket.values, "hour": start_et.hour,
-                       "year": start_et.year, "dow": start_et.dayofweek})
+                       "split": [split_of_day(x) for x in start_et.date],
+                       "dow": start_et.dayofweek})
     df = df[df.dow < 5]
     out = {}
-    for split, years in (("IS", IS_YEARS), ("OOS", OOS_YEARS)):
-        sub = df[df.year.isin(years)]
+    for split in ("IS", "OOS"):
+        sub = df[df.split == split]
         out[split] = {h: mean_se(list(g.r)) for h, g in sub.groupby("hour")}
     return out
 
@@ -299,7 +334,7 @@ def _reversal_by_day(series, days, anchor_fn, window_h):
 def _by_split(day_vals):
     out = {}
     for split in ("IS", "OOS"):
-        out[split] = mean_se([v for d, v in day_vals.items() if split_of(d.year) == split])
+        out[split] = mean_se([v for d, v in day_vals.items() if split_of_day(d) == split])
     out["ALL"] = mean_se(list(day_vals.values()))
     return out
 
@@ -392,8 +427,8 @@ def _f(x, nd=2):
 
 def build_report(series, window_h, label, coverage, with_trades=True):
     days = _days(next(iter(series.values())))
-    n_is = sum(1 for d in days if split_of(d.year) == "IS")
-    n_oos = sum(1 for d in days if split_of(d.year) == "OOS")
+    n_is = sum(1 for d in days if split_of_day(d) == "IS")
+    n_oos = sum(1 for d in days if split_of_day(d) == "OOS")
     L = [f"# P78 — the institutional FX clock ({label})", "",
          f"_coverage: {coverage}; trading days IS {n_is} / OOS {n_oos}; "
          f"window ±{window_h:g}h around each anchor_", ""]
@@ -534,6 +569,10 @@ def main():
     ap.add_argument("--plant", type=float, default=0.0,
                     help="with --null: plant a dollar W of this many bp at the ECB fix")
     ap.add_argument("--seed", type=int, default=11, help="with --null: RNG seed")
+    ap.add_argument("--yahoo", type=int, default=0, metavar="DAYS",
+                    help="recent-window mode on Yahoo 5m (max 60d). Halves = first/"
+                         "second half of the window. Writes fx_clock_recent_report.md "
+                         "so it can never be mistaken for the 4-year verdict.")
     ap.add_argument("--no-push", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -545,6 +584,36 @@ def main():
         coverage = "synthetic 5-min, 2022-2025 weekdays"
         text, verdict = build_report(series, a.window, label, coverage, with_trades=False)
         print(text)
+        return 0
+    if a.yahoo:
+        global _CUT
+        series = _load_yahoo(a.yahoo)
+        if not series:
+            print("No Yahoo data returned (rate-limited or blocked).")
+            return 1
+        any_c = next(iter(series.values()))
+        days = _days(any_c)
+        if len(days) < 6:
+            print(f"Only {len(days)} trading days returned — too few to split.")
+            return 1
+        _CUT = days[len(days) // 2]
+        cov = ", ".join(f"{p} {c.index.min():%Y-%m-%d}→{c.index.max():%Y-%m-%d} "
+                        f"({len(c):,} bars)" for p, c in series.items())
+        text, verdict = build_report(series, a.window,
+                                     f"Yahoo last {a.yahoo}d — RECENT WINDOW", cov,
+                                     with_trades=False)
+        warn = (f"> ⚠️ **{len(days)} trading days. This cannot confirm or reject the "
+                "clock.** The published effect is ~2bp/day; read the t-stats and the "
+                "§3 MDE — at this n the noise is several times the effect. Here "
+                f"'IS' = {days[0]}→{days[len(days)//2 - 1]}, 'OOS' = {_CUT}→{days[-1]} "
+                "(halves of the window, not the 2022-25 split). The 4-year verdict "
+                "lives in fx_clock_report.md and needs the HistData M1 set.\n\n")
+        i = text.index("## §2")
+        text = text[:i] + warn + text[i:]
+        print(text)
+        out = os.path.join(ROOT, "data", "fx_clock_recent_report.md")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        open(out, "w", encoding="utf-8").write(text)
         return 0
     series = {}
     for p in PAIRS:

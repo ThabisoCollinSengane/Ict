@@ -29,6 +29,10 @@ LOOSE = {"AMD_MIN_RANGE_BARS": 4, "AMD_MAX_RANGE_PIPS": 50.0, "AMD_MIN_TOUCHES":
 
 
 def _publish(path, msg):
+    if os.environ.get("NO_PUSH") == "1":           # CI commits once at the end
+        print("NO_PUSH=1 — report written, not pushed:", os.path.relpath(path, _ROOT))
+        return
+
     def _git(*a):
         return subprocess.run(["git", *a], cwd=_ROOT, capture_output=True, text=True)
     _git("add", "-f", path)
