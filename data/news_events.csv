@@ -1,6 +1,10 @@
 # High-impact news events 2022-2026 (2026 full year; NFP/CPI pattern-based,
 # FOMC/ECB/BOE exact from official 2026 schedules)
 # Format: utc_datetime,currency,impact
+# 2026-10-06: 2026 FOMC Oct/Dec CORRECTED to 10-28 / 12-09 (were 11-04 / 12-16) and summer
+#   FOMC hours to 18:00 UTC (14:00 EDT), verified against federalreserve.gov. 2025 Oct/Dec are
+#   STILL WRONG (11-05 / 12-17; real 10-29 / 12-10) - left untouched because they sit inside the
+#   OOS backtest and changing them needs a baseline re-run. See CLAUDE.md P78.
 utc_datetime,currency,impact,event_name
 2022-01-07 10:00:00,EUR,Medium,
 2022-01-07 13:30:00,USD,High,NFP
@@ -302,14 +306,14 @@ utc_datetime,currency,impact,event_name
 2026-02-18 07:00:00,GBP,Medium,
 2026-03-06 13:30:00,USD,High,NFP
 2026-03-11 13:30:00,USD,High,CPI
-2026-03-18 19:00:00,USD,High,FOMC
+2026-03-18 18:00:00,USD,High,FOMC
 2026-03-19 12:00:00,GBP,High,
 2026-03-19 12:45:00,EUR,High,
 2026-03-31 10:00:00,EUR,Medium,
 2026-04-03 13:30:00,USD,High,NFP
 2026-04-14 13:30:00,USD,High,CPI
 2026-04-15 07:00:00,GBP,Medium,
-2026-04-29 19:00:00,USD,High,FOMC
+2026-04-29 18:00:00,USD,High,FOMC
 2026-04-30 12:00:00,GBP,High,
 2026-04-30 12:45:00,EUR,High,
 2026-05-01 13:30:00,USD,High,NFP
@@ -319,13 +323,13 @@ utc_datetime,currency,impact,event_name
 2026-06-05 13:30:00,USD,High,NFP
 2026-06-10 13:30:00,USD,High,CPI
 2026-06-11 12:45:00,EUR,High,
-2026-06-17 19:00:00,USD,High,FOMC
+2026-06-17 18:00:00,USD,High,FOMC
 2026-06-18 12:00:00,GBP,High,
 2026-06-30 10:00:00,EUR,Medium,
 2026-07-02 13:30:00,USD,High,NFP
 2026-07-14 13:30:00,USD,High,CPI
 2026-07-15 07:00:00,GBP,Medium,
-2026-07-29 19:00:00,USD,High,FOMC
+2026-07-29 18:00:00,USD,High,FOMC
 2026-07-30 12:00:00,GBP,High,
 2026-07-30 12:45:00,EUR,High,
 2026-07-31 10:00:00,EUR,Medium,
@@ -334,25 +338,25 @@ utc_datetime,currency,impact,event_name
 2026-08-19 07:00:00,GBP,Medium,
 2026-08-28 10:00:00,EUR,Medium,
 2026-09-04 13:30:00,USD,High,NFP
-2026-09-10 13:30:00,USD,High,CPI
 2026-09-10 12:45:00,EUR,High,
-2026-09-16 19:00:00,USD,High,FOMC
+2026-09-10 13:30:00,USD,High,CPI
+2026-09-16 18:00:00,USD,High,FOMC
 2026-09-17 12:00:00,GBP,High,
 2026-09-30 10:00:00,EUR,Medium,
 2026-10-02 13:30:00,USD,High,NFP
 2026-10-13 13:30:00,USD,High,CPI
 2026-10-21 07:00:00,GBP,Medium,
 2026-10-28 12:45:00,EUR,High,
+2026-10-28 18:00:00,USD,High,FOMC
 2026-10-30 10:00:00,EUR,Medium,
-2026-11-04 19:00:00,USD,High,FOMC
 2026-11-05 12:00:00,GBP,High,
 2026-11-06 13:30:00,USD,High,NFP
 2026-11-12 13:30:00,USD,High,CPI
 2026-11-18 07:00:00,GBP,Medium,
 2026-11-27 10:00:00,EUR,Medium,
 2026-12-04 13:30:00,USD,High,NFP
-2026-12-10 13:30:00,USD,High,CPI
+2026-12-09 19:00:00,USD,High,FOMC
 2026-12-10 12:45:00,EUR,High,
-2026-12-16 19:00:00,USD,High,FOMC
+2026-12-10 13:30:00,USD,High,CPI
 2026-12-17 12:00:00,GBP,High,
 2026-12-18 10:00:00,EUR,Medium,

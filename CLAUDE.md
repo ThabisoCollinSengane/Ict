@@ -2198,6 +2198,55 @@ hiding a 2:1 split. Both were caught by putting the null's numbers in the same
 table as the real ones rather than reading its verdict label. **The verdict label
 is the least informative thing a null produces.**
 
+### P78 — the institutional FX clock (BUILT 2026-10-06, NOT run on real data)
+
+**What:** the trader asked what banks and interbank desks actually research. Nine
+research loops. The surviving, persistent finding is **mechanical flow tied to the
+clock**, not macro prediction: the dollar is bid INTO each benchmark fix and offered
+AFTER it — ECB 14:15 Frankfurt, WMR 16:00 London, Tokyo 09:55 — every day for 20+
+years (Krohn, Mueller & Whelan, J. Finance 2024), plus currencies weakening during
+their own working hours (Ranaldo; Breedon & Ranaldo — EURUSD net-profitable after
+costs). FOMC days favour short-dollar (Mueller et al., JF 2017); month-end hedging
+at the WMR fix is predictable from the month's equity returns (Melvin & Prins).
+
+**What is dead (do not build):** carry/momentum/value as signals (post-publication
+OOS Sharpe +0.39 -> -0.32; nothing net of costs since 2008); COT extremes for FX
+(not significant). Settlement windows (CLS 07:00-12:00 CET, Fedwire, CHAPS, T2) say
+WHEN liquidity is busy — no evidence they set DIRECTION. Our killzones lining up
+with these windows is partly circular (both built around London/NY opens).
+
+**`scripts/fx_clock_study.py`:** §1 ET-hour USD profile, §2 fix reversal R = dollar
+pre-fix minus post-fix move vs 52 placebo clock times (GREEN needs R>0 both halves,
+pooled t>=2, beats >=95% of placebos both halves), §3 daylight-saving natural
+experiment (~70 days where Europe is 5h ahead: European events land ONE HOUR LATER
+in ET — London open 04:00, ECB fix 09:15, WMR 12:00 inside the noon block), §4 our
+trades with/against the post-fix flow (descriptive unless §2 GREEN; prints n needed).
+
+**Calibration, verified before any real run:** random walk reads RED on 6 seeds
+(every cell inside ±1.9t); a planted 3bp ECB effect reads GREEN t+12.8, pctl 100
+both halves, and §3 picks the right clock (+4.96 at the Euro time vs +0.13 at the
+usual ET time). **The first gate was wrong** — YELLOW was "right sign both halves",
+which a null clears ~half the time; it now also needs pooled t>=2. **ECB and WMR
+are not independent tests**: windows overlap and the planted ECB effect leaked into
+WMR at t -3.5 (still -2.5 at a 1.375h window) — a negative WMR alongside a GREEN ECB
+is the echo, not a second finding.
+
+**Morning brief:** `scripts/fundamental_brief.py` now prints the institutional clock
+in ET for the date, flags mismatch weeks, month-end and FOMC days, and shows the P78
+verdict (or says plainly that the clock is NOT YET MEASURED on our data).
+
+**⚠️ CALENDAR BUG FOUND:** `data/news_events.csv` had the Oct and Dec FOMC a week
+late in BOTH 2025 and 2026, and every FOMC at 19:00 UTC (summer decisions are 18:00
+UTC). 2022-2024 verified correct. **2026 fixed** (live-only, cannot touch the
+backtest). **2025 left WRONG on purpose** (11-05/12-17, real 10-29/12-10): it sits
+in the OOS backtest and changing it needs a baseline re-run. Likely low impact —
+the decision is at 14:00 ET, outside both killzones, and `fomc_whipsaw_date` is
+never armed — but it feeds the P47 `narrative_rate` factor. Decide, then re-run.
+
+```
+python scripts/fx_clock_study.py          # auto-pushes data/fx_clock_report.md
+```
+
 ### Drawdown tolerance (corrected 2026-09-09)
 
 The -15% MaxDD breaker is a **parameter, not a law**. On a R1,000 account -15% is R150.

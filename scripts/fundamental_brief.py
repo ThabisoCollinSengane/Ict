@@ -230,6 +230,112 @@ def load_calendar():
     return cal, None
 
 
+# ───────────────────────── the institutional clock ──────────────────────────
+# Published operating windows of the plumbing the money runs on, converted to
+# ET for the given date (DST-aware per city). Sources: CLS settlement overview,
+# FRB Fedwire hours, ECB reference-rate procedure, BoE RTGS timetable, WMR
+# methodology, Krohn/Mueller/Whelan (J. Finance 2024) for the fix reversal.
+CLOCK = [
+    # (local tz,        hh, mm, label)
+    ("Europe/Berlin",    7,  0, "CLS funding window OPENS (all 18 RTGS systems overlap)"),
+    ("Europe/Berlin",    7,  0, "CLS Asia-Pacific pay-in window opens (NZD pays in)"),
+    ("Europe/London",    6,  0, "CHAPS (sterling) opens"),
+    ("Europe/London",    8,  0, "LONDON OPEN"),
+    ("Europe/Berlin",    9,  0, "CLS settlement-completion target"),
+    ("Europe/Berlin",   10,  0, "CLS early-closing pay-in deadline (Asia-Pacific window closes)"),
+    ("Europe/Berlin",   12,  0, "CLS funding window CLOSES"),
+    ("Europe/Berlin",   14, 15, "ECB FIX — dollar tends to be bid INTO it, offered AFTER"),
+    ("America/New_York", 8, 30, "US data release slot (peak-volume half hour follows)"),
+    ("America/New_York",10,  0, "NY OPTION CUT — expiring strikes can pin price"),
+    ("Europe/London",   16,  0, "WMR LONDON FIX — dollar bid into it, offered after"),
+    ("Europe/Berlin",   18,  0, "Euro T2 customer payments close"),
+    ("Europe/London",   18,  0, "CHAPS closes"),
+    ("America/New_York",17,  0, "NY CLOSE / value-date rollover — thinnest hour"),
+]
+FIX_NAMES = {"ECB FIX", "WMR LONDON FIX"}
+
+
+def _et(day, tzname, hh, mm):
+    tz = pytz.timezone(tzname)
+    return tz.localize(datetime.combine(day, dtime(hh, mm))).astimezone(ET)
+
+
+def eu_offset_hours(day) -> float:
+    noon = UTC.localize(datetime.combine(day, dtime(12, 0)))
+    b = noon.astimezone(pytz.timezone("Europe/Berlin")).utcoffset().total_seconds()
+    n = noon.astimezone(ET).utcoffset().total_seconds()
+    return (b - n) / 3600.0
+
+
+def is_month_end(day) -> bool:
+    """Last weekday of the month (holidays not modelled)."""
+    nxt = day + timedelta(days=1)
+    while nxt.weekday() >= 5:
+        nxt += timedelta(days=1)
+    return nxt.month != day.month
+
+
+def clock_verdict():
+    """The P78 verdict line from the measured report, if it has been run."""
+    p = _find("data/fx_clock_report.md")
+    if not p:
+        return None
+    for line in open(p, encoding="utf-8"):
+        if line.startswith("**VERDICT:"):
+            return line.strip().strip("*")
+    return None
+
+
+def clock_section(day, cal):
+    L = ["## The institutional clock (ET)", ""]
+    v = clock_verdict()
+    if v:
+        L += [f"_Measured on your 2022-25 data (P78): {v}_", ""]
+    else:
+        L += ["_⚠️ NOT YET MEASURED on your data. Run `python scripts/fx_clock_study.py`. "
+              "Until it reads GREEN the fix lean below is published research on "
+              "OTHER people's data, not a finding here._", ""]
+    rows = sorted(((_et(day, tz, hh, mm), lab) for tz, hh, mm, lab in CLOCK),
+                  key=lambda r: r[0])
+    L += ["| ET | event | your windows |", "|---|---|---|"]
+    for t, lab in rows:
+        kz = overlaps_killzone(t, config.KILLZONES)
+        noon = dtime(12, 0) <= t.time() < dtime(13, 0)
+        where = f"inside **{kz}**" if kz else ("inside **noon block**" if noon else "—")
+        L.append(f"| {t:%H:%M} | {lab} | {where} |")
+    L.append("")
+
+    off = eu_offset_hours(day)
+    if abs(off - 6.0) > 1e-9:
+        lon = _et(day, "Europe/London", 8, 0)
+        ecb = _et(day, "Europe/Berlin", 14, 15)
+        wmr = _et(day, "Europe/London", 16, 0)
+        L += [f"> ⚠️ **Daylight-saving mismatch week** — Europe is {off:g}h ahead of "
+              "New York, not 6. Every European event is **one hour LATER in ET**: "
+              f"London opens {lon:%H:%M} ET (your London KZ catches the hour BEFORE "
+              f"it plus its first hour), ECB fix {ecb:%H:%M} ET, and the WMR fix "
+              f"{wmr:%H:%M} ET lands inside your noon block. P78 §3 tests whether "
+              "the price effect follows the European clock on these days.", ""]
+    if is_month_end(day):
+        L += ["> **Month-end.** Fund managers re-hedge foreign equity at the last "
+              "WMR fix of the month. Melvin & Prins: a foreign equity market that "
+              "ROSE over the month predicts ITS currency WEAKENING into that fix. "
+              "Check the month's equity performance yourself — this brief does not "
+              "have equity data.", ""]
+    d0 = UTC.localize(datetime.combine(day, dtime(0, 0)))
+    if any(d0 <= e[0] < d0 + timedelta(days=1) and "FOMC" in (e[3] or "").upper()
+           for e in cal.events):
+        L += ["> **FOMC day.** Mueller, Tahbaz-Salehi & Vedolin (J. Finance 2017): "
+              "short-dollar returns are significantly larger on scheduled FOMC days, "
+              "more so under high uncertainty or easing. The decision itself is "
+              "still a hard news block.", ""]
+    L += ["_How it fits the draw: the morning dollar bid into the fixes is a common "
+          "reason price runs AGAINST the draw first. After the ECB and WMR fixes that "
+          "pressure lifts. A tilt of ~2bp/day on average — context for WHICH side has "
+          "the wind, never a trigger._", ""]
+    return L
+
+
 # ──────────────────────────────── report ────────────────────────────────────
 def build(day, stance, stance_w, us2y, us2y_w, cal, cal_w):
     L = [f"# Fundamental brief — {day:%a %d %b %Y}", "",
@@ -278,6 +384,8 @@ def build(day, stance, stance_w, us2y, us2y_w, cal, cal_w):
     L += ["| pair | story | lean | vs golden rule |", "|---|---|---|---|"]
     L += [f"| {p} | {lb} | {ar} | {gn or '—'} |" for p, lb, ar, gn in rows]
     L += [""] + detail
+
+    L += clock_section(day, cal)
 
     # today's calendar + killzone collisions
     L += ["## Today's calendar", ""]
@@ -434,6 +542,16 @@ def _selftest():
     assert overlaps_killzone(mk(23, 0), [("Wrap", "22:00", "01:00")]) == "Wrap"
     assert overlaps_killzone(mk(0, 30), [("Wrap", "22:00", "01:00")]) == "Wrap"
     assert overlaps_killzone(mk(12, 0), [("Wrap", "22:00", "01:00")]) is None
+    # clock
+    from datetime import date
+    assert eu_offset_hours(date(2026, 3, 2)) == 6.0
+    assert eu_offset_hours(date(2026, 3, 10)) == 5.0       # US moved first
+    assert eu_offset_hours(date(2026, 10, 30)) == 5.0      # EU moved back first
+    assert _et(date(2026, 3, 2), "Europe/Berlin", 14, 15).strftime("%H:%M") == "08:15"
+    assert _et(date(2026, 3, 10), "Europe/Berlin", 14, 15).strftime("%H:%M") == "09:15"
+    assert _et(date(2026, 3, 10), "Europe/London", 16, 0).strftime("%H:%M") == "12:00"
+    assert is_month_end(date(2026, 10, 30)) and not is_month_end(date(2026, 10, 29))
+    assert is_month_end(date(2026, 5, 29))                  # Fri; 30/31 are weekend
     print("selftest OK")
     return 0
 
