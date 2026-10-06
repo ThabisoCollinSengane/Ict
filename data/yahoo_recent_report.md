@@ -1,9 +1,9 @@
 # Yahoo replay — WHOLE algo (base + MM), last 60d, reporting last 20d
 
-_data span: 2026-07-14 23:00:00+00:00 → 2026-10-06 21:45:00+00:00 (17050 5m bars)_
+_data span: 2026-07-14 23:00:00+00:00 → 2026-10-06 21:50:00+00:00 (17051 5m bars)_
 _STARTING_CASH=1000 · MM_standalone=0 · MM_continuation=0 · SMT_req=0 · withdraw=1_
 
-_reporting window: trades opened at/after **2026-09-16 21:45:00+00:00** — 7 of 39 trades in the fetched span; the earlier part is HTF warm-up._
+_reporting window: trades opened at/after **2026-09-16 21:50:00+00:00** — 7 of 39 trades in the fetched span; the earlier part is HTF warm-up._
 
 ## HTF warm-up check
 
