@@ -1,6 +1,6 @@
 # P78 — the institutional FX clock (Yahoo last 58d — RECENT WINDOW)
 
-_coverage: EURUSD 2026-07-16→2026-10-06 (16,465 bars), GBPUSD 2026-07-16→2026-10-06 (16,465 bars), NZDUSD 2026-07-16→2026-10-06 (16,472 bars); trading days IS 29 / OOS 29; window ±2h around each anchor_
+_coverage: EURUSD 2026-07-16→2026-10-06 (16,474 bars), GBPUSD 2026-07-16→2026-10-06 (16,474 bars), NZDUSD 2026-07-16→2026-10-06 (16,481 bars); trading days IS 29 / OOS 29; window ±2h around each anchor_
 
 > ⚠️ **58 trading days. This cannot confirm or reject the clock.** The published effect is ~2bp/day; read the t-stats and the §3 MDE — at this n the noise is several times the effect. Here 'IS' = 2026-07-17→2026-08-26, 'OOS' = 2026-08-27→2026-10-06 (halves of the window, not the 2022-25 split). The 4-year verdict lives in fx_clock_report.md and needs the HistData M1 set.
 
@@ -36,9 +36,9 @@ giveback = bp the after-window gives back against the before-window's move (> 0 
 
 | fix | giveback IS (t) | pctl IS | giveback OOS (t) | pctl OOS | pooled t | verdict |
 |---|---|---|---|---|---|---|
-| ECB | -0.84 (-0.3) | 25 | +1.25 (+0.5) | 69 | +0.1 | **RED** |
+| ECB | -0.84 (-0.3) | 25 | +1.25 (+0.5) | 67 | +0.1 | **RED** |
 | WMR | -1.58 (-1.0) | 8 | -2.00 (-0.8) | 4 | -1.2 | **RED** |
-| TOKYO | +0.52 (+0.4) | 67 | +0.11 (+0.1) | 46 | +0.3 | **RED** |
+| TOKYO | +0.52 (+0.4) | 67 | +0.11 (+0.1) | 48 | +0.3 | **RED** |
 
 _Real FX mean-reverts a little at ANY time of day; the placebo percentile is what separates 'the fix' from 'any two-hour window'._
 
@@ -65,7 +65,7 @@ Mean bp per hour; positive = dollar up. t = mean / SE.
 | 14:00 | -2.66 | -1.4 | +1.38 | +0.6 |  |
 | 15:00 | -0.37 | -0.5 | -0.31 | -0.4 |  |
 | 16:00 | +0.49 | +1.0 | +0.41 | +1.0 |  |
-| 17:00 | +1.23 | +2.1 | -0.54 | -1.4 | NY close / rollover |
+| 17:00 | +1.23 | +2.1 | -0.57 | -1.5 | NY close / rollover |
 | 18:00 | -1.14 | -1.3 | -0.23 | -0.4 |  |
 | 19:00 | +0.18 | +0.2 | +0.47 | +0.8 |  |
 | 20:00 | -0.52 | -0.6 | +1.25 | +1.2 | Tokyo fix 20:55 |
