@@ -244,10 +244,10 @@ CLOCK = [
     ("Europe/Berlin",    9,  0, "CLS settlement-completion target"),
     ("Europe/Berlin",   10,  0, "CLS early-closing pay-in deadline (Asia-Pacific window closes)"),
     ("Europe/Berlin",   12,  0, "CLS funding window CLOSES"),
-    ("Europe/Berlin",   14, 15, "ECB FIX — dollar tends to be bid INTO it, offered AFTER"),
+    ("Europe/Berlin",   14, 15, "ECB FIX — published: dollar bid in, offered after. Measured 2010-25 on our pairs: no reliable reversal"),
     ("America/New_York", 8, 30, "US data release slot (peak-volume half hour follows)"),
     ("America/New_York",10,  0, "NY OPTION CUT — expiring strikes can pin price"),
-    ("Europe/London",   16,  0, "WMR LONDON FIX — dollar bid into it, offered after"),
+    ("Europe/London",   16,  0, "WMR LONDON FIX — dollar sold AFTER it in 2010-17 (beat every placebo); faded since 2018"),
     ("Europe/Berlin",   18,  0, "Euro T2 customer payments close"),
     ("Europe/London",   18,  0, "CHAPS closes"),
     ("America/New_York",17,  0, "NY CLOSE / value-date rollover — thinnest hour"),
@@ -282,7 +282,7 @@ def clock_verdict():
         return None
     for line in open(p, encoding="utf-8"):
         if line.startswith("**VERDICT:"):
-            return line.strip().strip("*")
+            return line.strip().replace("**", "")
     return None
 
 
@@ -329,10 +329,12 @@ def clock_section(day, cal):
               "short-dollar returns are significantly larger on scheduled FOMC days, "
               "more so under high uncertainty or easing. The decision itself is "
               "still a hard news block.", ""]
-    L += ["_How it fits the draw: the morning dollar bid into the fixes is a common "
-          "reason price runs AGAINST the draw first. After the ECB and WMR fixes that "
-          "pressure lifts. A tilt of ~2bp/day on average — context for WHICH side has "
-          "the wind, never a trigger._", ""]
+    L += ["_Measured on EURUSD/GBPUSD/NZDUSD, 16 years (P78): the London (WMR) fix "
+          "reversal was real in 2010-17 — the dollar sold off after 11:00 ET more than "
+          "at any other clock time — and has faded since 2018 (2018-25 beats only 27% "
+          "of placebo times). ECB never showed a reliable reversal. Today the fix clock "
+          "is a timetable of WHEN the big desks are busy, not a direction call. Under "
+          "1bp/day either way — never a trigger._", ""]
     return L
 
 

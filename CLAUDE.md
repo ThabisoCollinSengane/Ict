@@ -2278,6 +2278,28 @@ container cannot reach histdata.com), runs the study, then the full backtest.
 `dxy_real_used` absent. The `RANGE_BIAS_USE_LEAN` 1->0 flip is now empirically, not just
 statically, proven inert.
 
+### P78 16-YEAR RESULT (RAN 2026-10-07, 2010-17 vs 2018-25, ~4,100 days/pair)
+
+`.github/workflows/fix-clock-long.yml` -> `data/fx_clock_long_report.md`.
+
+| fix | R 2010-17 / 2018-25 (bp/day) | beats placebo | legs (before / after) |
+|---|---|---|---|
+| ECB 08:15 ET | -0.14 / +0.32 | 67% / 69% | 2010-17: dollar UP before (t 2.0) AND after (t 1.7) — a morning bid, no reversal |
+| **WMR 11:00 ET** | **+1.21 (t 1.9) / -0.28** | **100% / 27%** | 2010-17: dollar SOLD after the fix (t -2.4) |
+| Tokyo | +0.54 / -1.45 | 90% / 4% | 2018-25 "before" t -8.4 = NY-close spread artifact (17:00 ET t +6.6) |
+
+**Reading:** the London fix reversal was REAL in 2010-17 — beat every placebo clock
+time, dollar sold off after 11:00 ET exactly as Krohn/Mueller/Whelan describe — and it
+has FADED in 2018-25 (27% of placebo). Consistent with the post-2015 fix reforms (5-min
+WMR window, enforcement after the fix-rigging cases). ECB never showed the reversal on
+these pairs. Direction-free reversal: nothing at any fix. DST experiment still
+underpowered (273 days, MDE 3.3bp vs a sub-1bp effect).
+
+**For the trader:** the fix clock today is a timetable of WHEN desks are busy, not a
+direction call. The brief's clock section now says exactly this. Untested and the
+strongest remaining version: the MONTH-END WMR fix (Melvin & Prins — direction
+predictable from the month's equity returns), ~190 month-ends in 16 years.
+
 ### P79 — fundamentals scorecard: COT, US yields, news (RAN 2026-10-06) — 🔴 nothing tradeable
 
 **Where it runs:** this container is blocked from every market-data host, so
