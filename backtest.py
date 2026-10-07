@@ -5027,10 +5027,11 @@ class Backtester:
             stop = entry - cap * direction
         return stop
 
-    def _opposing_liquidity(self, pair, direction, price, t):
-        """Nearest UNSWEPT opposing-liquidity pool (ITH/ITL on H4/D/W) beyond the
-        current price in the trade direction — the far draw the distribution leg
-        delivers to. Returns a price or None."""
+    def _opposing_liquidity(self, pair, direction, price, t, nearest=False):
+        """UNSWEPT opposing-liquidity pool (ITH/ITL on H4/D/W) beyond the current
+        price in the trade direction — the draw the distribution leg delivers to.
+        Default returns the FURTHEST qualifying pool (P43); `nearest=True` returns
+        the first one price meets (P82, MM golden target). Returns a price or None."""
         pip = pip_size(pair)
         floor = self._min_pips_target() * pip
         best = None
@@ -5041,8 +5042,10 @@ class Backtester:
                 for cand in self._ithl_targets(bars, direction, price, pair, tf):
                     lvl = cand[0]
                     if (lvl - price) * direction >= floor:
-                        if best is None or (lvl - price) * direction > (best - price) * direction:
-                            best = lvl      # the FURTHEST qualifying pool = opposing end
+                        _d, _bd = (lvl - price) * direction, (
+                            None if best is None else (best - price) * direction)
+                        if best is None or (_d < _bd if nearest else _d > _bd):
+                            best = lvl      # furthest (default) or nearest pool
             except Exception:
                 continue
         return best
@@ -5825,6 +5828,20 @@ class Backtester:
             g["mm_golden_no_target"] = g.get("mm_golden_no_target", 0) + 1
             return
         target, target_type, _target_score, _tgt_escalated = _tgt
+        # P82 — the MM model delivers to the OPPOSING liquidity pool, not to the
+        # base strategy's nearest fib/level. "near" = the first unswept H4/D/W
+        # ITH/ITL beyond entry, "far" = the furthest. Falls back to the base target
+        # when no pool qualifies. MM channel only; default "0" = unchanged.
+        if config.MM_GOLDEN_TARGET_OPPOSING in ("near", "far"):
+            _opp = self._opposing_liquidity(
+                pair, direction, entry, t,
+                nearest=(config.MM_GOLDEN_TARGET_OPPOSING == "near"))
+            if _opp is not None:
+                target, target_type = _opp, "opposing_liq"
+                g["mm_golden_target_opposing"] = g.get("mm_golden_target_opposing", 0) + 1
+            else:
+                g["mm_golden_target_opposing_none"] = (
+                    g.get("mm_golden_target_opposing_none", 0) + 1)
         reward_pips = abs(target - entry) / pip
         if reward_pips < self._min_pips_target():
             g["mm_golden_target_short"] = g.get("mm_golden_target_short", 0) + 1

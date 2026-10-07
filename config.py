@@ -1287,3 +1287,6 @@ MM_GOLDEN_IFVG_ENTRY = bool(int(_os.environ.get("MM_GOLDEN_IFVG_ENTRY", "1")))
 MM_GOLDEN_IFVG_TFS = tuple(_os.environ.get("MM_GOLDEN_IFVG_TFS", "60T,15T,5T").split(","))
 # How far above/below the range a gap may sit and still belong to that consolidation.
 MM_GOLDEN_IFVG_ADJ_PIPS = float(_os.environ.get("MM_GOLDEN_IFVG_ADJ_PIPS", "20"))
+# P82 — MM golden target = the OPPOSING liquidity pool (unswept H4/D/W ITH/ITL).
+# "0" = base _find_target (unchanged), "near" = first pool beyond entry, "far" = furthest.
+MM_GOLDEN_TARGET_OPPOSING = _os.environ.get("MM_GOLDEN_TARGET_OPPOSING", "0").strip().lower()
