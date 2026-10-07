@@ -5418,6 +5418,25 @@ class Backtester:
             return "no_break"
         return "stale"
 
+    def _ifvg_ce_closed(self, pair, direction, t, lo, hi):
+        """P87: has a COMPLETED M5 candle closed at or beyond the IFVG's halfway line
+        (consequent encroachment) during the M1 lookback, without closing through the
+        far side? For a long the IFVG is support below price: halfway = close <= CE.
+        Mirror for a short. Completed bars only."""
+        ce = (lo + hi) / 2.0
+        n = max(2, config.MM_GOLDEN_M1_MSS_LOOKBACK // 5 + 1)
+        bars = self.bars_up_to(pair, "5T", t, max_bars=n + 1)
+        if not bars or len(bars) < 3:
+            return False
+        b = bars[:-1]
+        if direction > 0:
+            if any(x.Close < lo for x in b):
+                return False              # closed through the far side: zone failed
+            return any(x.Close <= ce for x in b)
+        if any(x.Close > hi for x in b):
+            return False
+        return any(x.Close >= ce for x in b)
+
     def _m1_shift(self, pair, direction, t, zone_lo, zone_hi):
         """P83 — M1 market-structure shift INSIDE the PD-array zone.
 
@@ -5938,6 +5957,8 @@ class Backtester:
             _pd_tf=_pd_tf,
             _retrace_tf=_retrace_tf,
             _zone_tf=_zone_tf,
+            _zone_lo=_zone_lo,
+            _zone_hi=_zone_hi,
             direction=direction,
             rng=rng,
             sweep_dir=sweep_dir,
@@ -5968,6 +5989,8 @@ class Backtester:
         _pd_tf = _S["_pd_tf"]
         _retrace_tf = _S["_retrace_tf"]
         _zone_tf = _S["_zone_tf"]
+        _zone_lo = _S.get("_zone_lo", 0.0)
+        _zone_hi = _S.get("_zone_hi", 0.0)
         direction = _S["direction"]
         rng = _S["rng"]
         sweep_dir = _S["sweep_dir"]
@@ -5982,6 +6005,16 @@ class Backtester:
             _m1_diag = self._m1_shift_diag(pair, direction, t, _zl, _zh)
         if config.MM_GOLDEN_M1_MSS:
             _m1_ok, _m1s_stop, _m1_ext = self._m1_shift(pair, direction, t, _zl, _zh)
+            if (not _m1_ok and config.MM_GOLDEN_M1_HTF_CE and _zone_tf in config.MM_GOLDEN_M1_HTF_CE_TFS
+                    and _zone_hi > _zone_lo > 0):
+                # P87 — HTF IFVG exception: once a completed candle has CLOSED halfway into
+                # the H1/H4 IFVG (its 50% / CE), the M1 turn may form anywhere inside the
+                # whole IFVG, not only the small rung zone.
+                if self._ifvg_ce_closed(pair, direction, t, _zone_lo, _zone_hi):
+                    _m1_ok, _m1s_stop, _m1_ext = self._m1_shift(pair, direction, t,
+                                                                _zone_lo, _zone_hi)
+                    if _m1_ok:
+                        g["mm_golden_m1_htf_ce"] = g.get("mm_golden_m1_htf_ce", 0) + 1
             if not _m1_ok:
                 g["mm_golden_no_m1_shift"] = g.get("mm_golden_no_m1_shift", 0) + 1
                 if config.MM_GOLDEN_M1_ARM and not _S.get("_armed"):

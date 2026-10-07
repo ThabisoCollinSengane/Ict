@@ -2499,6 +2499,21 @@ engine already re-evaluates every M5 bar, so part of this late catch is already 
 trade set (P83 opened 66 / 68 MM trades vs 9 / 6 `ok` here). Simulated outside the
 engine (R units, no sizing/path) — a lever built on it must be measured in the engine.
 
+### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
+
+Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
+went past the small rung zone. If that zone sits in an **H1/H4 IFVG** and a completed M5
+candle has **closed halfway (CE) into the IFVG** without closing through its far side,
+let the M1 turn form anywhere inside the whole IFVG. `MM_GOLDEN_M1_HTF_CE=1`
+(`MM_GOLDEN_M1_HTF_CE_TFS="60T,240T"`), helper `_ifvg_ce_closed`, counter
+`mm_golden_m1_htf_ce`. Fixture-verified (not reached / reached / closed through / short).
+`_zone_lo/_zone_hi` (the P61 IFVG precondition zone) now pass into `_mm_golden_finish`.
+
+Loops run (workflow matrix, all with MM + M1 on, full engine): `m1` control (must
+reproduce P83 407 / 433 / 842), `ce`, `f20` (`MM_GOLDEN_M1_MSS_FRESH=20` — recovers
+"stale"), `cef20`. Results land as `data/mm_golden_<is|oos|full>_<mode>_p87_*`.
+Ship gate: more MM trades than P83 AND withdrawn up in BOTH halves, MaxDD not worse.
+
 ### P86 — MM "keep watching": arm a setup, re-check for the M1 turn (RAN 2026-10-07) — 🔴 RED
 
 `MM_GOLDEN_M1_ARM=1` (default 0), `MM_GOLDEN_M1_ARM_BARS=60`. A setup that passes every MM

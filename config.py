@@ -1306,3 +1306,7 @@ MM_GOLDEN_M1_SHADOW = bool(int(_os.environ.get("MM_GOLDEN_M1_SHADOW", "0")))
 # ARMED and re-checked for the M1 turn for up to MM_GOLDEN_M1_ARM_BARS minutes.
 MM_GOLDEN_M1_ARM = bool(int(_os.environ.get("MM_GOLDEN_M1_ARM", "0")))
 MM_GOLDEN_M1_ARM_BARS = int(_os.environ.get("MM_GOLDEN_M1_ARM_BARS", "60"))
+# P87 — HTF IFVG exception for the M1 shift: once price has closed halfway (CE) into an
+# H1/H4 IFVG, the M1 turn may form anywhere inside the whole IFVG. Default 0 = unchanged.
+MM_GOLDEN_M1_HTF_CE = bool(int(_os.environ.get("MM_GOLDEN_M1_HTF_CE", "0")))
+MM_GOLDEN_M1_HTF_CE_TFS = tuple(_os.environ.get("MM_GOLDEN_M1_HTF_CE_TFS", "60T,240T").split(","))
