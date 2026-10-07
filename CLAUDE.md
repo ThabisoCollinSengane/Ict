@@ -2247,6 +2247,37 @@ never armed — but it feeds the P47 `narrative_rate` factor. Decide, then re-ru
 python scripts/fx_clock_study.py          # auto-pushes data/fx_clock_report.md
 ```
 
+### P78 RESULT (RAN 2026-10-07, 4 years, ~1,000 trading days/pair, on GitHub's runner)
+
+`.github/workflows/fix-clock-4yr.yml` downloads HistData M1 on GitHub's runner (this
+container cannot reach histdata.com), runs the study, then the full backtest.
+
+| fix | R 2022-23 / 2024-25 (bp/day) | beats placebo | reversal (direction-free) |
+|---|---|---|---|
+| **ECB 08:15 ET** | **+0.83 / +0.38** (t 0.5 / 0.4) | 85% / 58% | ~0 both halves |
+| WMR 11:00 ET | +1.01 / -0.94 (flips) | 88% / 10% | **+1.04 / +0.41, pctl 96 / 75, t 1.1** |
+| Tokyo 20:55 ET | -1.20 / -1.40 (t -2.6 pooled) | 10% / 6% | negative |
+
+- **ECB: the published direction holds in BOTH halves, but at under 1bp/day** — about a
+  tenth of a 10-pip stop, inside what any 2-hour window does. Real, too small to trade.
+- **WMR: leans REVERSAL at the London fix in both halves** (beats 96% of placebo times
+  IS). Under the bar; the one reading worth watching. The 58-day Yahoo window had
+  suggested continuation — short windows were not trustworthy, as stated.
+- **Tokyo "result" is almost certainly a DATA artifact:** §1 shows a dollar "jump" at
+  17:00 ET, t +3.8 / +3.3 both halves, then giveback. That is the NY-close spread
+  blow-out on HistData's BID quotes, not flow. Tokyo's window sits right after it.
+  Outside every killzone anyway.
+- **DST natural experiment: underpowered** — 68 mismatch days, MDE 6-8bp vs a sub-1bp
+  effect. Cannot say which clock drives it.
+- **§4 our trades:** with-flow vs against: IS WR 45.9% vs 38.5% (PF 3.83 vs 3.18), OOS
+  WR 41.4% vs 44.7% (PF 5.01 vs 3.79). PF favours "with" both halves, WR flips; +7.4pp
+  IS is 0.96 SE and needs ~355 trades/bucket. Not resolvable at this n.
+
+**Baseline CONFIRMED on real data (first full run since the pre-funding config flips):**
+736 trades, P&L R139,575.71 to the cent (per-year 181/174/193/188), report byte-identical,
+`dxy_real_used` absent. The `RANGE_BIAS_USE_LEAN` 1->0 flip is now empirically, not just
+statically, proven inert.
+
 ### P79 — fundamentals scorecard: COT, US yields, news (RAN 2026-10-06) — 🔴 nothing tradeable
 
 **Where it runs:** this container is blocked from every market-data host, so
