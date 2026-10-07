@@ -2321,6 +2321,55 @@ big-signal months lean right in both — all under the bar, one pair of three.
 **The month-end hedging flow is not visible in the 4h before the fix on these pairs.**
 Untested: hedging spread over the final days rather than the final hours.
 
+### P81 — the MM model could not see an IFVG (FIXED 2026-10-07, MM channel default OFF)
+
+**First-ever MM run on IS+OOS+full (`.github/workflows/mm-golden-isoos.yml`) opened
+1 / 2 / 1 MM trades.** The funnel showed why: `mm_golden_ob_failed` killed 74% of
+AMD-ok setups and `mm_golden_no_ifvg` killed 97% of what was left. Three bugs:
+
+1. **`latest_inversion` was handed the whole series** (`_mm_gap_entry`,
+   `_golden_cascade_ok`, plus analytics `_target_pd_array` / `_entry_pd_context` and
+   dead `_pd_array_in_range` / `_ifvg_cascade`). It needs a TOUCH before a full-body
+   close can invert the box, and the gap's own formation candles provided it — so a
+   genuine IFVG (gap traded into, then closed through) read **0** every time.
+   Fixed with `_gap_inversion(bars, g)` = slice from `g.bar_index + 2` (bar_index is
+   the MIDDLE candle). Fixture: true IFVG old 0 -> new −1.
+2. **The opposite slice bug** in the P43 path, `scripts/mm_scanner.py` (the live
+   Telegram MM alerts) and `mm_weekly_replay.py`: `bars[bi:]` where `_fvgs` returns
+   the 3rd (displacement) candle, so EVERY fresh gap read as an IFVG its own way.
+   Now `bars[bi + 1:]`.
+3. **`_ob_equilibrium_state` read the forming bar** — a future close in a backtest —
+   and marked blocks "failed". Completed candles only (`[... : -1]`).
+
+**Control:** MM off reproduces **736 / 43.9% / 4.01 / −13.24%, P&L R139,575.71 to
+the cent** — the fixes do not touch the base path.
+
+**RESULT with MM on (P81 fixed):**
+
+| | IS 2022-23 | OOS 2024-25 | Full 4yr |
+|---|---|---|---|
+| MM trades / WR / PF | 104 / 30.8% / **1.61** | 123 / 24.4% / **1.17** | 240 / 29.2% / 1.46 |
+| Book trades / PF | 439 / 2.65 (base 3.37) | 477 / 2.98 (base 4.28) | 921 / 2.92 (base 4.01) |
+| MaxDD | −13.14% (base −13.24) | **−18.65%** (base −10.21) | −13.14% (base −13.24) |
+| Withdrawn | R48.3k (base R41.4k) ✓ | **R63.9k (base R66.7k)** ❌ | R139.1k (base R132.0k) ✓ |
+
+**Verdict: 🟡 alive, weak, NOT shippable.** Positive PF both halves but it decays
+1.61 -> 1.17, OOS withdrawals fall and OOS MaxDD worsens 8.4pp. `MM_GOLDEN_ENABLED=0`
+stays.
+
+**Splits (read with the multiple-comparisons caveat — ~30 cells, n 18-63):**
+- **Quadrant flips completely between halves**: 1a PF 3.04 -> 0.49, 2b 0.61 -> 2.23.
+  Shorts carry IS (PF 2.24 vs 0.94), longs carry OOS (1.67 vs 0.57) — that is the
+  dollar's trend in each half, not a property of any quadrant. Do not filter on it.
+- Positive in BOTH halves: stage `ifvg` 1.61/1.32 (n 57/58) and `fvg` 1.83/1.34;
+  route `cascade` 1.61/1.28 (n 80/84); session `london` 1.59/1.92 (n 55/59).
+- Flips: stage `ob` 1.65 -> 0.84, route `own_ob` 1.61 -> 0.89, `ny` 1.63 -> 0.66.
+- WR 24-31% everywhere: the channel reuses base targets, built for a 44%-WR reversal.
+
+**Lesson (fourth of its kind):** a gate that only ever SUBTRACTS cannot be told apart
+from a correct strict gate by its counter alone — 97% rejection looked like "the
+model is rare". Drive the predicate on a fixture of the thing it is meant to accept.
+
 ### P79 — fundamentals scorecard: COT, US yields, news (RAN 2026-10-06) — 🔴 nothing tradeable
 
 **Where it runs:** this container is blocked from every market-data host, so
