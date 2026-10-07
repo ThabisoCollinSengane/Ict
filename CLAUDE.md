@@ -2516,6 +2516,25 @@ Fixture-verified both (shift fires/opposite/stale/no-data; SMT fires / both made
 Loops: `m1` control, `dxy`, `smt`, `dxysmt` x IS/OOS/full -> `data/mm_golden_*_p88_*`.
 Ship gate as P87. Next: combine the winner with the P87 winner.
 
+**P88 RESULT (RAN 2026-10-07) — 🟢 DXY M1 confirmation is the best MM variant to date.**
+Control reproduced P83 exactly (407 / 433 / 842).
+
+| | P83 M1 only | **+ DXY M1** | + SMT M1 | + both |
+|---|---|---|---|---|
+| MM trades IS / OOS | 66 / 68 | 51 / 44 | 10 / 15 | 6 / 9 |
+| MM WR IS / OOS | 25.8 / 35.3% | **33.3 / 40.9%** | 10.0 / 40.0% | 16.7 / 44.4% |
+| MM PF IS / OOS | 1.41 / 1.71 | **2.38 / 2.11** | 0.71 / 1.73 | 1.23 / 1.67 |
+| Book PF IS / OOS / full | 2.76 / 3.68 / 3.33 | **3.39 / 4.02 / 3.82** | 3.10 / 4.02 / 3.75 | 3.22 / 4.15 / 3.78 |
+| Withdrawn IS / OOS / full | R47.4k / 73.7k / 148.6k | **R62.0k / 71.9k / 163.1k** | R40.4k / 65.2k / 129.4k | R41.2k / 67.4k / 131.1k |
+| MaxDD IS / OOS / full | −15.59 / −11.72 / −15.59 | −15.59 / **−9.99** / −15.59 | −13.43 / −10.07 / −13.43 | −13.24 / −9.67 / −13.24 |
+
+DXY M1: MM PF up ~0.5-1.0 in BOTH halves, full withdrawn R163.1k (base R132.0k, +24%),
+OOS MaxDD BETTER than the untouched base (−9.99 vs −10.21). Cost: ~25% fewer MM trades,
+OOS withdrawn R71.9k vs P83's R73.7k (still above base R66.7k). DXY confirms ~half of M1
+shifts (ok 262 / no 255). **M1 SMT (block-half, 40 bars) is too restrictive** — rejects
+~85% of shifts, leaves 10-15 MM trades, below base on withdrawals; not usable as built.
+Next: `dxyf20` (DXY + fresh-20) to win back quantity.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
