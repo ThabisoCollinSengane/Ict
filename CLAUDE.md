@@ -2531,6 +2531,24 @@ reproduce P83 407 / 433 / 842), `ce`, `f20` (`MM_GOLDEN_M1_MSS_FRESH=20` — rec
 "stale"), `cef20`. Results land as `data/mm_golden_<is|oos|full>_<mode>_p87_*`.
 Ship gate: more MM trades than P83 AND withdrawn up in BOTH halves, MaxDD not worse.
 
+**P87 RESULT (RAN 2026-10-07):** control reproduced P83 exactly (407 / 433 / 842).
+- **`ce` (halfway exception) NEVER FIRED** — byte-identical to control, counter absent, though
+  60T IFVG zones dominate (5,393 of 7,240) and the path ran on ~6,344 failed-shift bars.
+  Diagnostic run with per-step counters pushed (`_p87diag`): `htf_try`, `htf_same_zone`
+  (rung zone == the IFVG itself, so the exception adds nothing), `htf_ce_closed`,
+  `htf_fail_<reason>`. Read those before concluding anything about the idea.
+- **`f20` (M1 break fresh within 20 bars, not 10): more trades + more money, more DD.**
+
+| | P83 control | f20 |
+|---|---|---|
+| MM trades IS / OOS / full | 66 / 68 / 140 | **82 / 86 / 177** |
+| MM PF IS / OOS | 1.41 / 1.71 | 1.68 / 1.51 |
+| Withdrawn IS / OOS / full | R47.4k / R73.7k / R148.6k | **R54.0k / R82.0k / R157.4k** |
+| MaxDD IS / OOS / full | −15.59 / −11.72 / −15.59 | **−17.18 / −14.25 / −17.18** |
+
+f20 passes "more trades + withdrawn up in BOTH halves" and fails "MaxDD not worse"
+(+1.6pp IS, +2.5pp OOS) — inside the trader's 15-30% tolerance, so it is the trader's call.
+
 ### P86 — MM "keep watching": arm a setup, re-check for the M1 turn (RAN 2026-10-07) — 🔴 RED
 
 `MM_GOLDEN_M1_ARM=1` (default 0), `MM_GOLDEN_M1_ARM_BARS=60`. A setup that passes every MM
