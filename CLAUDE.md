@@ -24,6 +24,34 @@ cache-bug post-mortem.)
 
 ---
 
+## 🧭 SESSION HANDOFF — READ FIRST (updated 2026-10-07)
+
+**Where the MM model stands (all default OFF; base 736 / 43.9% / 4.01 / −13.24% untouched):**
+- P81 fixed 3 bugs that blocked the MM channel (IFVG inversion slicing, live scanner slice,
+  OB equilibrium forming-bar lookahead). MM went from 1 trade/4yr to 240.
+- P82 opposing-liquidity target: RED. MM trades only travel ~10 pips; target irrelevant.
+- **P83 M1 structure shift (`MM_GOLDEN_M1_MSS=1`): BEST MM VARIANT.** MM PF 1.41 IS / 1.71 OOS;
+  withdrawn full R148.6k vs base R132.0k; MaxDD −15.59% (all in 2022). Decision pending with
+  trader: ship P83 as new baseline (842 / 42.5% / 3.33 / −15.59%) or test wider stop first.
+- P84 H4/H1/M15 FVG/IFVG/OB reaction vs mirror control: RED all 9 cells (zone alone = no edge).
+- P85 shadow study of trades the M1 gate skips: mostly bad fills (−1.6R / −28.6R). Reasons:
+  blew_through 97 (46%), no_break 33, stale 29, no_swing 27 (worst), no_touch 26.
+- P86 "keep watching" arm: RED in full engine — late entries weak AND they displace the good
+  immediate M1 entries via daily cap / one-pair slot.
+
+**Trader's current ask (2026-10-07):** keep QUANTITY high while filtering quality. Proposed
+exception: an HTF (H1/H4) IFVG — once price has CLOSED halfway into it (its 50% / CE), let M1
+market structure decide the entry. Build "different loops" (variants) and test in the FULL
+engine (killzones, news, breakers, caps, quadrant all on). This is P87 below.
+
+**How runs work:** this container cannot reach HistData. Push a workflow change; GitHub's
+runner downloads data, runs, commits `data/mm_golden_<arm>_<mode>_*` back to this branch.
+Workflow: `.github/workflows/mm-golden-isoos.yml` (matrix arm × mode). Always include a
+control arm that must reproduce the previous numbers exactly.
+
+**Trader preferences:** plain explanations, no jargon; never close a line of research early;
+full-engine tests only; drawdown 15-30% acceptable if the strategy is sound.
+
 ## ⚠️ WORKING AGREEMENT — surgical edits only (agreed 2026-09-09)
 
 **The algorithm as it stands is correct and validated. Do not rebuild it.**
