@@ -1299,3 +1299,6 @@ MM_GOLDEN_M1_MSS_FRESH = int(_os.environ.get("MM_GOLDEN_M1_MSS_FRESH", "10"))
 MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS", "2"))
 MM_GOLDEN_M1_MSS_BUFFER = float(_os.environ.get("MM_GOLDEN_M1_MSS_BUFFER", "1"))
 MM_GOLDEN_M1_MSS_MIN_STOP_PIPS = float(_os.environ.get("MM_GOLDEN_M1_MSS_MIN_STOP_PIPS", "3"))
+# P85 — shadow mode: trade the MM channel WITHOUT the M1 gate but record, on every MM
+# trade, what the M1 check would have said (column m1_diag) plus the zone (mm_zone_lo/hi).
+MM_GOLDEN_M1_SHADOW = bool(int(_os.environ.get("MM_GOLDEN_M1_SHADOW", "0")))

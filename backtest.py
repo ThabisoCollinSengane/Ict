@@ -533,6 +533,9 @@ class Backtester:
             "mm_scenario": st.get("mm_scenario", ""),
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_pd_stage": st.get("mm_pd_stage", ""),
+            "m1_diag": st.get("m1_diag", ""),
+            "mm_zone_lo": st.get("mm_zone_lo", ""),
+            "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
@@ -658,6 +661,9 @@ class Backtester:
             "mm_scenario": st.get("mm_scenario", ""),
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_pd_stage": st.get("mm_pd_stage", ""),
+            "m1_diag": st.get("m1_diag", ""),
+            "mm_zone_lo": st.get("mm_zone_lo", ""),
+            "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
             "mm_dxy_dir": st.get("mm_dxy_dir", 0),
             "mm_dxy_tf": st.get("mm_dxy_tf", ""),
@@ -5368,6 +5374,50 @@ class Backtester:
         bars = self.bars_up_to(pair, "1T", t, max_bars=config.MM_GOLDEN_M1_MSS_LOOKBACK + 1)
         return bool(bars) and any(b.High >= lo and b.Low <= hi for b in bars[:-1])
 
+    def _m1_shift_diag(self, pair, direction, t, zone_lo, zone_hi):
+        """P85 shadow read: WHY would the M1-shift gate accept or reject this entry?
+
+        Returns one of: ok / no_touch (no completed M1 bar reached the zone) /
+        blew_through (the pullback extreme went past the zone's far side) /
+        no_swing (V-turn: no M1 fractal swing formed before the extreme — the
+        continuation case) / no_break (swing exists, price has not closed through
+        it yet) / stale (it did break, but longer ago than the fresh window).
+        Analytics only; never gates.
+        """
+        ok, _s, _e = self._m1_shift(pair, direction, t, zone_lo, zone_hi)
+        if ok:
+            return "ok"
+        bars = self.bars_up_to(pair, "1T", t, max_bars=config.MM_GOLDEN_M1_MSS_LOOKBACK + 1)
+        if not bars or len(bars) < 10:
+            return "no_data"
+        b = bars[:-1]
+        tol = config.MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS * pip_size(pair)
+        if not any(x.High >= zone_lo - tol and x.Low <= zone_hi + tol for x in b):
+            return "no_touch"
+        if direction > 0:
+            ei = min(range(len(b)), key=lambda i: b[i].Low)
+            if b[ei].Low < zone_lo - tol:
+                return "blew_through"
+            sw = [j for j in range(1, ei) if j + 1 < len(b)
+                  and b[j].High > b[j - 1].High and b[j].High > b[j + 1].High]
+            if not sw:
+                return "no_swing"
+            lvl = b[sw[-1]].High
+            brk = [k for k in range(ei + 1, len(b)) if b[k].Close > lvl]
+        else:
+            ei = max(range(len(b)), key=lambda i: b[i].High)
+            if b[ei].High > zone_hi + tol:
+                return "blew_through"
+            sw = [j for j in range(1, ei) if j + 1 < len(b)
+                  and b[j].Low < b[j - 1].Low and b[j].Low < b[j + 1].Low]
+            if not sw:
+                return "no_swing"
+            lvl = b[sw[-1]].Low
+            brk = [k for k in range(ei + 1, len(b)) if b[k].Close < lvl]
+        if not brk:
+            return "no_break"
+        return "stale"
+
     def _m1_shift(self, pair, direction, t, zone_lo, zone_hi):
         """P83 — M1 market-structure shift INSIDE the PD-array zone.
 
@@ -5844,11 +5894,14 @@ class Backtester:
 
         # P83 — wait for M1 structure to SHIFT our way inside the zone before entering.
         _m1_ok, _m1s_stop = False, None
+        if _pd_stage == "ob" and _ob_zone is not None:
+            _zl, _zh = _ob_zone.bottom, _ob_zone.top
+        else:
+            _zl, _zh = _ifvg_lo, _ifvg_hi
+        _m1_diag = ""
+        if config.MM_GOLDEN_M1_SHADOW and not config.MM_GOLDEN_M1_MSS:
+            _m1_diag = self._m1_shift_diag(pair, direction, t, _zl, _zh)
         if config.MM_GOLDEN_M1_MSS:
-            if _pd_stage == "ob" and _ob_zone is not None:
-                _zl, _zh = _ob_zone.bottom, _ob_zone.top
-            else:
-                _zl, _zh = _ifvg_lo, _ifvg_hi
             _m1_ok, _m1s_stop, _m1_ext = self._m1_shift(pair, direction, t, _zl, _zh)
             if not _m1_ok:
                 g["mm_golden_no_m1_shift"] = g.get("mm_golden_no_m1_shift", 0) + 1
@@ -6057,6 +6110,9 @@ class Backtester:
             "mm_scenario": _mm_scenario,
             "mm_ifvg_tf": _pd_tf,
             "mm_pd_stage": _pd_stage,
+            "m1_diag": _m1_diag,
+            "mm_zone_lo": _zl,
+            "mm_zone_hi": _zh,
             "mm_ifvg_zone_tf": _zone_tf,
             "mm_dxy_dir": _mm_dxy_dir, "mm_dxy_tf": _mm_dxy_tf,
             "mm_eurgbp_dir": _mm_eg_dir, "mm_eurgbp_tf": _mm_eg_tf,
