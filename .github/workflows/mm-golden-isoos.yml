@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full]
-        mode: [m1, ce, f20, cef20]
+        mode: [m1, dxy, smt, dxysmt]
     env:
       NO_PUSH: "1"
     steps:
@@ -52,9 +52,9 @@ jobs:
           if [ "${{ matrix.mode }}" = base ]; then export MM_GOLDEN_ENABLED=0; else export MM_GOLDEN_ENABLED=1; fi
           export MM_GOLDEN_M1_MSS=1
           export MM_GOLDEN_M1_ARM=0
-          case "${{ matrix.mode }}" in ce|cef20) export MM_GOLDEN_M1_HTF_CE=1;; *) export MM_GOLDEN_M1_HTF_CE=0;; esac
-          case "${{ matrix.mode }}" in f20|cef20) export MM_GOLDEN_M1_MSS_FRESH=20;; *) export MM_GOLDEN_M1_MSS_FRESH=10;; esac
-          echo "MM_GOLDEN_ENABLED=$MM_GOLDEN_ENABLED MM_GOLDEN_M1_MSS=$MM_GOLDEN_M1_MSS MM_GOLDEN_M1_HTF_CE=$MM_GOLDEN_M1_HTF_CE FRESH=$MM_GOLDEN_M1_MSS_FRESH"
+          case "${{ matrix.mode }}" in dxy|dxysmt) export MM_GOLDEN_M1_DXY=1;; *) export MM_GOLDEN_M1_DXY=0;; esac
+          case "${{ matrix.mode }}" in smt|dxysmt) export MM_GOLDEN_M1_SMT=1;; *) export MM_GOLDEN_M1_SMT=0;; esac
+          echo "MM_GOLDEN_ENABLED=$MM_GOLDEN_ENABLED MM_GOLDEN_M1_MSS=$MM_GOLDEN_M1_MSS DXY=$MM_GOLDEN_M1_DXY SMT=$MM_GOLDEN_M1_SMT"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
       - name: Commit
@@ -62,7 +62,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p87
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p88
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

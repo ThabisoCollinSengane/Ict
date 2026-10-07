@@ -269,6 +269,8 @@ def _main(_real_stdout):
               f"close {m5['Close'].iloc[-1]:.5f}")
         if sym == "UDXUSD":
             dxy_5m = m5
+            if config.MM_GOLDEN_M1_DXY:      # P88: DXY M1 only when the check is on
+                data_m1[sym] = m1
         else:
             data_5m[sym] = m5
             # M1 bars registered for tradeable pairs — used for stop placement

@@ -1310,3 +1310,10 @@ MM_GOLDEN_M1_ARM_BARS = int(_os.environ.get("MM_GOLDEN_M1_ARM_BARS", "60"))
 # H1/H4 IFVG, the M1 turn may form anywhere inside the whole IFVG. Default 0 = unchanged.
 MM_GOLDEN_M1_HTF_CE = bool(int(_os.environ.get("MM_GOLDEN_M1_HTF_CE", "0")))
 MM_GOLDEN_M1_HTF_CE_TFS = tuple(_os.environ.get("MM_GOLDEN_M1_HTF_CE_TFS", "60T,240T").split(","))
+# P88 — intermarket confirmation on M1 at the MM entry. DXY: the dollar's M1 must shift
+# opposite to the trade within MM_GOLDEN_M1_DXY_FRESH bars. SMT: the sister pair
+# (EURUSD<->GBPUSD) must fail to confirm the traded pair's M1 sweep. Default 0 = off.
+MM_GOLDEN_M1_DXY = bool(int(_os.environ.get("MM_GOLDEN_M1_DXY", "0")))
+MM_GOLDEN_M1_DXY_FRESH = int(_os.environ.get("MM_GOLDEN_M1_DXY_FRESH", "15"))
+MM_GOLDEN_M1_SMT = bool(int(_os.environ.get("MM_GOLDEN_M1_SMT", "0")))
+MM_GOLDEN_M1_SMT_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_SMT_LOOKBACK", "40"))

@@ -5418,6 +5418,50 @@ class Backtester:
             return "no_break"
         return "stale"
 
+    def _m1_mss_any(self, sym, direction, t, fresh):
+        """P88: generic M1 structure shift on ANY symbol (used for DXY). For
+        direction +1: after the lowest low of the lookback window, a completed M1
+        close breaks above the last fractal swing high formed before that low, and
+        the FIRST such break is within the last `fresh` bars. Mirror for -1.
+        Returns True / False / None (None = no M1 data for the symbol)."""
+        bars = self.bars_up_to(sym, "1T", t, max_bars=config.MM_GOLDEN_M1_MSS_LOOKBACK + 1)
+        if not bars or len(bars) < 10:
+            return None
+        b = bars[:-1]
+        n = len(b)
+        if direction > 0:
+            li = min(range(n), key=lambda i: b[i].Low)
+            sw = [j for j in range(1, li) if j + 1 < n
+                  and b[j].High > b[j - 1].High and b[j].High > b[j + 1].High]
+            if not sw:
+                return False
+            lvl = b[sw[-1]].High
+            brk = [k for k in range(li + 1, n) if b[k].Close > lvl]
+        else:
+            li = max(range(n), key=lambda i: b[i].High)
+            sw = [j for j in range(1, li) if j + 1 < n
+                  and b[j].Low < b[j - 1].Low and b[j].Low < b[j + 1].Low]
+            if not sw:
+                return False
+            lvl = b[sw[-1]].Low
+            brk = [k for k in range(li + 1, n) if b[k].Close < lvl]
+        return bool(brk) and brk[0] >= n - fresh
+
+    def _m1_smt(self, pair, direction, t):
+        """P88: M1 SMT with the sister pair (EURUSD <-> GBPUSD) on completed M1 bars.
+        Long: the traded pair made a lower low that the sister did NOT confirm.
+        Short: a higher high the sister did NOT confirm. Uses ict.smt.smt_divergence."""
+        from ict.smt import smt_divergence
+        sister = {"EURUSD": "GBPUSD", "GBPUSD": "EURUSD"}.get(pair)
+        if sister is None:
+            return None
+        lb = config.MM_GOLDEN_M1_SMT_LOOKBACK
+        a = self.bars_up_to(pair, "1T", t, max_bars=lb + 1)
+        r = self.bars_up_to(sister, "1T", t, max_bars=lb + 1)
+        if not a or not r or len(a) < lb + 1 or len(r) < lb + 1:
+            return None
+        return bool(smt_divergence(a[:-1], r[:-1], direction, inverse=False, lookback=lb))
+
     def _ifvg_ce_closed(self, pair, direction, t, lo, hi):
         """P87: has a COMPLETED M5 candle closed at or beyond the IFVG's halfway line
         (consequent encroachment) during the M1 lookback, without closing through the
@@ -6025,6 +6069,23 @@ class Backtester:
                     g["mm_golden_armed"] = g.get("mm_golden_armed", 0) + 1
                 return
             g["mm_golden_m1_shift"] = g.get("mm_golden_m1_shift", 0) + 1
+            # P88 — intermarket confirmation ON M1: the dollar must turn the opposite
+            # way, and/or the sister pair must show SMT, at the moment of entry.
+            if config.MM_GOLDEN_M1_DXY:
+                _dx = self._m1_mss_any("UDXUSD", -direction, t, config.MM_GOLDEN_M1_DXY_FRESH)
+                if _dx is None:
+                    g["mm_golden_m1_dxy_nodata"] = g.get("mm_golden_m1_dxy_nodata", 0) + 1
+                    return
+                if not _dx:
+                    g["mm_golden_m1_dxy_no"] = g.get("mm_golden_m1_dxy_no", 0) + 1
+                    return
+                g["mm_golden_m1_dxy_ok"] = g.get("mm_golden_m1_dxy_ok", 0) + 1
+            if config.MM_GOLDEN_M1_SMT:
+                _sm = self._m1_smt(pair, direction, t)
+                if not _sm:
+                    g["mm_golden_m1_smt_no"] = g.get("mm_golden_m1_smt_no", 0) + 1
+                    return
+                g["mm_golden_m1_smt_ok"] = g.get("mm_golden_m1_smt_ok", 0) + 1
 
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)

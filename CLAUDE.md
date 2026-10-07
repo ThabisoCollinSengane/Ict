@@ -2499,6 +2499,23 @@ engine already re-evaluates every M5 bar, so part of this late catch is already 
 trade set (P83 opened 66 / 68 MM trades vs 9 / 6 `ok` here). Simulated outside the
 engine (R units, no sizing/path) — a lever built on it must be measured in the engine.
 
+### P88 — intermarket confirmation ON M1: DXY shift + sister-pair SMT (BUILT 2026-10-07, RUNNING)
+
+Trader: "these are very very important." Until P88 the M1 trigger read only the traded
+pair's M1 (the quadrant/SMT/draw gates upstream are H1+ reads). Two checks, applied right
+after the pair's own M1 shift, both default 0:
+- `MM_GOLDEN_M1_DXY=1` — UDXUSD M1 must shift OPPOSITE to the trade (dollar up for a pair
+  short): a completed close through the last M1 fractal swing beyond the lookback extreme,
+  first break within `MM_GOLDEN_M1_DXY_FRESH` (15) bars. `_m1_mss_any`. UDXUSD M1 is now
+  registered by `run_backtest_histdata.py` ONLY when this flag is on (default run unchanged).
+  Counters `mm_golden_m1_dxy_ok / _no / _nodata` — `_nodata` > 0 means the DXY M1 feed is
+  missing and the run is invalid.
+- `MM_GOLDEN_M1_SMT=1` — EURUSD<->GBPUSD M1 SMT via `ict.smt.smt_divergence` over
+  `MM_GOLDEN_M1_SMT_LOOKBACK` (40) completed M1 bars. `_m1_smt`. Counters `mm_golden_m1_smt_ok/_no`.
+Fixture-verified both (shift fires/opposite/stale/no-data; SMT fires / both made LL).
+Loops: `m1` control, `dxy`, `smt`, `dxysmt` x IS/OOS/full -> `data/mm_golden_*_p88_*`.
+Ship gate as P87. Next: combine the winner with the P87 winner.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
