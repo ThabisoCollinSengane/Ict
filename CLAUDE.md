@@ -2432,6 +2432,45 @@ the trader's stated tolerance is 15-30%, so this is reported, not rejected.
 **Not shipped:** `MM_GOLDEN_ENABLED=0` / `MM_GOLDEN_M1_MSS=0` stay the defaults until the
 trader decides. Shipping both re-anchors the baseline to 842 / 42.5% / 3.33 / −15.59%.
 
+### P85 — the MM trades the M1 shift SKIPS (RAN 2026-10-07) — mostly bad fills, not continuations
+
+`MM_GOLDEN_M1_SHADOW=1` (default 0) trades the MM channel WITHOUT the M1 gate and labels
+every MM trade with what the gate would have said (`m1_diag`) plus its zone
+(`mm_zone_lo/hi`). Shadow run reproduces P81 exactly (MM 104 / PF 1.61 IS, 123 / 1.17
+OOS) — analytics only. `scripts/m1_skip_study.py` (`.github/workflows/m1-skip-study.yml`
+-> `data/m1_skip_report.md`) then walks forward on completed M1 bars from each skipped
+entry for a later valid shift and simulates a late entry (same stop rule, original
+target, R units, stop-first on a shared bar).
+
+**Why the gate rejected them (immediate-entry result, sum R IS / OOS):**
+
+| m1_diag | n IS/OOS | orig PF (R) IS / OOS | sum R IS / OOS |
+|---|---|---|---|
+| blew_through (pullback went through the zone) | 49 / 48 | 1.05 / 1.19 | +1.1 / +3.5 |
+| no_break (swing formed, not broken yet) | 14 / 19 | 1.04 / 0.35 | +0.4 / −9.2 |
+| **no_swing (V-turn, no M1 swing)** | 10 / 17 | **0.22 / 0.46** | −6.7 / −7.1 |
+| no_touch (zone not reached on M1) | 9 / 17 | 1.42 / 0.20 | +1.8 / −11.2 |
+| stale (broke, but >10 bars ago) | 13 / 16 | 2.55 / 0.52 | +1.7 / −4.6 |
+| ok (gate would have taken it then) | 9 / 6 | 2.76 / 0.92 | +5.7 / −0.3 |
+
+All skipped: **−1.6R IS / −28.6R OOS**. The trader's hypothesis — "the skipped trades are
+usually continuation trades" — does NOT hold: the V-turn (`no_swing`) group, the
+continuation shape, is the WORST group in both halves. Only **22 of 212** skipped trades
+ran to the original target before ANY M1 shift formed (the true continuations the gate
+cannot catch): +7.8R IS / +3.8R OOS — positive both halves, but n=13/9.
+
+**Late catch — the finding that holds in both halves:** a valid M1 shift formed later
+within 60 M1 bars on 29 / 34 skipped setups. Entering THERE instead of at the first
+touch: **+13.0R vs −8.6R IS, +18.6R vs −16.0R OOS** on exactly the same setups (late PF
+1.69 / 1.77). Waiting for the M1 turn converts losing first-touch fills into winners in
+both halves. Per-label cells are n=2-11 — read the ALL row, not the cells.
+
+**What it means:** the P83 gate is skipping mostly bad fills, and the right move on a
+skipped setup is to KEEP WATCHING for the M1 turn, not to take the first touch. The P83
+engine already re-evaluates every M5 bar, so part of this late catch is already in its
+trade set (P83 opened 66 / 68 MM trades vs 9 / 6 `ok` here). Simulated outside the
+engine (R units, no sizing/path) — a lever built on it must be measured in the engine.
+
 ### P84 — how price acts at INTRADAY PD arrays: FVG / IFVG / OB on H4, H1, M15 (RAN 2026-10-07) — 🔴 RED, all 9 cells
 
 `scripts/pd_reaction_study.py` (`.github/workflows/pd-reaction-study.yml` ->
