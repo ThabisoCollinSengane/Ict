@@ -299,7 +299,7 @@ def scan_mm_setups(all_data, pairs=None):
             for (bi, lo, hi) in reversed(boxes):
                 if not (lo <= cur_price <= hi):
                     continue
-                idir = latest_inversion(bars[bi:], lo, hi)
+                idir = latest_inversion(bars[bi + 1:], lo, hi)
                 if idir == 0:
                     # Check one TF lower
                     lower_idx = ifvg_cascade.index(tf) + 1 if tf in ifvg_cascade else -1

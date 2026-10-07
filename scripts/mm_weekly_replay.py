@@ -183,7 +183,7 @@ def _detect_setup_at_point(df_5m_slice, pair, pref_dir, partner_slice=None, targ
         for (bi, lo, hi) in reversed(boxes):
             if not (lo <= cur_price <= hi):
                 continue
-            idir = latest_inversion(bars[bi:], lo, hi)
+            idir = latest_inversion(bars[bi + 1:], lo, hi)
             if idir == 0:
                 lower_idx = ifvg_cascade.index(tf) + 1 if tf in ifvg_cascade else -1
                 if lower_idx < len(ifvg_cascade):

@@ -23,10 +23,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arm: [is, oos, full]
+        arm: [is, oos, full, base]
     env:
       NO_PUSH: "1"
-      MM_GOLDEN_ENABLED: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,7 +46,10 @@ jobs:
             is)   Y="--years 2022 2023" ;;
             oos)  Y="--years 2024 2025" ;;
             full) Y="" ;;
+            base) Y="" ;;
           esac
+          if [ "${{ matrix.arm }}" = base ]; then export MM_GOLDEN_ENABLED=0; else export MM_GOLDEN_ENABLED=1; fi
+          echo "MM_GOLDEN_ENABLED=$MM_GOLDEN_ENABLED"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
       - name: Commit

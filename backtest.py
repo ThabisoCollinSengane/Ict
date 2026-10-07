@@ -899,7 +899,7 @@ class Backtester:
         for g in sorted(gaps, key=lambda x: -x.bar_index):
             if not inside(g.bottom, g.top):
                 continue
-            if latest_inversion(bars, g.bottom, g.top) == direction:
+            if self._gap_inversion(bars, g) == direction:
                 return "ifvg", g.bottom, g.top
             if g.direction == direction and not g.mitigated:
                 return "fvg", g.bottom, g.top
@@ -1087,7 +1087,7 @@ class Backtester:
             if bars is None or len(bars) < 5:
                 continue
             for fvg in self._scan_htf_fvgs(bars, sym):
-                if latest_inversion(bars, fvg.bottom, fvg.top) == direction:
+                if self._gap_inversion(bars, fvg) == direction:
                     return True, tf
         return False, ""
 
@@ -1856,7 +1856,7 @@ class Backtester:
                     continue                     # a filled gap no longer calls
                 if g.bottom - tol <= target <= g.top + tol:
                     # inverted counts as its own array (the MM draw)
-                    inv = latest_inversion(bars, g.bottom, g.top)
+                    inv = self._gap_inversion(bars, g)
                     return ("ifvg" if inv else "fvg"), tf
             if not ob_hit[0]:                    # remember, but keep hunting FVGs
                 for ob in detect_order_blocks(bars):
@@ -1930,7 +1930,7 @@ class Backtester:
             if g.mitigated:
                 continue                    # a filled gap no longer calls price
             r = _read(g.top, g.bottom, g.direction)
-            kind = "ifvg" if latest_inversion(d, g.bottom, g.top) else "fvg"
+            kind = "ifvg" if self._gap_inversion(d, g) else "fvg"
             if best_fvg is None or r[0] < best_fvg[0]:
                 best_fvg = (r[0], r[1], r[2], kind)
 
@@ -2720,6 +2720,21 @@ class Backtester:
                 if not s.swept and s.price < price:
                     out.append((s.price, "itl_liquidity"))
         return out
+
+    @staticmethod
+    def _gap_inversion(bars, g):
+        """Inversion direction of FVG `g`, judged only on bars AFTER it formed (P81).
+
+        latest_inversion() needs the box to be TOUCHED before a full-body close can
+        invert it. Handed the whole series, the gap's own three formation candles
+        satisfy the touch and their bodies decide the side, so a genuine IFVG -- a
+        gap traded into and then closed through -- read 0 ("not inverted") every
+        time, and the MM model's precondition gate rejected 97% of setups.
+        `g.bar_index` is the MIDDLE candle, so the first post-formation bar is +2
+        (ict.ifvg._fvgs returns the 3rd candle, so its callers slice `bars[bi + 1:]`).
+        """
+        from ict.ifvg import latest_inversion
+        return latest_inversion(bars[g.bar_index + 2:], g.bottom, g.top)
 
     @staticmethod
     def _scan_htf_fvgs(bars, pair):
@@ -4906,7 +4921,7 @@ class Backtester:
             for (bi, lo, hi) in reversed(boxes):      # most recent box first
                 if not (lo <= cur_price <= hi):       # must be retraced into it
                     continue
-                idir = latest_inversion(bars[bi:], lo, hi)    # judged on this TF…
+                idir = latest_inversion(bars[bi + 1:], lo, hi)    # judged on this TF…
                 if idir == 0 and lower:
                     idir = latest_inversion(lower, lo, hi)    # …and the next lower
                 if idir == direction:
@@ -5138,7 +5153,11 @@ class Backtester:
         """
         eq = ob.body_mid
         tested = False
-        for c in tf_bars[ob.bar_index + 2:]:
+        # COMPLETED candles only. bars_up_to() returns the still-forming bar, and in a
+        # backtest that bar already carries its whole window -- its Close is a FUTURE
+        # close. Reading it marked blocks "failed" off a close that had not happened
+        # (P81). The docstring always said "a completed candle"; the slice now agrees.
+        for c in tf_bars[ob.bar_index + 2:-1]:
             if direction < 0:                      # bearish OB — sell zone
                 if c.High >= eq:
                     tested = True
@@ -5323,7 +5342,7 @@ class Backtester:
             if ibars is None or len(ibars) < 5:
                 continue
             for fvg in self._scan_htf_fvgs(ibars, pair):
-                if latest_inversion(ibars, fvg.bottom, fvg.top) == direction:
+                if self._gap_inversion(ibars, fvg) == direction:
                     return True, tf
         return False, ""
 
@@ -5451,7 +5470,7 @@ class Backtester:
                 if not (_in_range or _in_zone):
                     continue
                 if inverted:
-                    if latest_inversion(bars, g.bottom, g.top) != direction:
+                    if self._gap_inversion(bars, g) != direction:
                         continue                  # not inverted our way
                 else:
                     # A gap running our way. It may sit INSIDE an IFVG or be one --
@@ -5459,7 +5478,7 @@ class Backtester:
                     # difference to the entry, so an inverted gap is NOT excluded
                     # here. Accept it if it points our way OR has been flipped our
                     # way; only a still-intact zone qualifies.
-                    _inv = latest_inversion(bars, g.bottom, g.top)
+                    _inv = self._gap_inversion(bars, g)
                     if _inv != direction and (g.direction != direction or g.mitigated):
                         continue
                 if not require_inside:            # existence only (model gate)
