@@ -1,0 +1,42 @@
+# P80 — month-end London (WMR) fix hedging flow (real data, 2010-2025)
+
+_FX: EURUSD 2010-01-03→2025-12-31, GBPUSD 2010-01-03→2025-12-31, NZDUSD 2010-01-03→2025-12-31. Equity indices: US=^GSPC, EURUSD=^STOXX50E, GBPUSD=^FTSE, NZDUSD=^NZ50. Month-end observations 562, placebo 567._
+
+Prediction made BEFORE the fix: foreign stocks beat the S&P 500 this month → that currency is sold into the 16:00 London fix (pair DOWN); S&P won → dollar sold (pair UP). FOLLOW = pair move in the 4h before the fix in the predicted direction (bp). Placebo = same method two weeks earlier.
+
+## The verdict — all three pairs pooled
+
+| half | month-ends | FOLLOW bp (t) | hit % | placebo FOLLOW bp (t) | beats placebo | 2h after the fix bp |
+|---|---|---|---|---|---|---|
+| 2010-17 | 288 | -1.60 (-0.7) | 49% | +0.30 (+0.2) | no | -2.44 (-1.6) |
+| 2018-25 | 274 | +0.27 (+0.2) | 51% | -1.90 (-1.2) | yes | -0.25 (-0.2) |
+
+**VERDICT: nothing** — pooled FOLLOW -0.69 bp, t -0.5, n 562, hit 50%. Gate: both halves > 0, pooled t ≥ 2.5, beats placebo both halves.
+
+_Note: pair-months share the dollar side, so the three pairs are not fully independent — the pooled t is somewhat optimistic. Read the per-pair table._
+
+## Per pair
+
+| pair | half | n | FOLLOW bp (t) | hit % | corr(signal, move) |
+|---|---|---|---|---|---|
+| EURUSD | 2010-17 | 96 | -2.72 (-0.8) | 48% | +0.09 |
+| EURUSD | 2018-25 | 92 | -0.51 (-0.2) | 49% | +0.07 |
+| GBPUSD | 2010-17 | 96 | -2.81 (-0.8) | 48% | +0.04 |
+| GBPUSD | 2018-25 | 92 | -2.88 (-0.9) | 43% | -0.06 |
+| NZDUSD | 2010-17 | 96 | +0.73 (+0.2) | 50% | -0.06 |
+| NZDUSD | 2018-25 | 90 | +4.30 (+1.4) | 62% | -0.11 |
+
+_corr(signal, move) should be NEGATIVE if the hedging story holds (foreign outperformance → that currency sold)._
+
+## Big months only (|signal| in the top third)
+
+Hedging needs scale: a month where stocks barely diverged leaves little to re-hedge. If the mechanism is real, the big months should carry it.
+
+| half | n | FOLLOW bp (t) | hit % |
+|---|---|---|---|
+| 2010-17 | 85 | +3.01 (+0.9) | 47% |
+| 2018-25 | 103 | +1.46 (+0.5) | 50% |
+
+_Context: the WMR window widened from 1 to 5 minutes in Feb 2015, inside the 2010-17 half; the daily fix reversal (P78) faded after 2018._
+
+
