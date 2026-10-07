@@ -2396,6 +2396,38 @@ entries do not travel — wrong-way or too-early fills, the same shape P73 found
 book's losers. Target work on the MM channel is closed; the remaining lever is the entry
 (which rung fills, and whether price has actually left the consolidation). Default stays `0`.
 
+### P84 — how price acts at INTRADAY PD arrays: FVG / IFVG / OB on H4, H1, M15 (RAN 2026-10-07) — 🔴 RED, all 9 cells
+
+`scripts/pd_reaction_study.py` (`.github/workflows/pd-reaction-study.yml` ->
+`data/pd_reaction_report.md` + console). P69's machinery extended to IFVG (judged only on
+bars after the gap formed, per P81) and order blocks (dated from the displacement bar), on
+H4/H1/M15. First return into each zone: respect / break within 3 bars, excursion over 12
+bars from the confirmation bar, broken-zone retest — every rate against a mirror control
+zone, IS 2022-23 / OOS 2024-25. Random-walk null read RED in all 9 cells before the run.
+
+**Lift over control (pp ± SE), respect IS / OOS:**
+
+| TF | FVG | IFVG | OB |
+|---|---|---|---|
+| H4 (n≈2,000 / 550 / 800) | +0.6 / +2.1 | +2.8 / **+6.7** | −0.5 / +0.1 |
+| H1 (n≈7,200 / 2,100 / 3,200) | +1.7 / +0.3 | **+4.3** / +0.0 | +1.7 / −2.2 |
+| M15 (n≈31,000 / 9,600 / 14,000) | −0.4 / −0.3 | −0.1 / −1.4 | +1.7 / +0.7 |
+
+**Price respects every zone type ~62-66% of the time — and the mirror band the same
+distance away on the other side of price gets ~59-66%.** Same as P69 one level up the
+ladder. Excursions are symmetric (resFav ≈ resAdv) in every OOS cell. Broken-zone retest
+("breakaway -> IFVG") has no lift on any rung (all within ~1 SE). M15, with n≈30,000 and
+SE 0.4pp, is flat to a fraction of a point: there is no mechanical reaction at an M15 gap.
+
+**Only lean worth noting:** H4 IFVG — respect +2.8 / +6.7, break −0.4 / −6.1, IS respect
+payoff 61.4 vs 46.5 pips. But IS is 1 SE, the OOS payoff is flat (37.2 vs 37.7), and the
+H1 IFVG flips (+4.3 IS / 0.0 OOS). Not a finding; the cell to re-check if a larger sample
+ever exists.
+
+**Scope:** zones STRIPPED BARE — every zone on the chart, no quadrant, no killzone, no
+raid, no structure shift. It says the zone ALONE carries no edge; it does not test the
+zone as the location for a context-selected entry (which is what P83's M1 shift does).
+
 ### P79 — fundamentals scorecard: COT, US yields, news (RAN 2026-10-06) — 🔴 nothing tradeable
 
 **Where it runs:** this container is blocked from every market-data host, so
