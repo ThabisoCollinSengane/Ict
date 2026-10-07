@@ -2300,6 +2300,27 @@ direction call. The brief's clock section now says exactly this. Untested and th
 strongest remaining version: the MONTH-END WMR fix (Melvin & Prins — direction
 predictable from the month's equity returns), ~190 month-ends in 16 years.
 
+### P80 — month-end WMR fix hedging flow (RAN 2026-10-07, 2010-2025) — 🔴 nothing
+
+`scripts/month_end_fix_study.py`, `.github/workflows/month-end-fix.yml` ->
+`data/month_end_fix_report.md`. Melvin & Prins mechanism: signal = foreign index minus
+S&P 500 month-to-date (to the day BEFORE the fix day); prediction = foreign currency
+sold into the last 16:00 London fix if foreign stocks outperformed. Measured the 4h
+before the fix; placebo = same method two weeks earlier. Calibrated first: null
+"nothing" on 3 seeds, planted 8bp recovered at +7.1bp t +15 (detectable ~1.2bp).
+
+| | 2010-17 | 2018-25 |
+|---|---|---|
+| pooled FOLLOW bp (t), hit | -1.60 (-0.7), 49% | +0.27 (+0.2), 51% |
+| placebo | +0.30 | -1.90 |
+| big-signal months only | +3.01 (+0.9) | +1.46 (+0.5) |
+
+Pooled -0.69bp, t -0.5, n 562, hit 50%. EURUSD and GBPUSD lean the WRONG way in both
+halves; NZDUSD leans right in both (+0.7 / +4.3bp, 62% hit 2018-25, t 1.4) and the
+big-signal months lean right in both — all under the bar, one pair of three.
+**The month-end hedging flow is not visible in the 4h before the fix on these pairs.**
+Untested: hedging spread over the final days rather than the final hours.
+
 ### P79 — fundamentals scorecard: COT, US yields, news (RAN 2026-10-06) — 🔴 nothing tradeable
 
 **Where it runs:** this container is blocked from every market-data host, so
