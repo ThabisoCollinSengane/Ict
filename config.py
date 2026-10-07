@@ -1302,3 +1302,7 @@ MM_GOLDEN_M1_MSS_MIN_STOP_PIPS = float(_os.environ.get("MM_GOLDEN_M1_MSS_MIN_STO
 # P85 — shadow mode: trade the MM channel WITHOUT the M1 gate but record, on every MM
 # trade, what the M1 check would have said (column m1_diag) plus the zone (mm_zone_lo/hi).
 MM_GOLDEN_M1_SHADOW = bool(int(_os.environ.get("MM_GOLDEN_M1_SHADOW", "0")))
+# P86 — keep watching: a setup that passed every MM gate but had no M1 shift yet is
+# ARMED and re-checked for the M1 turn for up to MM_GOLDEN_M1_ARM_BARS minutes.
+MM_GOLDEN_M1_ARM = bool(int(_os.environ.get("MM_GOLDEN_M1_ARM", "0")))
+MM_GOLDEN_M1_ARM_BARS = int(_os.environ.get("MM_GOLDEN_M1_ARM_BARS", "60"))

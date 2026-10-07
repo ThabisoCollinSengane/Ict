@@ -5691,6 +5691,35 @@ class Backtester:
         if news_impact in ("Medium", "Critical"):
             return
 
+        # P86 — an ARMED setup (passed every MM gate earlier, no M1 shift yet) is
+        # re-checked here for up to MM_GOLDEN_M1_ARM_BARS minutes. Killzone, circuit
+        # breakers and news above still apply; the caps / one-pair rule are re-applied.
+        _arm = getattr(self, "_mm_armed", {}).get(pair)
+        if _arm is not None and config.MM_GOLDEN_M1_MSS and config.MM_GOLDEN_M1_ARM:
+            g = self.gate
+            _age = (t - _arm["t"]).total_seconds() / 60.0
+            if _age > config.MM_GOLDEN_M1_ARM_BARS:
+                del self._mm_armed[pair]
+                g["mm_golden_arm_expired"] = g.get("mm_golden_arm_expired", 0) + 1
+            else:
+                _S = dict(_arm["S"], _armed=True)
+                _dir = _S["direction"]
+                _daykey = (pair, _dk)
+                _blocked = self._mm_golden_count.get(_daykey, 0) >= config.MM_GOLDEN_MAX_PER_DAY
+                if config.MM_GOLDEN_ONE_PAIR_ONLY:
+                    _other = "GBPUSD" if pair == "EURUSD" else "EURUSD"
+                    _blocked = _blocked or _other in self.active
+                if config.MM_GOLDEN_DECORR_ALL:
+                    _blocked = _blocked or any(-op["direction"] == -_dir
+                                               for op in self.active.values())
+                if not _blocked:
+                    _b15 = self.bars_up_to(pair, "15T", t)
+                    self._mm_golden_finish(pair, t, _S, _b15, _daykey, news_impact)
+                    if pair in self.active:
+                        self._mm_armed.pop(pair, None)
+                        g["mm_golden_arm_fired"] = g.get("mm_golden_arm_fired", 0) + 1
+                        return
+
         _mm_scenario = ""
         _mm_dxy_q = _mm_eg_q = 0
         if config.MM_GOLDEN_QUADRANT:
@@ -5892,6 +5921,56 @@ class Backtester:
             g[f"mm_golden_pd_{_pd_stage}_{_pd_tf}"] = (
                 g.get(f"mm_golden_pd_{_pd_stage}_{_pd_tf}", 0) + 1)
 
+        _S = dict(
+            _amd_source=_amd_source,
+            _golden_smt=_golden_smt,
+            _golden_via=_golden_via,
+            _ifvg_hi=_ifvg_hi,
+            _ifvg_lo=_ifvg_lo,
+            _mm_dxy_dir=_mm_dxy_dir,
+            _mm_dxy_tf=_mm_dxy_tf,
+            _mm_eg_dir=_mm_eg_dir,
+            _mm_eg_tf=_mm_eg_tf,
+            _mm_scenario=_mm_scenario,
+            _ob_state=_ob_state,
+            _ob_zone=_ob_zone,
+            _pd_stage=_pd_stage,
+            _pd_tf=_pd_tf,
+            _retrace_tf=_retrace_tf,
+            _zone_tf=_zone_tf,
+            direction=direction,
+            rng=rng,
+            sweep_dir=sweep_dir,
+        )
+        return self._mm_golden_finish(pair, t, _S, bars15, daykey, news_impact)
+
+    def _mm_golden_finish(self, pair, t, _S, bars15, daykey, news_impact):
+        """Second half of _mm_golden_entry: everything from the M1-shift gate onward.
+
+        Split out (P86) so an ARMED setup — one that passed every MM gate but had no
+        M1 shift yet — can be re-entered here on a later bar without re-running the
+        upstream gates. `_S` is the setup state captured when it qualified.
+        """
+        g = self.gate
+        _amd_source = _S["_amd_source"]
+        _golden_smt = _S["_golden_smt"]
+        _golden_via = _S["_golden_via"]
+        _ifvg_hi = _S["_ifvg_hi"]
+        _ifvg_lo = _S["_ifvg_lo"]
+        _mm_dxy_dir = _S["_mm_dxy_dir"]
+        _mm_dxy_tf = _S["_mm_dxy_tf"]
+        _mm_eg_dir = _S["_mm_eg_dir"]
+        _mm_eg_tf = _S["_mm_eg_tf"]
+        _mm_scenario = _S["_mm_scenario"]
+        _ob_state = _S["_ob_state"]
+        _ob_zone = _S["_ob_zone"]
+        _pd_stage = _S["_pd_stage"]
+        _pd_tf = _S["_pd_tf"]
+        _retrace_tf = _S["_retrace_tf"]
+        _zone_tf = _S["_zone_tf"]
+        direction = _S["direction"]
+        rng = _S["rng"]
+        sweep_dir = _S["sweep_dir"]
         # P83 — wait for M1 structure to SHIFT our way inside the zone before entering.
         _m1_ok, _m1s_stop = False, None
         if _pd_stage == "ob" and _ob_zone is not None:
@@ -5905,6 +5984,12 @@ class Backtester:
             _m1_ok, _m1s_stop, _m1_ext = self._m1_shift(pair, direction, t, _zl, _zh)
             if not _m1_ok:
                 g["mm_golden_no_m1_shift"] = g.get("mm_golden_no_m1_shift", 0) + 1
+                if config.MM_GOLDEN_M1_ARM and not _S.get("_armed"):
+                    # P86 — remember the setup and keep watching for the M1 turn.
+                    if not hasattr(self, "_mm_armed"):
+                        self._mm_armed = {}
+                    self._mm_armed[pair] = {"t": t, "S": dict(_S)}
+                    g["mm_golden_armed"] = g.get("mm_golden_armed", 0) + 1
                 return
             g["mm_golden_m1_shift"] = g.get("mm_golden_m1_shift", 0) + 1
 
@@ -5927,7 +6012,8 @@ class Backtester:
         bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
         if _m1_ok:
             # The M1 shift IS the trigger; the stop sits beyond the pullback extreme.
-            pat = (cur_price, _m1s_stop, f"m1_shift_{_pd_stage}")
+            pat = (cur_price, _m1s_stop,
+                   f"m1_{'arm' if _S.get('_armed') else 'shift'}_{_pd_stage}")
         else:
             pat = self._get_limit_entry(bars5, bars15, bars1h, pair, direction, cur_price,
                                         bars1m=bars1m)
