@@ -2471,6 +2471,42 @@ engine already re-evaluates every M5 bar, so part of this late catch is already 
 trade set (P83 opened 66 / 68 MM trades vs 9 / 6 `ok` here). Simulated outside the
 engine (R units, no sizing/path) — a lever built on it must be measured in the engine.
 
+### P86 — MM "keep watching": arm a setup, re-check for the M1 turn (RAN 2026-10-07) — 🔴 RED
+
+`MM_GOLDEN_M1_ARM=1` (default 0), `MM_GOLDEN_M1_ARM_BARS=60`. A setup that passes every MM
+gate but has no M1 shift yet is ARMED; later bars re-check the same zone for the M1 turn
+for 60 min — inside the killzone (the run loop's `can_open_new_trade`), after circuit
+breakers and the news gate, with daily cap / one-pair / de-correlation re-applied.
+`_mm_golden_entry` is split into setup + `_mm_golden_finish` (the half from the M1 gate on).
+
+**Controls exact:** MM off 736 / 43.9% / 4.01 / −13.24%; P83 (M1, no arm) 407 / 433 / 842 —
+the refactor changed nothing.
+
+| | P83 M1 only | P86 M1 + arm |
+|---|---|---|
+| IS MM trades / WR / PF | 66 / 25.8% / 1.41 | 85 / 21.2% / **1.22** |
+| OOS MM trades / WR / PF | 68 / 35.3% / 1.71 | 98 / 29.6% / **1.22** |
+| IS withdrawn / MaxDD | R47.4k / −15.59% | R45.2k / **−17.58%** |
+| OOS withdrawn / MaxDD | R73.7k / −11.72% | **R63.9k** / −11.79% |
+| Full withdrawn / MaxDD | R148.6k / −15.59% | R141.0k / **−17.58%** |
+
+Worse on every line in both halves. Two mechanisms, both visible in the dump:
+1. **The armed late entries are weak in the engine:** WR 16.9% / 27.3%, PF 1.09 / 1.12,
+   median MFE 5.2 / 9.9 pips. P83 already re-evaluates every M5 bar, so a late M1 turn on a
+   setup that is STILL valid is already caught; arming only adds turns on setups whose
+   upstream gates (sweep, retrace, OB state, quadrant) have since stopped passing — and
+   those gates were carrying information.
+2. **They DISPLACE the good entries:** armed entries fire first and use the daily cap /
+   one-pair slot, so immediate M1 entries fell 66 -> 20 (IS) and 68 -> 21 (OOS) — and those
+   are the strong ones (PF 1.72 / 1.58).
+
+**P85's simulated late catch (+13R / +18.6R) does not survive the full engine.** It
+measured late entries against the same setups' first-touch fills with the original
+target and no competition for the slot; the engine re-selects the target, sizes, and
+lets the late entry crowd out a better one. Lesson: a simulated lever outside the engine
+can be right about the setups it looks at and still wrong about the book. **P83 (M1 shift
+alone) remains the best MM variant; P86 stays default OFF.**
+
 ### P84 — how price acts at INTRADAY PD arrays: FVG / IFVG / OB on H4, H1, M15 (RAN 2026-10-07) — 🔴 RED, all 9 cells
 
 `scripts/pd_reaction_study.py` (`.github/workflows/pd-reaction-study.yml` ->
