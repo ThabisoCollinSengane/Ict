@@ -5358,6 +5358,74 @@ class Backtester:
         (-1, +1): ("EURUSD", +1, "2a"),   # dollar DOWN, EUR strong -> buy the stronger (EUR)
     }
 
+    def _mm_recent_touch(self, pair, t, lo, hi):
+        """P83 only: did a completed M1 bar trade into [lo, hi] within the M1-shift
+        lookback? With the M1 shift on, the entry comes AFTER the turn, when price
+        has usually left the zone, so "inside right now" would reject every
+        confirmed setup. Off -> always False (byte-identical ladder)."""
+        if not config.MM_GOLDEN_M1_MSS:
+            return False
+        bars = self.bars_up_to(pair, "1T", t, max_bars=config.MM_GOLDEN_M1_MSS_LOOKBACK + 1)
+        return bool(bars) and any(b.High >= lo and b.Low <= hi for b in bars[:-1])
+
+    def _m1_shift(self, pair, direction, t, zone_lo, zone_hi):
+        """P83 — M1 market-structure shift INSIDE the PD-array zone.
+
+        The trader's read: structure forms on M1 first and the higher timeframe
+        follows. So once price has retraced into the zone, wait for M1 to turn:
+        for a LONG, the pullback prints its low INTO the zone, then a completed M1
+        candle CLOSES above the last M1 fractal swing HIGH formed before that low
+        (the lower-high of the leg into the zone). Mirror for a short.
+
+        Completed M1 bars only (the last, possibly forming, bar is dropped). The
+        break must be the FIRST close through the swing and must be fresh (within
+        MM_GOLDEN_M1_MSS_FRESH bars) so the fill sits near the shift, not 40 pips on.
+
+        Returns (ok, stop_price, pullback_extreme). The stop sits beyond the
+        pullback extreme by MM_GOLDEN_M1_MSS_BUFFER pips.
+        """
+        bars = self.bars_up_to(pair, "1T", t, max_bars=config.MM_GOLDEN_M1_MSS_LOOKBACK + 1)
+        if not bars or len(bars) < 10:
+            return False, None, None
+        b = bars[:-1]
+        n = len(b)
+        pip = pip_size(pair)
+        tol = config.MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS * pip
+        fresh = config.MM_GOLDEN_M1_MSS_FRESH
+        for k in range(max(3, n - fresh), n):
+            seg = b[:k]
+            if direction > 0:
+                li = min(range(len(seg)), key=lambda i: seg[i].Low)
+                ext = seg[li].Low
+                if ext > zone_hi + tol or ext < zone_lo - tol:
+                    continue                      # pullback never reached / blew through
+                sw = [j for j in range(1, li) if j + 1 < len(seg)
+                      and seg[j].High > seg[j - 1].High and seg[j].High > seg[j + 1].High]
+                if not sw:
+                    continue
+                lvl = seg[sw[-1]].High
+                if b[k].Close <= lvl:
+                    continue
+                if any(c.Close > lvl for c in b[li + 1:k]):
+                    continue                      # not the first break -> stale
+                return True, ext - config.MM_GOLDEN_M1_MSS_BUFFER * pip, ext
+            else:
+                hi_i = max(range(len(seg)), key=lambda i: seg[i].High)
+                ext = seg[hi_i].High
+                if ext < zone_lo - tol or ext > zone_hi + tol:
+                    continue
+                sw = [j for j in range(1, hi_i) if j + 1 < len(seg)
+                      and seg[j].Low < seg[j - 1].Low and seg[j].Low < seg[j + 1].Low]
+                if not sw:
+                    continue
+                lvl = seg[sw[-1]].Low
+                if b[k].Close >= lvl:
+                    continue
+                if any(c.Close < lvl for c in b[hi_i + 1:k]):
+                    continue
+                return True, ext + config.MM_GOLDEN_M1_MSS_BUFFER * pip, ext
+        return False, None, None
+
     def _mm_ifvg_entry(self, pair, direction, t):
         """MM entry STAGE 2: price is INSIDE an IFVG adjacent to the consolidation.
 
@@ -5406,6 +5474,8 @@ class Backtester:
                     continue                       # not housed in the zone
                 if ob.bottom <= cur <= ob.top:     # price inside it = entry
                     return True, tf, ob.bottom, ob.top
+                if self._mm_recent_touch(pair, t, ob.bottom, ob.top):
+                    return True, tf, ob.bottom, ob.top  # P83
         return False, "", 0.0, 0.0
 
     def _mm_fvg_entry(self, pair, direction, t, zone=None):
@@ -5488,6 +5558,8 @@ class Backtester:
                     return True, tf, g.bottom, g.top
                 if g.bottom <= cur <= g.top:      # price INSIDE the zone = entry
                     return True, tf, g.bottom, g.top
+                if self._mm_recent_touch(pair, t, g.bottom, g.top):
+                    return True, tf, g.bottom, g.top   # P83: M1 shift confirms later
         return False, "", 0.0, 0.0
 
     def _mm_quadrant(self, t):
@@ -5770,6 +5842,19 @@ class Backtester:
             g[f"mm_golden_pd_{_pd_stage}_{_pd_tf}"] = (
                 g.get(f"mm_golden_pd_{_pd_stage}_{_pd_tf}", 0) + 1)
 
+        # P83 — wait for M1 structure to SHIFT our way inside the zone before entering.
+        _m1_ok, _m1s_stop = False, None
+        if config.MM_GOLDEN_M1_MSS:
+            if _pd_stage == "ob" and _ob_zone is not None:
+                _zl, _zh = _ob_zone.bottom, _ob_zone.top
+            else:
+                _zl, _zh = _ifvg_lo, _ifvg_hi
+            _m1_ok, _m1s_stop, _m1_ext = self._m1_shift(pair, direction, t, _zl, _zh)
+            if not _m1_ok:
+                g["mm_golden_no_m1_shift"] = g.get("mm_golden_no_m1_shift", 0) + 1
+                return
+            g["mm_golden_m1_shift"] = g.get("mm_golden_m1_shift", 0) + 1
+
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)
         bars_w = self.bars_up_to(pair, "W", t)
@@ -5787,8 +5872,12 @@ class Backtester:
         cur_price = bars5[-1].Close
         bars1h = self.bars_up_to(pair, "60T", t)
         bars1m = self.bars_up_to(pair, "1T", t, max_bars=120)
-        pat = self._get_limit_entry(bars5, bars15, bars1h, pair, direction, cur_price,
-                                    bars1m=bars1m)
+        if _m1_ok:
+            # The M1 shift IS the trigger; the stop sits beyond the pullback extreme.
+            pat = (cur_price, _m1s_stop, f"m1_shift_{_pd_stage}")
+        else:
+            pat = self._get_limit_entry(bars5, bars15, bars1h, pair, direction, cur_price,
+                                        bars1m=bars1m)
         if pat is None:
             g["mm_golden_no_pattern"] = g.get("mm_golden_no_pattern", 0) + 1
             return
@@ -5804,9 +5893,22 @@ class Backtester:
         # Stop: structural stop → M1 stop → pattern stop, capped at 10 pips.
         _stop_reason = "pattern (FVG/OB boundary)"
         _struct_stop = None
-        if config.STRUCTURE_STOP_ENABLED:
+        if _m1_ok:
+            # P83: beyond the M1 pullback extreme that made the shift. Skip the
+            # trade if price has already fallen back through it, and keep a floor
+            # so a 1-pip M1 wiggle cannot become the whole risk.
+            if (entry - stop) * direction <= 0:
+                g["mm_golden_m1_stale"] = g.get("mm_golden_m1_stale", 0) + 1
+                return
+            _min = config.MM_GOLDEN_M1_MSS_MIN_STOP_PIPS * pip
+            if abs(entry - stop) < _min:
+                stop = entry - direction * _min
+            _stop_reason = "M1 shift pullback extreme"
+        elif config.STRUCTURE_STOP_ENABLED:
             _struct_stop = self._structure_stop(pair, direction, entry, pip, t)
-        if _struct_stop is not None:
+        if _m1_ok:
+            pass
+        elif _struct_stop is not None:
             stop = _struct_stop
             _stop_reason = "structural swing (intact ITL/ITH)"
         else:

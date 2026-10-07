@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full]
-        opp: [near, far]
+        mode: [m1]
     env:
       NO_PUSH: "1"
     steps:
@@ -40,7 +40,7 @@ jobs:
           python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
                  --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD --dest /tmp/hd 2>&1 | tail -30
           python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
-      - name: Backtest (${{ matrix.arm }} / opp ${{ matrix.opp }})
+      - name: Backtest (${{ matrix.arm }} / ${{ matrix.mode }})
         continue-on-error: true
         run: |
           case "${{ matrix.arm }}" in
@@ -50,8 +50,8 @@ jobs:
             base) Y="" ;;
           esac
           if [ "${{ matrix.arm }}" = base ]; then export MM_GOLDEN_ENABLED=0; else export MM_GOLDEN_ENABLED=1; fi
-          export MM_GOLDEN_TARGET_OPPOSING=${{ matrix.opp }}
-          echo "MM_GOLDEN_ENABLED=$MM_GOLDEN_ENABLED MM_GOLDEN_TARGET_OPPOSING=$MM_GOLDEN_TARGET_OPPOSING"
+          export MM_GOLDEN_M1_MSS=1
+          echo "MM_GOLDEN_ENABLED=$MM_GOLDEN_ENABLED MM_GOLDEN_M1_MSS=$MM_GOLDEN_M1_MSS"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
       - name: Commit
@@ -59,7 +59,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_opp${{ matrix.opp }}
+          A=${{ matrix.arm }}_${{ matrix.mode }}
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

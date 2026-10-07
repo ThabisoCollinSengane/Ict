@@ -1290,3 +1290,12 @@ MM_GOLDEN_IFVG_ADJ_PIPS = float(_os.environ.get("MM_GOLDEN_IFVG_ADJ_PIPS", "20")
 # P82 — MM golden target = the OPPOSING liquidity pool (unswept H4/D/W ITH/ITL).
 # "0" = base _find_target (unchanged), "near" = first pool beyond entry, "far" = furthest.
 MM_GOLDEN_TARGET_OPPOSING = _os.environ.get("MM_GOLDEN_TARGET_OPPOSING", "0").strip().lower()
+# P83 — MM entry waits for an M1 market-structure shift inside the PD-array zone
+# (pullback prints its extreme in the zone, then a completed M1 close breaks the last
+# M1 swing). Stop beyond the pullback extreme. Default 0 = unchanged.
+MM_GOLDEN_M1_MSS = bool(int(_os.environ.get("MM_GOLDEN_M1_MSS", "0")))
+MM_GOLDEN_M1_MSS_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_MSS_LOOKBACK", "60"))
+MM_GOLDEN_M1_MSS_FRESH = int(_os.environ.get("MM_GOLDEN_M1_MSS_FRESH", "10"))
+MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS", "2"))
+MM_GOLDEN_M1_MSS_BUFFER = float(_os.environ.get("MM_GOLDEN_M1_MSS_BUFFER", "1"))
+MM_GOLDEN_M1_MSS_MIN_STOP_PIPS = float(_os.environ.get("MM_GOLDEN_M1_MSS_MIN_STOP_PIPS", "3"))
