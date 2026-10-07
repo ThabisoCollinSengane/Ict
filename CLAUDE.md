@@ -2396,6 +2396,42 @@ entries do not travel — wrong-way or too-early fills, the same shape P73 found
 book's losers. Target work on the MM channel is closed; the remaining lever is the entry
 (which rung fills, and whether price has actually left the consolidation). Default stays `0`.
 
+### P83 — MM entry waits for an M1 structure shift (RAN 2026-10-07) — 🟢 first MM variant to beat baseline OOS. Decision pending.
+
+`MM_GOLDEN_M1_MSS=1` (default 0). After the OB/IFVG/FVG ladder picks a zone, the pullback
+must print its extreme INSIDE the zone (±2 pips) and a completed M1 close must break the
+last M1 fractal swing before that extreme — the first break, within 10 M1 bars. The shift
+is the trigger; stop beyond the pullback extreme +1 pip (min 3, capped at 10). In this mode
+the rungs accept a recent M1 touch of the zone, since the shift comes after price leaves it.
+Fixture-verified both directions plus no-shift / no-touch / stale / blown-through cases.
+
+| | Base (MM off) | MM, no M1 shift (P81) | **MM + M1 shift** |
+|---|---|---|---|
+| IS MM trades / WR / PF | — | 104 / 30.8% / 1.61 | 66 / 25.8% / **1.41** |
+| OOS MM trades / WR / PF | — | 123 / 24.4% / 1.17 | 68 / **35.3%** / **1.71** |
+| IS withdrawn / MaxDD | R41.4k / −13.24% | R48.3k / −13.14% | R47.4k / **−15.59%** |
+| OOS withdrawn / MaxDD | R66.7k / −10.21% | R63.9k ❌ / −18.65% | **R73.7k ✓** / −11.72% |
+| Full withdrawn / MaxDD | R132.0k / −13.24% | R139.1k / −13.14% | **R148.6k (+12.5%)** / **−15.59%** |
+| Full book trades / PF | 736 / 4.01 | 921 / 2.92 | 842 / 3.33 |
+
+Per year vs base: 2022 +R8.2k, 2023 −R3.4k, 2024 +R10.8k, 2025 +R3.4k. The extra
+drawdown is all in **2022** (−15.6% vs −13.8%), the small-account phase. Working MaxDD
+25.0% vs 21.9%.
+
+**What changed:** the shift halves the MM trade count (227 -> 134 across the halves) and
+removes the OOS collapse — OOS PF 1.17 -> 1.71 and OOS MaxDD −18.65% -> −11.72%. MM median
+MFE rose to 14.4 pips OOS (was 7.6). Both halves PF > 1; OOS BETTER than IS, which is the
+not-curve-fit shape.
+
+**Caveats:** (1) median MM stop is exactly 10.0 pips — the cap binds on most trades, so the
+pullback extreme is usually >10 pips away and the stop sits INSIDE it. A wider/structural
+stop is untested. (2) The IFVG rung carries ~75% of MM trades (IS PF 1.12, OOS 2.04);
+OB/FVG/OB2 cells are n=3-9, ignore. (3) MaxDD −15.59% crosses the −15% breaker parameter;
+the trader's stated tolerance is 15-30%, so this is reported, not rejected.
+
+**Not shipped:** `MM_GOLDEN_ENABLED=0` / `MM_GOLDEN_M1_MSS=0` stay the defaults until the
+trader decides. Shipping both re-anchors the baseline to 842 / 42.5% / 3.33 / −15.59%.
+
 ### P84 — how price acts at INTRADAY PD arrays: FVG / IFVG / OB on H4, H1, M15 (RAN 2026-10-07) — 🔴 RED, all 9 cells
 
 `scripts/pd_reaction_study.py` (`.github/workflows/pd-reaction-study.yml` ->
