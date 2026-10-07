@@ -2550,6 +2550,20 @@ on OOS MaxDD. P88 DXY alone is still the top on MM PF and full withdrawals. **Ca
 ship: P88 (max quality) or P89 (quality + quantity) — trader's call.** `dxyf20ce` (adds the
 CE exception) still running.
 
+**P89b RESULT — `dxyf20ce`: the CE exception STILL never fires (closed).** Byte-identical to
+`dxyf20` (414 / 430 / 846, R160.0k), `mm_golden_m1_htf_ce` absent. Tried 4,615, price had
+closed halfway into the H1 IFVG 452 times, and in none of them did a valid M1 turn form
+inside the IFVG that the normal rung had not already caught. Mechanism: the rung zone is
+usually the H1 IFVG itself or sits inside it, so any M1 turn inside the IFVG is already a
+normal entry; the rest fail M1 structure outright. **The idea is correct ICT but adds no
+entries in this engine.** `MM_GOLDEN_M1_HTF_CE` stays 0. Closed.
+
+**DECISION PENDING (trader):** ship P88 (`MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1
+MM_GOLDEN_M1_DXY=1`, full 817 / PF 3.82 / −15.59% / R163.1k) or P89 (same + 
+`MM_GOLDEN_M1_MSS_FRESH=20`, full 846 / PF 3.58 / −15.66% / R160.0k, more trades).
+Either re-anchors the documented baseline. Open ideas: a looser M1 SMT (vs DXY, or shorter
+window) — the 40-bar sister-pair version rejected ~85% of shifts.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
