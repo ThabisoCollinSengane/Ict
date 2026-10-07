@@ -2370,6 +2370,32 @@ stays.
 from a correct strict gate by its counter alone — 97% rejection looked like "the
 model is rare". Drive the predicate on a fixture of the thing it is meant to accept.
 
+### P82 — MM target = opposing liquidity pool (RAN 2026-10-07) — 🔴 worse, closes
+
+`MM_GOLDEN_TARGET_OPPOSING=near|far` (default `0`) swaps the MM channel's target from the
+base nearest fib/level to the unswept H4/D/W ITH/ITL beyond entry (`_opposing_liquidity`,
+now with `nearest=`). Falls back to the base target when no pool qualifies.
+
+| MM channel | base target (P81) | opposing NEAR | opposing FAR |
+|---|---|---|---|
+| IS trades / WR / PF | 104 / 30.8% / **1.61** | 116 / 30.2% / 1.37 | identical to near |
+| OOS trades / WR / PF | 123 / 24.4% / **1.17** | 130 / 24.6% / 1.06 | 132 / 24.2% / 1.05 |
+| OOS book MaxDD | −18.65% | −18.54% | −18.54% |
+| median target distance | 33 / 33 pips | 72 / 61 pips | 777 / 216 pips |
+| exits at target (IS / OOS) | 10 / 7 | 4 / 1 | — |
+
+**Near and far are near-identical despite targets 10× apart** (verified: 86/116 IS targets
+differ). The reason is the real finding: **the median MM trade reaches only 8-13 pips of
+favourable excursion (MFE) before reversing**, on a ~6-7 pip stop. ~75% of MM trades are
+full stop-outs and the rest exit on the trailing/break-even stop. A target 30, 72 or 777
+pips away is irrelevant to a trade that travels 10. Aiming further only removes the
+handful of 30-pip target hits, so PF falls.
+
+**What this says about the MM channel:** the problem is not WHERE it aims, it is that the
+entries do not travel — wrong-way or too-early fills, the same shape P73 found for the base
+book's losers. Target work on the MM channel is closed; the remaining lever is the entry
+(which rung fills, and whether price has actually left the consolidation). Default stays `0`.
+
 ### P79 — fundamentals scorecard: COT, US yields, news (RAN 2026-10-06) — 🔴 nothing tradeable
 
 **Where it runs:** this container is blocked from every market-data host, so
