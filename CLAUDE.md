@@ -2556,6 +2556,11 @@ Ship gate: more MM trades than P83 AND withdrawn up in BOTH halves, MaxDD not wo
   Diagnostic run with per-step counters pushed (`_p87diag`): `htf_try`, `htf_same_zone`
   (rung zone == the IFVG itself, so the exception adds nothing), `htf_ce_closed`,
   `htf_fail_<reason>`. Read those before concluding anything about the idea.
+- **CE diagnostic (`_p87diag`, full 4yr):** tried 4,652; `same_zone` 1,930 (41% — the rung
+  zone already IS the H1 IFVG, so widening adds nothing); `ce_closed` 466; of those ALL
+  failed the M1 shift: stale 206, no_swing 118, no_break 72, blew_through 70. **The
+  exception is blocked by the 10-bar freshness rule** — by the time price has closed
+  halfway, the M1 break is usually older than 10 bars. Next: `dxyf20ce` (CE + DXY + fresh 20).
 - **`f20` (M1 break fresh within 20 bars, not 10): more trades + more money, more DD.**
 
 | | P83 control | f20 |
