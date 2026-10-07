@@ -356,8 +356,11 @@ def build(day, stance, stance_w, us2y, us2y_w, cal, cal_w):
             L.append(f"- Fed: **{us.get('stance','?')}** at {us.get('rate','?')}%"
                      + (f" · next {us['next_meeting']}" if us.get("next_meeting") else ""))
             L.append("")
-    L += ["All three pairs are X/USD, so this one read leans every pair at once. "
-          "A dollar bid is a headwind for EURUSD/GBPUSD/NZDUSD longs.", ""]
+    L += ["**Yields CONFIRM the dollar today — they do not predict tomorrow.** "
+          "Measured 2022-26 (P79): on the same day US 5y/10y yields and the pairs move "
+          "opposite (corr -0.25 to -0.40, every pair, both halves); the next day there "
+          "is nothing, and this 5-day yield lean scored no edge at +1d or +5d. Use it "
+          "like SMT — a cross-check on the move in front of you, not a forecast.", ""]
 
     # per pair
     L += ["## Per pair", ""]
