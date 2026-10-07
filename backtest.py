@@ -6054,11 +6054,18 @@ class Backtester:
                 # P87 — HTF IFVG exception: once a completed candle has CLOSED halfway into
                 # the H1/H4 IFVG (its 50% / CE), the M1 turn may form anywhere inside the
                 # whole IFVG, not only the small rung zone.
+                g["mm_golden_m1_htf_try"] = g.get("mm_golden_m1_htf_try", 0) + 1
+                if (_zone_lo, _zone_hi) == (_zl, _zh):
+                    g["mm_golden_m1_htf_same_zone"] = g.get("mm_golden_m1_htf_same_zone", 0) + 1
                 if self._ifvg_ce_closed(pair, direction, t, _zone_lo, _zone_hi):
+                    g["mm_golden_m1_htf_ce_closed"] = g.get("mm_golden_m1_htf_ce_closed", 0) + 1
                     _m1_ok, _m1s_stop, _m1_ext = self._m1_shift(pair, direction, t,
                                                                 _zone_lo, _zone_hi)
                     if _m1_ok:
                         g["mm_golden_m1_htf_ce"] = g.get("mm_golden_m1_htf_ce", 0) + 1
+                    else:
+                        _d = self._m1_shift_diag(pair, direction, t, _zone_lo, _zone_hi)
+                        g[f"mm_golden_m1_htf_fail_{_d}"] = g.get(f"mm_golden_m1_htf_fail_{_d}", 0) + 1
             if not _m1_ok:
                 g["mm_golden_no_m1_shift"] = g.get("mm_golden_no_m1_shift", 0) + 1
                 if config.MM_GOLDEN_M1_ARM and not _S.get("_armed"):
