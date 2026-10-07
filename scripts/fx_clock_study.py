@@ -632,6 +632,11 @@ def main():
     ap.add_argument("--plant", type=float, default=0.0,
                     help="with --null: plant a dollar W of this many bp at the ECB fix")
     ap.add_argument("--seed", type=int, default=11, help="with --null: RNG seed")
+    ap.add_argument("--is-years", type=int, nargs="+", default=None,
+                    help="override the IS years (e.g. 2010 ... 2017) for a long-history run")
+    ap.add_argument("--oos-years", type=int, nargs="+", default=None,
+                    help="override the OOS years (e.g. 2018 ... 2025)")
+    ap.add_argument("--out", default=None, help="report path (default data/fx_clock_report.md)")
     ap.add_argument("--yahoo", type=int, default=0, metavar="DAYS",
                     help="recent-window mode on Yahoo 5m (max 60d). Halves = first/"
                          "second half of the window. Writes fx_clock_recent_report.md "
@@ -641,6 +646,13 @@ def main():
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    global IS_YEARS, OOS_YEARS, REPORT
+    if a.is_years:
+        IS_YEARS = tuple(a.is_years)
+    if a.oos_years:
+        OOS_YEARS = tuple(a.oos_years)
+    if a.out:
+        REPORT = a.out if os.path.isabs(a.out) else os.path.join(ROOT, a.out)
     if a.null:
         series = _synthetic(a.plant, a.seed)
         label = f"RANDOM-WALK NULL, planted {a.plant:g}bp" if a.plant else "RANDOM-WALK NULL"
@@ -688,7 +700,10 @@ def main():
         return 1
     cov = ", ".join(f"{p} {c.index.min():%Y-%m-%d}→{c.index.max():%Y-%m-%d} "
                     f"({len(c):,} bars)" for p, c in series.items())
-    text, verdict = build_report(series, a.window, "real data", cov)
+    long_run = bool(a.is_years or a.oos_years)
+    label = (f"real data, IS {IS_YEARS[0]}-{IS_YEARS[-1]} / OOS {OOS_YEARS[0]}-{OOS_YEARS[-1]}"
+             if long_run else "real data")
+    text, verdict = build_report(series, a.window, label, cov, with_trades=not long_run)
     print(text)
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     open(REPORT, "w", encoding="utf-8").write(text)
