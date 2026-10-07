@@ -2535,6 +2535,21 @@ shifts (ok 262 / no 255). **M1 SMT (block-half, 40 bars) is too restrictive** �
 ~85% of shifts, leaves 10-15 MM trades, below base on withdrawals; not usable as built.
 Next: `dxyf20` (DXY + fresh-20) to win back quantity.
 
+**P89 RESULT (RAN 2026-10-07) — `dxyf20` (DXY M1 + fresh 20): P83's QUANTITY with better money/DD.**
+
+| | P83 M1 only | P88 DXY | **P89 DXY + f20** |
+|---|---|---|---|
+| MM trades IS / OOS / full | 66 / 68 / 140 | 51 / 44 / 100 | **67 / 58 / 134** |
+| MM PF IS / OOS | 1.41 / 1.71 | 2.38 / 2.11 | 1.98 / 1.71 |
+| Book PF full | 3.33 | 3.82 | 3.58 |
+| Withdrawn IS / OOS / full | R47.4k / 73.7k / 148.6k | R62.0k / 71.9k / **163.1k** | R60.2k / **74.9k** / 160.0k |
+| MaxDD IS / OOS / full | −15.59 / −11.72 / −15.59 | −15.59 / −9.99 / −15.59 | −15.66 / −9.98 / −15.66 |
+
+DXY+f20 keeps P83's trade count (134 vs 140) and beats it on withdrawals in BOTH halves and
+on OOS MaxDD. P88 DXY alone is still the top on MM PF and full withdrawals. **Candidates to
+ship: P88 (max quality) or P89 (quality + quantity) — trader's call.** `dxyf20ce` (adds the
+CE exception) still running.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
