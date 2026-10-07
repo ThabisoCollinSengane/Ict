@@ -1,0 +1,73 @@
+name: MM golden channel — IS / OOS / full (HistData M1, on GitHub's runner)
+
+# The never-run test from CLAUDE.md P58-P63: MM_GOLDEN_ENABLED=1, quadrant on,
+# on IS 2022-23, OOS 2024-25 and the full 4yr path. Base strategy untouched;
+# the MM channel is additive. Each arm runs in parallel and commits its own
+# report/console/trade dump under data/mm_golden_<arm>_*.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/mm-golden-isoos.yml"
+      - ".github/mm-golden.trigger"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [is, oos, full]
+    env:
+      NO_PUSH: "1"
+      MM_GOLDEN_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download HistData M1 2022-2025 (all pairs)
+        run: |
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
+                 --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD --dest /tmp/hd 2>&1 | tail -30
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+      - name: Backtest (${{ matrix.arm }})
+        continue-on-error: true
+        run: |
+          case "${{ matrix.arm }}" in
+            is)   Y="--years 2022 2023" ;;
+            oos)  Y="--years 2024 2025" ;;
+            full) Y="" ;;
+          esac
+          python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
+          tail -150 /tmp/run.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          A=${{ matrix.arm }}
+          [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
+          [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
+          cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
+          for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
+            [ -f "$d" ] && { cp "$d" data/mm_golden_${A}_trades.csv; break; }
+          done
+          git checkout -- data/backtest_report.md data/backtest_console.txt 2>/dev/null || true
+          git add -f data/mm_golden_${A}_*
+          git diff --cached --quiet && exit 0
+          git commit -m "MM golden ${A} run [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1
