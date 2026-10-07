@@ -86,5 +86,22 @@ _MDE = minimum detectable effect (2 SE). Where |R| < MDE the comparison is UNDER
 
 ## §4 Our trades — with / against the fix flow
 
-_trade dump not found in data/histdata/ or data/ — run `python run_backtest_histdata.py` first_
+_dump: data/histdata/trades_dump.csv; base legs only. 'with' = trade direction matches the expected pair move in the ±2h around the ECB/WMR fix._
+
+**§2 is not GREEN, so this table is DESCRIPTIVE ONLY** — there is no established flow to be with or against.
+
+| split | bucket | n | WR% | PF |
+|---|---|---|---|---|
+| IS | with | 85 | 45.9 | 3.83 |
+| IS | against | 78 | 38.5 | 3.18 |
+| IS | outside | 183 | 44.8 | 3.24 |
+| OOS | with | 99 | 41.4 | 5.01 |
+| OOS | against | 94 | 44.7 | 3.79 |
+| OOS | outside | 183 | 46.4 | 4.79 |
+
+_IS: with − against = +7.4pp (+0.96 SE); a gap that size needs ~355 trades per bucket to reach 2 SE (have 85/78)._
+
+_OOS: with − against = -3.3pp (-0.46 SE); a gap that size needs ~1838 trades per bucket to reach 2 SE (have 99/94)._
+
+_Trades opened on daylight-saving mismatch days: 54 (WR 50.0%, PF 7.11). These are the days London opens at 04:00 ET and the WMR fix lands at 12:00 ET, inside the noon block._
 
