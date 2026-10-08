@@ -31,6 +31,20 @@ cache-bug post-mortem.)
 MaxDD −15.66% / R176.0k withdrawn (IS R60.8k, OOS R85.0k).** The P94 `p93` control arm must
 reproduce this exactly. `MM_PRESET=p92` and `MM_PRESET=base` still reproduce their anchors.
 
+**P94 RESULT (RAN 2026-10-08) — break-even at halfway: more money, does NOT fix the 2024-25 drawdown.**
+Controls exact: p93 876 / R176,034 (new default confirmed); base 736 / R132,020.
+
+| run | book trades | MM PF IS/OOS | withdrawn IS / OOS / full | DD full / OOS |
+|---|---|---|---|---|
+| p93 (default) | 876 | 1.82 / 1.93 | 60.8 / 85.0 / 176.0 | −15.66 / −9.87 |
+| h1be50 (H1 Judas target + BE at 50%) | 880 | 1.59 / 2.67 | 62.2 / **97.0** / **188.6** | −15.59 / **−20.29** |
+| be50 (normal target + BE at 50%) | 851 | 1.69 / 2.78 | 63.4 / 91.8 / 184.3 | −15.59 / **−22.07** |
+
+MM exits IS / OOS: p93 full losses 38 / 28, BE exits 11 / 11, target hits 13 / 5; h1be50 46 / 36,
+5 / 16, 21 / 24. More targets reached, more full losses (avg R−357..−372 vs R−309..−337). The
+OOS drawdown is the same Apr-May 2024 cluster as P93c. Best total of any variant (R188.6k), but
+the risk trade-off is unchanged: managed exits keep OOS DD ~−10%, any fixed/late-BE exit ~−20%.
+
 ### P95 — SMT the trader's way: top-down, anchored on the swing that attacked the zone (BUILT 2026-10-08, RUNNING)
 
 Trader (2026-10-08): SMT starts on the bigger TF and goes lower; "the last swing that attacked the
