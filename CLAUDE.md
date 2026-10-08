@@ -2645,6 +2645,24 @@ P88/P89. **Next (P91b):** compare the tap to the extreme of the whole prior wind
 (`MM_GOLDEN_M1_SMTZ_REF=min`, PRIOR 60 / 120 / 240 M1 bars = the session's important
 low/high), record-only on p89 -> `data/mm_golden_*_p91b_*`.
 
+**P91b RESULT (RAN 2026-10-08) — at the session's important low/high, SMT trades did WORSE than
+"all three took it" trades.** Record-only on p89; all 9 runs reproduced 846 / R160.0k exactly.
+Tap compared with the extreme of the prior 60 / 120 / 240 M1 bars (`MM_GOLDEN_M1_SMTZ_REF=min`).
+
+| reading (MM trades) | 60 bars IS | 60 bars OOS | 120 IS | 120 OOS | 240 IS | 240 OOS |
+|---|---|---|---|---|---|---|
+| `cont` all 3 took it | 30 / 37% / **3.77** | 19 / 53% / **3.20** | 14 / 43% / 4.06 | 8 / 50% / 1.49 | 5 / 60% / 5.57 | 5 / 60% / 2.21 |
+| `smt` 1-2 took it | 30 / 30% / 1.27 | 30 / 27% / 1.03 | 35 / 26% / 1.34 | 28 / 39% / 1.67 | 24 / 25% / 1.24 | 16 / 56% / 4.54 |
+| `none` took it | 7 / 14% / 0.45 | 9 / 33% / 1.44 | 18 / 33% / 2.00 | 22 / 27% / 1.95 | 38 / 32% / 2.05 | 37 / 24% / 0.93 |
+
+(n / WR / PF.) The 60-bar window is the only one with usable n in every cell, and there
+`cont` beats `smt` in BOTH halves on WR and PF — the OPPOSITE of the trader's rule as
+mechanised here. 120/240 are mixed or tiny. Three windows were read, so one consistent
+column is weak evidence; but nothing here supports SMT-at-the-tap as a filter. Reading:
+when EURUSD, GBPUSD and DXY all run the last hour's low/high together at the zone, the
+whole dollar complex has been raided — the reversal from there paid better. Candidate
+(untested): size UP `cont` (60 bars) 1.25×, removing nothing. Trader to decide.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
