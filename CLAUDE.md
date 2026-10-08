@@ -93,6 +93,30 @@ anchored top-down SMT sizes MM trades 1.25× (R3k floor) instead of filtering; c
 on. `_smt3_took` fixture-verified (1 of 3 / all 3 / none / short). Loops: `p93` control (876 /
 R176,034), `closed`, `dxy3`, `closeddxy3`, `hsize` -> `data/mm_golden_*_p96_*`.
 
+**P96 RESULT (RAN 2026-10-08) — none beats p93; the old SMT gate's value is mostly REAL (not
+lookahead); keep p93.** Control exact (876 / R176,034).
+
+| run | book trades | MM IS/OOS | MM PF IS/OOS | withdrawn IS / OOS / full | DD full / OOS |
+|---|---|---|---|---|---|
+| p93 (default) | 876 | 70 / 64 | 1.82 / 1.93 | 60.8 / 85.0 / 176.0 | −15.66 / −9.87 |
+| closed (old gate, closed bars) | 861 | 67 / 65 | **1.91 / 2.07** | 61.9 / 74.1 / 165.1 | −16.42 / −13.65 |
+| dxy3 (old gate + DXY) | 870 | 70 / 69 | 1.81 / 1.79 | 60.7 / 80.9 / 169.9 | −15.66 / −13.64 |
+| closeddxy3 | 877 | 69 / 70 | 1.90 / 1.80 | 61.8 / 83.2 / 172.1 | −15.66 / −13.63 |
+| hsize (anchored SMT 1.25× size) | 845 | 60 / 60 | 1.51 / 1.99 | 54.7 / 71.6 / 156.8 | −15.66 / −9.88 |
+
+- **closed**: removing the forming bar did NOT weaken the gate — MM count unchanged (143) and MM PF
+  went UP in both halves. So the old gate's edge is real. The money fell (OOS −R10.9k) through a
+  path effect, not MM quality: MM P&L OOS +R1.5k, base P&L −R12.5k — a different MM sequence pushed
+  the account into the drawdown breaker more often (`drawdown_halt` bar-checks 1,906 -> 3,720,
+  `daily_loss_halt` 453 -> 696), which blocked ~25 profitable base trades. Same P8/P10 lesson: the
+  compounding path, not the bucket, decides the money.
+- **dxy3 / closeddxy3**: adding DXY lets more setups through (`mm_golden_no_smt` 2,739 -> 1,782 /
+  1,666) and the extra ones are weaker OOS (PF 1.93 -> 1.79/1.80). Not an improvement.
+- **hsize**: 1.25× on 130 anchored-SMT trades converted into skips (`risk_cap_skip` 181 -> 211, MM
+  143 -> 128) and lost R19.3k; IS MM PF 1.51. The P70 ARM-1 failure shape again.
+- Where the old gate passes (full p93, counts are gate CHECKS not trades): D 2,045, H4 1,609,
+  H1 1,521, M15 1,287, M5 1,090, M1 886 — it is mostly a Daily/H4/H1 read already.
+
 ### ⚠️ HOW SMT IS MEASURED TODAY (checked 2026-10-08, trader asked) — read before any SMT work
 
 The MM channel ALREADY requires a bigger-timeframe SMT on every trade: `MM_GOLDEN_OB_SMT_REQUIRED=1`
