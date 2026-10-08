@@ -31,6 +31,19 @@ cache-bug post-mortem.)
 MaxDD −15.66% / R176.0k withdrawn (IS R60.8k, OOS R85.0k).** The P94 `p93` control arm must
 reproduce this exactly. `MM_PRESET=p92` and `MM_PRESET=base` still reproduce their anchors.
 
+### ⚠️ HOW SMT IS MEASURED TODAY (checked 2026-10-08, trader asked) — read before any SMT work
+
+The MM channel ALREADY requires a bigger-timeframe SMT on every trade: `MM_GOLDEN_OB_SMT_REQUIRED=1`
+(default) -> `_htf_pair_smt` (backtest.py ~4828), cascade `MM_SMT_TFS` = D, H4, H1, M30, M15, M5, M1,
+**EURUSD vs GBPUSD only (no DXY)**, block-half method (`ict.smt.smt_divergence`, last
+`MM_HTF_SMT_LOOKBACK`=20 bars of each TF, prior half vs recent half), passes if ANY rung shows it.
+All MM trades carry `golden_smt=True` (P93b disp: 70 IS / 64 OOS). So "SMT on the bigger TF, M1 only
+shifts" is roughly what runs now. Known gaps: (1) DXY not in it; (2) ANY rung incl. M5/M1 counts —
+not top-down, and which rung fired is NOT recorded; (3) it reads the FORMING bar (`bars_up_to`, no
+`[:-1]`) — on D1/H4 that is the forming-bar lookahead class (P67/P73); (4) not anchored to the
+liquidity pool, just the last 20 bars at entry time. The M1-only SMT checks of P88/P90/P91/P92 were
+ON TOP of this. Proposed next: record the rung, completed bars only, add DXY, test HTF-only (D/H4/H1/M15).
+
 ### P94 — MM break-even only at HALFWAY to target (BUILT 2026-10-08, RUNNING)
 
 `MM_GOLDEN_BE_FRAC=0.5`: on MM trades the stop moves to entry only once price has covered 50%
