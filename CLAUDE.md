@@ -143,6 +143,28 @@ trades 08:00 ET, NY trades 12:00 ET; `MM_GOLDEN_SESS_END_LONDON/_NY`), 2 = close
 `time_exit`. Loops: `p93`, `h1be50`, `h1be50sbe`, `h1be50scl`, `h1be50nws` × is/oos/full/y26 ->
 `data/mm_golden_*_p97_*` (+ `_news_report.md` per run).
 
+**P97 RESULT (RAN 2026-10-08) — no exit rule fixes the 2024-25 drawdown; 2026 Jan-Sep is the
+first this-year test.** Controls exact: p93 876 / R176,034; h1be50 880 / R188.6k.
+
+| run | MM IS/OOS | MM PF IS/OOS | withdrawn IS / OOS / full | DD full / OOS | 2026 P&L / DD / MM n, PF |
+|---|---|---|---|---|---|
+| p93 (default) | 70 / 64 | 1.82 / 1.93 | 60.8 / 85.0 / 176.0 | −15.66 / −9.87 | +R3,596 / −19.37 / 15, 1.14 |
+| h1be50 | 72 / 76 | 1.59 / 2.67 | 62.2 / 97.0 / 188.6 | −15.59 / −20.29 | +R4,391 / −28.0 / 16, 0.81 |
+| h1be50sbe (BE at session end) | 72 / 76 | 1.46 / 2.83 | 60.1 / 97.8 / 187.2 | −15.59 / −20.29 | +R3,563 / −26.79 / 15, 1.22 |
+| h1be50scl (close at session end) | 69 / 68 | 1.51 / 2.16 | 59.4 / 90.7 / 177.3 | −15.59 / −20.29 | +R5,367 / −27.52 / 15, 0.64 |
+| h1be50nws (close before High news) | 72 / 76 | 1.57 / 2.99 | 62.2 / 100.3 / **191.0** | −15.59 / −20.29 | +R1,947 / −21.62 / 16, 1.39 |
+
+- Session-end rules touched 18 MM trades in 4 years; news exit 5. None moves the OOS −20.29%
+  (the Apr-May 2024 cluster). nws is the best total (+R2.4k over h1be50) off 5 trades — path noise
+  as much as edge. Session close costs R11.3k.
+- 2026 (R1,000 start, Jan-Sep, no withdrawals because equity never reached R6k): every version
+  profitable (+195% to +537%), but the year is harder: base WR 36% (history ~44%), base target
+  hits 10%. **The 2026 drawdown is the BASE strategy, not MM**: p93 trough −19.37%, 24 Jun ->
+  20 Jul 2026, 10 trades, 9 losers, 0 MM. Only 15-16 MM trades in 9 months; MM PF 0.81-1.39 —
+  far too few to judge.
+- 2026 news/session read (`data/mm_golden_y26_p93_p97_news_report.md`): 0 of 15 MM trades had
+  news while open; MM London 5 / PF 2.09, NY 10 / PF 0.45 — the reverse of 2024-25, n tiny.
+
 ### ⚠️ HOW SMT IS MEASURED TODAY (checked 2026-10-08, trader asked) — read before any SMT work
 
 The MM channel ALREADY requires a bigger-timeframe SMT on every trade: `MM_GOLDEN_OB_SMT_REQUIRED=1`
