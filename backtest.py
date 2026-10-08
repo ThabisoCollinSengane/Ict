@@ -5704,7 +5704,10 @@ class Backtester:
                 if ext > zone_hi + tol or ext < zone_lo - tol:
                     continue                      # pullback never reached / blew through
                 sw = [j for j in range(1, li) if j + 1 < len(seg)
-                      and seg[j].High > seg[j - 1].High and seg[j].High > seg[j + 1].High]
+                      and seg[j].High > seg[j - 1].High and seg[j].High > seg[j + 1].High
+                      and (not config.MM_GOLDEN_M1_MSS_DISP      # P93b: only the swing that
+                           or self._disp_swing_idx(seg, j, "high",   # caused the impulse
+                                                   config.MM_GOLDEN_M1_SMTX_DISP_SPAN))]
                 if not sw:
                     continue
                 lvl = seg[sw[-1]].High
@@ -5720,7 +5723,10 @@ class Backtester:
                 if ext < zone_lo - tol or ext > zone_hi + tol:
                     continue
                 sw = [j for j in range(1, hi_i) if j + 1 < len(seg)
-                      and seg[j].Low < seg[j - 1].Low and seg[j].Low < seg[j + 1].Low]
+                      and seg[j].Low < seg[j - 1].Low and seg[j].Low < seg[j + 1].Low
+                      and (not config.MM_GOLDEN_M1_MSS_DISP
+                           or self._disp_swing_idx(seg, j, "low",
+                                                   config.MM_GOLDEN_M1_SMTX_DISP_SPAN))]
                 if not sw:
                     continue
                 lvl = seg[sw[-1]].Low

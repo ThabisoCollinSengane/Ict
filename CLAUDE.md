@@ -2739,6 +2739,17 @@ applied (the trader's target replaces it). Flags: `MM_GOLDEN_JUDAS_TARGET`,
 Loops: `p92` (default, must = 869 / R167.1k), `base` (must = 736 / R132.0k), `jt`, `jtfx`,
 `fx2r` -> `data/mm_golden_*_p93_*`.
 
+### P93b — the pair's OWN M1 trigger must break the swing that caused the impulse (BUILT 2026-10-08, RUNNING)
+
+Trader: "what happened to the last swing [that] caused an impulse being the required shift in
+market structure?" In P92 the impulse-swing (displacement) rule was applied only to the 2-of-3
+EU/GU/DXY check; the traded pair's own trigger (`_m1_shift`) still broke ANY last 3-bar swing.
+`MM_GOLDEN_M1_MSS_DISP=1`: `_m1_shift` only counts swings price displaced away from (FVG within
+`MM_GOLDEN_M1_SMTX_DISP_SPAN` bars). Fixture: a close above a minor wiggle passes with the flag
+off and is rejected with it on; a close above the impulse swing passes both. Loops: `p92`
+control, `disp`, `dispjt` (+ Judas-origin target), `dispjtfx` (+ fixed exit) ->
+`data/mm_golden_*_p93b_*`.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that

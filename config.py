@@ -1383,3 +1383,7 @@ MM_GOLDEN_JT_LOOKBACK = {"60T": int(_os.environ.get("MM_GOLDEN_JT_LB_H1", "48"))
 MM_GOLDEN_JT_MIN_RR = float(_os.environ.get("MM_GOLDEN_JT_MIN_RR", "1.0"))
 MM_GOLDEN_FIXED_EXIT = bool(int(_os.environ.get("MM_GOLDEN_FIXED_EXIT", "0")))
 MM_GOLDEN_FIXED_RR = float(_os.environ.get("MM_GOLDEN_FIXED_RR", "0"))
+# P93b — the traded pair's OWN M1 entry trigger must break the swing that CAUSED the impulse
+# into the zone (a swing price displaced away from, FVG within MM_GOLDEN_M1_SMTX_DISP_SPAN
+# bars), not just the last 3-bar swing. Default 0 = P83/P92 behaviour.
+MM_GOLDEN_M1_MSS_DISP = bool(int(_os.environ.get("MM_GOLDEN_M1_MSS_DISP", "0")))
