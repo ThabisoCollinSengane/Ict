@@ -342,7 +342,7 @@ class Backtester:
             # Load M5 bars for structure trail AND trail-at-TP ratchet.
             bars5_trail = (self.bars_up_to(pair, config.STRUCTURE_TRAIL_TF, t)
                            if (config.STRUCTURE_TRAIL or config.TRAIL_AT_TP) else None)
-            for leg in st["legs"]:
+            for leg in ([] if st.get("fixed_exit") else st["legs"]):   # P93: fixed MM exits
                 pips_profit = (bar.Close - leg["entry"]) * direction / pip
                 if pips_profit >= config.TRAIL_LOCK_PIPS:
                     locked = leg["entry"] + 10 * pip * direction
@@ -5625,6 +5625,34 @@ class Backtester:
         who = "+".join(k for k in ("eu", "gu", "dxy") if took[k]) or "none"
         return ("smt" if 1 <= n <= 2 else ("cont" if n == 3 else "none")), who
 
+    def _judas_origin_target(self, pair, direction, entry, stop, t):
+        """P93: the consolidation the MM Judas swing LEFT - the trader's first reasonable
+        target. On completed H1 bars (then H4) find the Judas extreme in the lookback (lowest
+        low for a long, highest high for a short), then the most recent INTERMEDIATE swing
+        (ITH for a long / ITL for a short, Ep-12 fractal) that formed BEFORE it - the last
+        structure price left on its way into the manipulation. Must sit beyond entry by at
+        least MM_GOLDEN_JT_MIN_RR x the stop distance. Returns (price, tf) or (None, None)."""
+        risk = abs(entry - stop)
+        for tf in config.MM_GOLDEN_JT_TFS:
+            lb = config.MM_GOLDEN_JT_LOOKBACK.get(tf, 48)
+            bars = self.bars_up_to(pair, tf, t, max_bars=lb + 1)
+            if not bars or len(bars) < 10:
+                continue
+            b = bars[:-1]
+            res = mstruct.classify(b)
+            if direction > 0:
+                ji = min(range(len(b)), key=lambda i: b[i].Low)
+                cands = [s for s in res.get("ith", []) if s.bar_index < ji]
+            else:
+                ji = max(range(len(b)), key=lambda i: b[i].High)
+                cands = [s for s in res.get("itl", []) if s.bar_index < ji]
+            if not cands:
+                continue
+            sw = max(cands, key=lambda s: s.bar_index)
+            if (sw.price - entry) * direction >= config.MM_GOLDEN_JT_MIN_RR * risk > 0:
+                return sw.price, tf
+        return None, None
+
     def _ifvg_ce_closed(self, pair, direction, t, lo, hi):
         """P87: has a COMPLETED M5 candle closed at or beyond the IFVG's halfway line
         (consequent encroachment) during the M1 lookback, without closing through the
@@ -6395,8 +6423,20 @@ class Backtester:
             else:
                 g["mm_golden_target_opposing_none"] = (
                     g.get("mm_golden_target_opposing_none", 0) + 1)
+        _target_fixed = False
+        if config.MM_GOLDEN_JUDAS_TARGET:
+            # P93 — aim at the consolidation the Judas swing left (last H1/H4 ITH/ITL).
+            _jt, _jtf = self._judas_origin_target(pair, direction, entry, stop, t)
+            if _jt is not None:
+                target, target_type, _target_fixed = _jt, f"judas_origin_{_jtf}", True
+                g[f"mm_golden_jt_{_jtf}"] = g.get(f"mm_golden_jt_{_jtf}", 0) + 1
+            else:
+                g["mm_golden_jt_none"] = g.get("mm_golden_jt_none", 0) + 1
+        if config.MM_GOLDEN_FIXED_RR > 0:
+            target = entry + direction * config.MM_GOLDEN_FIXED_RR * abs(entry - stop)
+            target_type, _target_fixed = f"fixed_{config.MM_GOLDEN_FIXED_RR:g}r", True
         reward_pips = abs(target - entry) / pip
-        if reward_pips < self._min_pips_target():
+        if reward_pips < self._min_pips_target() and not _target_fixed:
             g["mm_golden_target_short"] = g.get("mm_golden_target_short", 0) + 1
             return
 
@@ -6500,6 +6540,7 @@ class Backtester:
             "draw_score": _draw_score,
             "im_scenario": "golden",
             "entry_model": "mm_golden",
+            "fixed_exit": config.MM_GOLDEN_FIXED_EXIT,     # P93
             # P49 analytics — what the trades that DO fire actually have.
             "golden_via": _golden_via,          # own_ob | cascade
             "golden_ob_tf": _ob_tf,             # D | 240T | 60T | 15T

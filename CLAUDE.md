@@ -24,6 +24,19 @@ cache-bug post-mortem.)
 
 ---
 
+## 🚨 NEW DEFAULT BASELINE (2026-10-08, trader's decision) — MM channel ON via `MM_PRESET=p92`
+
+`config.MM_PRESET` now defaults to **`p92`**: MM channel on + M1 structure shift (fresh 20 bars)
++ 2-of-3 key-swing shift on EURUSD / GBPUSD / DXY (P92). **The regression anchor is now
+869 trades / WR 42.8% / PF 3.56 / MaxDD −15.66% / R167.1k withdrawn (full 4yr)**, IS 432 /
+R60.5k, OOS 430 / R76.8k. `MM_PRESET=base` reproduces the OLD anchor (736 / 43.9% / 4.01 /
+−13.24% / R132.0k) — every run must still be able to reproduce both. Individual env vars
+override the preset. **Live note:** `live/run_live.py` calls only `_maybe_open`, never the MM
+channel, so the live/MT5 path is unchanged by this default — porting MM to live is separate.
+**Reporting rule from the trader (2026-10-08): explain findings thoroughly and plainly — what
+was measured, how, what each number means, what it does and does not show. Short summaries
+with my own conclusions were not enough.**
+
 ## 🧭 SESSION HANDOFF — READ FIRST (updated 2026-10-07)
 
 **Where the MM model stands (all default OFF; base 736 / 43.9% / 4.01 / −13.24% untouched):**
@@ -2710,6 +2723,21 @@ REVERSAL beat the continuation in EVERY bucket, both halves — including `shift
 "no SMT -> continues" rule is not supported here. Side lead (not acted on): the same setups
 simulated with a fixed 2R exit win ~50-55% vs the engine's ~30% MM WR — the engine's MM exits
 (base targets / trail / BE) may be leaving the edge on the table. Untested in the engine.
+
+### P93 — MM target = the consolidation the Judas swing LEFT + fixed exits (BUILT 2026-10-08, RUNNING)
+
+Trader: "the fixed target should be the last consolidation zone before the MM Judas swing
+began - the first reasonable target, usually the last ITH/ITL on the H1 or H4."
+`_judas_origin_target`: completed H1 bars (lookback 48), then H4 (30); Judas extreme = lowest
+low (long) / highest high (short) in the lookback; target = the most recent ITH (long) / ITL
+(short) that formed BEFORE that extreme; must sit >= 1R beyond entry (`MM_GOLDEN_JT_MIN_RR`),
+else fall back to the base target. When it applies, the 30-pip minimum-target floor is not
+applied (the trader's target replaces it). Flags: `MM_GOLDEN_JUDAS_TARGET`,
+`MM_GOLDEN_FIXED_EXIT` (no BE / +10 lock / milestone trail on MM trades),
+`MM_GOLDEN_FIXED_RR` (reference: target = RR x stop). Counters `mm_golden_jt_60T/_240T/_none`;
+`target_type` = `judas_origin_<tf>` / `fixed_2r`. Fixture-verified long, short, RR-too-small.
+Loops: `p92` (default, must = 869 / R167.1k), `base` (must = 736 / R132.0k), `jt`, `jtfx`,
+`fx2r` -> `data/mm_golden_*_p93_*`.
 
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 

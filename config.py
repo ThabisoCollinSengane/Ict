@@ -625,10 +625,11 @@ MM_SEMI_AUTO_MAX_PER_DAY = int(_os.environ.get("MM_SEMI_AUTO_MAX_PER_DAY", 3))
 #   p88 = MM on + M1 structure shift + DXY M1 confirmation (best quality)
 #   p89 = p88 + M1 break fresh within 20 bars (quality + more trades)
 #   p92 = M1 fresh 20 + 2-of-3 key-swing shift EU/GU/DXY (most money + trades, P92)
-# Unset = everything off (the documented 736-trade baseline). Any individual env
-# var still overrides the preset.
-MM_PRESET = _os.environ.get("MM_PRESET", "").strip().lower()
+# DEFAULT = p92 (shipped 2026-10-08 at the trader's request). MM_PRESET=base restores the
+# old 736-trade baseline (MM off). Any individual env var still overrides the preset.
+MM_PRESET = _os.environ.get("MM_PRESET", "p92").strip().lower()   # DEFAULT p92 (trader, 2026-10-08)
 _MM_PRESETS = {
+    "base": {},          # the pre-2026-10-08 baseline: MM channel off (736 trades)
     "p88": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_DXY": "1"},
     "p89": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_DXY": "1",
             "MM_GOLDEN_M1_MSS_FRESH": "20"},
@@ -1370,3 +1371,15 @@ MM_GOLDEN_M1_SMTX = int(_mmdef("MM_GOLDEN_M1_SMTX", "0"))
 MM_GOLDEN_M1_SMTX_WIN = int(_os.environ.get("MM_GOLDEN_M1_SMTX_WIN", "30"))
 MM_GOLDEN_M1_SMTX_PRIOR = int(_os.environ.get("MM_GOLDEN_M1_SMTX_PRIOR", "240"))
 MM_GOLDEN_M1_SMTX_DISP_SPAN = int(_os.environ.get("MM_GOLDEN_M1_SMTX_DISP_SPAN", "4"))
+# P93 — MM target = the consolidation the MM Judas swing LEFT (trader, 2026-10-08): the last
+# H1 ITH (longs) / ITL (shorts) before the Judas extreme, H4 if H1 has none. Lookback per TF
+# in completed bars. Falls back to the base target when none sits beyond entry at >= MIN_RR.
+# MM_GOLDEN_FIXED_EXIT=1: MM trades keep their stop and target - no break-even / lock /
+# milestone trailing. MM_GOLDEN_FIXED_RR>0: target = entry + RR x stop (reference arm).
+MM_GOLDEN_JUDAS_TARGET = bool(int(_os.environ.get("MM_GOLDEN_JUDAS_TARGET", "0")))
+MM_GOLDEN_JT_TFS = tuple(_os.environ.get("MM_GOLDEN_JT_TFS", "60T,240T").split(","))
+MM_GOLDEN_JT_LOOKBACK = {"60T": int(_os.environ.get("MM_GOLDEN_JT_LB_H1", "48")),
+                         "240T": int(_os.environ.get("MM_GOLDEN_JT_LB_H4", "30"))}
+MM_GOLDEN_JT_MIN_RR = float(_os.environ.get("MM_GOLDEN_JT_MIN_RR", "1.0"))
+MM_GOLDEN_FIXED_EXIT = bool(int(_os.environ.get("MM_GOLDEN_FIXED_EXIT", "0")))
+MM_GOLDEN_FIXED_RR = float(_os.environ.get("MM_GOLDEN_FIXED_RR", "0"))
