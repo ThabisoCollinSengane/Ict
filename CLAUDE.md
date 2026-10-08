@@ -2582,6 +2582,28 @@ the default is decided after this run.
 Loops: `p88` / `p89` controls (must reproduce 817 / 846), `p88smt3`, `p89smt3`,
 `m1smt3` (M1 shift + SMT3, no DXY) x IS/OOS/full -> `data/mm_golden_*_p90_*`.
 
+**P90 RESULT (RAN 2026-10-08) — 🔴 three-way SMT as a hard gate: better trades, far fewer, less money.**
+Controls exact: `MM_PRESET=p88` 817 / R163.1k, `p89` 846 / R160.0k (presets proven).
+
+| | p88 | p88+SMT3 | p89 | p89+SMT3 | M1+SMT3 (no DXY) |
+|---|---|---|---|---|---|
+| MM trades IS / OOS / full | 51 / 44 / 100 | 19 / 16 / 36 | 67 / 58 / 134 | 31 / 29 / 63 | 31 / 29 / 63 |
+| MM WR full | 37.0% | **47.2%** | 32.8% | 42.9% | 34.9% |
+| MM PF IS / OOS | 2.38 / 2.11 | 3.30 / 2.25 | 1.98 / 1.71 | 2.95 / 1.62 | 1.56 / 1.68 |
+| Withdrawn IS / OOS / full | 62.0k / 71.9k / **163.1k** | 47.1k / 67.7k / 139.1k | 60.2k / **74.9k** / 160.0k | 49.1k / 68.2k / 140.3k | 45.3k / 68.0k / 137.3k |
+| MaxDD full / OOS | −15.59 / −9.99 | −15.65 / −9.81 | −15.66 / −9.98 | −15.65 / −9.85 | −15.65 / −9.81 |
+
+Why: most rejections are "all three took the liquidity" (173 of ~313 full-run checks on
+p88) — EURUSD, GBPUSD and DXY usually move together on M1 because they are one dollar
+trade; real divergence is the minority. Divergence is mostly `eu+dxy` (44) — EURUSD and
+the dollar both took it while GBPUSD held. SMT3 without DXY is weaker than DXY alone, so
+**the DXY M1 shift is the stronger intermarket check; SMT adds quality but costs ~2/3 of
+MM trades.** Not a gate. Untested next: SMT3 as a SIZE-UP (1.25×) on top of p88/p89
+instead of a filter — it removes nothing, which is the only lever shape that has shipped.
+
+**Default NOT flipped** — `MM_PRESET` still defaults to unset (736 baseline). Trader to
+choose p88 (most money, R163.1k) or p89 (+29 trades, best OOS money R74.9k).
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
