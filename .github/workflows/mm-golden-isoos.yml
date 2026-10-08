@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full]
-        mode: [p88z, p89z, p88smtz, p89smtz]
+        mode: [p89zmin60, p89zmin120, p89zmin240]
     env:
       NO_PUSH: "1"
     steps:
@@ -58,8 +58,9 @@ jobs:
           case "${{ matrix.mode }}" in *smt3*) export MM_GOLDEN_M1_SMT3=1;; esac
           # P91: *z = record SMT-at-the-tap on every MM trade (must reproduce 817 / 846);
           #      *smtz = require SMT at the tap.
-          case "${{ matrix.mode }}" in *smtz) export MM_GOLDEN_M1_SMTZ=2;; *z) export MM_GOLDEN_M1_SMTZ=1;; esac
-          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ)"
+          case "${{ matrix.mode }}" in *smtz*) export MM_GOLDEN_M1_SMTZ=2;; *z*) export MM_GOLDEN_M1_SMTZ=1;; esac
+          case "${{ matrix.mode }}" in *min*) export MM_GOLDEN_M1_SMTZ_REF=min MM_GOLDEN_M1_SMTZ_PRIOR=${{ matrix.mode }}; export MM_GOLDEN_M1_SMTZ_PRIOR=${MM_GOLDEN_M1_SMTZ_PRIOR##*min};; esac
+          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,c.MM_GOLDEN_M1_SMTZ_REF,c.MM_GOLDEN_M1_SMTZ_PRIOR)"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
       - name: Commit
@@ -67,7 +68,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p91
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p91b
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

@@ -1352,3 +1352,7 @@ MM_GOLDEN_M1_SMT3_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_SMT3_LOOKBACK", "
 MM_GOLDEN_M1_SMTZ = int(_os.environ.get("MM_GOLDEN_M1_SMTZ", "0"))
 MM_GOLDEN_M1_SMTZ_TAP = int(_os.environ.get("MM_GOLDEN_M1_SMTZ_TAP", "3"))
 MM_GOLDEN_M1_SMTZ_PRIOR = int(_os.environ.get("MM_GOLDEN_M1_SMTZ_PRIOR", "30"))
+# Which previous low/high the tap is compared with: "fractal" = the last M1 swing in the
+# PRIOR window (P91 first run — a minor wiggle every instrument breaks); "min" = the
+# extreme of the whole PRIOR window (the session's important low/high).
+MM_GOLDEN_M1_SMTZ_REF = _os.environ.get("MM_GOLDEN_M1_SMTZ_REF", "fractal")

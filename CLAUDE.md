@@ -2626,6 +2626,25 @@ reading on the real trades), `p88smtz` / `p89smtz` (require SMT) -> `data/mm_gol
 Read first: MM WR/PF split by `m1_smtz` kind in the `*z` trade dumps — does `smt` beat
 `cont` in BOTH halves?
 
+**P91 RESULT (RAN 2026-10-08) — reading is NOT decisive; the reference low was too minor.**
+Record-only arms reproduced controls exactly (p88z 817 / R163.1k, p89z 846 / R160.0k).
+At the tap, ~80% of checks read `cont` (all three took it) and `none` NEVER occurred:
+the traded pair's tap IS the pullback extreme, so it always breaks the last minor M1
+fractal of the leg that just ran into the zone — and EU/GU/DXY move together on that leg.
+The reference was a wiggle, not "a previous important low".
+
+| MM trades by reading | p88 IS | p88 OOS | p89 IS | p89 OOS |
+|---|---|---|---|---|
+| `cont` (all 3) n / WR / PF | 43 / 33% / 2.85 | 36 / 36% / 1.88 | 54 / 31% / 2.48 | 47 / 34% / 1.56 |
+| `smt` (1-2) n / WR / PF | 8 / 38% / 0.54 | 8 / 62% / 3.28 | 13 / 31% / 0.44 | 11 / 45% / 2.53 |
+
+`smt` beats `cont` on WR in OOS only, loses PF in IS; n=8-13 per cell — unresolved. `cont`
+trades are profitable (PF 1.6-2.9) on this definition. Requiring SMT (`p88smtz` /
+`p89smtz`) leaves 20 / 27 MM trades over 4yr, withdrawn R136.3k / R133.4k — below
+P88/P89. **Next (P91b):** compare the tap to the extreme of the whole prior window
+(`MM_GOLDEN_M1_SMTZ_REF=min`, PRIOR 60 / 120 / 240 M1 bars = the session's important
+low/high), record-only on p89 -> `data/mm_golden_*_p91b_*`.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that

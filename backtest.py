@@ -5526,12 +5526,14 @@ class Backtester:
             if want_low:
                 fr = [pre[j].Low for j in range(1, len(pre) - 1)
                       if pre[j].Low < pre[j - 1].Low and pre[j].Low < pre[j + 1].Low]
-                ref = fr[-1] if fr else min(x.Low for x in pre)
+                ref = (min(x.Low for x in pre) if config.MM_GOLDEN_M1_SMTZ_REF == "min"
+                       else (fr[-1] if fr else min(x.Low for x in pre)))
                 took[key] = min(x.Low for x in tap) < ref
             else:
                 fr = [pre[j].High for j in range(1, len(pre) - 1)
                       if pre[j].High > pre[j - 1].High and pre[j].High > pre[j + 1].High]
-                ref = fr[-1] if fr else max(x.High for x in pre)
+                ref = (max(x.High for x in pre) if config.MM_GOLDEN_M1_SMTZ_REF == "min"
+                       else (fr[-1] if fr else max(x.High for x in pre)))
                 took[key] = max(x.High for x in tap) > ref
         n = sum(took.values())
         who = "+".join(k for k in ("eu", "gu", "dxy") if took[k]) or "none"
