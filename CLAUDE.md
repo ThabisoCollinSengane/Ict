@@ -60,6 +60,26 @@ SMT = 1-2 of 3 took it; first TF that fires wins. Column `htf_smt_tf` (e.g. `60T
 Loops: `p93` (control 876 / R176.0k), `hsmt1` (record only, must = p93), `hsmt2` (new SMT replaces
 old), `nosmt` (old SMT gate off, nothing instead) -> `data/mm_golden_*_p95_*`.
 
+**P95 RESULT (RAN 2026-10-08) — 🔴 the new anchored SMT as a requirement loses money; removing SMT
+altogether also loses money; the OLD any-rung EU/GU gate stays.** Controls exact: `p93` 876 /
+R176,034; `hsmt1` (record only) byte-identical to it.
+
+| run | book trades | MM IS/OOS | MM PF IS/OOS | withdrawn IS / OOS / full | DD full / OOS |
+|---|---|---|---|---|---|
+| p93 (old SMT gate, default) | 876 | 70 / 64 | 1.82 / 1.93 | 60.8 / 85.0 / 176.0 | −15.66 / −9.87 |
+| hsmt2 (new SMT replaces old) | 815 | 47 / 46 | 1.63 / 1.64 | 50.5 / 72.4 / 154.3 | −15.66 / −17.7 |
+| nosmt (no SMT at all) | 881 | 74 / 76 | 1.83 / 1.37 | 57.0 / 77.2 / 162.4 | −15.66 / −14.08 |
+
+- Removing the old gate adds 22 MM trades (143 -> 165 full) and costs R13.6k, nearly all OOS (PF 1.93 -> 1.37, OOS DD
+  −9.87 -> −14.08): the old gate is filtering real junk.
+- The new gate cuts MM to 103 (full) and loses R21.7k. Full-run anchor reads: no_div 2,884, 60T 1,742,
+  15T 1,141, 240T 992, D 478, no_anchor 88 — it says "no SMT" on most setups.
+- Per rung, record-only on actual MM trades (n / WR / PF, IS | OOS): 15T 15/33%/2.10 | 12/33%/0.65;
+  240T 7/43%/3.67 | 5/40%/1.34; 60T 19/21%/0.83 | 15/60%/3.27; D 3/100% | 3/33%/16.9;
+  no_div 26/23%/1.59 | 28/32%/2.14. No rung is consistent across halves; cells n = 3-28.
+- ⚠️ Caveat on the old gate's value: it reads the FORMING bar on D/H4 (see the next section), so part
+  of its +R13.6k could be lookahead. Untested: the old gate on completed bars only.
+
 ### ⚠️ HOW SMT IS MEASURED TODAY (checked 2026-10-08, trader asked) — read before any SMT work
 
 The MM channel ALREADY requires a bigger-timeframe SMT on every trade: `MM_GOLDEN_OB_SMT_REQUIRED=1`
