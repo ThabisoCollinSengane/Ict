@@ -2779,6 +2779,24 @@ control, `disp`, `dispjt` (+ Judas-origin target), `dispjtfx` (+ fixed exit) ->
   p92 — higher hit rate, less money.
 - MM exit detail (full): p92 losers 96 / stop-moved winners 28 / target hits 20; jtfx 97 / 0 / 50.
 
+**P93c RESULT (RAN 2026-10-08) — Judas-origin target from H1 ONLY.** Control p92 exact (869 / R167,123).
+
+| run | book trades | MM IS/OOS | MM PF IS/OOS | withdrawn IS / OOS / full | DD full / OOS |
+|---|---|---|---|---|---|
+| p92 | 869 | 74 / 61 | 1.85 / 1.65 | 60.5 / 76.8 / 167.1 | −15.66 / −9.87 |
+| disp (P93b, for reference) | 876 | 70 / 64 | 1.82 / 1.93 | 60.8 / 85.0 / 176.0 | −15.66 / −9.87 |
+| dispjt1 (H1 target, managed) | 885 | 72 / 66 | 1.66 / 1.94 | 58.6 / 85.1 / 174.3 | −15.66 / −9.87 |
+| **dispjt1fx (H1 target, fixed exit)** | 875 | 70 / 77 | 1.79 / 1.89 | **65.3 / 89.7 / 184.3** | −15.59 / **−20.29** |
+
+- Under normal management the H1 target adds nothing over `disp` (R174.3k vs R176.0k).
+- With a fixed exit it is the best total of every MM variant (R184.3k) and beats p92 in BOTH halves
+  (+4.8k IS, +12.9k OOS); the H1 target bucket: 13 / 46% / PF 2.72 IS, 20 / 45% / 3.66 OOS.
+- **Dropping H4 did NOT fix the OOS −20.29%.** It is one cluster: peak 25 Apr 2024 (equity R7,375,
+  vs R6,202 in p92 at the same date) -> trough 14 May 2024, 7 trades, 6 losers: 2 MM full stops
+  (R−541, R−437) + 4 base losses. The same window is −9.9% in p92: bigger lots (higher equity)
+  and MM trades taking full stops instead of break-even. Fixed exit trades smaller drawdown for
+  money; the cost is concentrated in one 3-week streak at the start of the 2024-25 test.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
