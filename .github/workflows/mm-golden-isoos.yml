@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full]
-        mode: [p92, dispjt1, dispjt1fx]
+        mode: [p93, base, h1be50, be50]
     env:
       NO_PUSH: "1"
     steps:
@@ -64,6 +64,10 @@ jobs:
           # base = MM off (736 / R132.0k), jt = target at the consolidation the Judas left,
           # jtfx = same with a fixed exit (no BE/trail), fx2r = fixed 2R + fixed exit.
           case "${{ matrix.mode }}" in base) export MM_PRESET=base;; esac
+          # P94 (default is now MM_PRESET=p93): h1be50 = H1 Judas-origin target + break-even only
+          # at halfway to target; be50 = normal target + break-even at halfway.
+          case "${{ matrix.mode }}" in h1be*) export MM_GOLDEN_JUDAS_TARGET=1 MM_GOLDEN_JT_TFS=60T;; esac
+          case "${{ matrix.mode }}" in *be50) export MM_GOLDEN_BE_FRAC=0.5;; esac
           # P93b: disp* = the pair's own M1 trigger must break the swing that caused the impulse.
           case "${{ matrix.mode }}" in disp*) export MM_GOLDEN_M1_MSS_DISP=1;; esac
           case "${{ matrix.mode }}" in dispjt*) export MM_GOLDEN_JUDAS_TARGET=1;; esac
@@ -77,7 +81,7 @@ jobs:
           #      *smtz = require SMT at the tap.
           case "${{ matrix.mode }}" in *smtz*) export MM_GOLDEN_M1_SMTZ=2;; *z*) export MM_GOLDEN_M1_SMTZ=1;; esac
           case "${{ matrix.mode }}" in *min*) export MM_GOLDEN_M1_SMTZ_REF=min MM_GOLDEN_M1_SMTZ_PRIOR=${{ matrix.mode }}; export MM_GOLDEN_M1_SMTZ_PRIOR=${MM_GOLDEN_M1_SMTZ_PRIOR##*min};; esac
-          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX,'JT',c.MM_GOLDEN_JUDAS_TARGET,'FX',c.MM_GOLDEN_FIXED_EXIT,'RR',c.MM_GOLDEN_FIXED_RR,'DISP',c.MM_GOLDEN_M1_MSS_DISP,'JTF',c.MM_GOLDEN_JT_TFS)"
+          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX,'JT',c.MM_GOLDEN_JUDAS_TARGET,'FX',c.MM_GOLDEN_FIXED_EXIT,'RR',c.MM_GOLDEN_FIXED_RR,'DISP',c.MM_GOLDEN_M1_MSS_DISP,'JTF',c.MM_GOLDEN_JT_TFS,'BEF',c.MM_GOLDEN_BE_FRAC)"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
           if [ -f data/histdata/mm_smtx_events.csv ]; then
@@ -88,7 +92,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p93c
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p94
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

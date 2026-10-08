@@ -342,6 +342,13 @@ class Backtester:
             # Load M5 bars for structure trail AND trail-at-TP ratchet.
             bars5_trail = (self.bars_up_to(pair, config.STRUCTURE_TRAIL_TF, t)
                            if (config.STRUCTURE_TRAIL or config.TRAIL_AT_TP) else None)
+            if st.get("be_frac"):          # P94: break-even only once frac of the way to target
+                for leg in st["legs"]:
+                    _need = abs(target - leg["entry"]) / pip * st["be_frac"]
+                    if (bar.Close - leg["entry"]) * direction / pip >= _need > 0:
+                        leg["stop"] = (max(leg["stop"], leg["entry"]) if direction > 0
+                                       else min(leg["stop"], leg["entry"]))
+                        leg["be_moved"] = True
             for leg in ([] if st.get("fixed_exit") else st["legs"]):   # P93: fixed MM exits
                 pips_profit = (bar.Close - leg["entry"]) * direction / pip
                 if pips_profit >= config.TRAIL_LOCK_PIPS:
@@ -6546,7 +6553,8 @@ class Backtester:
             "draw_score": _draw_score,
             "im_scenario": "golden",
             "entry_model": "mm_golden",
-            "fixed_exit": config.MM_GOLDEN_FIXED_EXIT,     # P93
+            "fixed_exit": config.MM_GOLDEN_FIXED_EXIT or config.MM_GOLDEN_BE_FRAC > 0,  # P93/P94
+            "be_frac": config.MM_GOLDEN_BE_FRAC,          # P94
             # P49 analytics — what the trades that DO fire actually have.
             "golden_via": _golden_via,          # own_ob | cascade
             "golden_ob_tf": _ob_tf,             # D | 240T | 60T | 15T

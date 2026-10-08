@@ -24,6 +24,22 @@ cache-bug post-mortem.)
 
 ---
 
+## 🚨 DEFAULT UPDATED AGAIN (2026-10-08, trader's decision) — `MM_PRESET=p93`
+
+`p93` = `p92` + the pair's own M1 trigger must break the swing that caused the impulse (P93b,
+`MM_GOLDEN_M1_MSS_DISP=1`). **Expected anchor (from the P93b `disp` run): 876 trades / PF 3.64 /
+MaxDD −15.66% / R176.0k withdrawn (IS R60.8k, OOS R85.0k).** The P94 `p93` control arm must
+reproduce this exactly. `MM_PRESET=p92` and `MM_PRESET=base` still reproduce their anchors.
+
+### P94 — MM break-even only at HALFWAY to target (BUILT 2026-10-08, RUNNING)
+
+`MM_GOLDEN_BE_FRAC=0.5`: on MM trades the stop moves to entry only once price has covered 50%
+of the distance to the target; no +10 BE, no +20 lock, no milestone trail. Aim: keep the extra
+target hits of the fixed exit (P93c R184.3k) without its full-stop losses (OOS −20.29%).
+Fixture: +15 of a 40-pip target leaves the stop; +21 moves it to entry; +25 stays at entry.
+Loops: `p93` (new default control), `base` (736), `h1be50` (H1 Judas target + BE at halfway),
+`be50` (normal target + BE at halfway) -> `data/mm_golden_*_p94_*`.
+
 ## 🚨 NEW DEFAULT BASELINE (2026-10-08, trader's decision) — MM channel ON via `MM_PRESET=p92`
 
 `config.MM_PRESET` now defaults to **`p92`**: MM channel on + M1 structure shift (fresh 20 bars)

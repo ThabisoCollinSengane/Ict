@@ -624,10 +624,11 @@ MM_SEMI_AUTO_MAX_PER_DAY = int(_os.environ.get("MM_SEMI_AUTO_MAX_PER_DAY", 3))
 # MM_PRESET — one switch that "locks in" a tested MM configuration (2026-10-08).
 #   p88 = MM on + M1 structure shift + DXY M1 confirmation (best quality)
 #   p89 = p88 + M1 break fresh within 20 bars (quality + more trades)
-#   p92 = M1 fresh 20 + 2-of-3 key-swing shift EU/GU/DXY (most money + trades, P92)
+#   p92 = M1 fresh 20 + 2-of-3 key-swing shift EU/GU/DXY (P92)
+#   p93 = p92 + impulse-swing M1 trigger (P93b) - DEFAULT since 2026-10-08
 # DEFAULT = p92 (shipped 2026-10-08 at the trader's request). MM_PRESET=base restores the
 # old 736-trade baseline (MM off). Any individual env var still overrides the preset.
-MM_PRESET = _os.environ.get("MM_PRESET", "p92").strip().lower()   # DEFAULT p92 (trader, 2026-10-08)
+MM_PRESET = _os.environ.get("MM_PRESET", "p93").strip().lower()   # DEFAULT p93 (trader, 2026-10-08)
 _MM_PRESETS = {
     "base": {},          # the pre-2026-10-08 baseline: MM channel off (736 trades)
     "p88": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_DXY": "1"},
@@ -636,6 +637,9 @@ _MM_PRESETS = {
     # p92 = M1 shift (fresh 20) + 2-of-3 key-swing shift on EU / GU / DXY (no DXY-only check)
     "p92": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_MSS_FRESH": "20",
             "MM_GOLDEN_M1_SMTX": "3"},
+    # p93 = p92 + the pair's own M1 trigger must break the impulse (displacement) swing (P93b)
+    "p93": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_MSS_FRESH": "20",
+            "MM_GOLDEN_M1_SMTX": "3", "MM_GOLDEN_M1_MSS_DISP": "1"},
 }
 if MM_PRESET and MM_PRESET not in _MM_PRESETS:
     raise ValueError(f"MM_PRESET={MM_PRESET!r} unknown; use one of {sorted(_MM_PRESETS)}")
@@ -1386,4 +1390,7 @@ MM_GOLDEN_FIXED_RR = float(_os.environ.get("MM_GOLDEN_FIXED_RR", "0"))
 # P93b — the traded pair's OWN M1 entry trigger must break the swing that CAUSED the impulse
 # into the zone (a swing price displaced away from, FVG within MM_GOLDEN_M1_SMTX_DISP_SPAN
 # bars), not just the last 3-bar swing. Default 0 = P83/P92 behaviour.
-MM_GOLDEN_M1_MSS_DISP = bool(int(_os.environ.get("MM_GOLDEN_M1_MSS_DISP", "0")))
+MM_GOLDEN_M1_MSS_DISP = bool(int(_mmdef("MM_GOLDEN_M1_MSS_DISP", "0")))
+# P94 — MM stop moves to break-even only once price has covered MM_GOLDEN_BE_FRAC of the way
+# to the target (e.g. 0.5 = halfway); no other trailing on MM trades. 0 = off (normal trailing).
+MM_GOLDEN_BE_FRAC = float(_os.environ.get("MM_GOLDEN_BE_FRAC", "0"))
