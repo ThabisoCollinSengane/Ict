@@ -23,8 +23,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arm: [is, oos, full]
-        mode: [p93, closed, dxy3, closeddxy3, hsize]
+        arm: [is, oos, full, y26]
+        mode: [p93, h1be50, h1be50sbe, h1be50scl, h1be50nws]
     env:
       NO_PUSH: "1"
     steps:
@@ -39,6 +39,9 @@ jobs:
         run: |
           python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
                  --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD --dest /tmp/hd 2>&1 | tail -30
+          # P97: this year too — 2026 Jan-Sep (HistData serves completed months only).
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 \
+                 --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD --dest /tmp/hd 2>&1 | tail -30
           python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
       - name: Backtest (${{ matrix.arm }} / ${{ matrix.mode }})
         continue-on-error: true
@@ -47,6 +50,7 @@ jobs:
             is)   Y="--years 2022 2023" ;;
             oos)  Y="--years 2024 2025" ;;
             full) Y="" ;;
+            y26)  Y="--years 2026" ;;
             base) Y="" ;;
           esac
           # P90: controls use the MM_PRESET switch (p88 must reproduce 817, p89 846).
@@ -67,10 +71,13 @@ jobs:
           # P94 (default is now MM_PRESET=p93): h1be50 = H1 Judas-origin target + break-even only
           # at halfway to target; be50 = normal target + break-even at halfway.
           case "${{ matrix.mode }}" in h1be*) export MM_GOLDEN_JUDAS_TARGET=1 MM_GOLDEN_JT_TFS=60T;; esac
-          case "${{ matrix.mode }}" in *be50) export MM_GOLDEN_BE_FRAC=0.5;; esac
+          case "${{ matrix.mode }}" in *be50*) export MM_GOLDEN_BE_FRAC=0.5;; esac
           # P96: closed = old EU/GU SMT gate on completed bars only; dxy3 = old gate read EU/GU/DXY
           # three-way; closeddxy3 = both; hsize = old gate kept + anchored top-down SMT as a 1.25x size-up.
           case "${{ matrix.mode }}" in closed) export MM_GOLDEN_OB_SMT_CLOSED=1;; dxy3) export MM_GOLDEN_OB_SMT_DXY=1;; closeddxy3) export MM_GOLDEN_OB_SMT_CLOSED=1 MM_GOLDEN_OB_SMT_DXY=1;; hsize) export MM_GOLDEN_HSMT=1 MM_GOLDEN_HSMT_MULT=1.25;; esac
+          # P97: *sbe = stop to entry (if in profit) once the entry session is over; *scl = close at
+          #      session end; *nws = close before High-impact news (incl. NFP/CPI/FOMC) due within 15 min.
+          case "${{ matrix.mode }}" in *sbe) export MM_GOLDEN_SESSION_EXIT=1;; *scl) export MM_GOLDEN_SESSION_EXIT=2;; *nws) export MM_GOLDEN_NEWS_EXIT=2;; esac
           # P93b: disp* = the pair's own M1 trigger must break the swing that caused the impulse.
           case "${{ matrix.mode }}" in disp*) export MM_GOLDEN_M1_MSS_DISP=1;; esac
           case "${{ matrix.mode }}" in dispjt*) export MM_GOLDEN_JUDAS_TARGET=1;; esac
@@ -84,9 +91,12 @@ jobs:
           #      *smtz = require SMT at the tap.
           case "${{ matrix.mode }}" in *smtz*) export MM_GOLDEN_M1_SMTZ=2;; *z*) export MM_GOLDEN_M1_SMTZ=1;; esac
           case "${{ matrix.mode }}" in *min*) export MM_GOLDEN_M1_SMTZ_REF=min MM_GOLDEN_M1_SMTZ_PRIOR=${{ matrix.mode }}; export MM_GOLDEN_M1_SMTZ_PRIOR=${MM_GOLDEN_M1_SMTZ_PRIOR##*min};; esac
-          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX,'JT',c.MM_GOLDEN_JUDAS_TARGET,'FX',c.MM_GOLDEN_FIXED_EXIT,'RR',c.MM_GOLDEN_FIXED_RR,'DISP',c.MM_GOLDEN_M1_MSS_DISP,'JTF',c.MM_GOLDEN_JT_TFS,'BEF',c.MM_GOLDEN_BE_FRAC,'HSMT',c.MM_GOLDEN_HSMT,'OBSMT',c.MM_GOLDEN_OB_SMT_REQUIRED)"
+          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX,'JT',c.MM_GOLDEN_JUDAS_TARGET,'FX',c.MM_GOLDEN_FIXED_EXIT,'RR',c.MM_GOLDEN_FIXED_RR,'DISP',c.MM_GOLDEN_M1_MSS_DISP,'JTF',c.MM_GOLDEN_JT_TFS,'BEF',c.MM_GOLDEN_BE_FRAC,'HSMT',c.MM_GOLDEN_HSMT,'OBSMT',c.MM_GOLDEN_OB_SMT_REQUIRED,'SESS',c.MM_GOLDEN_SESSION_EXIT,'NEWS',c.MM_GOLDEN_NEWS_EXIT)"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
+          for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
+            [ -f "$d" ] && { python scripts/news_session_reach.py --dump "$d" --out /tmp/news_report.md > /dev/null || true; break; }
+          done
           if [ -f data/histdata/mm_smtx_events.csv ]; then
             python scripts/smtx_study.py --events data/histdata/mm_smtx_events.csv --out /tmp/smtx_report.md || true
           fi
@@ -95,11 +105,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p96
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p97
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
           cp /tmp/smtx_report.md data/mm_golden_${A}_smtx_report.md 2>/dev/null || true
+          cp /tmp/news_report.md data/mm_golden_${A}_news_report.md 2>/dev/null || true
           cp data/histdata/mm_smtx_events.csv data/mm_golden_${A}_smtx_events.csv 2>/dev/null || true
           for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
             [ -f "$d" ] && { cp "$d" data/mm_golden_${A}_trades.csv; break; }

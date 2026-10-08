@@ -349,6 +349,9 @@ class Backtester:
                         leg["stop"] = (max(leg["stop"], leg["entry"]) if direction > 0
                                        else min(leg["stop"], leg["entry"]))
                         leg["be_moved"] = True
+            if st.get("sess_exit") or st.get("news_exit"):   # P97: session-end / pre-news MM exits
+                if self._mm_time_exit(pair, st, bar, t, pip):
+                    return
             for leg in ([] if st.get("fixed_exit") else st["legs"]):   # P93: fixed MM exits
                 pips_profit = (bar.Close - leg["entry"]) * direction / pip
                 if pips_profit >= config.TRAIL_LOCK_PIPS:
@@ -444,6 +447,55 @@ class Backtester:
             if not self.active.get(pair, {}).get("legs"):
                 self.active.pop(pair, None)
 
+
+    def _mm_time_exit(self, pair, st, bar, t, pip):
+        """P97 — MM exits driven by the clock (session end) and the calendar (news ahead).
+
+        Session end (MM_GOLDEN_SESSION_EXIT): once the session the trade opened in is over
+        (London trades at MM_GOLDEN_SESS_END_LONDON, NY trades at MM_GOLDEN_SESS_END_NY, New
+        York time), 1 = move the stop to entry if the trade is in profit, 2 = close at market.
+        News (MM_GOLDEN_NEWS_EXIT): when a High-impact event (incl. NFP/CPI/FOMC) is due within
+        MM_GOLDEN_NEWS_EXIT_MIN minutes, 1 = move the stop to entry if in profit, 2 = close.
+        Returns True when the position was closed."""
+        g = self.gate
+        direction = st["direction"]
+        ny = t.tz_convert("America/New_York") if getattr(t, "tzinfo", None) else t
+        act = 0
+        if st.get("sess_exit") and not st.get("_sess_done"):
+            end = (config.MM_GOLDEN_SESS_END_LONDON if st.get("profile") == "london"
+                   else config.MM_GOLDEN_SESS_END_NY)
+            hh, mm = (int(x) for x in end.split(":"))
+            op = st["legs"][0]["opened_at"] if st.get("legs") else t
+            op_ny = op.tz_convert("America/New_York") if getattr(op, "tzinfo", None) else op
+            if (ny.date() > op_ny.date()) or (ny.hour, ny.minute) >= (hh, mm):
+                st["_sess_done"] = True
+                act = st["sess_exit"]
+                g["mm_exit_session"] = g.get("mm_exit_session", 0) + 1
+        if not act and st.get("news_exit") and not st.get("_news_done"):
+            from datetime import timedelta
+            horizon = timedelta(minutes=config.MM_GOLDEN_NEWS_EXIT_MIN)
+            tt = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+            for ev_dt, _c, impact, _n in self.news.events:
+                if impact == "High" and tt <= ev_dt <= tt + horizon:
+                    st["_news_done"] = True
+                    act = st["news_exit"]
+                    g["mm_exit_news"] = g.get("mm_exit_news", 0) + 1
+                    break
+        if not act:
+            return False
+        if act >= 2:
+            for leg in list(st["legs"]):
+                self._exit_leg(pair, leg, bar.Close, t, "time_exit")
+            if not self.active.get(pair, {}).get("legs"):
+                self.active.pop(pair, None)
+            g["mm_exit_closed"] = g.get("mm_exit_closed", 0) + 1
+            return True
+        for leg in st["legs"]:
+            if (bar.Close - leg["entry"]) * direction > 0:
+                leg["stop"] = (max(leg["stop"], leg["entry"]) if direction > 0
+                               else min(leg["stop"], leg["entry"]))
+                g["mm_exit_be"] = g.get("mm_exit_be", 0) + 1
+        return False
 
     def _exit_leg(self, pair, leg, exit_price, t, reason):
         st = self.active[pair]
@@ -6669,6 +6721,8 @@ class Backtester:
             "entry_model": "mm_golden",
             "fixed_exit": config.MM_GOLDEN_FIXED_EXIT or config.MM_GOLDEN_BE_FRAC > 0,  # P93/P94
             "be_frac": config.MM_GOLDEN_BE_FRAC,          # P94
+            "sess_exit": config.MM_GOLDEN_SESSION_EXIT,   # P97
+            "news_exit": config.MM_GOLDEN_NEWS_EXIT,      # P97
             # P49 analytics — what the trades that DO fire actually have.
             "golden_via": _golden_via,          # own_ob | cascade
             "golden_ob_tf": _ob_tf,             # D | 240T | 60T | 15T

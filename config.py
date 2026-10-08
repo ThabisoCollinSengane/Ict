@@ -1409,3 +1409,11 @@ MM_GOLDEN_HSMT_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_HSMT_TOL_PIPS", "5"))
 MM_GOLDEN_OB_SMT_CLOSED = int(_os.environ.get("MM_GOLDEN_OB_SMT_CLOSED", "0"))
 MM_GOLDEN_OB_SMT_DXY = int(_os.environ.get("MM_GOLDEN_OB_SMT_DXY", "0"))
 MM_GOLDEN_HSMT_MULT = float(_os.environ.get("MM_GOLDEN_HSMT_MULT", "1.0"))
+# P97 — MM exits driven by the session clock and the news calendar (default off).
+#   SESSION_EXIT: 1 = stop to entry if in profit once the entry session is over, 2 = close.
+#   NEWS_EXIT:    1 = stop to entry if in profit when High news is due within NEWS_EXIT_MIN, 2 = close.
+MM_GOLDEN_SESSION_EXIT = int(_os.environ.get("MM_GOLDEN_SESSION_EXIT", "0"))
+MM_GOLDEN_SESS_END_LONDON = _os.environ.get("MM_GOLDEN_SESS_END_LONDON", "08:00")
+MM_GOLDEN_SESS_END_NY = _os.environ.get("MM_GOLDEN_SESS_END_NY", "12:00")
+MM_GOLDEN_NEWS_EXIT = int(_os.environ.get("MM_GOLDEN_NEWS_EXIT", "0"))
+MM_GOLDEN_NEWS_EXIT_MIN = int(_os.environ.get("MM_GOLDEN_NEWS_EXIT_MIN", "15"))

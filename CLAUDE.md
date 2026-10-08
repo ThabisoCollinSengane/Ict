@@ -117,6 +117,32 @@ lookahead); keep p93.** Control exact (876 / R176,034).
 - Where the old gate passes (full p93, counts are gate CHECKS not trades): D 2,045, H4 1,609,
   H1 1,521, M15 1,287, M5 1,090, M1 886 — it is mostly a Daily/H4/H1 read already.
 
+### P97 — MM exits by session clock and news calendar + news/session target-reach study (BUILT 2026-10-08, RUNNING)
+
+Trader asked for option 1 (MM exits) with news impact on target reach, news + session, going
+back as far as possible, "even if it's just for this year". **Data limit, stated plainly:** the
+news calendar (`data/news_events.csv`) holds 354 events 2022-2026, ~6 per month (Critical
+NFP/CPI/FOMC 160, High 79, Medium 115) — no earlier history in the repo. So news can be studied
+2022-25 plus 2026; the workflow now also downloads **2026 Jan-Sep** (arm `y26`) as a this-year test.
+
+**Study (`scripts/news_session_reach.py`, selftest ok; `data/news_session_report.md` on the
+P94 dumps):** per trade, highest-impact news released while open, minutes from entry to the next
+event, session, entry hour; target %, full-loss %, WR, PF, median MFE by half. First read:
+**only 1 of 143 (p93) and 6 of 156 (h1be50) MM trades had any news release while open** — the
+entry gate already blocks ±15 min of Medium/Critical news and the calendar is thin, so news
+cannot explain the MM drawdown. Session: NY beats London for MM in OOS (p93 PF 3.02 vs 1.34;
+h1be50 3.88 vs 1.48) but not IS (2.00 vs 1.62; 1.23 vs 2.12). 03:00 ET entries weakest OOS.
+h1be50 losers: 19 had MFE > 20 pips and 20 were held 2h+ (p93: 5 and 7) — the extra damage of
+break-even-at-halfway is long-held trades that went well in favour and came all the way back.
+
+**Engine exits (`_mm_time_exit`, MM trades only, default off, fixture-verified):**
+`MM_GOLDEN_SESSION_EXIT` 1 = stop to entry if in profit once the entry session is over (London
+trades 08:00 ET, NY trades 12:00 ET; `MM_GOLDEN_SESS_END_LONDON/_NY`), 2 = close at market;
+`MM_GOLDEN_NEWS_EXIT` 1/2 = same when a High-impact event (incl. NFP/CPI/FOMC) is due within
+`MM_GOLDEN_NEWS_EXIT_MIN` (15). Counters `mm_exit_session/_news/_be/_closed`; exit reason
+`time_exit`. Loops: `p93`, `h1be50`, `h1be50sbe`, `h1be50scl`, `h1be50nws` × is/oos/full/y26 ->
+`data/mm_golden_*_p97_*` (+ `_news_report.md` per run).
+
 ### ⚠️ HOW SMT IS MEASURED TODAY (checked 2026-10-08, trader asked) — read before any SMT work
 
 The MM channel ALREADY requires a bigger-timeframe SMT on every trade: `MM_GOLDEN_OB_SMT_REQUIRED=1`
