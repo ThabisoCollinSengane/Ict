@@ -2750,6 +2750,35 @@ off and is rejected with it on; a close above the impulse swing passes both. Loo
 control, `disp`, `dispjt` (+ Judas-origin target), `dispjtfx` (+ fixed exit) ->
 `data/mm_golden_*_p93b_*`.
 
+**P93 / P93b RESULT (RAN 2026-10-08).** Controls exact: `base` 736 / R132,020; `p92` 869 / R167,123
+(both batches). All with the full engine. Withdrawn R k; DD = max drawdown %.
+
+| run | book trades | MM trades IS/OOS | MM PF IS/OOS | withdrawn IS / OOS / full | DD full / OOS |
+|---|---|---|---|---|---|
+| p92 (default) | 869 | 74 / 61 | 1.85 / 1.65 | 60.5 / 76.8 / 167.1 | −15.66 / −9.87 |
+| jt (Judas-origin target) | 869 | 73 / 62 | 2.06 / 1.66 | 62.1 / 77.0 / 169.2 | −15.66 / −9.87 |
+| jtfx (+ fixed exit) | 871 | 70 / 69 | 2.27 / 1.25 | 69.5 / 77.7 / 178.0 | −15.59 / **−20.29** |
+| fx2r (fixed 2R, fixed exit) | 864 | 73 / 61 | 1.40 / 1.75 | 50.1 / 80.5 / 155.2 | −15.59 / −17.02 |
+| **disp (impulse-swing trigger)** | 876 | 70 / 64 | 1.82 / 1.93 | **60.8 / 85.0 / 176.0** | −15.66 / −9.87 |
+| dispjt | 886 | 72 / 67 | 1.72 / 1.96 | 59.5 / 85.2 / 175.3 | −15.66 / −9.87 |
+| dispjtfx | 876 | 70 / 78 | 1.92 / 1.73 | 66.8 / 86.8 / **182.9** | −15.59 / **−20.29** |
+
+- **Impulse-swing trigger (disp)**: same quantity (143 vs 144 MM), more money in BOTH halves
+  (+0.3k IS, +8.2k OOS), drawdown identical. Cleanest improvement of the batch.
+- **Judas-origin target under normal management (jt)**: almost no effect — found a target on
+  ~35% of target evaluations (H1 41 / H4 26 / none 122, full), and under BE/lock/milestone
+  trailing most MM trades exit before reaching any target (only 23 of 144 hit target).
+- **Fixed exit**: most money (R178.0k / R182.9k) but OOS MaxDD doubles to −20.29% and in jtfx
+  the OOS MM PF falls 1.65 -> 1.25. Mechanism: no break-even means trades that were closed at
+  BE / +10 now run to the full stop — avg MM loss R−339..−389 vs R−238..−265 managed; the
+  28-30 "stop-moved" winners (avg ~R600) become target hits or full losses.
+- **H1 vs H4 Judas target (fixed-exit runs)**: H1 good both halves (jtfx PF 4.17 / 2.03,
+  dispjtfx 2.72 / 3.66; median target 30-40 pips); **H4 bad** (OOS 0 wins in 11 and 10; full
+  PF 0.45 / 0.46; median target 55-62 pips). n = 6-20 per cell. -> P93c tests H1 only.
+- **Fixed 2R**: WR 45% (sim said 50-55%) but avg win R707 vs ~R1,200-1,400, withdrawn R155k <
+  p92 — higher hit rate, less money.
+- MM exit detail (full): p92 losers 96 / stop-moved winners 28 / target hits 20; jtfx 97 / 0 / 50.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
