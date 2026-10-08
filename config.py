@@ -1402,3 +1402,10 @@ MM_GOLDEN_HSMT = int(_os.environ.get("MM_GOLDEN_HSMT", "0"))
 MM_GOLDEN_HSMT_TFS = tuple(_os.environ.get("MM_GOLDEN_HSMT_TFS", "D,240T,60T,15T").split(","))
 MM_GOLDEN_HSMT_LB = {"D": 30, "240T": 60, "60T": 72, "15T": 96}
 MM_GOLDEN_HSMT_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_HSMT_TOL_PIPS", "5"))
+# P96 — three follow-ups to P95 (all default no-op):
+#   OB_SMT_CLOSED: the old any-rung EU/GU SMT gate reads completed bars only (no forming bar)
+#   OB_SMT_DXY:    the old gate reads EU / GU / DXY three-way (1-2 of 3 took it)
+#   HSMT_MULT:     with MM_GOLDEN_HSMT=1, size MM trades with an anchored SMT by this factor
+MM_GOLDEN_OB_SMT_CLOSED = int(_os.environ.get("MM_GOLDEN_OB_SMT_CLOSED", "0"))
+MM_GOLDEN_OB_SMT_DXY = int(_os.environ.get("MM_GOLDEN_OB_SMT_DXY", "0"))
+MM_GOLDEN_HSMT_MULT = float(_os.environ.get("MM_GOLDEN_HSMT_MULT", "1.0"))

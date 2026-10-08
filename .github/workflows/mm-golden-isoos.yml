@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full]
-        mode: [p93, hsmt1, hsmt2, nosmt]
+        mode: [p93, closed, dxy3, closeddxy3, hsize]
     env:
       NO_PUSH: "1"
     steps:
@@ -68,9 +68,9 @@ jobs:
           # at halfway to target; be50 = normal target + break-even at halfway.
           case "${{ matrix.mode }}" in h1be*) export MM_GOLDEN_JUDAS_TARGET=1 MM_GOLDEN_JT_TFS=60T;; esac
           case "${{ matrix.mode }}" in *be50) export MM_GOLDEN_BE_FRAC=0.5;; esac
-          # P95: hsmt1 = record the new top-down zone-anchored SMT (must = p93), hsmt2 = require it
-          # INSTEAD of the old any-rung EU/GU SMT, nosmt = old SMT gate off, nothing in its place.
-          case "${{ matrix.mode }}" in hsmt1) export MM_GOLDEN_HSMT=1;; hsmt2) export MM_GOLDEN_HSMT=2 MM_GOLDEN_OB_SMT_REQUIRED=0;; nosmt) export MM_GOLDEN_OB_SMT_REQUIRED=0;; esac
+          # P96: closed = old EU/GU SMT gate on completed bars only; dxy3 = old gate read EU/GU/DXY
+          # three-way; closeddxy3 = both; hsize = old gate kept + anchored top-down SMT as a 1.25x size-up.
+          case "${{ matrix.mode }}" in closed) export MM_GOLDEN_OB_SMT_CLOSED=1;; dxy3) export MM_GOLDEN_OB_SMT_DXY=1;; closeddxy3) export MM_GOLDEN_OB_SMT_CLOSED=1 MM_GOLDEN_OB_SMT_DXY=1;; hsize) export MM_GOLDEN_HSMT=1 MM_GOLDEN_HSMT_MULT=1.25;; esac
           # P93b: disp* = the pair's own M1 trigger must break the swing that caused the impulse.
           case "${{ matrix.mode }}" in disp*) export MM_GOLDEN_M1_MSS_DISP=1;; esac
           case "${{ matrix.mode }}" in dispjt*) export MM_GOLDEN_JUDAS_TARGET=1;; esac
@@ -95,7 +95,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p95
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p96
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

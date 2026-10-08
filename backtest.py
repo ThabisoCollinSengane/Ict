@@ -4847,15 +4847,50 @@ class Backtester:
         # direction is the TRADE direction (short = -1). smt_divergence's `direction`
         # is the sweep direction: a short fades a buy-side sweep (higher high) = -1.
         # positive correlation → inverse=False. Either pair may be the primary.
+        # P96: MM_GOLDEN_OB_SMT_CLOSED drops the still-forming bar (no D/H4 lookahead);
+        # MM_GOLDEN_OB_SMT_DXY reads EU / GU / DXY three-way (1-2 of 3 took it = SMT).
+        _closed = config.MM_GOLDEN_OB_SMT_CLOSED
+        _dxy3 = config.MM_GOLDEN_OB_SMT_DXY
+        self._pair_smt_tf = ""
         for tf in (tfs if tfs is not None else config.MM_SMT_TFS):
-            p = self.bars_up_to(pair, tf, t, max_bars=lb + 5)
-            r = self.bars_up_to(partner, tf, t, max_bars=lb + 5)
+            p = self.bars_up_to(pair, tf, t, max_bars=lb + 6)
+            r = self.bars_up_to(partner, tf, t, max_bars=lb + 6)
+            if _closed:
+                p, r = p[:-1], r[:-1]
             if len(p) < lb or len(r) < lb:
                 continue
+            if _dxy3:
+                x = self.bars_up_to("UDXUSD", tf, t, max_bars=lb + 6)
+                if _closed:
+                    x = x[:-1]
+                if len(x) >= lb:
+                    if self._smt3_took(p, r, x, direction, lb):
+                        self._pair_smt_tf = tf
+                        return True
+                    continue
             if (smt_divergence(p, r, direction, inverse=False, lookback=lb) or
                     smt_divergence(r, p, direction, inverse=False, lookback=lb)):
+                self._pair_smt_tf = tf
                 return True
         return False
+
+    @staticmethod
+    def _smt3_took(p, r, x, direction, lb):
+        """P96 three-way block-half SMT. For each of pair / partner / DXY: did the recent
+        half of the last `lb` bars run the prior half's extreme in the sweep direction?
+        Long (+1): EU/GU took = lower low, DXY took = higher high. Short mirrored.
+        SMT = 1 or 2 of the 3 took it (all three = continuation, none = no sweep)."""
+        half = lb // 2
+
+        def took(bars, low_side):
+            b = bars[-lb:]
+            pr, rc = b[:half], b[half:]
+            if low_side:
+                return min(z.Low for z in rc) < min(z.Low for z in pr)
+            return max(z.High for z in rc) > max(z.High for z in pr)
+
+        n = int(took(p, direction > 0)) + int(took(r, direction > 0)) + int(took(x, direction < 0))
+        return 1 <= n <= 2
 
     def _smt_pair_pref(self, pair, direction, t):
         """Intraday EURUSD↔GBPUSD SMT pair-preference signal (P44 analytics).
@@ -6168,6 +6203,9 @@ class Backtester:
         # direction story, SMT confirms the two pairs disagree. Scored, not just gated,
         # so the analytics can show whether it separates winners from losers.
         _golden_smt = bool(self._htf_pair_smt(pair, direction, t))
+        if _golden_smt:
+            _k = f"mm_golden_smt_rung_{getattr(self, '_pair_smt_tf', '')}"
+            g[_k] = g.get(_k, 0) + 1
         if config.MM_GOLDEN_OB_SMT_REQUIRED and not _golden_smt:
             g["mm_golden_no_smt"] = g.get("mm_golden_no_smt", 0) + 1
             return
@@ -6310,6 +6348,7 @@ class Backtester:
         _m1_smtz = ""
         _m1_smtx = ""
         _htf_smt_tf = ""
+        _hsmt_hit = False
         if config.MM_GOLDEN_HSMT:
             # P95 — bigger-TF SMT anchored on the swing that attacked the zone (decides the trade;
             # M1 only times the entry). Zone = the union of the rung zone and the IFVG zone.
@@ -6319,6 +6358,7 @@ class Backtester:
             _htf, _hwho = self._htf_smt_anchor(pair, direction, t, _hlo, _hhi)
             _htf_smt_tf = f"{_htf}:{_hwho}" if _htf else _hwho
             g[f"mm_golden_hsmt_{_htf or _hwho}"] = g.get(f"mm_golden_hsmt_{_htf or _hwho}", 0) + 1
+            _hsmt_hit = bool(_htf)
             if config.MM_GOLDEN_HSMT >= 2 and not _htf:
                 g["mm_golden_hsmt_blocked"] = g.get("mm_golden_hsmt_blocked", 0) + 1
                 return
@@ -6534,6 +6574,11 @@ class Backtester:
             units = max(int(units * _draw_mult), min_units)
         if config.GOLDEN_RULE_MULT != 1.0 and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
             units = max(int(units * config.GOLDEN_RULE_MULT), min_units)
+        if (_hsmt_hit and config.MM_GOLDEN_HSMT_MULT != 1.0
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+            # P96 — anchored top-down SMT as a SIZE-UP, never a filter.
+            units = max(int(units * config.MM_GOLDEN_HSMT_MULT), min_units)
+            g["mm_golden_hsmt_sized"] = g.get("mm_golden_hsmt_sized", 0) + 1
         if (_target_score >= config.TARGET_SCORE_MULT_THRESHOLD
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.TARGET_SCORE_MULT), min_units)

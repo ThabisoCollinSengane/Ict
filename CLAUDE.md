@@ -80,6 +80,19 @@ R176,034; `hsmt1` (record only) byte-identical to it.
 - ⚠️ Caveat on the old gate's value: it reads the FORMING bar on D/H4 (see the next section), so part
   of its +R13.6k could be lookahead. Untested: the old gate on completed bars only.
 
+### P96 — three SMT follow-ups to P95 (BUILT 2026-10-08, RUNNING)
+
+All default no-op. (1) `MM_GOLDEN_OB_SMT_CLOSED=1` — the existing any-rung EU/GU SMT gate
+(`_htf_pair_smt`) drops the still-forming bar, so the D/H4 rungs cannot see the rest of the day:
+tests whether the old gate's +R13.6k is real or lookahead. (2) `MM_GOLDEN_OB_SMT_DXY=1` — the same
+gate reads EU / GU / DXY three-way (`_smt3_took`: per instrument, did the recent half of the last
+20 bars run the prior half's extreme; SMT = 1-2 of 3; rungs with no DXY series, i.e. M30, fall back
+to the two-pair test). (3) `MM_GOLDEN_HSMT=1 MM_GOLDEN_HSMT_MULT=1.25` — old gate kept, the P95
+anchored top-down SMT sizes MM trades 1.25× (R3k floor) instead of filtering; counter
+`mm_golden_hsmt_sized`. New counter `mm_golden_smt_rung_<tf>` records WHICH rung the old gate fired
+on. `_smt3_took` fixture-verified (1 of 3 / all 3 / none / short). Loops: `p93` control (876 /
+R176,034), `closed`, `dxy3`, `closeddxy3`, `hsize` -> `data/mm_golden_*_p96_*`.
+
 ### ⚠️ HOW SMT IS MEASURED TODAY (checked 2026-10-08, trader asked) — read before any SMT work
 
 The MM channel ALREADY requires a bigger-timeframe SMT on every trade: `MM_GOLDEN_OB_SMT_REQUIRED=1`
