@@ -535,6 +535,7 @@ class Backtester:
             "mm_pd_stage": st.get("mm_pd_stage", ""),
             "m1_diag": st.get("m1_diag", ""),
             "m1_smtz": st.get("m1_smtz", ""),
+            "m1_smtx": st.get("m1_smtx", ""),
             "mm_zone_lo": st.get("mm_zone_lo", ""),
             "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
@@ -664,6 +665,7 @@ class Backtester:
             "mm_pd_stage": st.get("mm_pd_stage", ""),
             "m1_diag": st.get("m1_diag", ""),
             "m1_smtz": st.get("m1_smtz", ""),
+            "m1_smtx": st.get("m1_smtx", ""),
             "mm_zone_lo": st.get("mm_zone_lo", ""),
             "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
@@ -5540,6 +5542,89 @@ class Backtester:
         kind = "smt" if 1 <= n <= 2 else ("cont" if n == 3 else "none")
         return kind, who
 
+    # ── P92: Episode-22-framed reversal + SMT (trader's rule, 2026-10-08) ────────────
+    @staticmethod
+    def _disp_swing_idx(b, j, kind, span):
+        """True when b[j] is a 3-bar fractal swing that price DISPLACED away from: a
+        fair value gap opens in the move away within `span` bars. kind "high" = swing
+        high followed by a bearish FVG; "low" = swing low followed by a bullish FVG."""
+        n = len(b)
+        if j < 1 or j + 1 >= n:
+            return False
+        if kind == "high":
+            if not (b[j].High > b[j - 1].High and b[j].High > b[j + 1].High):
+                return False
+            return any(b[k].High < b[k - 2].Low for k in range(j + 2, min(n, j + 2 + span)))
+        if not (b[j].Low < b[j - 1].Low and b[j].Low < b[j + 1].Low):
+            return False
+        return any(b[k].Low > b[k - 2].High for k in range(j + 2, min(n, j + 2 + span)))
+
+    def _disp_mss(self, sym, d, t):
+        """P92: M1 market-structure shift framed on KEY swings (ones that caused
+        displacement). d = +1 bullish shift / -1 bearish. Bullish: from the lookback's
+        lowest low (the tap), the last key swing HIGH before it - the swing the leg into
+        the zone displaced away from - is closed through, first close, within FRESH
+        bars. Returns True / False / None (no data)."""
+        lb = config.MM_GOLDEN_M1_MSS_LOOKBACK
+        span = config.MM_GOLDEN_M1_SMTX_DISP_SPAN
+        bars = self.bars_up_to(sym, "1T", t, max_bars=lb + 1)
+        if not bars or len(bars) < 10:
+            return None
+        b = bars[:-1]
+        n = len(b)
+        fresh = config.MM_GOLDEN_M1_MSS_FRESH
+        if d > 0:
+            li = min(range(n), key=lambda i: b[i].Low)
+            sw = [j for j in range(1, li) if self._disp_swing_idx(b, j, "high", span)]
+            if not sw:
+                return False
+            lvl = b[sw[-1]].High
+            brk = [k for k in range(li + 1, n) if b[k].Close > lvl]
+        else:
+            hi_i = max(range(n), key=lambda i: b[i].High)
+            sw = [j for j in range(1, hi_i) if self._disp_swing_idx(b, j, "low", span)]
+            if not sw:
+                return False
+            lvl = b[sw[-1]].Low
+            brk = [k for k in range(hi_i + 1, n) if b[k].Close < lvl]
+        return bool(brk) and brk[0] >= n - fresh
+
+    def _smtx(self, direction, t):
+        """P92: SMT in the last MM_GOLDEN_M1_SMTX_WIN (30) M1 bars, framed on key swings.
+        For each of EU / GU / DXY the reference is the most recent KEY swing (displaced
+        from) in the prior MM_GOLDEN_M1_SMTX_PRIOR bars that was still intact when the
+        window opened. Long: EU/GU took = window low below their key low; DXY took =
+        window high above its key high. Short mirrored. Returns (kind, who):
+        kind smt (1-2 took) / cont (all 3) / none / noref (an instrument had no intact
+        key swing) / None (no data)."""
+        W, P = config.MM_GOLDEN_M1_SMTX_WIN, config.MM_GOLDEN_M1_SMTX_PRIOR
+        span = config.MM_GOLDEN_M1_SMTX_DISP_SPAN
+        took = {}
+        for sym, key, inv in (("EURUSD", "eu", False), ("GBPUSD", "gu", False),
+                              ("UDXUSD", "dxy", True)):
+            bb = self.bars_up_to(sym, "1T", t, max_bars=W + P + 1)
+            if not bb or len(bb) < W + 10:
+                return None, "nodata"
+            bb = bb[:-1]
+            pre, win = bb[:-W], bb[-W:]
+            want_low = (direction > 0) != inv
+            ref = None
+            for j in range(len(pre) - 2, 0, -1):
+                if want_low and self._disp_swing_idx(pre, j, "low", span):
+                    if min(x.Low for x in pre[j + 1:]) > pre[j].Low:
+                        ref = pre[j].Low
+                        break
+                if not want_low and self._disp_swing_idx(pre, j, "high", span):
+                    if max(x.High for x in pre[j + 1:]) < pre[j].High:
+                        ref = pre[j].High
+                        break
+            if ref is None:
+                return "noref", key
+            took[key] = (min(x.Low for x in win) < ref) if want_low else (max(x.High for x in win) > ref)
+        n = sum(took.values())
+        who = "+".join(k for k in ("eu", "gu", "dxy") if took[k]) or "none"
+        return ("smt" if 1 <= n <= 2 else ("cont" if n == 3 else "none")), who
+
     def _ifvg_ce_closed(self, pair, direction, t, lo, hi):
         """P87: has a COMPLETED M5 candle closed at or beyond the IFVG's halfway line
         (consequent encroachment) during the M1 lookback, without closing through the
@@ -6126,6 +6211,7 @@ class Backtester:
             _zl, _zh = _ifvg_lo, _ifvg_hi
         _m1_diag = ""
         _m1_smtz = ""
+        _m1_smtx = ""
         if config.MM_GOLDEN_M1_SHADOW and not config.MM_GOLDEN_M1_MSS:
             _m1_diag = self._m1_shift_diag(pair, direction, t, _zl, _zh)
         if config.MM_GOLDEN_M1_MSS:
@@ -6157,6 +6243,32 @@ class Backtester:
                     g["mm_golden_armed"] = g.get("mm_golden_armed", 0) + 1
                 return
             g["mm_golden_m1_shift"] = g.get("mm_golden_m1_shift", 0) + 1
+            # P92 — Episode-22 framing: at the tap, >=2 of EU / GU / DXY must shift on key
+            # swings (DXY the opposite way), then SMT in the last 30 min must support it.
+            # 1 = record only, 2 = require shift + SMT, 3 = require shift only.
+            if config.MM_GOLDEN_M1_SMTX:
+                _sister = "GBPUSD" if pair == "EURUSD" else "EURUSD"
+                _sh = [self._disp_mss(pair, direction, t), self._disp_mss(_sister, direction, t),
+                       self._disp_mss("UDXUSD", -direction, t)]
+                _nsh = sum(1 for x in _sh if x)
+                _xk, _xw = self._smtx(direction, t)
+                _m1_smtx = f"s{_nsh}:{_xk}:{_xw}"
+                g[f"mm_golden_m1_smtx_s{_nsh}"] = g.get(f"mm_golden_m1_smtx_s{_nsh}", 0) + 1
+                if _nsh >= 2:
+                    g[f"mm_golden_m1_smtx_s2p_{_xk}"] = g.get(f"mm_golden_m1_smtx_s2p_{_xk}", 0) + 1
+                _b1 = self.bars_up_to(pair, "1T", t, max_bars=2)
+                if not hasattr(self, "mm_smtx_events"):
+                    self.mm_smtx_events = []
+                self.mm_smtx_events.append({
+                    "t": t, "pair": pair, "direction": direction,
+                    "price": _b1[-2].Close if _b1 and len(_b1) > 1 else None,
+                    "ext": _m1_ext, "shifts": _nsh, "smt": _xk, "who": _xw})
+                if config.MM_GOLDEN_M1_SMTX >= 2 and _nsh < 2:
+                    g["mm_golden_m1_smtx_blocked_shift"] = g.get("mm_golden_m1_smtx_blocked_shift", 0) + 1
+                    return
+                if config.MM_GOLDEN_M1_SMTX == 2 and _xk != "smt":
+                    g["mm_golden_m1_smtx_blocked_smt"] = g.get("mm_golden_m1_smtx_blocked_smt", 0) + 1
+                    return
             # P91 — SMT at the zone tap (EURUSD / GBPUSD / DXY). 1 = record only, 2 = require.
             if config.MM_GOLDEN_M1_SMTZ:
                 _zk, _zw = self._m1_smt_zone(direction, t, getattr(self, "_m1_ext_off", 1))
@@ -6398,6 +6510,7 @@ class Backtester:
             "mm_pd_stage": _pd_stage,
             "m1_diag": _m1_diag,
             "m1_smtz": _m1_smtz,
+            "m1_smtx": _m1_smtx,
             "mm_zone_lo": _zl,
             "mm_zone_hi": _zh,
             "mm_ifvg_zone_tf": _zone_tf,

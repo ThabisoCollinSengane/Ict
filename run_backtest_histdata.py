@@ -269,7 +269,7 @@ def _main(_real_stdout):
               f"close {m5['Close'].iloc[-1]:.5f}")
         if sym == "UDXUSD":
             dxy_5m = m5
-            if config.MM_GOLDEN_M1_DXY or config.MM_GOLDEN_M1_SMT3 or config.MM_GOLDEN_M1_SMTZ:  # P88/P90: DXY M1 only when a check needs it
+            if config.MM_GOLDEN_M1_DXY or config.MM_GOLDEN_M1_SMT3 or config.MM_GOLDEN_M1_SMTZ or config.MM_GOLDEN_M1_SMTX:  # P88/P90: DXY M1 only when a check needs it
                 data_m1[sym] = m1
         else:
             data_5m[sym] = m5
@@ -317,6 +317,13 @@ def _main(_real_stdout):
         print(f"  final working balance: R{backtester.equity:,.0f}  "
               f"(keep-level R{getattr(backtester, '_keep_level', 0):,.0f})")
 
+    if getattr(backtester, "mm_smtx_events", None):      # P92 events for the continuation study
+        try:
+            pd.DataFrame(backtester.mm_smtx_events).to_csv(
+                os.path.join(DATA_DIR, "mm_smtx_events.csv"), index=False)
+            print(f"[P92 events -> {len(backtester.mm_smtx_events)} rows]")
+        except Exception as _e:
+            print(f"[P92 events skipped: {_e}]")
     if backtester.trades:
         df = pd.DataFrame(backtester.trades)
         # Full trade dump for offline analysis (Judas vs continuation, session

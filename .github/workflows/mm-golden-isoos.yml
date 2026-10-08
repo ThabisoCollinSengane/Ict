@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full]
-        mode: [p89zmin60, p89zmin120, p89zmin240]
+        mode: [p89, f20x1, f10x2, f20x2, f20x3]
     env:
       NO_PUSH: "1"
     steps:
@@ -54,24 +54,34 @@ jobs:
             p88*) export MM_PRESET=p88 ;;
             p89*) export MM_PRESET=p89 ;;
             m1*)  export MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1 ;;
+            f10x*) export MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1 MM_GOLDEN_M1_MSS_FRESH=10 ;;
+            f20x*) export MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1 MM_GOLDEN_M1_MSS_FRESH=20 ;;
           esac
+          # P92: *x1 record only (must reproduce P87 f20), *x2 require 2-of-3 key-swing shift + SMT,
+          #      *x3 require the shift only. All without the old DXY-only check.
+          case "${{ matrix.mode }}" in *x1) export MM_GOLDEN_M1_SMTX=1;; *x2) export MM_GOLDEN_M1_SMTX=2;; *x3) export MM_GOLDEN_M1_SMTX=3;; esac
           case "${{ matrix.mode }}" in *smt3*) export MM_GOLDEN_M1_SMT3=1;; esac
           # P91: *z = record SMT-at-the-tap on every MM trade (must reproduce 817 / 846);
           #      *smtz = require SMT at the tap.
           case "${{ matrix.mode }}" in *smtz*) export MM_GOLDEN_M1_SMTZ=2;; *z*) export MM_GOLDEN_M1_SMTZ=1;; esac
           case "${{ matrix.mode }}" in *min*) export MM_GOLDEN_M1_SMTZ_REF=min MM_GOLDEN_M1_SMTZ_PRIOR=${{ matrix.mode }}; export MM_GOLDEN_M1_SMTZ_PRIOR=${MM_GOLDEN_M1_SMTZ_PRIOR##*min};; esac
-          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,c.MM_GOLDEN_M1_SMTZ_REF,c.MM_GOLDEN_M1_SMTZ_PRIOR)"
+          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX)"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
+          if [ -f data/histdata/mm_smtx_events.csv ]; then
+            python scripts/smtx_study.py --events data/histdata/mm_smtx_events.csv --out /tmp/smtx_report.md || true
+          fi
       - name: Commit
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p91b
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p92
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
+          cp /tmp/smtx_report.md data/mm_golden_${A}_smtx_report.md 2>/dev/null || true
+          cp data/histdata/mm_smtx_events.csv data/mm_golden_${A}_smtx_events.csv 2>/dev/null || true
           for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
             [ -f "$d" ] && { cp "$d" data/mm_golden_${A}_trades.csv; break; }
           done

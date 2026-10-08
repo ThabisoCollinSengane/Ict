@@ -1356,3 +1356,13 @@ MM_GOLDEN_M1_SMTZ_PRIOR = int(_os.environ.get("MM_GOLDEN_M1_SMTZ_PRIOR", "30"))
 # PRIOR window (P91 first run — a minor wiggle every instrument breaks); "min" = the
 # extreme of the whole PRIOR window (the session's important low/high).
 MM_GOLDEN_M1_SMTZ_REF = _os.environ.get("MM_GOLDEN_M1_SMTZ_REF", "fractal")
+# P92 — the trader's Episode-22 framing (2026-10-08). Key swings = M1 swings price DISPLACED
+# away from (an FVG opens within MM_GOLDEN_M1_SMTX_DISP_SPAN bars). At the tap, >=2 of
+# EURUSD / GBPUSD / DXY must shift structure through their key swing (DXY the opposite way);
+# then SMT must have formed in the last MM_GOLDEN_M1_SMTX_WIN M1 bars against each
+# instrument's last intact key swing. 0 off, 1 record only (column m1_smtx + events dump),
+# 2 require shift + SMT, 3 require shift only.
+MM_GOLDEN_M1_SMTX = int(_os.environ.get("MM_GOLDEN_M1_SMTX", "0"))
+MM_GOLDEN_M1_SMTX_WIN = int(_os.environ.get("MM_GOLDEN_M1_SMTX_WIN", "30"))
+MM_GOLDEN_M1_SMTX_PRIOR = int(_os.environ.get("MM_GOLDEN_M1_SMTX_PRIOR", "240"))
+MM_GOLDEN_M1_SMTX_DISP_SPAN = int(_os.environ.get("MM_GOLDEN_M1_SMTX_DISP_SPAN", "4"))

@@ -2663,6 +2663,31 @@ when EURUSD, GBPUSD and DXY all run the last hour's low/high together at the zon
 whole dollar complex has been raided — the reversal from there paid better. Candidate
 (untested): size UP `cont` (60 bars) 1.25×, removing nothing. Trader to decide.
 
+### P92 — Episode-22 framing: 2-of-3 key-swing shift at the tap, then SMT (BUILT 2026-10-08, RUNNING)
+
+**Trader's rule (2026-10-08):** frame key swings with Episode-22 market structure. When price
+taps a liquidity zone and at least 2 of EURUSD / GBPUSD / DXY shift structure, a reversal is
+about to appear; then look back the past 30 min for SMT supporting it. No SMT -> price will
+likely keep going. Trader's choices: key swing = **a swing price DISPLACED away from**; no SMT
+-> skip AND test the continuation; the 2-of-3 shift **replaces** the DXY-only M1 check.
+
+- `_disp_swing_idx`: 3-bar fractal swing followed by an FVG in the move away within
+  `MM_GOLDEN_M1_SMTX_DISP_SPAN` (4) bars.
+- `_disp_mss(sym, d, t)`: from the lookback extreme (the tap), the last key swing on the other
+  side (the one the leg into the zone displaced away from) is closed through, first close,
+  within `MM_GOLDEN_M1_MSS_FRESH`. Applied to the pair, the sister and DXY (opposite way).
+- `_smtx(direction, t)`: per instrument, the most recent key swing in the prior 240 M1 bars
+  still intact when the 30-bar window opened; took = window ran it. 1-2 took = `smt`,
+  3 = `cont`, 0 = `none`, an instrument without a key swing = `noref`.
+- `MM_GOLDEN_M1_SMTX`: 1 record (column `m1_smtx` = `s<shifts>:<kind>:<who>`, events dump
+  `mm_smtx_events.csv`), 2 require shift>=2 + SMT, 3 require shift>=2 only. Counters
+  `mm_golden_m1_smtx_s<n>`, `_s2p_<kind>`, `_blocked_shift`, `_blocked_smt`.
+- `scripts/smtx_study.py`: on every logged setup, simulates the reversal AND the
+  continuation (2R, stop 3-10 pips) and splits by bucket x half. Selftest + end-to-end stub.
+
+Loops: `p89` control (846), `f20x1` (record only, must reproduce P87 f20: R157.4k), `f10x2`,
+`f20x2` (shift + SMT), `f20x3` (shift only) -> `data/mm_golden_*_p92_*`.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
