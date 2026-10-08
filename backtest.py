@@ -543,6 +543,7 @@ class Backtester:
             "m1_diag": st.get("m1_diag", ""),
             "m1_smtz": st.get("m1_smtz", ""),
             "m1_smtx": st.get("m1_smtx", ""),
+            "htf_smt_tf": st.get("htf_smt_tf", ""),
             "mm_zone_lo": st.get("mm_zone_lo", ""),
             "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
@@ -673,6 +674,7 @@ class Backtester:
             "m1_diag": st.get("m1_diag", ""),
             "m1_smtz": st.get("m1_smtz", ""),
             "m1_smtx": st.get("m1_smtx", ""),
+            "htf_smt_tf": st.get("htf_smt_tf", ""),
             "mm_zone_lo": st.get("mm_zone_lo", ""),
             "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
@@ -5660,6 +5662,60 @@ class Backtester:
                 return sw.price, tf
         return None, None
 
+    def _htf_smt_anchor(self, pair, direction, t, zlo, zhi):
+        """P95: SMT the trader's way - top-down D -> H4 -> H1 -> M15 on COMPLETED bars, anchored
+        on the last swing that attacked the liquidity zone. On each TF: anchor = the traded
+        pair's most recent 3-bar swing low (long; high for short) that reached into the zone
+        [zlo, zhi] (+/- MM_GOLDEN_HSMT_TOL_PIPS). Then watch the swings that form AFTER it: each
+        of EURUSD / GBPUSD / DXY "took it" if its extreme after the anchor went beyond its own
+        extreme at the anchor (long: EU/GU lower low, DXY higher high). SMT = 1 or 2 of 3 took
+        it. First TF that fires wins. Returns (tf, who) or ("", why)."""
+        sister = {"EURUSD": "GBPUSD", "GBPUSD": "EURUSD"}.get(pair)
+        if sister is None or not (zhi > zlo > 0):
+            return "", "na"
+        tol = config.MM_GOLDEN_HSMT_TOL_PIPS * pip_size(pair)
+        why = "no_anchor"
+        for tf in config.MM_GOLDEN_HSMT_TFS:
+            lb = config.MM_GOLDEN_HSMT_LB.get(tf, 60)
+            series = {}
+            for sym in (pair, sister, "UDXUSD"):
+                b = self.bars_up_to(sym, tf, t, max_bars=lb + 1)
+                if b and len(b) >= 12:
+                    series[sym] = b[:-1]                  # completed bars only
+            if pair not in series or sister not in series:
+                continue
+            n = min(len(v) for v in series.values())
+            for k in series:
+                series[k] = series[k][-n:]
+            p = series[pair]
+            low = direction > 0
+            sw = [j for j in range(1, n - 2)
+                  if (low and p[j].Low < p[j - 1].Low and p[j].Low < p[j + 1].Low
+                      and zlo - tol <= p[j].Low <= zhi + tol)
+                  or (not low and p[j].High > p[j - 1].High and p[j].High > p[j + 1].High
+                      and zlo - tol <= p[j].High <= zhi + tol)]
+            if not sw:
+                continue
+            # the raid = the deepest swing into the zone (later shallower swings are what we watch)
+            a = (min(sw, key=lambda j: p[j].Low) if low else max(sw, key=lambda j: p[j].High))
+            why = "no_div"
+            took = {}
+            for sym, key in ((pair, "pair"), (sister, "sister"), ("UDXUSD", "dxy")):
+                if sym not in series:
+                    continue
+                b = series[sym]
+                want_low = low != (sym == "UDXUSD")
+                at = b[max(0, a - 1):a + 2]
+                after = b[a + 2:]
+                if not after:
+                    continue
+                took[key] = ((min(x.Low for x in after) < min(x.Low for x in at)) if want_low
+                             else (max(x.High for x in after) > max(x.High for x in at)))
+            k = sum(took.values())
+            if len(took) >= 2 and 1 <= k < len(took):
+                return tf, "+".join(x for x in ("pair", "sister", "dxy") if took.get(x)) or "none"
+        return "", why
+
     def _ifvg_ce_closed(self, pair, direction, t, lo, hi):
         """P87: has a COMPLETED M5 candle closed at or beyond the IFVG's halfway line
         (consequent encroachment) during the M1 lookback, without closing through the
@@ -6253,6 +6309,19 @@ class Backtester:
         _m1_diag = ""
         _m1_smtz = ""
         _m1_smtx = ""
+        _htf_smt_tf = ""
+        if config.MM_GOLDEN_HSMT:
+            # P95 — bigger-TF SMT anchored on the swing that attacked the zone (decides the trade;
+            # M1 only times the entry). Zone = the union of the rung zone and the IFVG zone.
+            _hz = [z for z in ((_zl, _zh), (_zone_lo, _zone_hi)) if z[0] and z[1] and z[1] > z[0]]
+            _hlo = min(z[0] for z in _hz) if _hz else 0
+            _hhi = max(z[1] for z in _hz) if _hz else 0
+            _htf, _hwho = self._htf_smt_anchor(pair, direction, t, _hlo, _hhi)
+            _htf_smt_tf = f"{_htf}:{_hwho}" if _htf else _hwho
+            g[f"mm_golden_hsmt_{_htf or _hwho}"] = g.get(f"mm_golden_hsmt_{_htf or _hwho}", 0) + 1
+            if config.MM_GOLDEN_HSMT >= 2 and not _htf:
+                g["mm_golden_hsmt_blocked"] = g.get("mm_golden_hsmt_blocked", 0) + 1
+                return
         if config.MM_GOLDEN_M1_SHADOW and not config.MM_GOLDEN_M1_MSS:
             _m1_diag = self._m1_shift_diag(pair, direction, t, _zl, _zh)
         if config.MM_GOLDEN_M1_MSS:
@@ -6566,6 +6635,7 @@ class Backtester:
             "m1_diag": _m1_diag,
             "m1_smtz": _m1_smtz,
             "m1_smtx": _m1_smtx,
+            "htf_smt_tf": _htf_smt_tf,
             "mm_zone_lo": _zl,
             "mm_zone_hi": _zh,
             "mm_ifvg_zone_tf": _zone_tf,

@@ -31,6 +31,21 @@ cache-bug post-mortem.)
 MaxDD −15.66% / R176.0k withdrawn (IS R60.8k, OOS R85.0k).** The P94 `p93` control arm must
 reproduce this exactly. `MM_PRESET=p92` and `MM_PRESET=base` still reproduce their anchors.
 
+### P95 — SMT the trader's way: top-down, anchored on the swing that attacked the zone (BUILT 2026-10-08, RUNNING)
+
+Trader (2026-10-08): SMT starts on the bigger TF and goes lower; "the last swing that attacked the
+liquidity zone is the key factor to start hunting the SMT, watching the next swings that form";
+**M1 is for entries only, not for deciding which trade to take.** `_htf_smt_anchor`: D -> H4 -> H1
+-> M15 (`MM_GOLDEN_HSMT_TFS`), completed bars only; anchor = the traded pair's DEEPEST 3-bar swing
+(long: low) inside the zone (union of rung zone + IFVG zone, ±5 pips); after it, EU / GU / DXY each
+"took it" if their extreme after the anchor beat their own extreme at the anchor (DXY inverse);
+SMT = 1-2 of 3 took it; first TF that fires wins. Column `htf_smt_tf` (e.g. `60T:sister`, or
+`no_anchor` / `no_div`); counters `mm_golden_hsmt_<tf|why>`, `_blocked`. `MM_GOLDEN_HSMT`: 1 record,
+2 require (with `MM_GOLDEN_OB_SMT_REQUIRED=0` to replace the old check). Fixture-verified
+(sister-only took -> fires on 60T; all three / none took -> no_div; no swing in zone -> no_anchor).
+Loops: `p93` (control 876 / R176.0k), `hsmt1` (record only, must = p93), `hsmt2` (new SMT replaces
+old), `nosmt` (old SMT gate off, nothing instead) -> `data/mm_golden_*_p95_*`.
+
 ### ⚠️ HOW SMT IS MEASURED TODAY (checked 2026-10-08, trader asked) — read before any SMT work
 
 The MM channel ALREADY requires a bigger-timeframe SMT on every trade: `MM_GOLDEN_OB_SMT_REQUIRED=1`

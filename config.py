@@ -1394,3 +1394,11 @@ MM_GOLDEN_M1_MSS_DISP = bool(int(_mmdef("MM_GOLDEN_M1_MSS_DISP", "0")))
 # P94 — MM stop moves to break-even only once price has covered MM_GOLDEN_BE_FRAC of the way
 # to the target (e.g. 0.5 = halfway); no other trailing on MM trades. 0 = off (normal trailing).
 MM_GOLDEN_BE_FRAC = float(_os.environ.get("MM_GOLDEN_BE_FRAC", "0"))
+# P95 — SMT the trader's way: D -> H4 -> H1 -> M15, completed bars, anchored on the last swing
+# that attacked the liquidity zone, watching the swings after it; EU / GU / DXY, 1-2 of 3 took
+# it = SMT. 0 off, 1 record only (column htf_smt_tf), 2 require (set MM_GOLDEN_OB_SMT_REQUIRED=0
+# to replace the old any-rung EU/GU check).
+MM_GOLDEN_HSMT = int(_os.environ.get("MM_GOLDEN_HSMT", "0"))
+MM_GOLDEN_HSMT_TFS = tuple(_os.environ.get("MM_GOLDEN_HSMT_TFS", "D,240T,60T,15T").split(","))
+MM_GOLDEN_HSMT_LB = {"D": 30, "240T": 60, "60T": 72, "15T": 96}
+MM_GOLDEN_HSMT_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_HSMT_TOL_PIPS", "5"))
