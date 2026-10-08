@@ -2688,6 +2688,29 @@ likely keep going. Trader's choices: key swing = **a swing price DISPLACED away 
 Loops: `p89` control (846), `f20x1` (record only, must reproduce P87 f20: R157.4k), `f10x2`,
 `f20x2` (shift + SMT), `f20x3` (shift only) -> `data/mm_golden_*_p92_*`.
 
+**P92 RESULT (RAN 2026-10-08) — 🟢 the 2-of-3 key-swing SHIFT is the best MM variant yet; requiring
+SMT on top of it fails again.** Controls exact: p89 846 / R160.0k; f20x1 (record only) = P87 f20 R157.4k.
+
+| | P88 | P89 | **2-of-3 shift (f20x3)** | shift + SMT f20 | shift + SMT f10 |
+|---|---|---|---|---|---|
+| Book trades full | 817 | 846 | **869** | 774 | 747 |
+| MM trades IS / OOS / full | 51 / 44 / 100 | 67 / 58 / 134 | **74 / 61 / 144** | 24 / 26 / 54 | 11 / 8 / 21 |
+| MM PF IS / OOS | 2.38 / 2.11 | 1.98 / 1.71 | 1.85 / 1.65 | 1.44 / 0.76 | 1.36 / 0.23 |
+| Withdrawn IS / OOS / full | 62.0k / 71.9k / 163.1k | 60.2k / 74.9k / 160.0k | **60.5k / 76.8k / 167.1k** | 44.2k / 58.7k / 130.9k | 42.8k / 63.1k / 129.7k |
+| MaxDD full / OOS | −15.59 / −9.99 | −15.66 / −9.98 | −15.66 / −9.87 | −13.24 / −9.55 | −13.24 / −8.75 |
+
+**2-of-3 shift (replacing the DXY-only check):** most MM trades, most money (R167.1k full, best of
+any variant; beats P89 in BOTH halves), same MaxDD as P89. Preset `MM_PRESET=p92` (not default).
+**+ SMT required:** MM trades collapse to 21-54, OOS PF < 1, withdrawn below the 736 base. Of the
+setups with >=2 shifts, SMT-in-30-min reads `smt` 182 vs `cont` 307 vs `noref` 104 (full, f20x2).
+
+**Continuation study (`smtx_study.py`, 440 unique setups, outside the engine, 2R fixed):** the
+REVERSAL beat the continuation in EVERY bucket, both halves — including `shift>=2 & cont`
+(reversal PF 2.24 / 1.94, continuation 0.40 / 0.43) and `shift<2`. `none` is n=4-5. The
+"no SMT -> continues" rule is not supported here. Side lead (not acted on): the same setups
+simulated with a fixed 2R exit win ~50-55% vs the engine's ~30% MM WR — the engine's MM exits
+(base targets / trail / BE) may be leaving the edge on the table. Untested in the engine.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that

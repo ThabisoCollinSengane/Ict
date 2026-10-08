@@ -624,6 +624,7 @@ MM_SEMI_AUTO_MAX_PER_DAY = int(_os.environ.get("MM_SEMI_AUTO_MAX_PER_DAY", 3))
 # MM_PRESET — one switch that "locks in" a tested MM configuration (2026-10-08).
 #   p88 = MM on + M1 structure shift + DXY M1 confirmation (best quality)
 #   p89 = p88 + M1 break fresh within 20 bars (quality + more trades)
+#   p92 = M1 fresh 20 + 2-of-3 key-swing shift EU/GU/DXY (most money + trades, P92)
 # Unset = everything off (the documented 736-trade baseline). Any individual env
 # var still overrides the preset.
 MM_PRESET = _os.environ.get("MM_PRESET", "").strip().lower()
@@ -631,6 +632,9 @@ _MM_PRESETS = {
     "p88": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_DXY": "1"},
     "p89": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_DXY": "1",
             "MM_GOLDEN_M1_MSS_FRESH": "20"},
+    # p92 = M1 shift (fresh 20) + 2-of-3 key-swing shift on EU / GU / DXY (no DXY-only check)
+    "p92": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_MSS_FRESH": "20",
+            "MM_GOLDEN_M1_SMTX": "3"},
 }
 if MM_PRESET and MM_PRESET not in _MM_PRESETS:
     raise ValueError(f"MM_PRESET={MM_PRESET!r} unknown; use one of {sorted(_MM_PRESETS)}")
@@ -1362,7 +1366,7 @@ MM_GOLDEN_M1_SMTZ_REF = _os.environ.get("MM_GOLDEN_M1_SMTZ_REF", "fractal")
 # then SMT must have formed in the last MM_GOLDEN_M1_SMTX_WIN M1 bars against each
 # instrument's last intact key swing. 0 off, 1 record only (column m1_smtx + events dump),
 # 2 require shift + SMT, 3 require shift only.
-MM_GOLDEN_M1_SMTX = int(_os.environ.get("MM_GOLDEN_M1_SMTX", "0"))
+MM_GOLDEN_M1_SMTX = int(_mmdef("MM_GOLDEN_M1_SMTX", "0"))
 MM_GOLDEN_M1_SMTX_WIN = int(_os.environ.get("MM_GOLDEN_M1_SMTX_WIN", "30"))
 MM_GOLDEN_M1_SMTX_PRIOR = int(_os.environ.get("MM_GOLDEN_M1_SMTX_PRIOR", "240"))
 MM_GOLDEN_M1_SMTX_DISP_SPAN = int(_os.environ.get("MM_GOLDEN_M1_SMTX_DISP_SPAN", "4"))
