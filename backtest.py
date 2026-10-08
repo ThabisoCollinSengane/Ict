@@ -534,6 +534,7 @@ class Backtester:
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_pd_stage": st.get("mm_pd_stage", ""),
             "m1_diag": st.get("m1_diag", ""),
+            "m1_smtz": st.get("m1_smtz", ""),
             "mm_zone_lo": st.get("mm_zone_lo", ""),
             "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
@@ -662,6 +663,7 @@ class Backtester:
             "mm_ifvg_tf": st.get("mm_ifvg_tf", ""),
             "mm_pd_stage": st.get("mm_pd_stage", ""),
             "m1_diag": st.get("m1_diag", ""),
+            "m1_smtz": st.get("m1_smtz", ""),
             "mm_zone_lo": st.get("mm_zone_lo", ""),
             "mm_zone_hi": st.get("mm_zone_hi", ""),
             "mm_ifvg_zone_tf": st.get("mm_ifvg_zone_tf", ""),
@@ -5489,6 +5491,53 @@ class Backtester:
         label = "+".join(k for k in ("eu", "gu", "dxy") if took[k]) or "none"
         return (1 <= n <= 2), label
 
+    def _m1_smt_zone(self, direction, t, off):
+        """P91: SMT read AT THE ZONE TAP, across EURUSD, GBPUSD and DXY (trader's rule).
+
+        SMT only matters where a reversal is expected - the pullback into the PD array.
+        `off` = how many completed M1 bars before now the pullback extreme printed
+        (set by _m1_shift). For each instrument, the tap window is that bar +/-
+        MM_GOLDEN_M1_SMTZ_TAP bars, and the reference is the last M1 fractal swing in the
+        MM_GOLDEN_M1_SMTZ_PRIOR bars before the tap (the previous low/high). Long: EU/GU
+        "took it" = tap low below their previous low; DXY "took it" = tap high above its
+        previous high. Short mirrored.
+          1 or 2 took it -> SMT (reversal signal)
+          all 3 took it  -> continuation (price likely keeps going that way)
+          none took it   -> no liquidity taken at the zone
+        Returns (kind, label): kind in {"smt","cont","none",None}; None = no data."""
+        T, P = config.MM_GOLDEN_M1_SMTZ_TAP, config.MM_GOLDEN_M1_SMTZ_PRIOR
+        need = off + T + P + 2
+        took = {}
+        for sym, key, inv in (("EURUSD", "eu", False), ("GBPUSD", "gu", False),
+                              ("UDXUSD", "dxy", True)):
+            bb = self.bars_up_to(sym, "1T", t, max_bars=need + 1)
+            if not bb or len(bb) < 10:
+                return None, "nodata"
+            bb = bb[:-1]
+            m = len(bb)
+            c = m - off
+            if c < 0 or c >= m:
+                return None, "nodata"
+            tap = bb[max(0, c - T):min(m, c + T + 1)]
+            pre = bb[max(0, c - T - P):max(0, c - T)]
+            if len(tap) < 1 or len(pre) < 5:
+                return None, "nodata"
+            want_low = (direction > 0) != inv     # long: pairs' low / DXY's high
+            if want_low:
+                fr = [pre[j].Low for j in range(1, len(pre) - 1)
+                      if pre[j].Low < pre[j - 1].Low and pre[j].Low < pre[j + 1].Low]
+                ref = fr[-1] if fr else min(x.Low for x in pre)
+                took[key] = min(x.Low for x in tap) < ref
+            else:
+                fr = [pre[j].High for j in range(1, len(pre) - 1)
+                      if pre[j].High > pre[j - 1].High and pre[j].High > pre[j + 1].High]
+                ref = fr[-1] if fr else max(x.High for x in pre)
+                took[key] = max(x.High for x in tap) > ref
+        n = sum(took.values())
+        who = "+".join(k for k in ("eu", "gu", "dxy") if took[k]) or "none"
+        kind = "smt" if 1 <= n <= 2 else ("cont" if n == 3 else "none")
+        return kind, who
+
     def _ifvg_ce_closed(self, pair, direction, t, lo, hi):
         """P87: has a COMPLETED M5 candle closed at or beyond the IFVG's halfway line
         (consequent encroachment) during the M1 lookback, without closing through the
@@ -5548,6 +5597,7 @@ class Backtester:
                     continue
                 if any(c.Close > lvl for c in b[li + 1:k]):
                     continue                      # not the first break -> stale
+                self._m1_ext_off = n - li         # P91: where the tap sits
                 return True, ext - config.MM_GOLDEN_M1_MSS_BUFFER * pip, ext
             else:
                 hi_i = max(range(len(seg)), key=lambda i: seg[i].High)
@@ -5563,6 +5613,7 @@ class Backtester:
                     continue
                 if any(c.Close < lvl for c in b[hi_i + 1:k]):
                     continue
+                self._m1_ext_off = n - hi_i
                 return True, ext + config.MM_GOLDEN_M1_MSS_BUFFER * pip, ext
         return False, None, None
 
@@ -6072,6 +6123,7 @@ class Backtester:
         else:
             _zl, _zh = _ifvg_lo, _ifvg_hi
         _m1_diag = ""
+        _m1_smtz = ""
         if config.MM_GOLDEN_M1_SHADOW and not config.MM_GOLDEN_M1_MSS:
             _m1_diag = self._m1_shift_diag(pair, direction, t, _zl, _zh)
         if config.MM_GOLDEN_M1_MSS:
@@ -6103,6 +6155,14 @@ class Backtester:
                     g["mm_golden_armed"] = g.get("mm_golden_armed", 0) + 1
                 return
             g["mm_golden_m1_shift"] = g.get("mm_golden_m1_shift", 0) + 1
+            # P91 — SMT at the zone tap (EURUSD / GBPUSD / DXY). 1 = record only, 2 = require.
+            if config.MM_GOLDEN_M1_SMTZ:
+                _zk, _zw = self._m1_smt_zone(direction, t, getattr(self, "_m1_ext_off", 1))
+                _m1_smtz = f"{_zk}:{_zw}" if _zk else "nodata"
+                g[f"mm_golden_m1_smtz_{_m1_smtz}"] = g.get(f"mm_golden_m1_smtz_{_m1_smtz}", 0) + 1
+                if config.MM_GOLDEN_M1_SMTZ >= 2 and _zk != "smt":
+                    g["mm_golden_m1_smtz_blocked"] = g.get("mm_golden_m1_smtz_blocked", 0) + 1
+                    return
             # P88 — intermarket confirmation ON M1: the dollar must turn the opposite
             # way, and/or the sister pair must show SMT, at the moment of entry.
             if config.MM_GOLDEN_M1_DXY:
@@ -6335,6 +6395,7 @@ class Backtester:
             "mm_ifvg_tf": _pd_tf,
             "mm_pd_stage": _pd_stage,
             "m1_diag": _m1_diag,
+            "m1_smtz": _m1_smtz,
             "mm_zone_lo": _zl,
             "mm_zone_hi": _zh,
             "mm_ifvg_zone_tf": _zone_tf,

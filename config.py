@@ -1344,3 +1344,11 @@ MM_GOLDEN_M1_SMT_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_SMT_LOOKBACK", "40
 # failed to confirm. All three or none = no SMT. Default 0 = off.
 MM_GOLDEN_M1_SMT3 = bool(int(_os.environ.get("MM_GOLDEN_M1_SMT3", "0")))
 MM_GOLDEN_M1_SMT3_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_SMT3_LOOKBACK", "30"))
+# P91 — SMT read AT THE ZONE TAP (trader's correction, 2026-10-08): SMT only matters where
+# a reversal is expected, so it is measured on the M1 bars around the pullback extreme
+# inside the PD array, vs each instrument's previous M1 swing. 1-2 of EU/GU/DXY took the
+# liquidity = SMT; all 3 = continuation; none = nothing taken.
+# 0 = off, 1 = record the reading on every MM trade only (column m1_smtz), 2 = require SMT.
+MM_GOLDEN_M1_SMTZ = int(_os.environ.get("MM_GOLDEN_M1_SMTZ", "0"))
+MM_GOLDEN_M1_SMTZ_TAP = int(_os.environ.get("MM_GOLDEN_M1_SMTZ_TAP", "3"))
+MM_GOLDEN_M1_SMTZ_PRIOR = int(_os.environ.get("MM_GOLDEN_M1_SMTZ_PRIOR", "30"))

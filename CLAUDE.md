@@ -2604,6 +2604,28 @@ instead of a filter — it removes nothing, which is the only lever shape that h
 **Default NOT flipped** — `MM_PRESET` still defaults to unset (736 baseline). Trader to
 choose p88 (most money, R163.1k) or p89 (+29 trades, best OOS money R74.9k).
 
+### P91 — SMT read AT THE ZONE TAP (BUILT 2026-10-08, RUNNING)
+
+**Trader's correction to P90:** "SMT is only looked at where we anticipate a reversal,
+inside a FVG, OB, breaker or previous important high/low. If they all take out the lows or
+highs on M1 together then that's a continuation. On the M1 SMT is always there before a
+move begins." P90 measured the last 30 M1 bars ending AT ENTRY — after the turn had
+started — so it never read the tap itself. P90's numbers do not test the trader's rule.
+
+`_m1_smt_zone(direction, t, off)`: `_m1_shift` now stores `self._m1_ext_off` (bars from
+the end to the pullback extreme INSIDE the zone). For EU, GU and DXY: tap window = that
+bar ±`MM_GOLDEN_M1_SMTZ_TAP` (3); reference = last M1 fractal swing in the
+`MM_GOLDEN_M1_SMTZ_PRIOR` (30) bars before the tap. Long: EU/GU took = tap low < previous
+low, DXY took = tap high > previous high; short mirrored. 1-2 took = `smt`, all 3 =
+`cont`, none = `none`. `MM_GOLDEN_M1_SMTZ=1` records column `m1_smtz` (e.g. `smt:eu+dxy`)
+on every MM trade without gating; `=2` requires `smt`. Counters
+`mm_golden_m1_smtz_<kind>:<who>`, `_blocked`. Fixture-verified.
+
+Loops: `p88z` / `p89z` (record only — MUST reproduce 817 / 846, and give WR by SMT
+reading on the real trades), `p88smtz` / `p89smtz` (require SMT) -> `data/mm_golden_*_p91_*`.
+Read first: MM WR/PF split by `m1_smtz` kind in the `*z` trade dumps — does `smt` beat
+`cont` in BOTH halves?
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that
