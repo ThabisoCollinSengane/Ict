@@ -621,7 +621,27 @@ MM_SEMI_AUTO_MAX_PER_DAY = int(_os.environ.get("MM_SEMI_AUTO_MAX_PER_DAY", 3))
 # edge (P44: WR 50%, PF 4.40) replaces the EURGBP pair-selection signal. DXY
 # direction is still required as the primary USD gate. Default OFF — validate
 # IS/OOS before shipping. Set MM_GOLDEN_ENABLED=1 env to test.
-MM_GOLDEN_ENABLED = bool(int(_os.environ.get("MM_GOLDEN_ENABLED", 0)))
+# MM_PRESET — one switch that "locks in" a tested MM configuration (2026-10-08).
+#   p88 = MM on + M1 structure shift + DXY M1 confirmation (best quality)
+#   p89 = p88 + M1 break fresh within 20 bars (quality + more trades)
+# Unset = everything off (the documented 736-trade baseline). Any individual env
+# var still overrides the preset.
+MM_PRESET = _os.environ.get("MM_PRESET", "").strip().lower()
+_MM_PRESETS = {
+    "p88": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_DXY": "1"},
+    "p89": {"MM_GOLDEN_ENABLED": "1", "MM_GOLDEN_M1_MSS": "1", "MM_GOLDEN_M1_DXY": "1",
+            "MM_GOLDEN_M1_MSS_FRESH": "20"},
+}
+if MM_PRESET and MM_PRESET not in _MM_PRESETS:
+    raise ValueError(f"MM_PRESET={MM_PRESET!r} unknown; use one of {sorted(_MM_PRESETS)}")
+
+
+def _mmdef(name, default):
+    """Env var wins, then the MM_PRESET value, then the plain default."""
+    return _os.environ.get(name, _MM_PRESETS.get(MM_PRESET, {}).get(name, default))
+
+
+MM_GOLDEN_ENABLED = bool(int(_mmdef("MM_GOLDEN_ENABLED", "0")))
 MM_GOLDEN_MAX_PER_DAY = int(_os.environ.get("MM_GOLDEN_MAX_PER_DAY", "1"))
 MM_GOLDEN_DECORR_ALL = bool(int(_os.environ.get("MM_GOLDEN_DECORR_ALL", "1")))
 MM_GOLDEN_MIN_DRAW = int(_os.environ.get("MM_GOLDEN_MIN_DRAW", "2"))
@@ -1293,9 +1313,9 @@ MM_GOLDEN_TARGET_OPPOSING = _os.environ.get("MM_GOLDEN_TARGET_OPPOSING", "0").st
 # P83 — MM entry waits for an M1 market-structure shift inside the PD-array zone
 # (pullback prints its extreme in the zone, then a completed M1 close breaks the last
 # M1 swing). Stop beyond the pullback extreme. Default 0 = unchanged.
-MM_GOLDEN_M1_MSS = bool(int(_os.environ.get("MM_GOLDEN_M1_MSS", "0")))
+MM_GOLDEN_M1_MSS = bool(int(_mmdef("MM_GOLDEN_M1_MSS", "0")))
 MM_GOLDEN_M1_MSS_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_MSS_LOOKBACK", "60"))
-MM_GOLDEN_M1_MSS_FRESH = int(_os.environ.get("MM_GOLDEN_M1_MSS_FRESH", "10"))
+MM_GOLDEN_M1_MSS_FRESH = int(_mmdef("MM_GOLDEN_M1_MSS_FRESH", "10"))
 MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS = float(_os.environ.get("MM_GOLDEN_M1_MSS_ZONE_TOL_PIPS", "2"))
 MM_GOLDEN_M1_MSS_BUFFER = float(_os.environ.get("MM_GOLDEN_M1_MSS_BUFFER", "1"))
 MM_GOLDEN_M1_MSS_MIN_STOP_PIPS = float(_os.environ.get("MM_GOLDEN_M1_MSS_MIN_STOP_PIPS", "3"))
@@ -1313,7 +1333,14 @@ MM_GOLDEN_M1_HTF_CE_TFS = tuple(_os.environ.get("MM_GOLDEN_M1_HTF_CE_TFS", "60T,
 # P88 — intermarket confirmation on M1 at the MM entry. DXY: the dollar's M1 must shift
 # opposite to the trade within MM_GOLDEN_M1_DXY_FRESH bars. SMT: the sister pair
 # (EURUSD<->GBPUSD) must fail to confirm the traded pair's M1 sweep. Default 0 = off.
-MM_GOLDEN_M1_DXY = bool(int(_os.environ.get("MM_GOLDEN_M1_DXY", "0")))
+MM_GOLDEN_M1_DXY = bool(int(_mmdef("MM_GOLDEN_M1_DXY", "0")))
 MM_GOLDEN_M1_DXY_FRESH = int(_os.environ.get("MM_GOLDEN_M1_DXY_FRESH", "15"))
 MM_GOLDEN_M1_SMT = bool(int(_os.environ.get("MM_GOLDEN_M1_SMT", "0")))
 MM_GOLDEN_M1_SMT_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_SMT_LOOKBACK", "40"))
+# P90 — THREE-WAY M1 SMT across EURUSD, GBPUSD and DXY (trader's rule, 2026-10-08):
+# over the last MM_GOLDEN_M1_SMT3_LOOKBACK completed M1 bars, each instrument either
+# took the liquidity on our sweep side (long: EU/GU a lower low, DXY a higher high —
+# short mirrored) or did not. SMT = ONE or TWO of the three took it while the rest
+# failed to confirm. All three or none = no SMT. Default 0 = off.
+MM_GOLDEN_M1_SMT3 = bool(int(_os.environ.get("MM_GOLDEN_M1_SMT3", "0")))
+MM_GOLDEN_M1_SMT3_LOOKBACK = int(_os.environ.get("MM_GOLDEN_M1_SMT3_LOOKBACK", "30"))

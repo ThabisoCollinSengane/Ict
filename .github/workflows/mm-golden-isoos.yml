@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full]
-        mode: [dxyf20ce]
+        mode: [p88, p89, p88smt3, p89smt3, m1smt3]
     env:
       NO_PUSH: "1"
     steps:
@@ -49,14 +49,14 @@ jobs:
             full) Y="" ;;
             base) Y="" ;;
           esac
-          if [ "${{ matrix.mode }}" = base ]; then export MM_GOLDEN_ENABLED=0; else export MM_GOLDEN_ENABLED=1; fi
-          export MM_GOLDEN_M1_MSS=1
-          export MM_GOLDEN_M1_ARM=0
-          case "${{ matrix.mode }}" in *dxy*) export MM_GOLDEN_M1_DXY=1;; *) export MM_GOLDEN_M1_DXY=0;; esac
-          case "${{ matrix.mode }}" in *f20*) export MM_GOLDEN_M1_MSS_FRESH=20;; *) export MM_GOLDEN_M1_MSS_FRESH=10;; esac
-          case "${{ matrix.mode }}" in *ce*) export MM_GOLDEN_M1_HTF_CE=1;; *) export MM_GOLDEN_M1_HTF_CE=0;; esac
-          case "${{ matrix.mode }}" in smt|dxysmt) export MM_GOLDEN_M1_SMT=1;; *) export MM_GOLDEN_M1_SMT=0;; esac
-          echo "MM_GOLDEN_ENABLED=$MM_GOLDEN_ENABLED MM_GOLDEN_M1_MSS=$MM_GOLDEN_M1_MSS DXY=$MM_GOLDEN_M1_DXY SMT=$MM_GOLDEN_M1_SMT"
+          # P90: controls use the MM_PRESET switch (p88 must reproduce 817, p89 846).
+          case "${{ matrix.mode }}" in
+            p88*) export MM_PRESET=p88 ;;
+            p89*) export MM_PRESET=p89 ;;
+            m1*)  export MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1 ;;
+          esac
+          case "${{ matrix.mode }}" in *smt3*) export MM_GOLDEN_M1_SMT3=1;; esac
+          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK)"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
       - name: Commit
@@ -64,7 +64,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p89
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p90
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

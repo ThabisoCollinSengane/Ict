@@ -269,7 +269,7 @@ def _main(_real_stdout):
               f"close {m5['Close'].iloc[-1]:.5f}")
         if sym == "UDXUSD":
             dxy_5m = m5
-            if config.MM_GOLDEN_M1_DXY:      # P88: DXY M1 only when the check is on
+            if config.MM_GOLDEN_M1_DXY or config.MM_GOLDEN_M1_SMT3:  # P88/P90: DXY M1 only when a check needs it
                 data_m1[sym] = m1
         else:
             data_5m[sym] = m5

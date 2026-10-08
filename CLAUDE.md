@@ -2564,6 +2564,24 @@ MM_GOLDEN_M1_DXY=1`, full 817 / PF 3.82 / −15.59% / R163.1k) or P89 (same +
 Either re-anchors the documented baseline. Open ideas: a looser M1 SMT (vs DXY, or shorter
 window) — the 40-bar sister-pair version rejected ~85% of shifts.
 
+### P90 — THREE-WAY M1 SMT (EURUSD / GBPUSD / DXY) + MM presets (BUILT 2026-10-08, RUNNING)
+
+Trader's rule: SMT is read across ALL THREE — DXY, EURUSD, GBPUSD. If one or two of
+them take the liquidity and the rest fail to confirm, that is the signal.
+`MM_GOLDEN_M1_SMT3=1` (`_m1_smt3`, lookback `MM_GOLDEN_M1_SMT3_LOOKBACK`=30 completed M1
+bars, split in two halves). Long: EU/GU "took it" = recent-half lower low, DXY "took it"
+= recent-half higher high (inverse). Short mirrored. Signal = 1 or 2 of 3 took it; all
+three or none = no SMT. Counters `mm_golden_m1_smt3_<ok|no>_<who>` (e.g. `ok_eu+dxy`)
+say WHICH instruments diverged. Fixture-verified (single, double, all, none, short, no
+data). Replaces the P88 sister-pair-only SMT, which rejected ~85%.
+
+**`MM_PRESET=p88|p89`** locks in a tested configuration with one switch (individual env
+vars still override). Unset = the 736-trade baseline, unchanged. Which preset becomes
+the default is decided after this run.
+
+Loops: `p88` / `p89` controls (must reproduce 817 / 846), `p88smt3`, `p89smt3`,
+`m1smt3` (M1 shift + SMT3, no DXY) x IS/OOS/full -> `data/mm_golden_*_p90_*`.
+
 ### P87 — HTF IFVG halfway exception + freshness loops (BUILT 2026-10-07, RUNNING)
 
 Trader's idea: the M1 gate's biggest rejection (46%, "blew_through") is a pullback that

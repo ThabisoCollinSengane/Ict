@@ -5462,6 +5462,33 @@ class Backtester:
             return None
         return bool(smt_divergence(a[:-1], r[:-1], direction, inverse=False, lookback=lb))
 
+    def _m1_smt3(self, pair, direction, t):
+        """P90: three-way M1 SMT across EURUSD, GBPUSD and DXY, on completed M1 bars.
+        Each instrument is split into two halves of the lookback window. For a LONG
+        the sell-side is the liquidity: EURUSD/GBPUSD 'took it' if the recent half
+        made a lower low; DXY (inverse) 'took it' if it made a higher high. SHORT is
+        mirrored. SMT = one or two of the three took it, the rest failed to confirm.
+        Returns (signal, label) where label names who took it, e.g. 'eu+dxy';
+        (None, 'nodata') when a series is missing."""
+        lb = config.MM_GOLDEN_M1_SMT3_LOOKBACK
+        half = lb // 2
+        took = {}
+        for sym, key, inv in (("EURUSD", "eu", False), ("GBPUSD", "gu", False),
+                              ("UDXUSD", "dxy", True)):
+            b = self.bars_up_to(sym, "1T", t, max_bars=lb + 1)
+            if not b or len(b) < lb + 1:
+                return None, "nodata"
+            b = b[:-1][-lb:]
+            prior, recent = b[:half], b[half:]
+            want_low = (direction > 0) != inv     # long: pairs low / DXY high
+            if want_low:
+                took[key] = min(x.Low for x in recent) < min(x.Low for x in prior)
+            else:
+                took[key] = max(x.High for x in recent) > max(x.High for x in prior)
+        n = sum(took.values())
+        label = "+".join(k for k in ("eu", "gu", "dxy") if took[k]) or "none"
+        return (1 <= n <= 2), label
+
     def _ifvg_ce_closed(self, pair, direction, t, lo, hi):
         """P87: has a COMPLETED M5 candle closed at or beyond the IFVG's halfway line
         (consequent encroachment) during the M1 lookback, without closing through the
@@ -6093,6 +6120,16 @@ class Backtester:
                     g["mm_golden_m1_smt_no"] = g.get("mm_golden_m1_smt_no", 0) + 1
                     return
                 g["mm_golden_m1_smt_ok"] = g.get("mm_golden_m1_smt_ok", 0) + 1
+            if config.MM_GOLDEN_M1_SMT3:
+                _s3, _s3l = self._m1_smt3(pair, direction, t)
+                if _s3 is None:
+                    g["mm_golden_m1_smt3_nodata"] = g.get("mm_golden_m1_smt3_nodata", 0) + 1
+                    return
+                _k = f"mm_golden_m1_smt3_{'ok' if _s3 else 'no'}_{_s3l}"
+                g[_k] = g.get(_k, 0) + 1
+                if not _s3:
+                    return
+                g["mm_golden_m1_smt3_ok"] = g.get("mm_golden_m1_smt3_ok", 0) + 1
 
         # Draw cascade 0/3 gate (same reversal logic as base).
         pip_v = pip_size(pair)
