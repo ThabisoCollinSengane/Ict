@@ -24,6 +24,45 @@ cache-bug post-mortem.)
 
 ---
 
+## 🔧 P98 — LIVE ENGINE: base-strategy crash fixed + MM channel ported (2026-10-09)
+
+**Critical live bug found and fixed.** `LiveTrader` (live/run_live.py) inherits all signal code
+but never calls `Backtester.__init__`, and P45/P47 added state there that the live class never
+got: `_narrative_ctx` (P47, 2026-09-05) and `_session_range_cache` (P45). Every base setup that
+reached the narrative score raised `AttributeError` inside `_maybe_open` — caught by the run
+loop's catch-all, so **the live bot could not open a base trade at all from 2026-09-05 until this
+fix**, and the rest of that cycle (heartbeat etc.) was skipped. Fixed by initialising the missing
+state in `LiveTrader.__init__` (list kept in step with `Backtester.__init__`).
+
+**How it was found:** `live/test_live_stub.py` — replaces `live.mt5_connector` with an in-memory
+fake (random-walk M1 for every symbol, any timeframe, orders always fill), builds `LiveTrader`
+and walks the real `_run_once` loop bar by bar, then calls the MM helpers directly. Before the
+fix: 3/3 setups crashed. After: clean, a base order is sent. **Run it after any change to
+Backtester.__init__ or the live class:** `python -m live.test_live_stub --days 4`.
+
+**MM channel in the live loop (MM_PRESET p93):** `_run_once` now calls `_mm_golden_entry` after
+`_maybe_open` finds nothing, exactly as `Backtester.run` does. `MM_LIVE_ENABLED=1` (default; 0 =
+base only). Three live-specific pieces:
+1. **UDXUSD** — brokers do not carry the Dollar Index; the backtest reads HistData's real one.
+   `_synthetic_dxy_bars` builds it bar-by-bar from the six ICE constituents (same formula,
+   aligned on bar time, per-minute cache). Without it the quadrant read DXY flat and MM never fired.
+2. **Forming bar** — `mt.get_bars` drops the forming bar; the backtest MM code slices `[:-1]` to
+   mean "completed", which needs the forming bar present. MM reads use `include_forming=True`
+   (the live forming bar holds only data so far — no lookahead). Base-strategy reads unchanged.
+3. Orders via the shared `_place_new_position` (comment `ict_mm`); the Telegram `/bias` /
+   `/levels` filter applies to MM setups too. Management = the existing `_trail_stops` (BE +10,
+   lock +20, milestone) — the same as p93's MM exits.
+
+Verified on the fake feed: MM gates run end to end with synthetic DXY (quadrants 1a/1b/2a/2b
+all reached), a forced MM setup sends one `ict_mm` order, `/bias` blocks it, forming-bar mode is
+on only inside the call. Backtest untouched (no backtest.py change).
+
+**Known live-vs-backtest gaps NOT fixed here (affect the base strategy, pre-existing):**
+`_get_weekly_amd` returns None and `_session_range_amd` / `_prev_session_range` find no data live
+(they read backtest-only frames), so live skips the P45 session-range fallback and weekly-AMD
+conviction; base reads that slice `[:-1]` drop one extra closed candle live. **Smoke-test on the
+Exness DEMO before funding.**
+
 ## 🚨 DEFAULT UPDATED AGAIN (2026-10-08, trader's decision) — `MM_PRESET=p93`
 
 `p93` = `p92` + the pair's own M1 trigger must break the swing that caused the impulse (P93b,

@@ -208,11 +208,15 @@ def _tf(code: str):
 
 
 # ── Market data ───────────────────────────────────────────────────────────────
-def get_bars(base: str, tf: str, count: int) -> list[Bar]:
+def get_bars(base: str, tf: str, count: int, include_forming: bool = False) -> list[Bar]:
     """Return the most recent `count` completed bars for `base` at `tf`.
 
     Oldest→newest. The currently-forming bar is dropped so the strategy only ever
     sees closed candles (no repaint). Returns [] on any error.
+
+    include_forming=True keeps the in-progress bar (its OHLC so far). The MM channel
+    uses it because its backtest code slices `[:-1]` to mean "completed candles",
+    which only holds when the forming bar is present (see LiveTrader.bars_up_to).
     """
     name = resolve_symbol(base)
     if name is None:
@@ -226,7 +230,8 @@ def get_bars(base: str, tf: str, count: int) -> list[Bar]:
     if rates is None or len(rates) == 0:
         log.warning("No rates for %s %s: %s", base, tf, mt5.last_error())
         return []
-    rates = rates[:-1]          # drop the in-progress bar
+    if not include_forming:
+        rates = rates[:-1]      # drop the in-progress bar
     return [Bar(int(r["time"]), float(r["open"]), float(r["high"]),
                 float(r["low"]), float(r["close"]), float(r["tick_volume"]))
             for r in rates]

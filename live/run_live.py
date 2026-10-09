@@ -162,6 +162,27 @@ class LiveTrader(Backtester):
         self.tf_index = {}
         self.tf_pos = {}
 
+        # State Backtester.__init__ sets and the inherited entry code reads. LiveTrader
+        # does not call super().__init__, so each of these was an AttributeError on a
+        # live entry check: _narrative_ctx crashed EVERY base setup that reached the
+        # P47 narrative score (since 2026-09-05), _session_range_cache the P45 fallback.
+        # Found by live/test_live_stub.py; keep this list in step with Backtester.__init__.
+        from ict.narrative import NarrativeContext
+        self._narrative_ctx = NarrativeContext()
+        self._session_range_cache = {}
+        self._sr_widths = []
+        self._mm_golden_count = {}      # MM channel: (pair, date) -> entries opened today
+        self._mm_armed = {}
+        self.withdrawn_total = 0.0
+        self.withdrawal_count = 0
+        self.withdrawal_events = []
+        self._keep_level = config.WITHDRAW_KEEP
+        self._ceiling = config.WITHDRAW_AT
+        self._work_peak = self.equity
+        self._max_work_dd = 0.0
+        self._bars_forming = False      # MM channel reads include the forming bar
+        self._dxy_cache = {}            # synthetic DXY bars per (tf, count, forming, minute)
+
         # Diagnostic counters
         self.gate = {
             "checks": 0, "in_killzone": 0, "news_clear": 0,
@@ -307,7 +328,41 @@ class LiveTrader(Backtester):
         `max_bars` caps fetch count; 0 or None = up to 3000 (safe for H4/D/W full history).
         """
         count = max_bars if (max_bars and max_bars < 3000) else 3000
-        return _to_bars(mt.get_bars(sym, tf, count))
+        if sym == "UDXUSD":
+            return self._synthetic_dxy_bars(tf, count)
+        return _to_bars(mt.get_bars(sym, tf, count, include_forming=self._bars_forming))
+
+    def _synthetic_dxy_bars(self, tf, count):
+        """UDXUSD for the live feed. The backtest reads HistData's real Dollar Index
+        (UDXUSD); MT5 brokers do not carry it, so build it from the six ICE
+        constituents with the same formula (ict.dxy_synthetic), bar by bar, aligned on
+        bar TIME so a missing bar in one symbol cannot shift the series. A constituent
+        the broker lacks is skipped (compute_dxy needs EURUSD + a minimum set).
+        Cached per minute — the MM checks read DXY several times per evaluation."""
+        from ict.dxy_synthetic import compute_dxy, compute_dxy_range
+        key = (tf, count, self._bars_forming, datetime.now(timezone.utc).strftime("%Y%m%d%H%M"))
+        hit = self._dxy_cache.get(key)
+        if hit is not None:
+            return hit
+        rolls = {}
+        for s in mt.DXY_CONSTITUENTS:
+            bars = mt.get_bars(s, tf, count, include_forming=self._bars_forming)
+            if bars:
+                rolls[s] = {b.time: b for b in bars}
+        out = []
+        if "EURUSD" in rolls:
+            for ts in sorted(rolls["EURUSD"]):
+                row = {s: r[ts] for s, r in rolls.items() if ts in r}
+                o = compute_dxy({s: b.open for s, b in row.items()})
+                c = compute_dxy({s: b.close for s, b in row.items()})
+                h, l = compute_dxy_range({s: b.high for s, b in row.items()},
+                                         {s: b.low for s, b in row.items()})
+                if None not in (o, c, h, l):
+                    out.append(_BBar(o, h, l, c))
+        if len(self._dxy_cache) > 64:
+            self._dxy_cache.clear()
+        self._dxy_cache[key] = out
+        return out
 
     def _bar_at(self, sym, tf, t):
         bars = self.bars_up_to(sym, tf, t, max_bars=2)
@@ -2051,14 +2106,49 @@ class LiveTrader(Backtester):
 
         st  = self.active[pair]
         self._apply_manual_target(pair, st)  # full-manual-AMD TP override (if set)
+        self._place_new_position(pair, st)
+
+    def _mm_golden_entry(self, pair, t):
+        """MM channel (the backtest's _mm_golden_entry, MM_PRESET p93) on live bars.
+
+        Runs after the base entry check finds nothing, exactly as Backtester.run does.
+        Its reads include the forming bar for the duration of the call: the backtest MM
+        code slices `[:-1]` to mean "completed candles", which is only true when the
+        last bar is the forming one — without it every such read would drop a closed
+        candle (a whole day on D1). The Telegram direction filter (/bias, /levels)
+        applies to MM trades too; a filtered setup is discarded before any order."""
+        if not (config.MM_GOLDEN_ENABLED and config.MM_LIVE_ENABLED):
+            return
+        if pair in self.active or self._manual_halt:
+            return
+        self._current_pair = pair
+        self._bars_forming = True
+        try:
+            super()._mm_golden_entry(pair, t)
+        finally:
+            self._bars_forming = False
+        if pair not in self.active:
+            return
+        st = self.active[pair]
+        if not self._direction_allowed(pair, st["direction"], t):
+            log.info("MM setup %s %s discarded by the Telegram direction filter",
+                     pair, "long" if st["direction"] > 0 else "short")
+            del self.active[pair]
+            return
+        self._place_new_position(pair, st)
+
+    def _place_new_position(self, pair, st):
+        """Send the market order for a position the strategy just opened in
+        self.active[pair]; on failure the tracking entry is removed."""
         leg = st["legs"][0]
         lots = round(leg["units"] / config.LOT_UNITS, 2)
         lots = max(lots, config.MIN_LOT_SIZE)
 
+        _tag = "mm" if st.get("entry_model") == "mm_golden" else st.get("im_scenario", "")
         res = mt.market_order(
             pair, lots, st["direction"],
             sl=leg["stop"], tp=st["target"],
-            comment=f"ict_{st.get('im_scenario', '')}",
+            comment=f"ict_{_tag}",
         )
         if res and res["ok"]:
             ticket = res.get("ticket") or self._recover_ticket(pair)
@@ -2488,6 +2578,8 @@ class LiveTrader(Backtester):
         log.info("ICT live loop started — pairs: %s", ", ".join(config.PAIRS))
         log.info("Account: %.2f ZAR  leverage 1:%s", self.equity,
                  mt.account().leverage if mt.account() else "?")
+        log.info("MM channel: %s (preset %s)", "ON" if (config.MM_GOLDEN_ENABLED and
+                 config.MM_LIVE_ENABLED) else "OFF", config.MM_PRESET)
         log.info("DEMO mode until smoke test confirmed — see LIVE_SETUP.md")
         log.info("=" * 60)
 
@@ -2594,6 +2686,8 @@ class LiveTrader(Backtester):
                 if pair not in self.active:
                     if can_open_new_trade(now, pair):
                         self._maybe_open(pair, now)
+                        if pair not in self.active:
+                            self._mm_golden_entry(pair, now)
 
         # Gate-funnel HEARTBEAT — once per calendar day, log the FULL funnel so a
         # quiet stretch self-explains: is the loop even evaluating (checks climbing)?

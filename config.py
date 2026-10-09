@@ -1417,3 +1417,6 @@ MM_GOLDEN_SESS_END_LONDON = _os.environ.get("MM_GOLDEN_SESS_END_LONDON", "08:00"
 MM_GOLDEN_SESS_END_NY = _os.environ.get("MM_GOLDEN_SESS_END_NY", "12:00")
 MM_GOLDEN_NEWS_EXIT = int(_os.environ.get("MM_GOLDEN_NEWS_EXIT", "0"))
 MM_GOLDEN_NEWS_EXIT_MIN = int(_os.environ.get("MM_GOLDEN_NEWS_EXIT_MIN", "15"))
+# Live engine: run the MM channel (MM_PRESET p93) in live/run_live.py. Default on so the
+# live bot trades what the backtest anchor measures; set 0 to run the base strategy only.
+MM_LIVE_ENABLED = int(_os.environ.get("MM_LIVE_ENABLED", "1"))
