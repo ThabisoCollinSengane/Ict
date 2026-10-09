@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+"""Market Maker IFVG-continuation — full-backtest A/B. Pure Python, no bash.
+
+    python run_mm_validation.py
+
+Three arms x {full 4yr, IS 2022-23, OOS 2024-25}, by shelling out to
+`python run_backtest_histdata.py` with env overrides:
+
+  1. baseline            MM_CONTINUATION_ENABLED=0                      (reference)
+  2. MM adds             MM_CONTINUATION_ENABLED=1  MM_TARGET_OPPOSING=0
+                         (IFVG re-entries, keep the normal nearest-draw target)
+  3. MM adds + opp-tgt   MM_CONTINUATION_ENABLED=1  MM_TARGET_OPPOSING=1
+                         (also escalate the target to the opposing liquidity pool)
+
+Writes data/mm_validation.md. Arm 2 isolates the re-entries; arm 3 adds the
+far-target change (the piece that has repeatedly failed on its own). Ships only if
+an arm lifts equity with MaxDD held on the full 4yr AND both splits stay positive.
+
+Options:
+    --smt     also require H1 EU/GU SMT for MM adds (MM_HTF_SMT_REQUIRED=1)
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+
+_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+SPLITS = (("Full 4yr", ["2022", "2023", "2024", "2025"]),
+          ("IS 2022-23", ["2022", "2023"]),
+          ("OOS 2024-25", ["2024", "2025"]))
+
+
+def _run(env_over, years):
+    env = dict(os.environ, **env_over)
+    cmd = [sys.executable, "run_backtest_histdata.py", "--years", *years]
+    p = subprocess.run(cmd, cwd=_ROOT, env=env, capture_output=True, text=True)
+    return p.stdout + p.stderr
+
+
+def _parse(txt):
+    def g(k, cast=float):
+        m = re.search(rf"{k}\s+(-?[\d.]+)", txt)
+        return cast(m.group(1)) if m else None
+    add = re.search(r"mm_added\s+(\d+)", txt)
+    esc = re.search(r"mm_target_escalated\s+(\d+)", txt)
+    std = re.search(r"mm_std_opened\s+(\d+)", txt)
+    return {"trades": g("trades", int), "wr": g("win_rate_pct"),
+            "pf": g("profit_factor"), "dd": g("max_drawdown_pct"),
+            "eq": g("ending_equity_ZAR"),
+            # withdrawal-model metrics (the ones that matter under frequent withdrawals)
+            "wdd": g("working_max_drawdown_pct"),      # DD on the working account
+            "wdn": g("withdrawn_total_ZAR"),           # total banked
+            "wbal": g("working_balance_ZAR"),          # working balance (climbing)
+            "wcount": g("withdrawal_count", int),
+            "adds": (int(add.group(1)) if add else 0) + (int(std.group(1)) if std else 0),
+            "esc": int(esc.group(1)) if esc else 0}
+
+
+def _fmt(d, k, suf=""):
+    v = d.get(k)
+    if v is None:
+        return "—"
+    return (f"{v:,.0f}" if k in ("eq", "wdn", "wbal") else f"{v:.2f}") + suf
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--smt", action="store_true")
+    ap.add_argument("--standalone", action="store_true",
+                    help="test the standalone daily-sweep MM entry (opens its own "
+                         "trades) instead of the pyramid-add arms")
+    ap.add_argument("--withdraw", action="store_true",
+                    help="frequent-withdrawal model: judge on working-account DD + "
+                         "total withdrawn, not the compounding curve")
+    a = ap.parse_args()
+
+    smt = {"MM_HTF_SMT_REQUIRED": "1"} if a.smt else {}
+    # `common` is applied to EVERY arm (incl. baseline) so they're comparable. Under
+    # --withdraw: frequent-withdrawal model — bank 70% of profit above the keep-level
+    # on a climbing cadence, reinvest 30% so the base ratchets up. STARTING_CASH is
+    # inherited from the shell (e.g. =1000); WITHDRAW_KEEP defaults to it.
+    common = dict(smt)
+    if a.withdraw:
+        common.update({"WITHDRAW_SCHEDULE": "1", "WITHDRAW_FRACTION": "0.7",
+                       "WITHDRAW_BAND": "1000"})
+    # every arm sets BOTH MM flags explicitly so an inline env var can't leak.
+    off = {"MM_CONTINUATION_ENABLED": "0", "MM_STANDALONE_ENABLED": "0", **common}
+    if a.standalone:
+        arms = [
+            ("baseline", dict(off)),
+            ("MM standalone", {**off, "MM_STANDALONE_ENABLED": "1"}),
+            ("MM standalone + adds", {**off, "MM_STANDALONE_ENABLED": "1",
+                                      "MM_CONTINUATION_ENABLED": "1"}),
+        ]
+    else:
+        arms = [
+            ("baseline", dict(off)),
+            ("MM adds", {**off, "MM_CONTINUATION_ENABLED": "1", "MM_TARGET_OPPOSING": "0"}),
+            ("MM adds + opp-tgt", {**off, "MM_CONTINUATION_ENABLED": "1",
+                                   "MM_TARGET_OPPOSING": "1"}),
+        ]
+
+    head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=_ROOT,
+                          capture_output=True, text=True).stdout.strip() or "unknown"
+    cover2025 = os.path.exists(os.path.join(_ROOT, "data", "histdata", "UDXUSD_2025.csv"))
+
+    res = {}   # (split, arm) -> parsed
+    logs = {}
+    for split, years in SPLITS:
+        for arm, env in arms:
+            print(f"=== {split} / {arm} ===")
+            txt = _run(env, years)
+            res[(split, arm)] = _parse(txt)
+            logs[(split, arm)] = txt
+
+    L = ["# Market Maker IFVG-continuation — full-backtest validation", "",
+         "Arm 1 baseline (MM off) · Arm 2 IFVG re-entries only · Arm 3 re-entries + "
+         "opposing-liquidity target. `adds` = MM legs added, `esc` = targets "
+         "escalated to the opposing pool." + (" **H1 EU/GU SMT required.**" if a.smt else ""),
+         "", f"_run commit: `{head}`_",
+         ("_**TRUE 4yr** — 2025 M1 present._" if cover2025 else
+          "_⚠️ **2025 M1 ABSENT** — 'Full' is 2022-2024 only._"), ""]
+
+    crash = []
+    for split, _years in SPLITS:
+        b = res[(split, "baseline")]
+        if a.withdraw:
+            L += [f"## {split}", "",
+                  "| arm | trades | WR% | PF | **workDD%** | **withdrawn ZAR** | work bal | #wd | opens |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        else:
+            L += [f"## {split}", "",
+                  "| arm | trades | WR% | PF | MaxDD% | equity ZAR | adds | esc |",
+                  "|---|---|---|---|---|---|---|---|"]
+        for arm, _env in arms:
+            d = res[(split, arm)]
+            if a.withdraw:
+                L.append(f"| {arm} | {_fmt(d,'trades')} | {_fmt(d,'wr')} | {_fmt(d,'pf')} "
+                         f"| {_fmt(d,'wdd')} | {_fmt(d,'wdn')} | {_fmt(d,'wbal')} "
+                         f"| {d.get('wcount') or 0} | {d.get('adds',0)} |")
+            else:
+                L.append(f"| {arm} | {_fmt(d,'trades')} | {_fmt(d,'wr')} | {_fmt(d,'pf')} "
+                         f"| {_fmt(d,'dd')} | {_fmt(d,'eq')} | {d.get('adds',0)} | {d.get('esc',0)} |")
+            if d.get("pf") is None:
+                tt = logs[(split, arm)]
+                crash.append(f"### {split} / {arm} — NO SUMMARY\n\n```\n"
+                             f"{chr(10).join(tt.splitlines()[-25:])}\n```\n")
+        L.append("")
+
+    # verdict per arm: full-4yr equity up + MaxDD not worse, both splits PF>1 and
+    # MaxDD not worse by >1pp (OOS-restart tolerance, per CLAUDE.md).
+    def judge(arm):
+        f, i, o = (res[("Full 4yr", arm)], res[("IS 2022-23", arm)],
+                   res[("OOS 2024-25", arm)])
+        fb, ib, ob = (res[("Full 4yr", "baseline")], res[("IS 2022-23", "baseline")],
+                      res[("OOS 2024-25", "baseline")])
+        for d in (f, i, o, fb, ib, ob):
+            if any(d.get(k) is None for k in ("pf", "eq", "dd")):
+                return None, "a run crashed"
+        fails = []
+        if f["eq"] <= fb["eq"]:
+            fails.append(f"full equity {f['eq']:,.0f}≤{fb['eq']:,.0f}")
+        if f["dd"] < fb["dd"] - 0.10:
+            fails.append(f"full MaxDD {f['dd']:.2f} worse than {fb['dd']:.2f}")
+        for nm, d, base in (("IS", i, ib), ("OOS", o, ob)):
+            if d["pf"] <= 1.0:
+                fails.append(f"{nm} PF {d['pf']:.2f}≤1")
+            if d["dd"] < base["dd"] - 1.0:
+                fails.append(f"{nm} MaxDD {d['dd']:.2f} worse than {base['dd']:.2f} by >1pp")
+        return (not fails), ("; ".join(fails) if fails else "ok")
+
+    # Withdrawal-model verdict: judge on the WORKING-account drawdown (survival) and
+    # total withdrawn (the return) — NOT the compounding curve. Deep DD is acceptable
+    # (user's call) as long as the working account never blows up (workDD < 60%) and
+    # the arm banks more than baseline.
+    def judge_withdraw(arm):
+        f, fb = res[("Full 4yr", arm)], res[("Full 4yr", "baseline")]
+        if any(x.get("wdn") is None for x in (f, fb)) or f.get("wdd") is None:
+            return None, "crashed / no withdrawal metrics (WITHDRAW_SCHEDULE off?)"
+        fails = []
+        if f["wdn"] <= (fb["wdn"] or 0):
+            fails.append(f"withdrew {f['wdn']:,.0f} ≤ baseline {fb['wdn'] or 0:,.0f}")
+        if f["wdd"] is not None and f["wdd"] >= 60:
+            fails.append(f"working DD {f['wdd']:.0f}% — account near-blowup")
+        # both splits must also bank more than baseline (not a single-period fluke)
+        for nm, s in (("IS", "IS 2022-23"), ("OOS", "OOS 2024-25")):
+            fa, ba = res[(s, arm)], res[(s, "baseline")]
+            if (fa.get("wdn") or 0) <= (ba.get("wdn") or 0):
+                fails.append(f"{nm} withdrew ≤ baseline")
+        return (not fails), ("; ".join(fails) if fails else "banks more, working account survives")
+
+    L += ["## Verdict", ""]
+    if a.withdraw:
+        L += ["_Withdrawal model: judged on **working-account DD** (survival) and "
+              "**total withdrawn** (return), not the compounding curve._", ""]
+    any_green = False
+    for arm, _env in arms[1:]:
+        adds = sum(res[(s, arm)].get("adds", 0) for s, _y in SPLITS)
+        v, why = (judge_withdraw(arm) if a.withdraw else judge(arm))
+        if adds == 0:
+            mark, why = "⚠️ inert", "0 MM entries fired — no setups matched (check gates)"
+        elif v is None:
+            mark = "⚠️ crash"
+        elif v:
+            mark, any_green = "🟢 GREEN", True
+        else:
+            mark = "🔴 RED"
+        L.append(f"- **{arm}: {mark}** — {why}")
+    L += ["", ("_At least one arm passed — Claude reviews split magnitudes before shipping._"
+               if any_green else
+               "_No arm passed the gate._")]
+    if crash:
+        L += ["", "## Crash diagnostics", ""] + crash
+
+    out = os.path.join(_ROOT, "data", "mm_validation.md")
+    text = "\n".join(L) + "\n"
+    open(out, "w").write(text)
+    print(text)
+    print(f"[report → {os.path.relpath(out, _ROOT)}]")
+    # auto-publish (data/ is gitignored) so Claude can read it without manual git
+    def _git(*a):
+        return subprocess.run(["git", *a], cwd=_ROOT, capture_output=True, text=True)
+    _git("add", "-f", out)
+    _git("commit", "-q", "-m", f"MM validation results (auto, commit {head})")
+    _git("pull", "-q", "--no-rebase", "--no-edit", "origin", "HEAD")
+    if _git("push", "origin", "HEAD").returncode == 0:
+        print("RESULTS PUSHED — Claude can read data/mm_validation.md")
+    else:
+        print("(auto-push failed — paste the tables above to Claude)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
