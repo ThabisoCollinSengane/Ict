@@ -1,0 +1,542 @@
+<title>Killzone Journal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a trading-desk logbook. Header + three tabs; the log tab is a two-column form with a live "pre-flight" checklist that sticks beside it. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --sunk:#e8ecf2; --line:#d3dae4;
+  --fg:#16202c; --muted:#5a6878; --accent:#b45f17; --accent-ink:#ffffff;
+  --good:#1d7a4c; --good-bg:#e1f2e8; --bad:#b0352b; --bad-bg:#f8e3e0; --warn:#9a6a00; --warn-bg:#fbf0d2;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141b; --surface:#16202b; --sunk:#1d2935; --line:#2b3a4a;
+  --fg:#e4eaf1; --muted:#93a3b5; --accent:#e8964b; --accent-ink:#1a1006;
+  --good:#5cc994; --good-bg:#16352a; --bad:#f08376; --bad-bg:#3d1f1c; --warn:#e6bb4f; --warn-bg:#3a3018; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141b; --surface:#16202b; --sunk:#1d2935; --line:#2b3a4a;
+  --fg:#e4eaf1; --muted:#93a3b5; --accent:#e8964b; --accent-ink:#1a1006;
+  --good:#5cc994; --good-bg:#16352a; --bad:#f08376; --bad-bg:#3d1f1c; --warn:#e6bb4f; --warn-bg:#3a3018; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(26px,4vw,34px);letter-spacing:-.01em}
+h2{font-size:20px}
+h3{font-size:15px;font-family:var(--f-body);font-weight:600}
+.sub{color:var(--muted);max-width:68ch;margin:4px 0 0}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+header{display:flex;flex-direction:column;gap:14px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{appearance:none;border:0;background:none;color:var(--muted);font:600 14px var(--f-body);padding:10px 14px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 14px;font-size:14px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:16px;min-width:0}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;min-width:0}
+legend{padding:0;margin-bottom:2px}
+.stage{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.stage .tag{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.q{display:flex;flex-direction:column;gap:6px;min-width:0}
+.q>label,.q>.lbl{font-weight:600;font-size:14px}
+.q .hint{color:var(--muted);font-size:13px;margin-top:-4px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+input[type=text],input[type=number],input[type=datetime-local],select,textarea{width:100%;background:var(--sunk);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:9px 10px;font:14px var(--f-body)}
+input[type=number]{font-family:var(--f-mono)}
+textarea{min-height:70px;resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip span{display:inline-block;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:13px;cursor:pointer;user-select:none}
+.chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.divider{height:1px;background:var(--line)}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:10px 16px;font:600 14px var(--f-body);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.preflight{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--line)}
+.dot.ok{background:var(--good)}.dot.no{background:var(--bad)}.dot.warn{background:var(--warn)}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.kv b{font-family:var(--f-mono);font-weight:600}
+.pill{display:inline-block;font:600 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.pill.good{background:var(--good-bg);color:var(--good)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:2px}
+.tile .v{font:600 24px var(--f-mono);font-variant-numeric:tabular-nums}
+.tile .l{color:var(--muted);font-size:13px}
+.tablebox{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+.entries{display:flex;flex-direction:column;gap:10px}
+.entry{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px}
+.entry .meta{color:var(--muted);font-size:13px}
+.entry p{margin:0;font-size:14px;min-width:0;overflow-wrap:anywhere}
+.cols3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;font-size:14px}
+.empty{color:var(--muted);text-align:center;padding:28px 12px;border:1px dashed var(--line);border-radius:10px}
+.prose{max-width:68ch;display:flex;flex-direction:column;gap:10px}
+.prose p{margin:0}
+@media (prefers-reduced-motion:no-preference){.chip span,.btn,.tabs button{transition:background .15s,color .15s,border-color .15s}}
+</style>
+
+<div class="wrap">
+<header>
+  <div>
+    <h1>Killzone Journal</h1>
+    <p class="sub">Write the plan before you enter, the result after you exit. Each trade is logged next to what the bot does, so after 40 trades the numbers show which one has the edge.</p>
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-log" aria-selected="true" data-tab="log">Log a trade</button>
+    <button role="tab" id="tab-journal" aria-selected="false" data-tab="journal">My journal</button>
+    <button role="tab" id="tab-bot" aria-selected="false" data-tab="bot">Bot vs me</button>
+    <button role="tab" id="tab-why" aria-selected="false" data-tab="why">How to review</button>
+  </div>
+</header>
+
+<div id="nodb" class="banner" hidden>Saving isn't available in this view. Open the journal from your claude.ai account to save entries.</div>
+
+<!-- LOG -->
+<section id="view-log" class="grid2">
+<form id="form" class="panel" novalidate>
+  <div class="q">
+    <span class="lbl">What are you logging?</span>
+    <div class="chips" id="kind">
+      <label class="chip"><input type="radio" name="kind" value="manual" checked><span>My own trade</span></label>
+      <label class="chip"><input type="radio" name="kind" value="override"><span>Overriding the bot</span></label>
+    </div>
+  </div>
+  <p id="editing" class="banner" hidden></p>
+
+  <!-- OVERRIDE -->
+  <fieldset id="fs-override" hidden>
+    <legend class="stage"><span class="tag">Override</span><h2>What did you change and why?</h2></legend>
+    <div class="row">
+      <div class="q"><label for="ov_action">Command</label>
+        <select id="ov_action"><option>/halt</option><option>/close</option><option>/hold</option><option>/bias</option><option>/levels</option><option>/trail</option><option>Manual SL/TP change</option></select></div>
+      <div class="q"><label for="ov_pair">Pair</label>
+        <select id="ov_pair"><option>EURUSD</option><option>GBPUSD</option><option>NZDUSD</option><option>All pairs</option></select></div>
+      <div class="q"><label for="ov_time">When</label><input type="datetime-local" id="ov_time"></div>
+    </div>
+    <div class="q"><label for="ov_reason">Reason, written before you act</label>
+      <p class="hint">Was it on your list of allowed reasons (unscheduled news, bot malfunction), or a feeling?</p>
+      <textarea id="ov_reason" placeholder="e.g. Unscheduled ECB press conference in 10 minutes"></textarea></div>
+    <div class="q"><span class="lbl">Allowed reason?</span>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="ov_allowed" value="rule"><span>Yes, it's on my rules list</span></label>
+        <label class="chip"><input type="radio" name="ov_allowed" value="feeling"><span>No, it was a feeling</span></label>
+      </div></div>
+    <div class="divider"></div>
+    <div class="stage"><span class="tag">Afterwards</span><h3>Did it help?</h3></div>
+    <div class="row">
+      <div class="q"><label for="ov_pips">Pips saved (+) or given up (−) vs leaving the bot alone</label><input type="number" step="0.1" id="ov_pips"></div>
+      <div class="q"><span class="lbl">Verdict</span>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="ov_verdict" value="helped"><span>Helped</span></label>
+          <label class="chip"><input type="radio" name="ov_verdict" value="hurt"><span>Hurt</span></label>
+          <label class="chip"><input type="radio" name="ov_verdict" value="neutral"><span>No difference</span></label>
+        </div></div>
+    </div>
+  </fieldset>
+
+  <!-- MANUAL: BEFORE -->
+  <fieldset id="fs-before">
+    <legend class="stage"><span class="tag">Before entry</span><h2>The plan</h2></legend>
+    <div class="row">
+      <div class="q"><label for="pair">Pair</label>
+        <select id="pair"><option>EURUSD</option><option>GBPUSD</option><option>NZDUSD</option><option>AUDUSD</option><option>USDJPY</option><option>Other</option></select></div>
+      <div class="q"><span class="lbl">Direction</span>
+        <div class="chips"><label class="chip"><input type="radio" name="dir" value="1" checked><span>Buy</span></label><label class="chip"><input type="radio" name="dir" value="-1"><span>Sell</span></label></div></div>
+      <div class="q"><label for="time">Entry time</label><input type="datetime-local" id="time"></div>
+    </div>
+    <div class="q"><span class="lbl">Session</span>
+      <div class="chips" data-name="session">
+        <label class="chip"><input type="radio" name="session" value="london" checked><span>London 03–05 ET</span></label>
+        <label class="chip"><input type="radio" name="session" value="ny"><span>NY AM 07–10 ET</span></label>
+        <label class="chip"><input type="radio" name="session" value="nypm"><span>NY PM</span></label>
+        <label class="chip"><input type="radio" name="session" value="asia"><span>Asia</span></label>
+        <label class="chip"><input type="radio" name="session" value="outside"><span>Outside a killzone</span></label>
+      </div></div>
+    <div class="row">
+      <div class="q"><span class="lbl">DXY</span>
+        <div class="chips"><label class="chip"><input type="radio" name="dxy" value="up"><span>Up</span></label><label class="chip"><input type="radio" name="dxy" value="down"><span>Down</span></label><label class="chip"><input type="radio" name="dxy" value="flat" checked><span>Flat</span></label></div></div>
+      <div class="q"><span class="lbl">EURGBP</span>
+        <div class="chips"><label class="chip"><input type="radio" name="eg" value="up"><span>Up</span></label><label class="chip"><input type="radio" name="eg" value="down"><span>Down</span></label><label class="chip"><input type="radio" name="eg" value="flat" checked><span>Flat</span></label></div></div>
+    </div>
+    <div class="row">
+      <div class="q"><label for="draw">Where is price drawn to? (the target's liquidity)</label>
+        <select id="draw"><option value="">Choose…</option><option>PDH / PDL</option><option>Previous session high / low</option><option>PWH / PWL</option><option>ITH / ITL</option><option>Equal highs / lows</option><option>Daily / H4 FVG</option><option>Fib extension</option><option>Not sure</option></select></div>
+      <div class="q"><label for="swept">Which liquidity was swept first?</label>
+        <select id="swept"><option value="">Choose…</option><option>Asian high / low</option><option>London high / low</option><option>PDH / PDL</option><option>Equal highs / lows</option><option>Session open (Judas)</option><option>Nothing swept</option></select></div>
+    </div>
+    <div class="row">
+      <div class="q"><label for="model">Setup</label>
+        <select id="model"><option value="judas">Judas reversal</option><option value="breakout">Breakout continuation</option><option value="mm">Market Maker (IFVG)</option><option value="crt">CRT / Turtle Soup</option><option value="other">Other</option></select></div>
+      <div class="q"><label for="pd">Entered on</label>
+        <select id="pd"><option>FVG</option><option>IFVG</option><option>Order block</option><option>Breaker</option><option>Market (no PD array)</option></select></div>
+      <div class="q"><label for="pdtf">PD array timeframe</label>
+        <select id="pdtf"><option>M1</option><option selected>M5</option><option>M15</option><option>H1</option><option>H4</option></select></div>
+    </div>
+    <div class="q"><span class="lbl">Confirmations you actually saw</span>
+      <div class="chips">
+        <label class="chip"><input type="checkbox" name="conf" value="mss"><span>MSS on M1/M5</span></label>
+        <label class="chip"><input type="checkbox" name="conf" value="disp"><span>Displacement + FVG</span></label>
+        <label class="chip"><input type="checkbox" name="conf" value="smt"><span>SMT EU/GU</span></label>
+        <label class="chip"><input type="checkbox" name="conf" value="dxyshift"><span>DXY shifted the other way</span></label>
+        <label class="chip"><input type="checkbox" name="conf" value="htf"><span>HTF draw agrees</span></label>
+      </div></div>
+    <div class="row">
+      <div class="q"><label for="entry">Entry price</label><input type="number" step="0.00001" id="entry" placeholder="1.16880"></div>
+      <div class="q"><label for="stop">Stop</label><input type="number" step="0.00001" id="stop" placeholder="1.16780"></div>
+      <div class="q"><label for="target">Target</label><input type="number" step="0.00001" id="target" placeholder="1.17200"></div>
+      <div class="q"><label for="lots">Lots</label><input type="number" step="0.01" id="lots" placeholder="0.01"></div>
+    </div>
+    <div class="row">
+      <div class="q"><span class="lbl">News in the next 60 minutes?</span>
+        <div class="chips"><label class="chip"><input type="radio" name="news" value="none" checked><span>None</span></label><label class="chip"><input type="radio" name="news" value="medium"><span>Medium</span></label><label class="chip"><input type="radio" name="news" value="high"><span>High / NFP / CPI / FOMC</span></label></div></div>
+      <div class="q"><span class="lbl">Is the bot in a trade right now?</span>
+        <div class="chips"><label class="chip"><input type="radio" name="bot" value="none" checked><span>No</span></label><label class="chip"><input type="radio" name="bot" value="samedollar"><span>Yes, same dollar direction</span></label><label class="chip"><input type="radio" name="bot" value="oppdollar"><span>Yes, opposite</span></label></div></div>
+    </div>
+    <div class="row">
+      <div class="q"><span class="lbl">How do you feel?</span>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="mood" value="calm" checked><span>Calm</span></label>
+          <label class="chip"><input type="radio" name="mood" value="confident"><span>Confident</span></label>
+          <label class="chip"><input type="radio" name="mood" value="fomo"><span>Afraid to miss it</span></label>
+          <label class="chip"><input type="radio" name="mood" value="revenge"><span>Want it back</span></label>
+          <label class="chip"><input type="radio" name="mood" value="bored"><span>Bored</span></label>
+          <label class="chip"><input type="radio" name="mood" value="tired"><span>Tired</span></label>
+        </div></div>
+      <div class="q"><label for="conf_score">Confidence <span class="mono" id="conf_out">3</span> / 5</label><input type="range" min="1" max="5" value="3" id="conf_score"></div>
+    </div>
+    <div class="q"><label for="thesis">The trade in one sentence</label>
+      <textarea id="thesis" placeholder="DXY up, EURGBP up → sell GBPUSD. London swept Asian high, M5 MSS, entry in the FVG, target PDL."></textarea></div>
+    <div class="q"><label for="chart">Chart link (optional)</label><input type="text" id="chart" placeholder="TradingView snapshot link"></div>
+  </fieldset>
+
+  <!-- MANUAL: AFTER -->
+  <fieldset id="fs-after">
+    <div class="divider"></div>
+    <legend class="stage"><span class="tag">After exit</span><h2>What happened</h2></legend>
+    <p class="hint" style="margin:0;color:var(--muted);font-size:13px">Leave this blank while the trade is open. Open the entry from “My journal” to finish it.</p>
+    <div class="row">
+      <div class="q"><label for="outcome">Result</label>
+        <select id="outcome"><option value="">Still open</option><option value="target">Hit target</option><option value="stop">Hit stop</option><option value="be">Break-even</option><option value="manual">Closed by hand</option><option value="nofill">Never filled</option></select></div>
+      <div class="q"><label for="exit">Exit price</label><input type="number" step="0.00001" id="exit"></div>
+      <div class="q"><label for="pnl">Profit / loss (R in Rand)</label><input type="number" step="0.01" id="pnl"></div>
+    </div>
+    <div class="row">
+      <div class="q"><span class="lbl">Did you follow your plan?</span>
+        <div class="chips"><label class="chip"><input type="radio" name="plan" value="yes"><span>Yes</span></label><label class="chip"><input type="radio" name="plan" value="partly"><span>Partly</span></label><label class="chip"><input type="radio" name="plan" value="no"><span>No</span></label></div></div>
+      <div class="q"><span class="lbl">Did you touch the trade?</span>
+        <div class="chips"><label class="chip"><input type="checkbox" name="touched" value="movedstop"><span>Moved the stop</span></label><label class="chip"><input type="checkbox" name="touched" value="earlyexit"><span>Exited early</span></label><label class="chip"><input type="checkbox" name="touched" value="added"><span>Added size</span></label></div></div>
+    </div>
+    <div class="q"><span class="lbl">After you were out, where did price go?</span>
+      <p class="hint">This separates “early” from “wrong”. If a stop-out later runs to your target, you were early. If it doesn't, you were wrong.</p>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="after" value="totarget"><span>Went on to my target</span></label>
+        <label class="chip"><input type="radio" name="after" value="against"><span>Kept going against me</span></label>
+        <label class="chip"><input type="radio" name="after" value="chop"><span>Chopped sideways</span></label>
+      </div></div>
+    <div class="q"><label for="lesson">One lesson, one sentence</label><textarea id="lesson" placeholder="What would you do the same or differently next time?"></textarea></div>
+  </fieldset>
+
+  <div class="actions">
+    <button type="submit" class="btn primary" id="save">Save entry</button>
+    <button type="button" class="btn" id="reset">Clear form</button>
+    <span id="savemsg" class="hint" style="color:var(--muted);font-size:13px"></span>
+  </div>
+</form>
+
+<aside class="panel preflight" aria-live="polite">
+  <h2>Pre-flight</h2>
+  <div id="pf"></div>
+  <div class="divider"></div>
+  <div id="pfnums" style="display:flex;flex-direction:column;gap:6px"></div>
+</aside>
+</section>
+
+<!-- JOURNAL -->
+<section id="view-journal" hidden>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="tiles" id="jtiles"></div>
+    <div class="cols3" id="jbreak"></div>
+    <div class="actions"><h2 style="flex:1">Entries</h2>
+      <select id="jfilter" aria-label="Filter entries" style="width:auto"><option value="all">All</option><option value="open">Open trades</option><option value="closed">Closed trades</option><option value="override">Bot overrides</option></select></div>
+    <div class="entries" id="jlist"><div class="empty">Your entries appear here. Log your first trade in “Log a trade”. Fill the plan before you enter.</div></div>
+  </div>
+</section>
+
+<!-- BOT -->
+<section id="view-bot" hidden>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="prose">
+      <h2>The bot's 2026 trades (backtest, Jan–Sep)</h2>
+      <p>This is what the algorithm, on its current settings, would have traded this year from a R1,000 start. Use it as the yardstick for your own entries. Rand amounts depend on account size, so compare <b>win rate, pips and trades per month</b>, not Rand.</p>
+    </div>
+    <div class="tiles" id="btiles"></div>
+    <div class="cols3">
+      <div class="panel"><h3>Bot vs you</h3><div class="tablebox"><table id="vs"></table></div></div>
+      <div class="panel"><h3>By setup</h3><div class="tablebox"><table id="bmodel"></table></div></div>
+      <div class="panel"><h3>By month</h3><div class="tablebox"><table id="bmonth"></table></div></div>
+    </div>
+    <div class="panel"><div class="actions"><h3 style="flex:1">Every bot trade</h3>
+      <select id="bpair" aria-label="Filter by pair" style="width:auto"><option value="">All pairs</option><option>EURUSD</option><option>GBPUSD</option><option>NZDUSD</option></select></div>
+      <div class="tablebox" style="max-height:420px;overflow:auto"><table id="btable"></table></div></div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section id="view-why" hidden>
+  <div class="cols3">
+    <div class="panel prose"><h2>Why the journal works</h2>
+      <p><b>It stops you rewriting the story.</b> Written before entry, the plan can't be adjusted to fit the result.</p>
+      <p><b>It finds your real edge.</b> After 40 trades, “My journal” shows which setups, sessions and moods win. You may find your edge is only in London, or only when the quadrant agrees.</p>
+      <p><b>It separates early from wrong.</b> The “where did price go after” question is the same test we ran on the bot (P73). Its losers were wrong, not early, so stop and entry tweaks wouldn't help. Your journal answers it for you.</p>
+      <p><b>It shows your leaks.</b> Revenge or bored entries and moved stops show up as their own numbers.</p>
+    </div>
+    <div class="panel prose"><h2>Weekly review (Saturday, 15 min)</h2>
+      <p>1. Win rate and average R this week vs the bot's.</p>
+      <p>2. Trades where you broke the plan: how did they do vs plan-followed trades?</p>
+      <p>3. Any trades with “Afraid to miss it”, “Want it back” or “Bored”? Their result?</p>
+      <p>4. Stop-outs: how many went on to the target (early) vs kept going (wrong)?</p>
+      <p>5. Overrides: helped or hurt, and were they on your rules list?</p>
+      <p>6. One rule to keep and one to change for next week. Write it in the next entry's thesis.</p>
+    </div>
+    <div class="panel prose"><h2>House rules</h2>
+      <p>Max one manual trade per killzone.</p>
+      <p>No manual trade in the same dollar direction while the bot is in a trade. EURUSD, GBPUSD and NZDUSD are one dollar bet.</p>
+      <p>Bot and manual losses share one 6% daily limit. If it's hit, both stop.</p>
+      <p>Override the bot only for unscheduled news or a malfunction.</p>
+      <p>Decide after 40 trades, not 4. Fewer is luck.</p>
+    </div>
+  </div>
+</section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const BOT = [["2026-01-12 03:05","EURUSD",1,"judas","london",1.16881,1.16781,1.172,1.16777,"stop",-10.4,-38.48,1],["2026-01-13 07:30","EURUSD",-1,"breakout","ny",1.16626,1.16626,1.1623,1.1663,"stop",-0.4,-0.74,1],["2026-01-14 04:00","GBPUSD",1,"judas","london",1.34507,1.34407,1.3485,1.34483,"session_handover",-2.4,-4.44,1],["2026-01-14 07:45","EURUSD",1,"breakout","ny",1.16489,1.16489,1.168,1.16485,"stop",-0.4,-0.75,1],["2026-01-15 07:45","GBPUSD",-1,"breakout","ny",1.34063,1.33963,1.33758,1.33763,"target",30.0,55.59,1],["2026-01-19 09:30","EURUSD",1,"breakout","ny",1.16374,1.16374,1.16801,1.1637,"stop",-0.4,-1.48,1],["2026-01-20 03:00","NZDUSD",1,"breakout","london",0.58412,0.58312,0.58772,0.58304,"stop",-10.8,-39.78,1],["2026-01-21 04:30","GBPUSD",-1,"breakout","london",1.34221,1.34221,1.33918,1.34226,"stop",-0.5,-0.93,1],["2026-01-22 08:15","EURUSD",1,"breakout","ny",1.17179,1.17079,1.175,1.17075,"stop",-10.4,-19.24,1],["2026-01-26 08:40","EURUSD",1,"mm_golden","ny",1.18476,1.18576,1.188,1.18796,"target",32.0,59.2,1],["2026-01-27 04:00","GBPUSD",1,"mm_golden","london",1.36748,1.36848,1.371,1.36843,"stop",9.5,35.15,1],["2026-01-28 08:45","EURUSD",-1,"breakout","ny",1.19558,1.19658,1.192,1.19662,"stop",-10.4,-38.48,1],["2026-02-02 08:00","GBPUSD",-1,"breakout","ny",1.36732,1.36632,1.3643,1.36435,"target",29.7,109.89,1],["2026-02-03 04:30","EURUSD",-1,"judas","london",1.18024,1.18024,1.17704,1.18028,"stop",-0.4,-1.48,1],["2026-02-09 07:00","GBPUSD",1,"breakout","ny",1.36401,1.36501,1.36769,1.36496,"stop",9.5,35.15,1],["2026-02-09 08:20","EURUSD",1,"breakout","ny",1.18999,1.19099,1.1937,1.19095,"stop",9.6,35.52,2],["2026-02-09 08:00","EURUSD",1,"breakout","ny",1.18828,1.18928,1.1937,1.18924,"stop",9.6,35.52,1],["2026-02-10 08:30","GBPUSD",1,"judas","ny",1.36806,1.36806,1.37109,1.36801,"stop",-0.5,-1.85,1],["2026-02-10 09:00","EURUSD",1,"judas","ny",1.19046,1.19146,1.19403,1.19142,"stop",9.6,35.52,1],["2026-02-11 07:05","EURUSD",-1,"judas","ny",1.19029,1.18679,1.18675,1.18683,"stop",34.6,128.02,1],["2026-02-12 04:00","EURUSD",1,"breakout","london",1.18854,1.18754,1.192,1.1875,"stop",-10.4,-38.48,1],["2026-02-13 08:00","EURUSD",1,"judas","ny",1.18657,1.18574,1.18985,1.1857,"stop",-8.7,-32.19,1],["2026-02-17 08:15","GBPUSD",-1,"judas","ny",1.35339,1.35439,1.34809,1.35444,"stop",-10.5,-38.85,1],["2026-02-18 09:00","GBPUSD",-1,"judas","ny",1.35548,1.35448,1.3523,1.35453,"stop",9.5,35.15,1],["2026-02-18 08:25","EURUSD",-1,"judas","ny",1.18362,1.18262,1.18049,1.18266,"stop",9.6,35.52,1],["2026-02-19 07:00","GBPUSD",-1,"breakout","ny",1.34648,1.34727,1.34339,1.34732,"stop",-8.4,-31.08,1],["2026-02-23 04:15","EURUSD",-1,"judas","london",1.18041,1.17941,1.1771,1.17945,"stop",9.6,35.52,1],["2026-02-26 03:00","GBPUSD",-1,"judas","london",1.35346,1.35346,1.35035,1.35351,"stop",-0.5,-1.85,1],["2026-02-26 04:15","EURUSD",-1,"judas","london",1.17979,1.18079,1.1767,1.18016,"session_handover",-3.7,-13.69,1],["2026-02-27 08:30","GBPUSD",-1,"judas","ny",1.34504,1.34604,1.34011,1.34609,"stop",-10.5,-38.85,1],["2026-03-02 07:00","EURUSD",-1,"mm_golden","ny",1.17316,1.17216,1.17,1.17004,"target",31.2,115.44,1],["2026-03-03 03:00","GBPUSD",-1,"breakout","london",1.3331,1.3331,1.33,1.33315,"stop",-0.5,-1.85,1],["2026-03-03 04:15","EURUSD",-1,"breakout","london",1.16229,1.16129,1.15857,1.15861,"target",36.8,136.04,1],["2026-03-03 09:00","EURUSD",-1,"breakout","ny",1.15946,1.15846,1.15515,1.1585,"stop",9.6,35.52,1],["2026-03-10 03:05","EURUSD",1,"judas","london",1.16406,1.16306,1.16716,1.16302,"stop",-10.4,-38.48,1],["2026-03-10 07:05","GBPUSD",1,"mm_golden","ny",1.34545,1.34445,1.34903,1.3444,"stop",-10.5,-38.85,1],["2026-03-11 08:30","EURUSD",-1,"breakout","ny",1.15876,1.15976,1.15573,1.1598,"stop",-10.4,-38.48,1],["2026-03-12 09:15","EURUSD",-1,"judas","ny",1.15273,1.15373,1.1484,1.15377,"stop",-10.4,-38.48,1],["2026-03-13 03:00","GBPUSD",-1,"breakout","london",1.32996,1.32646,1.32528,1.32651,"stop",34.5,127.65,1],["2026-03-16 09:30","EURUSD",1,"breakout","ny",1.14842,1.14842,1.152,1.14838,"stop",-0.4,-1.48,1],["2026-03-17 04:30","EURUSD",1,"breakout","london",1.14958,1.15058,1.15267,1.15054,"stop",9.6,35.52,1],["2026-03-17 09:00","EURUSD",1,"breakout","ny",1.15353,1.15253,1.15662,1.15249,"stop",-10.4,-38.48,1],["2026-03-18 08:15","GBPUSD",-1,"breakout","ny",1.33389,1.33289,1.33067,1.33072,"target",31.7,117.41,1],["2026-03-19 09:00","GBPUSD",1,"judas","ny",1.33057,1.32957,1.33395,1.32932,"stop",-12.5,-46.25,1],["2026-03-23 07:00","GBPUSD",1,"breakout","ny",1.32686,1.33836,1.33668,1.33831,"stop",114.5,423.65,1],["2026-03-25 09:15","EURUSD",-1,"breakout","ny",1.15892,1.15792,1.15569,1.15796,"stop",9.6,35.52,1],["2026-03-26 07:15","EURUSD",-1,"breakout","ny",1.15495,1.15395,1.15136,1.15399,"stop",9.6,35.52,1],["2026-03-27 07:45","GBPUSD",-1,"breakout","ny",1.32874,1.32874,1.32566,1.32879,"stop",-0.5,-1.85,1],["2026-04-06 04:30","EURUSD",1,"breakout","london",1.15412,1.15512,1.15833,1.15508,"stop",9.6,35.52,1],["2026-04-08 09:00","GBPUSD",1,"breakout","ny",1.34659,1.34559,1.34987,1.34554,"stop",-10.5,-38.85,1],["2026-04-09 08:15","EURUSD",1,"breakout","ny",1.1681,1.1681,1.17217,1.16806,"stop",-0.4,-1.48,1],["2026-04-10 03:15","EURUSD",-1,"breakout","london",1.16848,1.16946,1.16542,1.1695,"stop",-10.2,-37.74,1],["2026-04-10 08:00","EURUSD",1,"breakout","ny",1.17167,1.1711,1.175,1.17106,"stop",-6.1,-22.57,1],["2026-04-14 04:00","EURUSD",1,"breakout","london",1.17895,1.17795,1.18235,1.17791,"stop",-10.4,-38.48,1],["2026-04-14 07:00","GBPUSD",1,"breakout","ny",1.35449,1.35549,1.35749,1.35744,"target",29.5,109.15,1],["2026-04-15 07:15","EURUSD",-1,"breakout","ny",1.1779,1.17878,1.17473,1.17882,"stop",-9.2,-34.04,1],["2026-04-14 03:30","NZDUSD",1,"judas","london",0.58794,0.59144,0.59206,0.59199,"target",40.5,149.95,1],["2026-04-17 09:15","EURUSD",1,"breakout","ny",1.18014,1.18114,1.1832,1.1811,"stop",9.6,35.52,1],["2026-04-21 04:00","EURUSD",-1,"judas","london",1.17709,1.17709,1.17408,1.17713,"stop",-0.4,-1.48,1],["2026-04-22 09:15","EURUSD",-1,"breakout","ny",1.17324,1.17386,1.17,1.1739,"stop",-6.6,-24.42,1],["2026-04-23 07:00","EURUSD",-1,"breakout","ny",1.16915,1.16915,1.16613,1.16919,"stop",-0.4,-1.48,1],["2026-04-24 07:25","EURUSD",1,"judas","london",1.16969,1.17069,1.17392,1.17065,"stop",9.6,35.52,2],["2026-04-24 04:30","EURUSD",1,"judas","london",1.16809,1.17159,1.17392,1.17155,"stop",34.6,131.35,1],["2026-04-27 03:35","GBPUSD",1,"mm_golden","london",1.35333,1.35433,1.35674,1.35669,"target",33.6,124.32,1],["2026-04-28 03:30","EURUSD",-1,"breakout","london",1.17015,1.17015,1.16709,1.17019,"stop",-0.4,-1.48,1],["2026-04-28 08:30","GBPUSD",-1,"breakout","ny",1.34756,1.34756,1.34308,1.34761,"stop",-0.5,-1.85,1],["2026-05-01 07:15","GBPUSD",1,"mm_golden","ny",1.36073,1.36173,1.36413,1.36408,"target",33.5,124.08,1],["2026-05-04 07:00","GBPUSD",-1,"breakout","ny",1.35478,1.35478,1.35088,1.35483,"stop",-0.5,-1.85,1],["2026-05-06 07:45","GBPUSD",1,"mm_golden","ny",1.36279,1.36279,1.36597,1.36274,"stop",-0.5,-1.85,1],["2026-05-07 04:00","EURUSD",1,"breakout","london",1.17558,1.17658,1.17878,1.17654,"stop",9.6,35.52,1],["2026-05-07 09:05","GBPUSD",1,"mm_golden","ny",1.36217,1.36117,1.36543,1.36112,"stop",-10.5,-38.85,1],["2026-05-12 03:20","GBPUSD",-1,"judas","london",1.35584,1.35484,1.35244,1.35249,"target",33.5,124.03,1],["2026-05-13 03:00","EURUSD",-1,"judas","london",1.17331,1.17231,1.17024,1.17028,"target",30.3,178.81,1],["2026-05-14 04:15","GBPUSD",-1,"judas","london",1.35121,1.35121,1.34801,1.35126,"stop",-0.5,-1.85,1],["2026-05-14 08:30","EURUSD",-1,"breakout","ny",1.17027,1.16927,1.16707,1.16711,"target",31.6,143.35,1],["2026-05-18 03:15","GBPUSD",1,"breakout","london",1.33408,1.33758,1.33818,1.33753,"stop",34.5,319.12,1],["2026-05-18 09:30","GBPUSD",1,"breakout","ny",1.33934,1.33834,1.34235,1.33829,"stop",-10.5,-97.12,1],["2026-05-21 08:40","EURUSD",-1,"mm_golden","ny",1.16065,1.16065,1.15705,1.16069,"stop",-0.4,-9.25,1],["2026-06-02 03:00","EURUSD",1,"breakout","london",1.16391,1.16391,1.16787,1.16387,"stop",-0.4,-5.78,1],["2026-06-08 08:00","GBPUSD",1,"breakout","ny",1.33425,1.33525,1.33732,1.3352,"stop",9.5,87.87,1],["2026-06-09 07:15","GBPUSD",1,"breakout","ny",1.33933,1.33933,1.34366,1.33928,"stop",-0.5,-4.63,1],["2026-06-10 08:00","EURUSD",-1,"judas","ny",1.1537,1.1547,1.15069,1.15474,"stop",-10.4,-240.5,1],["2026-06-16 07:15","EURUSD",1,"breakout","ny",1.161,1.16,1.16442,1.15996,"stop",-10.4,-187.88,1],["2026-06-17 08:00","EURUSD",-1,"breakout","ny",1.15961,1.16017,1.15519,1.16021,"stop",-6.0,-31.62,1],["2026-06-18 07:00","GBPUSD",-1,"breakout","ny",1.32308,1.32308,1.31993,1.32313,"stop",-0.5,-1.85,1],["2026-06-22 04:30","EURUSD",-1,"breakout","london",1.14478,1.14578,1.14178,1.14582,"stop",-10.4,-38.48,1],["2026-06-23 04:30","EURUSD",-1,"judas","london",1.14256,1.14156,1.13923,1.13927,"target",32.9,121.73,1],["2026-06-23 08:30","EURUSD",-1,"breakout","ny",1.13927,1.13577,1.13497,1.13581,"stop",34.6,800.13,1],["2026-06-25 08:15","EURUSD",-1,"breakout","ny",1.13394,1.13468,1.1303,1.13472,"stop",-7.8,-270.56,1],["2026-06-29 03:15","EURUSD",1,"judas","london",1.13976,1.13976,1.14329,1.13972,"stop",-0.4,-5.78,1],["2026-07-01 09:00","EURUSD",-1,"breakout","ny",1.13858,1.13758,1.13505,1.13762,"stop",9.6,88.8,1],["2026-07-02 03:45","GBPUSD",1,"breakout","london",1.33144,1.33044,1.33461,1.33039,"stop",-10.5,-97.12,1],["2026-07-06 03:15","EURUSD",-1,"breakout","london",1.14215,1.14215,1.13897,1.14219,"stop",-0.4,-11.1,1],["2026-07-08 04:15","EURUSD",1,"breakout","london",1.14227,1.14161,1.14585,1.14157,"stop",-7.0,-101.17,1],["2026-07-08 04:30","NZDUSD",1,"breakout","london",0.57167,0.57067,0.57485,0.57059,"stop",-10.8,-124.3,1],["2026-07-09 03:00","GBPUSD",1,"breakout","london",1.34106,1.34106,1.34429,1.34101,"stop",-0.5,-4.63,1],["2026-07-09 07:45","EURUSD",-1,"judas","ny",1.14271,1.14326,1.1391,1.1433,"stop",-5.9,-204.66,1],["2026-07-20 04:20","GBPUSD",1,"judas","london",1.34673,1.34673,1.35,1.34668,"stop",-0.5,-5.78,1],["2026-07-23 03:35","GBPUSD",-1,"mm_golden","london",1.33788,1.33688,1.33417,1.33422,"target",36.6,846.37,1],["2026-07-23 07:15","EURUSD",-1,"judas","ny",1.14066,1.13966,1.1376,1.13764,"target",30.2,698.38,1],["2026-07-24 07:50","EURUSD",-1,"mm_golden","ny",1.13814,1.13814,1.135,1.13818,"stop",-0.4,-13.88,1],["2026-07-27 07:55","GBPUSD",-1,"judas","ny",1.33175,1.33175,1.32697,1.3318,"stop",-0.5,-5.78,1],["2026-07-27 09:00","EURUSD",-1,"breakout","ny",1.13884,1.13784,1.13489,1.13788,"stop",9.6,88.8,1],["2026-07-28 08:10","GBPUSD",-1,"mm_golden","ny",1.32745,1.32835,1.32425,1.3284,"stop",-9.5,-329.53,1],["2026-07-29 07:00","EURUSD",-1,"judas","ny",1.13914,1.13971,1.13531,1.13921,"session_handover",-0.7,-25.29,1],["2026-07-30 03:00","EURUSD",-1,"breakout","london",1.14476,1.14476,1.14139,1.1448,"stop",-0.4,-7.23,1],["2026-07-30 07:00","GBPUSD",1,"breakout","ny",1.33783,1.33883,1.34173,1.33878,"stop",9.5,219.69,1],["2026-07-31 03:05","EURUSD",1,"mm_golden","london",1.15158,1.15058,1.155,1.15054,"stop",-10.4,-240.5,1],["2026-07-31 08:00","EURUSD",-1,"breakout","ny",1.14993,1.14993,1.14577,1.14997,"stop",-0.4,-5.78,1],["2026-08-03 08:50","EURUSD",1,"mm_golden","ny",1.15293,1.15195,1.1578,1.15191,"stop",-10.2,-235.88,1],["2026-08-10 09:15","EURUSD",-1,"judas","ny",1.15489,1.15489,1.15176,1.15493,"stop",-0.4,-5.78,1],["2026-08-11 04:30","EURUSD",-1,"breakout","london",1.1536,1.1541,1.15059,1.15366,"session_handover",-0.6,-6.94,1],["2026-08-11 04:30","NZDUSD",-1,"breakout","london",0.58745,0.58789,0.58441,0.58797,"stop",-5.1,-74.16,1],["2026-08-25 03:00","EURUSD",-1,"breakout","london",1.16528,1.16574,1.16216,1.16578,"stop",-5.0,-46.25,2],["2026-08-25 03:10","EURUSD",-1,"breakout","london",1.16563,1.16603,1.16216,1.16607,"stop",-4.4,-40.7,2],["2026-08-24 04:00","EURUSD",-1,"breakout","london",1.16764,1.16664,1.16216,1.16668,"stop",9.6,111.0,1],["2026-09-08 04:00","NZDUSD",-1,"judas","london",0.58548,0.58548,0.58222,0.58556,"stop",-0.8,-21.68,1],["2026-09-09 03:00","GBPUSD",1,"breakout","london",1.35569,1.35471,1.35893,1.35466,"stop",-10.3,-95.28,1],["2026-09-10 08:45","EURUSD",-1,"breakout","ny",1.1622,1.1612,1.15891,1.16145,"stop",7.5,69.37,1],["2026-09-11 07:15","EURUSD",-1,"judas","ny",1.15933,1.15933,1.155,1.15937,"stop",-0.4,-3.7,1],["2026-09-14 03:00","EURUSD",-1,"breakout","london",1.15646,1.15546,1.15308,1.15312,"target",33.4,617.79,1],["2026-09-14 09:20","GBPUSD",-1,"judas","ny",1.34864,1.34764,1.34539,1.34769,"stop",9.5,109.84,1],["2026-09-15 03:05","GBPUSD",-1,"judas","london",1.34743,1.34743,1.3434,1.34748,"stop",-0.5,-7.23,1],["2026-09-17 03:50","EURUSD",1,"breakout","london",1.14833,1.14733,1.1578,1.14729,"stop",-10.4,-96.2,2],["2026-09-17 09:10","EURUSD",1,"breakout","london",1.14837,1.14837,1.1578,1.14833,"stop",-0.4,-3.7,2],["2026-09-17 03:00","EURUSD",1,"breakout","london",1.14666,1.14766,1.1578,1.14762,"stop",9.6,208.02,1],["2026-09-18 07:30","EURUSD",-1,"judas","ny",1.14796,1.14696,1.1443,1.147,"stop",9.6,277.5,1],["2026-09-21 08:15","EURUSD",1,"judas","ny",1.14833,1.14833,1.152,1.14829,"stop",-0.4,-6.07,1],["2026-09-22 04:30","EURUSD",-1,"breakout","london",1.14563,1.14563,1.14194,1.14567,"stop",-0.4,-11.56,1],["2026-09-28 03:00","EURUSD",-1,"mm_golden","london",1.13765,1.13865,1.13333,1.13869,"stop",-10.4,-240.5,1],["2026-09-29 04:30","EURUSD",-1,"breakout","london",1.13425,1.13525,1.1311,1.13529,"stop",-10.4,-192.4,1]];
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const pipOf = p => /JPY$/.test(p) ? 0.01 : 0.0001;
+const fmt = (x, d=1) => (x==null||isNaN(x)) ? "—" : (x>0?"+":"") + x.toFixed(d);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let entries = [], db = null, col = null, editId = null;
+
+function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>t.hidden=true,2200); }
+function nowLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+
+/* tabs */
+$$(".tabs button").forEach(b => b.onclick = () => {
+  $$(".tabs button").forEach(x => x.setAttribute("aria-selected", x===b));
+  ["log","journal","bot","why"].forEach(v => $("#view-"+v).hidden = v!==b.dataset.tab);
+  try{ localStorage.setItem("kz_tab", b.dataset.tab); }catch(e){}
+});
+try{ const t=localStorage.getItem("kz_tab"); if(t) document.querySelector(`[data-tab="${t}"]`)?.click(); }catch(e){}
+
+/* form helpers */
+const radio = n => document.querySelector(`input[name="${n}"]:checked`)?.value ?? "";
+const checks = n => $$(`input[name="${n}"]:checked`).map(i=>i.value);
+const setRadio = (n,v) => { const i=document.querySelector(`input[name="${n}"][value="${v}"]`); if(i) i.checked=true; else $$(`input[name="${n}"]`).forEach(x=>x.checked=false); };
+const setChecks = (n,vs) => $$(`input[name="${n}"]`).forEach(i => i.checked = (vs||[]).includes(i.value));
+const num = id => { const v=parseFloat($("#"+id).value); return isNaN(v)?null:v; };
+const FIELDS = ["pair","time","draw","swept","model","pd","pdtf","entry","stop","target","lots","thesis","chart","outcome","exit","pnl","lesson","ov_action","ov_pair","ov_time","ov_reason","ov_pips"];
+const RADIOS = ["kind","dir","session","dxy","eg","news","bot","mood","plan","after","ov_allowed","ov_verdict"];
+const CHECKS = ["conf","touched"];
+
+function quadrant(dxy, eg){
+  if(dxy==="up" && eg==="up") return {q:"1a",pair:"GBPUSD",dir:-1};
+  if(dxy==="up" && eg==="down") return {q:"1b",pair:"EURUSD",dir:-1};
+  if(dxy==="down" && eg==="up") return {q:"2a",pair:"EURUSD",dir:1};
+  if(dxy==="down" && eg==="down") return {q:"2b",pair:"GBPUSD",dir:1};
+  return {q:"none"};
+}
+function calc(e){
+  const p=pipOf(e.pair||"EURUSD"), risk = (e.entry!=null&&e.stop!=null) ? Math.abs(e.entry-e.stop)/p : null;
+  const reward = (e.entry!=null&&e.target!=null) ? (e.target-e.entry)*e.dir/p : null;
+  const pips = (e.entry!=null&&e.exit!=null) ? (e.exit-e.entry)*e.dir/p : null;
+  return {risk, reward, rr: risk&&reward!=null ? reward/risk : null, pips, R: risk&&pips!=null ? pips/risk : null};
+}
+function read(){
+  const e={}; FIELDS.forEach(f=>{ const el=$("#"+f); e[f] = el.type==="number" ? num(f) : el.value; });
+  RADIOS.forEach(r=>e[r]=radio(r)); CHECKS.forEach(c=>e[c]=checks(c));
+  e.dir=parseInt(e.dir||"1"); e.confidence=parseInt($("#conf_score").value);
+  e.quadrant=quadrant(e.dxy,e.eg).q; return e;
+}
+function fill(e){
+  FIELDS.forEach(f=>{ $("#"+f).value = e[f] ?? ""; });
+  RADIOS.forEach(r=>setRadio(r, r==="dir" ? String(e.dir) : e[r])); CHECKS.forEach(c=>setChecks(c,e[c]));
+  $("#conf_score").value=e.confidence||3; syncKind(); preflight();
+}
+
+function syncKind(){
+  const ov = radio("kind")==="override";
+  $("#fs-override").hidden=!ov; $("#fs-before").hidden=ov; $("#fs-after").hidden=ov;
+  $(".preflight").hidden=ov;
+}
+
+function preflight(){
+  $("#conf_out").textContent=$("#conf_score").value;
+  const e=read(), c=calc(e), q=quadrant(e.dxy,e.eg), L=[];
+  const add=(st,t)=>L.push(`<div class="check"><span class="dot ${st}"></span><span>${t}</span></div>`);
+  if(q.q==="none") add("no","No MM quadrant. DXY or EURGBP is flat.");
+  else if(q.pair===e.pair && q.dir===e.dir) add("ok",`Matches quadrant ${q.q}: ${q.dir>0?"buy":"sell"} ${q.pair}.`);
+  else add("warn",`Quadrant ${q.q} points to ${q.dir>0?"buying":"selling"} ${q.pair}, not this trade.`);
+  add(["london","ny"].includes(e.session)?"ok":"no", ["london","ny"].includes(e.session)?"Inside a killzone.":"Outside the London / NY AM killzones.");
+  add(e.swept && e.swept!=="Nothing swept"?"ok":"warn", e.swept && e.swept!=="Nothing swept"?`Liquidity swept: ${esc(e.swept)}.`:"No sweep recorded.");
+  add(e.draw && e.draw!=="Not sure"?"ok":"warn", e.draw && e.draw!=="Not sure"?`Draw: ${esc(e.draw)}.`:"Target liquidity not named.");
+  add(e.conf.length>=2?"ok":"warn", `${e.conf.length} confirmation${e.conf.length===1?"":"s"} ticked.`);
+  if(e.news==="high") add("no","High-impact news within the hour.");
+  if(e.bot==="samedollar") add("no","Bot is already in the same dollar direction. This doubles the risk.");
+  if(["fomo","revenge","bored","tired"].includes(e.mood)) add("no",`Mood: ${({fomo:"afraid to miss it",revenge:"wanting it back",bored:"bored",tired:"tired"})[e.mood]}. Consider skipping.`);
+  if(c.rr!=null) add(c.rr>=2?"ok":"warn", `Reward : risk ${c.rr.toFixed(2)}`);
+  $("#pf").innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">${L.join("")}</div>`;
+  $("#pfnums").innerHTML=[["Risk",c.risk!=null?c.risk.toFixed(1)+" pips":"—"],["Reward",c.reward!=null?c.reward.toFixed(1)+" pips":"—"],["Result",c.pips!=null?fmt(c.pips)+" pips · "+fmt(c.R,2)+" R":"—"]]
+    .map(([k,v])=>`<div class="kv"><span>${k}</span><b>${v}</b></div>`).join("");
+}
+$("#form").addEventListener("input", preflight);
+$("#form").addEventListener("change", e => { if(e.target.name==="kind") syncKind(); preflight(); });
+
+function resetForm(){
+  editId=null; $("#form").reset(); $("#time").value=nowLocal(); $("#ov_time").value=nowLocal();
+  $("#editing").hidden=true; $("#save").textContent="Save entry"; syncKind(); preflight();
+}
+$("#reset").onclick=resetForm;
+
+$("#form").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const e=read();
+  if(e.kind==="manual" && (e.entry==null || e.stop==null)){ $("#savemsg").textContent="Add the entry and stop prices. They're needed to measure R."; return; }
+  if(e.kind==="override" && !e.ov_reason.trim()){ $("#savemsg").textContent="Write the reason before saving."; return; }
+  if(!col){ $("#savemsg").textContent="Saving isn't available in this view."; return; }
+  $("#save").disabled=true; $("#savemsg").textContent="";
+  try{
+    e.status = e.kind==="override" ? "override" : (e.outcome ? "closed" : "open");
+    e.updatedAt = new Date().toISOString();
+    if(editId){ const old=entries.find(x=>x.id===editId)||{}; await col.doc(editId).set({...old.data, ...e}); toast("Entry updated"); }
+    else { e.createdAt=e.updatedAt; await col.add(e); toast("Saved"); }
+    resetForm();
+  }catch(err){ $("#savemsg").textContent = err?.code==="quota_exceeded" ? "The journal is full. Ask Claude to archive old entries." : "Couldn't save: "+(err?.message||"unknown error")+". Try again."; }
+  finally{ $("#save").disabled=false; }
+});
+
+/* journal stats */
+function stats(list){
+  const closed=list.filter(e=>e.outcome && e.outcome!=="nofill");
+  const Rs=closed.map(e=>calc(e).R).filter(x=>x!=null);
+  const wins=closed.filter(e=> e.pnl!=null ? e.pnl>0 : calc(e).R>0).length;
+  const w=Rs.filter(r=>r>0).reduce((a,b)=>a+b,0), l=-Rs.filter(r=>r<0).reduce((a,b)=>a+b,0);
+  return {n:closed.length, wr: closed.length? wins/closed.length*100 : null, avgR: Rs.length? Rs.reduce((a,b)=>a+b,0)/Rs.length : null, totR: Rs.reduce((a,b)=>a+b,0), pf: l? w/l : (w? Infinity:null),
+    pips: closed.map(e=>calc(e).pips).filter(x=>x!=null).reduce((a,b)=>a+b,0)};
+}
+function breakdown(title, list, key, labels={}){
+  const groups={}; list.forEach(e=>{ const k=typeof key==="function"?key(e):e[key]; (groups[k||"—"] ??= []).push(e); });
+  const rows=Object.entries(groups).map(([k,g])=>{ const s=stats(g); return s.n?`<tr><td>${esc(labels[k]||k)}</td><td class="n">${s.n}</td><td class="n">${s.wr.toFixed(0)}%</td><td class="n ${s.avgR>0?"pos":"neg"}">${fmt(s.avgR,2)}</td></tr>`:""; }).join("");
+  return `<div class="panel"><h3>${title}</h3><div class="tablebox"><table><tr><th></th><th class="n">Trades</th><th class="n">Win</th><th class="n">Avg R</th></tr>${rows||'<tr><td colspan="4" style="color:var(--muted)">Needs closed trades</td></tr>'}</table></div></div>`;
+}
+function renderJournal(){
+  const trades=entries.map(x=>x.data).filter(e=>e.kind!=="override"), ovs=entries.map(x=>x.data).filter(e=>e.kind==="override");
+  const s=stats(trades), open=trades.filter(e=>!e.outcome).length;
+  const ovHelp=ovs.filter(o=>o.ov_verdict==="helped").length, ovHurt=ovs.filter(o=>o.ov_verdict==="hurt").length;
+  $("#jtiles").innerHTML=[
+    [trades.length, `Trades logged · ${open} open`],
+    [s.wr!=null? s.wr.toFixed(0)+"%":"—", "Win rate (closed)"],
+    [fmt(s.avgR,2), "Average R per trade"],
+    [fmt(s.totR,1)+" R", "Total R"],
+    [ovs.length? `${ovHelp} / ${ovHurt}`:"—", "Overrides helped / hurt"],
+  ].map(([v,l])=>`<div class="tile"><span class="v">${v}</span><span class="l">${l}</span></div>`).join("");
+  const MOOD={calm:"Calm",confident:"Confident",fomo:"Afraid to miss it",revenge:"Want it back",bored:"Bored",tired:"Tired"};
+  const PLAN={yes:"Followed plan",partly:"Partly",no:"Broke plan","—":"Not answered"};
+  const SESS={london:"London",ny:"NY AM",nypm:"NY PM",asia:"Asia",outside:"Outside killzone"};
+  const AFTER={totarget:"Early (went to target)",against:"Wrong (kept going)",chop:"Chop","—":"Not answered"};
+  $("#jbreak").innerHTML =
+    breakdown("Followed the plan?", trades, "plan", PLAN) +
+    breakdown("Quadrant agreed?", trades, e=>{const q=quadrant(e.dxy,e.eg); return q.q==="none"?"No quadrant":(q.pair===e.pair&&q.dir===e.dir?"Agreed":"Disagreed");}) +
+    breakdown("Mood at entry", trades, "mood", MOOD) +
+    breakdown("Session", trades, "session", SESS) +
+    breakdown("Setup", trades, "model", {judas:"Judas reversal",breakout:"Breakout",mm:"Market Maker",crt:"CRT",other:"Other"}) +
+    breakdown("Stop-outs: early or wrong?", trades.filter(e=>e.outcome==="stop"), e=>e.after||"—", AFTER);
+  renderList(); renderVs();
+}
+function renderList(){
+  const f=$("#jfilter").value;
+  const list=entries.filter(x=> f==="all" || (f==="override"? x.data.kind==="override" : x.data.kind!=="override" && (f==="open"? !x.data.outcome : !!x.data.outcome)));
+  if(!entries.length){ $("#jlist").innerHTML='<div class="empty">Your entries appear here. Log your first trade in “Log a trade”. Fill the plan before you enter.</div>'; return; }
+  if(!list.length){ $("#jlist").innerHTML='<div class="empty">No entries match this filter.</div>'; return; }
+  $("#jlist").innerHTML=list.map(({id,data:e})=>{
+    if(e.kind==="override"){
+      const v=e.ov_verdict; return `<div class="entry"><div><h3>${esc(e.ov_action)} · ${esc(e.ov_pair)} <span class="pill ${v==="helped"?"good":v==="hurt"?"bad":""}">${v||"verdict pending"}</span></h3>
+        <p class="meta">${esc((e.ov_time||"").replace("T"," "))} · ${e.ov_allowed==="rule"?"on the rules list":e.ov_allowed==="feeling"?"a feeling":"reason type not set"}${e.ov_pips!=null?` · ${fmt(e.ov_pips)} pips`:""}</p><p>${esc(e.ov_reason)}</p></div>
+        <div><button class="btn" data-edit="${id}">Open</button></div></div>`;
+    }
+    const c=calc(e), st=!e.outcome?["Open","warn"]:e.outcome==="nofill"?["Not filled",""]:(e.pnl!=null?e.pnl>0:c.R>0)?["Win","good"]:["Loss","bad"];
+    return `<div class="entry"><div><h3>${e.dir>0?"Buy":"Sell"} ${esc(e.pair)} <span class="pill ${st[1]}">${st[0]}</span> ${c.R!=null&&e.outcome?`<span class="mono ${c.R>0?"pos":"neg"}">${fmt(c.R,2)} R</span>`:""}</h3>
+      <p class="meta">${esc((e.time||"").replace("T"," "))} · ${esc(e.session)} · quadrant ${esc(e.quadrant)} · ${esc(e.pd)} ${esc(e.pdtf)} · confidence ${e.confidence}/5</p>
+      <p>${esc(e.thesis)}</p>${e.lesson?`<p class="meta">Lesson: ${esc(e.lesson)}</p>`:""}</div>
+      <div><button class="btn" data-edit="${id}">${e.outcome?"Open":"Finish"}</button></div></div>`;
+  }).join("");
+}
+$("#jfilter").onchange=renderList;
+$("#jlist").addEventListener("click", ev => {
+  const id=ev.target.closest("[data-edit]")?.dataset.edit; if(!id) return;
+  const x=entries.find(e=>e.id===id); if(!x) return;
+  editId=id; fill(x.data); $("#editing").hidden=false; $("#editing").textContent="Editing a saved entry. Fill the “After exit” part, then save.";
+  $("#save").textContent="Update entry"; $("#tab-log").click(); $("#fs-after").scrollIntoView({behavior:"smooth",block:"start"});
+});
+
+/* bot */
+const B = BOT.map(r=>({t:r[0],pair:r[1],dir:r[2],model:r[3],sess:r[4],entry:r[5],stop:r[6],target:r[7],exit:r[8],reason:r[9],pips:r[10],pnl:r[11],leg:r[12]}));
+function bstats(list){ const w=list.filter(x=>x.pnl>0), gw=w.reduce((a,x)=>a+x.pnl,0), gl=-list.filter(x=>x.pnl<0).reduce((a,x)=>a+x.pnl,0);
+  return {n:list.length, wr:list.length?w.length/list.length*100:0, pf:gl?gw/gl:0, pnl:list.reduce((a,x)=>a+x.pnl,0), pips:list.reduce((a,x)=>a+x.pips,0), tgt:list.filter(x=>x.reason==="target").length}; }
+function renderBot(){
+  const s=bstats(B), months=new Set(B.map(x=>x.t.slice(0,7))).size;
+  $("#btiles").innerHTML=[[s.n,"Trades (incl. "+B.filter(x=>x.leg>1).length+" pyramid adds)"],[s.wr.toFixed(1)+"%","Win rate"],[s.pf.toFixed(2),"Profit factor"],["R"+Math.round(s.pnl).toLocaleString("en-ZA"),"Profit from R1,000"],[(s.n/months).toFixed(1),"Trades per month"]]
+    .map(([v,l])=>`<div class="tile"><span class="v">${v}</span><span class="l">${l}</span></div>`).join("");
+  const by=(k,lab)=>{ const g={}; B.forEach(x=>(g[x[k]] ??= []).push(x)); return Object.entries(g).map(([kk,v])=>{const z=bstats(v); return `<tr><td>${lab?lab[kk]||kk:kk}</td><td class="n">${z.n}</td><td class="n">${z.wr.toFixed(0)}%</td><td class="n">${z.pf.toFixed(2)}</td><td class="n ${z.pnl>0?"pos":"neg"}">${Math.round(z.pnl)}</td></tr>`;}).join(""); };
+  const H='<tr><th></th><th class="n">Trades</th><th class="n">Win</th><th class="n">PF</th><th class="n">R</th></tr>';
+  $("#bmodel").innerHTML=H+by("model",{judas:"Judas reversal",breakout:"Breakout",mm_golden:"Market Maker"});
+  B.forEach(x=>x.month=x.t.slice(0,7));
+  $("#bmonth").innerHTML=H+by("month");
+  renderBTable(); renderVs();
+}
+function renderBTable(){
+  const p=$("#bpair").value;
+  $("#btable").innerHTML='<tr><th>Opened (NY)</th><th>Pair</th><th></th><th>Setup</th><th>Session</th><th class="n">Entry</th><th class="n">Exit</th><th>Exit by</th><th class="n">Pips</th><th class="n">R</th></tr>'+
+    B.filter(x=>!p||x.pair===p).map(x=>`<tr><td class="mono">${x.t}</td><td>${x.pair}</td><td>${x.dir>0?"Buy":"Sell"}</td><td>${({judas:"Judas",breakout:"Breakout",mm_golden:"MM"})[x.model]||x.model}${x.leg>1?" (add)":""}</td><td>${x.sess}</td><td class="n">${x.entry.toFixed(5)}</td><td class="n">${x.exit.toFixed(5)}</td><td>${x.reason.replace("_"," ")}</td><td class="n ${x.pips>0?"pos":"neg"}">${fmt(x.pips)}</td><td class="n ${x.pnl>0?"pos":"neg"}">${x.pnl.toFixed(0)}</td></tr>`).join("");
+}
+$("#bpair").onchange=renderBTable;
+function renderVs(){
+  const b=bstats(B), me=stats(entries.map(x=>x.data).filter(e=>e.kind!=="override"));
+  const months=new Set(B.map(x=>x.t.slice(0,7))).size;
+  const myMonths=new Set(entries.map(x=>(x.data.time||"").slice(0,7)).filter(Boolean)).size||1;
+  $("#vs").innerHTML='<tr><th></th><th class="n">Bot</th><th class="n">You</th></tr>'+[
+    ["Closed trades", b.n, me.n],
+    ["Win rate", b.wr.toFixed(0)+"%", me.wr!=null?me.wr.toFixed(0)+"%":"—"],
+    ["Avg pips / trade", fmt(b.pips/b.n), me.n?fmt(me.pips/me.n):"—"],
+    ["Trades / month", (b.n/months).toFixed(1), me.n?(me.n/myMonths).toFixed(1):"—"],
+    ["Profit factor", b.pf.toFixed(2), me.pf==null?"—":me.pf===Infinity?"∞":me.pf.toFixed(2)],
+  ].map(r=>`<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td class="n">${r[2]}</td></tr>`).join("")+
+  `<tr><td colspan="3" style="white-space:normal;color:var(--muted);font-size:12.5px">Your PF uses R (risk units). The bot's uses Rand. Read it once you have 40+ trades.</td></tr>`;
+}
+
+/* boot */
+resetForm(); renderBot(); renderJournal();
+(async () => {
+  try{ db = await window.claude?.use?.("db"); }catch(e){ db=null; }
+  if(!db){ $("#nodb").hidden=false; $("#save").disabled=true; return; }
+  col = db.collection("journal");
+  col.orderBy("createdAt","desc").onSnapshot(snap => {
+    entries = snap.docs.map(d=>({id:d.id, data:d.data()}));
+    renderJournal();
+  }, err => { $("#nodb").hidden=false; $("#nodb").textContent="Lost connection to the journal store. Reload the page."; });
+})();
+</script>
