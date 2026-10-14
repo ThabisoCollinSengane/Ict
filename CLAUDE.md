@@ -46,6 +46,20 @@ counter `wrb_breakout_skipped`. Arms: `wrbd` (yesterday's range > day before), `
 (last M15 / H1 bar > 1.5x mean of prior 20) × is/oos/full/y26 -> `data/mm_golden_*_p100_*`.
 Control = p93 anchors (876 / R176,034; IS R60.8k, OOS R85.0k; 2026 131 trades +R3,596).
 
+**WRB RESULT (RAN 2026-10-14) — 🔴 RED in every period; less money in all 12 runs. Keep off.**
+
+| run | trades full | withdrawn IS / OOS / full (R k) | DD full / OOS | working DD full | breakouts full n / WR / PF | 2026 P&L / DD |
+|---|---|---|---|---|---|---|
+| p93 control | 876 | 60.8 / 85.0 / 176.0 | −15.66 / −9.87 | 31.6 | 408 / 44.4% / 4.32 | +3,596 / −19.4 |
+| wrbd (daily) | 676 | 34.7 / 47.5 / 112.0 | −28.83 / −12.3 | 28.8 | 187 / 50.8% / 4.52 | +2,115 / −13.1 |
+| wrb15 (M15) | 776 | 44.0 / 75.5 / 138.3 | −15.36 / −9.24 | 33.3 | 297 / 43.4% / 4.17 | +1,920 / −13.4 |
+| wrb60 (H1) | 790 | 45.5 / 57.6 / 132.5 | −15.46 / −19.99 | 16.8 | 311 / 44.7% / 3.91 | +1,967 / −16.1 |
+
+Daily version is the only one that lifts breakout WR (44 -> 51%) but it halves the breakouts and
+costs R64k with a −28.8% headline DD. Skips (`wrb_breakout_skipped`, checks not trades): full
+1,409 / 800 / 636. Same lesson as P8/P10/P70: a removal filter on a profitable bucket loses the
+compounding path. 2026 drawdowns are smaller in every arm, but profit is ~45% lower.
+
 ## 🔧 P98 — LIVE ENGINE: base-strategy crash fixed + MM channel ported (2026-10-09)
 
 **Critical live bug found and fixed.** `LiveTrader` (live/run_live.py) inherits all signal code
