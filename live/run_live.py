@@ -182,6 +182,14 @@ class LiveTrader(Backtester):
         self._max_work_dd = 0.0
         self._bars_forming = False      # MM channel reads include the forming bar
         self._dxy_cache = {}            # synthetic DXY bars per (tf, count, forming, minute)
+        # P104: the rest of Backtester.__init__ (an AST diff found these). _day_idx_total
+        # crashed every index entry check when INDICES_ENABLED=1.
+        self._day_idx_total = {}
+        self._mm_day_dir = {}
+        self._mm_day_range = {}
+        self._mm_day_count = {}
+        self._last_withdraw_date = None
+        self._cur_loop_date = None
 
         # Diagnostic counters
         self.gate = {
