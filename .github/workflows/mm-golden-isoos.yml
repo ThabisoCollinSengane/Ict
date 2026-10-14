@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [idx, idx05, idxonly]
+        mode: [idxonly, goldonly]
     env:
       NO_PUSH: "1"
     steps:
@@ -86,11 +86,11 @@ jobs:
           case "${{ matrix.mode }}" in cmp4) export COMPRESS_MULT=1.25 COMPRESS_TF=240T;; cmpd) export COMPRESS_MULT=1.25 COMPRESS_TF=D;; volx) export VOLX_MULT=0.75 VOLX_RATIO=1.8;; volx15) export VOLX_MULT=0.75 VOLX_RATIO=1.5;; esac
           # P103: gold as a second system on the current engine. gold = FX + XAUUSD (DXY+silver+AUD
           #       all agree); gold075 = 2-of-3 breadth; gold05 = gold at half size; goldonly = XAUUSD alone.
-          case "${{ matrix.mode }}" in gold) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0;; gold075) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=0.75;; gold05) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 GOLD_SIZE_MULT=0.5;; goldonly) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 TRADE_PAIRS=XAUUSD;; esac
+          case "${{ matrix.mode }}" in gold) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0;; gold075) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=0.75;; gold05) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 GOLD_SIZE_MULT=0.5;; goldonly) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 TRADE_PAIRS=XAUUSD STARTING_CASH=10000;; esac
           # P104: US indices (S&P 500 = SPXUSD, Nasdaq = NSXUSD) as another system. idx = FX + indices,
           #       idx05 = indices at half size, idxonly = indices alone. US30 confirmer not in HistData.
           case "${{ matrix.mode }}" in idx*) export INDICES_ENABLED=1 INDEX_PAIRS="SPXUSD NSXUSD" INDEX_AMD_MAX_RANGE_PCT=0.8 INDEX_MAX_TRADES_PER_DAY=3;; esac
-          case "${{ matrix.mode }}" in idx05) export INDEX_SIZE_MULT=0.5;; idxonly) export TRADE_PAIRS="SPXUSD NSXUSD";; esac
+          case "${{ matrix.mode }}" in idx05) export INDEX_SIZE_MULT=0.5;; idxonly) export TRADE_PAIRS="SPXUSD NSXUSD" STARTING_CASH=10000;; esac
           # P93b: disp* = the pair's own M1 trigger must break the swing that caused the impulse.
           case "${{ matrix.mode }}" in disp*) export MM_GOLDEN_M1_MSS_DISP=1;; esac
           case "${{ matrix.mode }}" in dispjt*) export MM_GOLDEN_JUDAS_TARGET=1;; esac
@@ -118,7 +118,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p104
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p104b
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
