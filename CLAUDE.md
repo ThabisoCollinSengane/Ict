@@ -125,6 +125,51 @@ compounding path. 2026 drawdowns are smaller in every arm, but profit is ~45% lo
 live-vs-backtest gaps (weekly AMD, session-range fallback, extra dropped candle); FVG target
 fix decision; 2025 FOMC dates; main.py out of date.
 
+## 📊 P103/P104/P106 RESULTS (RAN 2026-10-14) — gold 🔴, indices 🟡, market selector 🔴 (session wins)
+
+**Gold on the current engine — 🔴.** Gold trades are almost always blocked by the 8% risk cap
+(min 0.02 lot = 2 oz; the structural M5 gold stop is usually > $21, i.e. > R800 even at R10k):
+`goldonly` from R1k AND from R10k (P104b) = 0 trades (risk_cap_skip 381 IS / 656 full). In the
+book: `gold` 4 trades full (all lose), `gold075` 12 (PF 0.26), `gold05` 43 (WR 14%, PF 0.68,
+−R3.0k; London −R3.2k, NY +R0.2k). Every gold arm withdraws LESS than p93 (172.9 / 171.6 / 150.3k
+vs 176.0k) and IS headline DD −22.76% vs −15.66%. Weekly corr gold vs FX −0.08. The August PF 3.5
+result does not reproduce on this engine. Gold stays OFF.
+
+**Indices — 🟡 real edge, sizing unresolved.** ⚠️ Sizing quirk: `INDEX_LOT_UNITS=1` makes the
+floor `int(0.02 x 1) = 0`, so at `INDEX_SIZE_MULT=1.0` every index setup sizes to 0 units (`idx`
+and `idxonly` = 0 index trades, `units_nonzero 0`); only `idx05` traded, because the multiplier
+branch floors at `max(1, ...)` = 1 unit. So `idx05` = "indices at 1 unit/trade", not "half size".
+Its result (FX + SPXUSD/NSXUSD):
+
+| | p93 | idx05 |
+|---|---|---|
+| withdrawn IS / OOS / full (R k) | 60.8 / 85.0 / 176.0 | **71.7** / 82.2 / **189.6** |
+| headline DD IS / OOS / full | −15.66 / −9.87 / −15.66 | −15.66 / **−25.98** / −15.66 |
+| working DD IS / OOS / full | 31.6 / 16.1 / 31.6 | **22.4** / 20.9 / **22.9** |
+| index trades (WR, PF) IS / OOS / full | — | 112 (40%, 4.39) / 56 (38%, 2.34) / 180 (39%, 3.86, +R31.5k) |
+| 2026 | +R3,596 / −19.4 | +R3,323 / −23.2 (3 index trades) |
+
+Index trades profitable every year (2022 +11.7k, 2023 +11.0k, 2024 +5.1k, 2025 +3.8k — fading);
+SPXUSD NY best (+16.9k), SPX London +8.5k, NSX +6.1k. Weekly corr index vs FX +0.16. Full run:
++R13.6k and working DD 31.6 -> 22.9%; but OOS headline DD −9.87 -> −25.98 and OOS money −2.8k.
+**Not shipped.** Next: confirm the Exness US500/US100 contract (min lot, $/point) and set
+`INDEX_LOT_UNITS` properly, then re-run at a real size; live stays `INDEX_SEMI_AUTO_ONLY=1`.
+
+**P106 market selector (pure price, 11,906 instrument-sessions) — 🔴 no prediction beyond SESSION.**
+Session dominates and is stable in every period: indices and gold in NY far outperform London
+(NY `amd` SPX 34/41/41%, NSX 40/43/45%, gold 31/28/29% vs London 1-15%); FX London ≈ NY (17-25%).
+`past` (own recent move) ranks future move on indices/gold (+0.14..+0.31 both halves; null ~0) =
+volatility clustering — real, but it predicts SIZE of move, not which market the bot wins on.
+`coil` vs amd −0.20..−0.26 = the geometric artifact (null −0.25). `er5` / `edge` ≈ 0. Selector
+OOS move 0.309 vs fixed rule (London -> GBPUSD, NY -> XAUUSD) 0.302 (+2%, inside the null's +2-3%
+noise) and its amd rate is LOWER than the fixed rule (19% vs 23%). Verdict: trade each market in
+its best session (indices/gold = NY); no extra switching signal found.
+
+**P105 rerun with index trades (`data/system_switch_idx_report.md`):** form still does not persist
+(K=20 corr SPX −0.50, GBP −0.25, EUR +0.11); pause/half rules −2..−8% vs always-on and lose to
+random. (Index trades are over-weighted in that tool's fixed-size scaling — read the persistence
+table, not the totals.)
+
 ## 🧭 P106 — which MARKET will deliver today? FX vs gold vs indices (BUILT 2026-10-14, RUNNING)
 
 Trader's clarification of "switching": not between the bot's internal models, but between
