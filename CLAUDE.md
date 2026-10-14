@@ -24,6 +24,28 @@ cache-bug post-mortem.)
 
 ---
 
+## 🎲 P100 — Monte Carlo drawdown study + Unger wide-range-bar filter (2026-10-14)
+
+**Monte Carlo (`scripts/monte_carlo.py` -> `data/monte_carlo_report.md`, RAN).** 876 p93 trades
+(P99 re-run reproduced 876 / R176,034 exactly), re-sized to the simulated account's equity tier,
+monthly withdrawals above R6k, 10k shuffles + 10k bootstraps. Calibration: replaying the real
+order gives total-value MaxDD **15.66% (= engine headline, exact)** and working-balance 30.70%
+(engine `working_max_drawdown_pct` 31.59%). **⚠️ The headline −15.66% is on TOTAL value
+(balance + all banked withdrawals); the money in the MT5 account fell 31.6% from its high in
+the real backtest order.** Distribution (shuffle / bootstrap near-identical): total-value DD
+median 18%, 90th 29%, 95th 33%, 99th 41%; working-balance DD median 28%, 90th 36%, 95th 39%,
+99th 46%, worst ~63-65%; P(working DD > 30%) ≈ 33%; longest losing streak median 11, 95th 15.
+The backtest's −15.66% is a LUCKY ordering: 66% of random orders are worse. Withdrawals stay
+robust (bootstrap 5th pct R148k). Never fell below R500. Circuit breakers not simulated (in a
+random order a pause only removes random trades, so it does not change the distribution much).
+
+**Wide-range-bar filter (BUILT, RUNNING):** Unger's published rule — skip a BREAKOUT entry right
+after a bar wider than the reference. `WRB_FILTER=1`, `WRB_TF`, `WRB_MULT`, `WRB_LOOKBACK`;
+helper `_wide_range_bar` (completed bars only, fixture-verified incl. forming bar ignored);
+counter `wrb_breakout_skipped`. Arms: `wrbd` (yesterday's range > day before), `wrb15` / `wrb60`
+(last M15 / H1 bar > 1.5x mean of prior 20) × is/oos/full/y26 -> `data/mm_golden_*_p100_*`.
+Control = p93 anchors (876 / R176,034; IS R60.8k, OOS R85.0k; 2026 131 trades +R3,596).
+
 ## 🔧 P98 — LIVE ENGINE: base-strategy crash fixed + MM channel ported (2026-10-09)
 
 **Critical live bug found and fixed.** `LiveTrader` (live/run_live.py) inherits all signal code
