@@ -125,6 +125,26 @@ compounding path. 2026 drawdowns are smaller in every arm, but profit is ~45% lo
 live-vs-backtest gaps (weekly AMD, session-range fallback, extra dropped candle); FVG target
 fix decision; 2025 FOMC dates; main.py out of date.
 
+## 🧭 P106 — which MARKET will deliver today? FX vs gold vs indices (BUILT 2026-10-14, RUNNING)
+
+Trader's clarification of "switching": not between the bot's internal models, but between
+INSTRUMENTS (FX / gold / indices), predicted from past performance + market structure (dealing
+range / consolidation) + session (each instrument has a best session).
+`scripts/instrument_selector_study.py`, workflow `.github/workflows/instrument-selector.yml`
+-> `data/instrument_selector_report.md` (+ `_null.md`). Pure price, EURUSD / GBPUSD / XAUUSD /
+SPXUSD / NSXUSD, 2022-2026, London (from 03:00 ET) and NY (from 07:00 ET) sessions.
+Outcomes over 5h: `move` = directional travel / 20-day ADR; `amd` = ran one side of the
+pre-session range then the other. Predictors (only bars before the session): `coil` (pre-
+session range vs its 20-session median), `er5` (5-day efficiency ratio, trend vs range),
+`edge` (open's distance from the middle of the prior 5-day dealing range), `past` (own last
+10 sessions' move). Selector = linear model fitted on IS, picks one instrument per session;
+must beat the best FIXED instrument-per-session rule learned in IS, out of sample.
+**Random-walk null (same code): selector OOS move 0.241 vs average 0.235 vs fixed 0.233 —
+that +2-3% is the noise floor; coil vs amd reads −0.25 on pure noise (bigger pre-range is
+geometrically harder to cross) — real results must beat these, not zero.**
+Next layer once P103/P104 dumps exist: the same question on the BOT's own trade P&L per
+instrument x session.
+
 ## 🔀 P105 — switching between sub-systems by recent form (RAN 2026-10-14) — 🔴 no rule helps
 
 Trader's idea: each system has losing periods; switch between systems for those periods.
