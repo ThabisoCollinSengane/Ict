@@ -60,6 +60,27 @@ costs R64k with a −28.8% headline DD. Skips (`wrb_breakout_skipped`, checks no
 1,409 / 800 / 636. Same lesson as P8/P10/P70: a removal filter on a profitable bucket loses the
 compounding path. 2026 drawdowns are smaller in every arm, but profit is ~45% lower.
 
+## 🥇 P103 — gold as a second system + how independent the current models are (2026-10-14, RUNNING)
+
+**The book is ALREADY a multi-system.** Weekly P&L correlation (p93 full dump, rand per 1 lot so
+sizing growth is removed): judas vs breakout −0.05, judas vs MM −0.05, breakout vs MM −0.10;
+pairs EU/GU 0.10, EU/NZ 0.12, GU/NZ −0.08. P&L share: breakout R80.8k, judas R79.8k, MM R23.5k.
+32% of trading days have >1 trade; on those, all trades lose together on 25% of days. So the
+"three pairs = one dollar bet" description (P101 notes) is true of the GATE (every model reads
+DXY), not of realised P&L — the models' weekly results are uncorrelated.
+
+**Gold was built 2026-08-09** (`GOLD_ENABLED`, `_is_point_instrument`, DXY + XAGUSD + AUDUSD
+2-of-3 gate, structural M5 stop, 100-oz contract, `GOLD_MIN_IMSCORE`, `GOLD_SIZE_MULT`) on the
+pre-MM engine: first clean run 167 trades PF 3.71 / 2.95 / 3.49 (full/IS/OOS), MaxDD full −15.67%,
+OOS −20%; the tightened im 1.0 gate was never re-run. Now re-run on the current p93 engine
+(gold path driven through the live stub first: no exceptions). Arms: `gold` (im 1.0),
+`gold075`, `gold05` (GOLD_SIZE_MULT 0.5), `goldonly` (TRADE_PAIRS=XAUUSD) × is/oos/full/y26 ->
+`data/mm_golden_*_p103_*`. Workflow now fetches XAUUSD + XAGUSD. **Small-account caveat:** the
+broker min lot is 0.01 = 1 oz, so a $10 structural stop = ~R185, 18% of R1,000 — gold cannot be
+sized properly until the account is several thousand rand; read `risk_cap_skip` on every arm.
+Indices (US500/US100, `INDICES_ENABLED`, `INDEX_SEMI_AUTO_ONLY=1`) are also built; untested on
+the current engine; US30 confirmer is not in HistData.
+
 ## 🏆 P101 — what the Robbins winners do, mapped onto this book (2026-10-14, RUNNING)
 
 Research (secondary sources only; official standings page unreachable): forex-division winners
