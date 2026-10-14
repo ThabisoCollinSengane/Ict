@@ -60,6 +60,89 @@ costs R64k with a −28.8% headline DD. Skips (`wrb_breakout_skipped`, checks no
 1,409 / 800 / 636. Same lesson as P8/P10/P70: a removal filter on a profitable bucket loses the
 compounding path. 2026 drawdowns are smaller in every arm, but profit is ~45% lower.
 
+## 🗒️ SESSION LOG 2026-10-14 — everything since the Robbins Cup discussion (READ FIRST)
+
+**Trader context / decisions**
+- Funding the Exness ZAR account (R1,000) soon; demo smoke-test first is the agreed plan.
+- Telegram stays for push alerts. A web dashboard was discussed: options were Streamlit on the
+  VPS or a Floot-hosted app fed by a 5-min status push from the bot. **Floot connector is
+  installed on the account but the sign-in was never completed** (claude.ai/customize/
+  connectors -> Floot -> Connect, then start a NEW session). Not built yet.
+- Bot cannot be hosted on GitHub (Actions = 6h ephemeral Linux; MT5 Python needs Windows +
+  logged-in terminal). Free hosting research (Oct 2026): Exness free VPS needs ~US$1,000
+  balance (or $500 + $500k volume/30d) — not free at R1k; MetaQuotes MQL5 VPS ~$10/mo runs
+  EAs only, NO Python, no analysis advantage; Azure B1s Windows free 12 months (1 GB RAM,
+  tight); Oracle free = Linux only (Wine + mt5linux workaround). Trader chose: keep current
+  setup (own machine). MetaTrader5 Python pkg latest 5.0.5735 (Apr 2026), still Windows-only.
+- Discretionary vs algo: agreed structure = algo runs untouched (overrides only for listed
+  reasons, each logged), discretionary trades on DEMO first with a pre-trade journal, one
+  shared risk budget (no manual trade in the same dollar direction as an open bot trade,
+  combined 6% daily loss cap), decide after ~40 trades.
+- **Killzone Journal** artifact: https://claude.ai/artifact/ET4yLz4Q9BvJSobNXddU6R
+  (source `dashboard/journal.html`, db collection `journal`, private). Pre-trade form
+  (pair, dir, session, DXY/EURGBP -> quadrant check, draw, swept liquidity, setup, PD array,
+  confirmations, entry/stop/target -> R:R, news, bot-in-trade, mood, confidence, thesis),
+  post-trade form (result, plan followed, touched trade, early-vs-wrong, lesson), bot-override
+  mode, stats breakdowns, "Bot vs me" tab with the bot's 2026 Jan-Sep backtest (131 trades).
+- "mantos" in the trader's messages = **Monte Carlo** (typo), not a trader.
+- Robbins contest entry rules were asked out of curiosity only — the trader is NOT entering.
+
+**Research (secondary sources; official Robbins pages unreachable from the sandbox)**
+- Andrea Unger (Italy): 4x World Cup futures champion (2008 +672%, 2009 +115%, 2010 +240%,
+  2012). Automated; three base models (breakout / counter-trend / time-bias) + bar-pattern
+  FILTERS; many systems on many futures; published rules: skip breakout after a wide-range
+  bar, volatility-compression filter (8h bar body < half range), money stop, BE stop, time
+  exit ~3 sessions; best forex stop in his tests a fixed 40 pips. Says contest sizing is not
+  for real accounts. Stefano Serafini (Italy, Unger student) 2017 +217%: intraday commodity
+  trend systems, time windows, HTF filters, "avoid high volatility".
+- Forex division: Misino 2021 +405.5% (Bisceglie shop owner, ex-crypto, Unger mentee,
+  automated systems, PAUSED systems once leading in Nov; sells "Misino System" courses: 5
+  robots for prop challenges / AI system building; no rules, platform, risk or verified
+  record published); Pareschi 2017 (COT + macro, discretionary); Smolen 2019/20; Magala
+  2023/24 (currency strength FOTSI + EMA pullbacks + ATR stops); Ventre 2024-25 (automated);
+  Perdices 2025 +600.9% record (discretionary, almost all gold, trend pullback + RSI, adds to
+  winners). Kevin Davey (algo, 2nd/1st 2005-07): walk-forward, Monte Carlo, incubation,
+  several systems. Larry Williams 1987 11,376% had a ~65% intra-contest drawdown.
+- Contest rules: calendar Forex min $5,000; Global Cup $5,000; Quarterly $2,500; Monthly
+  $500; real money at authorised broker only (FOREX.com US / ATC Brokers non-US) — Exness
+  not eligible; return = (ending equity incl. withdrawals − deposits) / deposits; EAs allowed.
+- REA ("Reverse Engineer Anything") tool from an X post: reverse-engineers software without
+  source; not useful here (we own our code); never point it at MT5/Exness (licence).
+
+**Results this session**
+- P99 re-run of default p93 reproduced exactly (876 / R176,034; 2026 131 / +R3,596).
+- P100 Monte Carlo: headline −15.66% is TOTAL-value; account balance fell 31.6% in the real
+  order; median working DD 28%, 95th 39%. Unger wide-range-bar filter RED (all 12 runs).
+- P101 Unger compression size-up / Serafini volatility size-down: RED (results below).
+- P102 first-live-year Monte Carlo (`scripts/monte_carlo_live.py` ->
+  `data/monte_carlo_live_report.md`): history pool median 12-month total R40k; **2026 pool
+  (plan on this) median R9.1k, 10th pct R4.1k, 25% chance R6k not reached in 12 months**;
+  missing 20% of trades costs ~25%, +1 pip cost <10%; never below R500. Live alarm levels:
+  account −35% from high, 13-15 losses in a row, >4 months without a new high -> stop and review.
+- P103/P104 gold + indices (below); P105 switching (below).
+
+**Open items:** demo smoke test; Floot sign-in; gold/indices results (P103/P104/P104b);
+live-vs-backtest gaps (weekly AMD, session-range fallback, extra dropped candle); FVG target
+fix decision; 2025 FOMC dates; main.py out of date.
+
+## 🔀 P105 — switching between sub-systems by recent form (RAN 2026-10-14) — 🔴 no rule helps
+
+Trader's idea: each system has losing periods; switch between systems for those periods.
+`scripts/system_switch_study.py` (p93 full + 2026 dumps, 1,007 trades: breakout 485, judas 364,
+MM 158; fixed R6k-tier size; paused systems tracked on paper). Rules per system on its own last
+K trades: pause / half size when the last K summed < 0, half size below the K-trade equity
+average, PF-based 0.5x/1.25x, contrarian 1.25x after a slump. **Control: the same weights
+shuffled at random within each system, 500 times.**
+- **Form does not persist:** corr(last-K sum, next-K sum) K=10: breakout +0.09, judas +0.01,
+  MM −0.00; K=20: +0.07 / −0.22 / −0.23. By pair: −0.06..+0.10 (NZD +0.24 on 60 trades).
+- Every pause / half / MA rule earns LESS than always-on in every half (−1% to −14%) and mostly
+  loses to random de-weighting. PF-rule gains (+6..+17%) come from the 1.25x upsizing, not
+  timing (beats random 8-15% IS, 0-9% 2026). Contrarian: +0..+4%, inconsistent vs random.
+- Conclusion: the systems' losing stretches are not predictable from their own recent results,
+  so switching cannot add value; the protection comes from running them TOGETHER (weekly corr
+  ~0). Re-test with gold/index trades added once P103/P104 dumps exist
+  (`--dumps ... --group pair`).
+
 ## 📈 P104 — US indices as another system + a second live init crash (2026-10-14, RUNNING)
 
 Arms `idx` (FX + SPXUSD/NSXUSD, `INDEX_AMD_MAX_RANGE_PCT=0.8`, `INDEX_MAX_TRADES_PER_DAY=3`),
@@ -116,6 +199,14 @@ breakout size-up, body < `COMPRESS_BODY_FRAC` 0.5 x range; `VOLX_MULT=0.75` when
 range > `VOLX_RATIO` 1.8 (`volx`) / 1.5 (`volx15`) x the 20-day mean — Serafini's volatility
 lesson as a size-down. Counters `compress_sized`, `volx_sized`. × is/oos/full/y26 ->
 `data/mm_golden_*_p101_*`. Control = p93 anchors.
+
+**P101 RESULT (RAN 2026-10-14) — 🔴 both RED; keep off.** Withdrawn R k (IS / OOS / full),
+2026 P&L, risk_cap_skip full:
+p93 60.8 / 85.0 / 176.0, +R3,596, 181 · cmp4 53.3 / 84.1 / 159.2, +R2,296, 299 ·
+cmpd 52.5 / 84.3 / 167.3, +R2,284, 257 · volx 58.6 / 84.1 / 174.4, +R3,548, 165 ·
+volx15 59.6 / 79.0 / 168.8, +R3,493, 150. The compression 1.25x converts into risk-cap SKIPS
+(181 -> 299, the P70 ARM-1 shape) and cuts money; the volatility 0.75x barely fires (63-113
+trades) and costs R1.6-7k.
 
 ## 🔧 P98 — LIVE ENGINE: base-strategy crash fixed + MM channel ported (2026-10-09)
 
