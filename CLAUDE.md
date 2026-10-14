@@ -60,6 +60,28 @@ costs R64k with a −28.8% headline DD. Skips (`wrb_breakout_skipped`, checks no
 1,409 / 800 / 636. Same lesson as P8/P10/P70: a removal filter on a profitable bucket loses the
 compounding path. 2026 drawdowns are smaller in every arm, but profit is ~45% lower.
 
+## 🏆 P101 — what the Robbins winners do, mapped onto this book (2026-10-14, RUNNING)
+
+Research (secondary sources only; official standings page unreachable): forex-division winners
+include Misino 2021 +405.5% (automated, Unger mentee, paused systems once leading; no rules
+published), Magala 2023/24 (rules-based currency strength FOTSI + EMA pullbacks + ATR stops),
+Perdices 2025 +600.9% (discretionary, almost all GOLD, trend pullback + RSI, adds to winners),
+Pareschi 2017 (COT + macro, discretionary), Smolen 2019/20 (unpublished). Recurring practices:
+currency strength / intermarket (we have: DXY x EURGBP), trend-pullback entries (we have),
+adding to winners (we have: pyramids P21/P22), several systems/markets (we DON'T: 3 pairs =
+one dollar bet), gold in the book (we DON'T). None publish drawdown or a verified record.
+
+Year-by-year check of p93 (full + 2026 dumps), trades / WR / PF: 2022 219/42%/3.47,
+2023 205/42%/2.98, 2024 225/45%/4.18, 2025 227/44%/3.92, 2026 131/37%/1.90. Judas, breakout and
+MM each PF > 1 in every year; 2026 is the weakest year for every model.
+
+Arms (default off, `_compressed_bar` / `_extreme_vol`, completed bars, fixture-verified):
+`COMPRESS_MULT=1.25` with `COMPRESS_TF` 240T (`cmp4`) / D (`cmpd`) — Unger's coil filter as a
+breakout size-up, body < `COMPRESS_BODY_FRAC` 0.5 x range; `VOLX_MULT=0.75` when the last daily
+range > `VOLX_RATIO` 1.8 (`volx`) / 1.5 (`volx15`) x the 20-day mean — Serafini's volatility
+lesson as a size-down. Counters `compress_sized`, `volx_sized`. × is/oos/full/y26 ->
+`data/mm_golden_*_p101_*`. Control = p93 anchors.
+
 ## 🔧 P98 — LIVE ENGINE: base-strategy crash fixed + MM channel ported (2026-10-09)
 
 **Critical live bug found and fixed.** `LiveTrader` (live/run_live.py) inherits all signal code
