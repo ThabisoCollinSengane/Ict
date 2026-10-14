@@ -1049,6 +1049,21 @@ class Backtester:
             return -1   # GBP outperforming → synthetic EURGBP falling
         return 0
 
+    def _wide_range_bar(self, pair, t) -> bool:
+        """P100 — Unger's wide-range-bar filter for breakouts: True when the last
+        COMPLETED bar on WRB_TF is wider than WRB_MULT x the reference range (the
+        previous bar when WRB_LOOKBACK == 1, else the mean of the prior
+        WRB_LOOKBACK bars). The forming bar is dropped (bars_up_to returns it)."""
+        bars = self.bars_up_to(pair, config.WRB_TF, t, max_bars=config.WRB_LOOKBACK + 3)
+        lb = config.WRB_LOOKBACK
+        if not bars or len(bars) < lb + 2:
+            return False
+        done = bars[:-1]
+        last = done[-1].High - done[-1].Low
+        prior = [b.High - b.Low for b in done[-1 - lb:-1]]
+        ref = sum(prior) / len(prior)
+        return ref > 0 and last > config.WRB_MULT * ref
+
     def _intermarket_breakout(self, t) -> int:
         """Triple-confirmed intermarket breakout on M15.
 
@@ -3736,6 +3751,10 @@ class Backtester:
             _is_breakout = False
         if _is_breakout:
             g["breakout_confirmed"] = g.get("breakout_confirmed", 0) + 1
+            # P100: Unger — skip a breakout right after a wide-range bar (default off).
+            if config.WRB_FILTER and self._wide_range_bar(pair, t):
+                g["wrb_breakout_skipped"] = g.get("wrb_breakout_skipped", 0) + 1
+                return
 
         # Semi-auto manual override (live only; no-op in backtest). Vetoes the
         # trade when it fights the trader's Telegram direction filter or the

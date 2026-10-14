@@ -621,6 +621,14 @@ MM_SEMI_AUTO_MAX_PER_DAY = int(_os.environ.get("MM_SEMI_AUTO_MAX_PER_DAY", 3))
 # edge (P44: WR 50%, PF 4.40) replaces the EURGBP pair-selection signal. DXY
 # direction is still required as the primary USD gate. Default OFF — validate
 # IS/OOS before shipping. Set MM_GOLDEN_ENABLED=1 env to test.
+# P100 — Unger's wide-range-bar filter on the BREAKOUT model (default off).
+# Skip a breakout when the last completed WRB_TF bar is wider than WRB_MULT x the
+# reference range (previous bar if WRB_LOOKBACK == 1, else mean of the prior N bars).
+WRB_FILTER = _envi("WRB_FILTER", 0)
+WRB_TF = _os.environ.get("WRB_TF", "D")
+WRB_MULT = _envf("WRB_MULT", 1.0)
+WRB_LOOKBACK = _envi("WRB_LOOKBACK", 1)
+
 # MM_PRESET — one switch that "locks in" a tested MM configuration (2026-10-08).
 #   p88 = MM on + M1 structure shift + DXY M1 confirmation (best quality)
 #   p89 = p88 + M1 break fresh within 20 bars (quality + more trades)
