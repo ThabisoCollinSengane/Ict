@@ -629,6 +629,16 @@ WRB_TF = _os.environ.get("WRB_TF", "D")
 WRB_MULT = _envf("WRB_MULT", 1.0)
 WRB_LOOKBACK = _envi("WRB_LOOKBACK", 1)
 
+# P101 — size levers from the Robbins winners (default off).
+# Unger compression: breakout after a coiled bar (body < frac x range) sized up.
+COMPRESS_MULT = _envf("COMPRESS_MULT", 1.0)
+COMPRESS_TF = _os.environ.get("COMPRESS_TF", "240T")
+COMPRESS_BODY_FRAC = _envf("COMPRESS_BODY_FRAC", 0.5)
+# Serafini volatility: last daily range > VOLX_RATIO x mean of prior VOLX_LOOKBACK -> size down.
+VOLX_MULT = _envf("VOLX_MULT", 1.0)
+VOLX_RATIO = _envf("VOLX_RATIO", 1.8)
+VOLX_LOOKBACK = _envi("VOLX_LOOKBACK", 20)
+
 # MM_PRESET — one switch that "locks in" a tested MM configuration (2026-10-08).
 #   p88 = MM on + M1 structure shift + DXY M1 confirmation (best quality)
 #   p89 = p88 + M1 break fresh within 20 bars (quality + more trades)

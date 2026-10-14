@@ -1064,6 +1064,29 @@ class Backtester:
         ref = sum(prior) / len(prior)
         return ref > 0 and last > config.WRB_MULT * ref
 
+    def _compressed_bar(self, pair, t) -> bool:
+        """P101 — Unger's volatility-compression filter: the last COMPLETED
+        COMPRESS_TF bar has a body smaller than COMPRESS_BODY_FRAC of its range."""
+        bars = self.bars_up_to(pair, config.COMPRESS_TF, t, max_bars=4)
+        if not bars or len(bars) < 2:
+            return False
+        b = bars[-2]                                   # last completed bar
+        rng = b.High - b.Low
+        return rng > 0 and abs(b.Close - b.Open) < config.COMPRESS_BODY_FRAC * rng
+
+    def _extreme_vol(self, pair, t) -> bool:
+        """P101 — last COMPLETED daily range above VOLX_RATIO x the mean of the
+        VOLX_LOOKBACK daily ranges before it."""
+        lb = config.VOLX_LOOKBACK
+        bars = self.bars_up_to(pair, "D", t, max_bars=lb + 3)
+        if not bars or len(bars) < lb + 2:
+            return False
+        done = bars[:-1]
+        last = done[-1].High - done[-1].Low
+        prior = [b.High - b.Low for b in done[-1 - lb:-1]]
+        ref = sum(prior) / len(prior)
+        return ref > 0 and last > config.VOLX_RATIO * ref
+
     def _intermarket_breakout(self, t) -> int:
         """Triple-confirmed intermarket breakout on M15.
 
@@ -4653,6 +4676,18 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.GOLDEN_RULE_MULT), min_units)
             g["golden_rule_sized"] = g.get("golden_rule_sized", 0) + 1
+        # P101 (Unger): breakout after a COMPRESSED bar (body < frac x range on the
+        # last completed COMPRESS_TF bar) sizes up. Default off (mult 1.0).
+        if (config.COMPRESS_MULT != 1.0 and _is_breakout
+                and self.equity >= config.DRAW_SIZE_MIN_EQUITY
+                and self._compressed_bar(pair, t)):
+            units = max(int(units * config.COMPRESS_MULT), min_units)
+            g["compress_sized"] = g.get("compress_sized", 0) + 1
+        # P101 (Serafini): extreme volatility -> smaller position, never a skip.
+        # Last completed daily range > VOLX_RATIO x mean of the prior VOLX_LOOKBACK.
+        if config.VOLX_MULT != 1.0 and self._extreme_vol(pair, t):
+            units = max(int(units * config.VOLX_MULT), min_units)
+            g["volx_sized"] = g.get("volx_sized", 0) + 1
         # Entry-type tag (computed here so the P40 modulator below can read it;
         # also reused at fill time). news upgrade may already have set max_legs.
         base_type  = "amd" if amd_score else "mss"
