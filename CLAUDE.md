@@ -60,6 +60,20 @@ costs R64k with a −28.8% headline DD. Skips (`wrb_breakout_skipped`, checks no
 1,409 / 800 / 636. Same lesson as P8/P10/P70: a removal filter on a profitable bucket loses the
 compounding path. 2026 drawdowns are smaller in every arm, but profit is ~45% lower.
 
+## 📈 P104 — US indices as another system + a second live init crash (2026-10-14, RUNNING)
+
+Arms `idx` (FX + SPXUSD/NSXUSD, `INDEX_AMD_MAX_RANGE_PCT=0.8`, `INDEX_MAX_TRADES_PER_DAY=3`),
+`idx05` (`INDEX_SIZE_MULT=0.5`), `idxonly` (`TRADE_PAIRS="SPXUSD NSXUSD"`) × is/oos/full/y26 ->
+`data/mm_golden_*_p104_*`. Backtest uses the AUTO index gate (DXY inverse + sibling; US30 ref is
+not in HistData so it reads flat -> 2-of-3 im 0.75). Live default stays `INDEX_SEMI_AUTO_ONLY=1`.
+`INDEX_LOT_UNITS=1` is provisional — check the Exness US500/US100 contract before trusting rand.
+
+**Live bug found by the stub (same class as P98):** with `INDICES_ENABLED=1` every live check
+raised `AttributeError: _day_idx_total`. An AST diff of `Backtester.__init__` vs
+`LiveTrader.__init__` found six missing attrs (`_day_idx_total`, `_mm_day_dir/_range/_count`,
+`_last_withdraw_date`, `_cur_loop_date`); all now initialised. Re-run that AST diff after any
+`Backtester.__init__` change.
+
 ## 🥇 P103 — gold as a second system + how independent the current models are (2026-10-14, RUNNING)
 
 **The book is ALREADY a multi-system.** Weekly P&L correlation (p93 full dump, rand per 1 lot so
