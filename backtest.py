@@ -352,6 +352,15 @@ class Backtester:
             if st.get("sess_exit") or st.get("news_exit"):   # P97: session-end / pre-news MM exits
                 if self._mm_time_exit(pair, st, bar, t, pip):
                     return
+            if config.TIME_EXIT_HOURS > 0 and st.get("legs"):   # P108 (Unger): time exit
+                _op = st["legs"][0].get("opened_at")
+                if _op is not None and (t - _op) >= timedelta(hours=config.TIME_EXIT_HOURS):
+                    for leg in list(st["legs"]):
+                        self._exit_leg(pair, leg, bar.Close, t, "time_exit")
+                    if not self.active.get(pair, {}).get("legs"):
+                        self.active.pop(pair, None)
+                    self.gate["time_exit_closed"] = self.gate.get("time_exit_closed", 0) + 1
+                    return
             for leg in ([] if st.get("fixed_exit") else st["legs"]):   # P93: fixed MM exits
                 pips_profit = (bar.Close - leg["entry"]) * direction / pip
                 if pips_profit >= config.TRAIL_LOCK_PIPS:
@@ -585,6 +594,7 @@ class Backtester:
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
             "golden_rule": st.get("golden_rule", ""),
+            "cs_aligned": st.get("cs_aligned", ""),
             "golden_via": st.get("golden_via", ""),
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
@@ -716,6 +726,7 @@ class Backtester:
             "htf_smt": st.get("htf_smt", False),
             "smt_pair_pref": st.get("smt_pair_pref", ""),
             "golden_rule": st.get("golden_rule", ""),
+            "cs_aligned": st.get("cs_aligned", ""),
             "golden_via": st.get("golden_via", ""),
             "golden_ob_tf": st.get("golden_ob_tf", ""),
             "golden_ob_state": st.get("golden_ob_state", ""),
@@ -1350,6 +1361,35 @@ class Backtester:
             if config.INDEX_AMD_MAX_RANGE_PIPS > 0:
                 return config.INDEX_AMD_MAX_RANGE_PIPS
         return config.AMD_MAX_RANGE_PIPS
+
+    _CS_PAIRS = ("EURUSD", "GBPUSD", "NZDUSD", "AUDUSD", "EURGBP", "AUDNZD")
+
+    def _ccy_strength(self, t):
+        """P108 (Magala) — currency strength: average % move of each currency over the
+        last CS_BARS COMPLETED CS_TF bars, across the six FX pairs (base +, quote -).
+        The forming bar is dropped (bars_up_to returns it), so no lookahead."""
+        n, acc = config.CS_BARS, {}
+        for p in self._CS_PAIRS:
+            b = self.bars_up_to(p, config.CS_TF, t, max_bars=n + 2)[:-1]
+            if len(b) < n + 1 or not b[-1 - n].Close:
+                continue
+            r = (b[-1].Close / b[-1 - n].Close - 1.0) * 100.0
+            for c, s in ((p[:3], r), (p[3:], -r)):
+                acc.setdefault(c, []).append(s)
+        return {c: sum(v) / len(v) for c, v in acc.items()}
+
+    def _cs_aligned(self, pair, direction, t):
+        """True when `pair` (an X/USD major) is the strongest expression of the move
+        in `direction`: d x (strength[X] - strength[USD]) is positive and the largest
+        of EUR/GBP/NZD/AUD. Returns (aligned, spread)."""
+        if len(pair) != 6 or pair[3:] != "USD":
+            return False, None
+        s = self._ccy_strength(t)
+        if "USD" not in s or pair[:3] not in s:
+            return False, None
+        spreads = {c: direction * (s[c] - s["USD"]) for c in ("EUR", "GBP", "NZD", "AUD") if c in s}
+        mine = spreads.get(pair[:3])
+        return (mine is not None and mine > 0 and mine >= max(spreads.values())), mine
 
     def _is_point_instrument(self, pair):
         """True for point-based (non-FX) instruments — gold and the US indices.
@@ -4689,6 +4729,13 @@ class Backtester:
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.GOLDEN_RULE_MULT), min_units)
             g["golden_rule_sized"] = g.get("golden_rule_sized", 0) + 1
+        # P108 (Magala): currency strength — the pair is the strongest expression of
+        # the dollar move among EUR/GBP/NZD/AUD. Size up; never a filter.
+        _cs_al, _cs_sp = (self._cs_aligned(pair, direction, t) if config.CS_MULT != 1.0
+                          else (False, None))
+        if _cs_al and self.equity >= config.DRAW_SIZE_MIN_EQUITY:
+            units = max(int(units * config.CS_MULT), min_units)
+            g["cs_sized"] = g.get("cs_sized", 0) + 1
         # P101 (Unger): breakout after a COMPRESSED bar (body < frac x range on the
         # last completed COMPRESS_TF bar) sizes up. Default off (mult 1.0).
         if (config.COMPRESS_MULT != 1.0 and _is_breakout
@@ -4912,6 +4959,7 @@ class Backtester:
             "htf_smt": _htf_smt,
             "smt_pair_pref": _smt_pref,
             "golden_rule": _golden_rule,
+            "cs_aligned": _cs_al if config.CS_MULT != 1.0 else "",
             "narrative_score": _narrative_score,
             "narrative_weekly_profile": _narrative["weekly_profile"],
             "narrative_nfp": _narrative["nfp"],

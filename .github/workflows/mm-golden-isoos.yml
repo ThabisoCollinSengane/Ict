@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [g1, g1ny, g1ny10, g1ny15s, g1ny075, gonlyny]
+        mode: [p93, cs, csd, tx24, tx8, stop15, stop20]
     env:
       NO_PUSH: "1"
     steps:
@@ -84,6 +84,9 @@ jobs:
           # P101: cmp4/cmpd = breakout after a compressed H4/D bar sized 1.25x (Unger);
           #       volx/volx15 = 0.75x size when yesterday's range > 1.8x/1.5x the 20-day mean (Serafini).
           case "${{ matrix.mode }}" in cmp4) export COMPRESS_MULT=1.25 COMPRESS_TF=240T;; cmpd) export COMPRESS_MULT=1.25 COMPRESS_TF=D;; volx) export VOLX_MULT=0.75 VOLX_RATIO=1.8;; volx15) export VOLX_MULT=0.75 VOLX_RATIO=1.5;; esac
+          # P108: Robbins winners integrated. cs/csd = Magala currency strength 1.25x (H4 x6 / D x5);
+          #       tx24/tx8 = Unger time exit (hours); stop15/stop20 = Unger wider fixed stop cap.
+          case "${{ matrix.mode }}" in cs) export CS_MULT=1.25;; csd) export CS_MULT=1.25 CS_TF=D CS_BARS=5;; tx24) export TIME_EXIT_HOURS=24;; tx8) export TIME_EXIT_HOURS=8;; stop15) export FIXED_STOP_PIPS=15;; stop20) export FIXED_STOP_PIPS=20;; esac
           # P107: gold sized as GOLD (Exness 0.01 lot = 1 oz floor, not the FX tier lot).
           case "${{ matrix.mode }}" in g1*|gonly*) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
           case "${{ matrix.mode }}" in *ny*) export GOLD_SESSIONS=ny;; esac
@@ -122,7 +125,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p107
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p108
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

@@ -24,6 +24,29 @@ cache-bug post-mortem.)
 
 ---
 
+## 🏆 P108 — Robbins winners' ideas INTEGRATED into the FX core (BUILT 2026-10-15, RUNNING)
+
+Trader (2026-10-15): the mission is to take what the championship winners do and build it
+into this strategy (trader confirms gold trades at 0.01 lot on their account). Already in the
+book from them: intermarket/currency strength (DXY x EURGBP), pullback entries, adding to
+winners (pyramids), several systems (judas/breakout/MM, weekly corr ~0), gold (P107).
+Tried earlier as filters (P100/P101, lost money): Unger wide-range-bar skip, compression
+size-up, Serafini volatility size-down. New, all default off (FX byte-identical):
+- **Magala currency strength** `CS_MULT` (`_ccy_strength` / `_cs_aligned`): strength of
+  USD/EUR/GBP/NZD/AUD from the six FX pairs over `CS_BARS` COMPLETED `CS_TF` bars (forming bar
+  dropped; fixture-verified incl. a junk forming bar ignored). Size 1.25x when the traded pair
+  is the strongest expression of the move (largest d x (X - USD) of the four, and > 0).
+  Column `cs_aligned` (plumbed 3x), counter `cs_sized`.
+- **Unger time exit** `TIME_EXIT_HOURS`: close at market once the first leg is that old.
+  Counter `time_exit_closed`, exit reason `time_exit`.
+- **Unger wider fixed stop**: `FIXED_STOP_PIPS` now env-overridable (his best FX stop was a
+  fixed 40 pips; ours is a 10-pip cap).
+Arms `p93` (control 876 / R176,034), `cs`, `csd` (D x5), `tx24`, `tx8`, `stop15`, `stop20`
+× is/oos/full/y26 -> `data/mm_golden_*_p108_*`. Not yet built: Perdices's gold trend-pullback
++ RSI system (gold-specific, after P107 sizing results); Misino's "pause once leading" (a
+month-target lock; P105 says pausing on form does not help, but pausing on a TARGET is
+different and untested).
+
 ## 🥇 P107 — gold sized as GOLD, not as FX (BUILT 2026-10-15, RUNNING)
 
 **Trader (2026-10-15): stop "failing" things on FX settings; the plan is multiple systems

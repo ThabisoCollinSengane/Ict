@@ -138,7 +138,16 @@ MIN_TARGET_SCALED     = bool(int(_os.environ.get("MIN_TARGET_SCALED", 0)))
 MIN_PIPS_TARGET_SMALL = int(_os.environ.get("MIN_PIPS_TARGET_SMALL", 20))
 MIN_PIPS_TARGET_LARGE = int(_os.environ.get("MIN_PIPS_TARGET_LARGE", 30))
 MIN_RR = 1.2                       # minimum reward:risk
-FIXED_STOP_PIPS = 10               # max/fallback stop distance — 10 pips from entry
+FIXED_STOP_PIPS = _envf("FIXED_STOP_PIPS", 10)  # max/fallback stop distance — 10 pips from entry
+# P108 — Robbins-winner ideas integrated (all default off -> byte-identical).
+# Magala (FX division 2023/24): currency strength. CS_MULT sizes a trade up when its pair
+# is the STRONGEST expression of the move among EUR/GBP/NZD/AUD vs USD, read from the six
+# FX pairs on completed CS_TF bars over CS_BARS.
+CS_MULT = _envf("CS_MULT", 1.0)
+CS_TF   = _os.environ.get("CS_TF", "240T")
+CS_BARS = _envi("CS_BARS", 6)
+# Unger (4x World Cup): time exit — close a trade still open after TIME_EXIT_HOURS.
+TIME_EXIT_HOURS = _envf("TIME_EXIT_HOURS", 0)
 TRAIL_BE_PIPS   = 10               # move stop to breakeven when +10 pips profit
 TRAIL_LOCK_PIPS = 20               # lock in +10 pips profit when +20 pips profit
 
