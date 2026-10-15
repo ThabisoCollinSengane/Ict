@@ -302,6 +302,8 @@ class Backtester:
                         self._mm_golden_entry(pair, t)
                     if pair not in self.active:   # base + golden didn't open → standalone MM
                         self._mm_standalone(pair, t)
+                    if pair not in self.active and config.GOLD_PB_ENABLED:
+                        self._gold_pullback_entry(pair, t)   # P110 gold's own model
 
             if i % 1000 == 0 and i > 0:
                 print(f"    bar {i}/{total} ({t}) - active={len(self.active)} "
@@ -5355,6 +5357,140 @@ class Backtester:
         age = (len(bars) - 1) - last.bar_index
         # a fresh, already-swept opposing swing = structure just shifted our way.
         return bool(last.swept) and age <= config.MM_MSS_LOOKBACK
+
+    @staticmethod
+    def _rsi(closes, n):
+        """Wilder RSI of the last value of `closes` (list of floats). None if too short."""
+        if len(closes) < n + 1:
+            return None
+        gains = losses = 0.0
+        for a, b in zip(closes[:n], closes[1:n + 1]):
+            d = b - a
+            gains += max(d, 0.0)
+            losses += max(-d, 0.0)
+        ag, al = gains / n, losses / n
+        for a, b in zip(closes[n:-1], closes[n + 1:]):
+            d = b - a
+            ag = (ag * (n - 1) + max(d, 0.0)) / n
+            al = (al * (n - 1) + max(-d, 0.0)) / n
+        if al == 0:
+            return 100.0
+        return 100.0 - 100.0 / (1.0 + ag / al)
+
+    def _gold_pb_signal(self, pair, t):
+        """P110 — gold trend-pullback signal on COMPLETED bars only.
+        Returns (direction, stop_price) or (0, reason)."""
+        tb = self.bars_up_to(pair, config.GOLD_PB_TREND_TF, t,
+                             max_bars=config.GOLD_PB_EMA * 4)[:-1]
+        n_ema = config.GOLD_PB_EMA
+        if len(tb) < n_ema + 6:
+            return 0, "no_trend_bars"
+        k, ema, hist = 2.0 / (n_ema + 1), tb[0].Close, []
+        for b in tb:
+            ema = b.Close * k + ema * (1 - k)
+            hist.append(ema)
+        last = tb[-1].Close
+        if last > hist[-1] and hist[-1] > hist[-6]:
+            d = 1
+        elif last < hist[-1] and hist[-1] < hist[-6]:
+            d = -1
+        else:
+            return 0, "trend_flat"
+        rb = self.bars_up_to(pair, config.GOLD_PB_RSI_TF, t)[:-1]
+        n, w = config.GOLD_PB_RSI_LEN, config.GOLD_PB_RSI_WIN
+        if len(rb) < n * 3 + w:
+            return 0, "no_rsi_bars"
+        closes = [b.Close for b in rb[-(n * 3 + w):]]
+        rs = [self._rsi(closes[:len(closes) - k], n) for k in range(w)]
+        rs = [r for r in rs if r is not None]
+        if not rs:
+            return 0, "no_rsi"
+        if (d > 0 and min(rs) > config.GOLD_PB_RSI_LO) or (d < 0 and max(rs) < config.GOLD_PB_RSI_HI):
+            return 0, "no_pullback"
+        mb = self.bars_up_to(pair, "5T", t)[:-1]
+        lb = config.GOLD_PB_SWING_LB
+        if len(mb) < lb + 3:
+            return 0, "no_m5"
+        win = mb[-lb:]
+        # last 3-bar fractal swing in the window (trend side), excluding the trigger bars
+        lvl = None
+        for i in range(len(win) - 2, 0, -1):
+            if d > 0 and win[i].High > win[i - 1].High and win[i].High > win[i + 1].High:
+                lvl = win[i].High; break
+            if d < 0 and win[i].Low < win[i - 1].Low and win[i].Low < win[i + 1].Low:
+                lvl = win[i].Low; break
+        if lvl is None:
+            return 0, "no_swing"
+        cl = [b.Close for b in mb[-(config.GOLD_PB_FRESH + 1):]]
+        broke_now = (cl[-1] > lvl) if d > 0 else (cl[-1] < lvl)
+        broke_before = any((c > lvl) if d > 0 else (c < lvl) for c in cl[:-1])
+        if not broke_now or broke_before:
+            return 0, "no_trigger"
+        ext = min(b.Low for b in win) if d > 0 else max(b.High for b in win)
+        return d, ext - d * 0.5
+
+    def _gold_pullback_entry(self, pair, t):
+        """P110 — gold's own entry channel (Perdices trend pullback). Same killzone
+        (incl. GOLD_SESSIONS), circuit breakers and news gate as the other channels;
+        broker-min-lot sizing (P107)."""
+        if not (config.GOLD_ENABLED and pair == config.GOLD_PAIR) or pair in self.active:
+            return
+        g = self.gate
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        _dk = now.date()
+        if self._drawdown_halt_until is not None and _dk < self._drawdown_halt_until:
+            return
+        _day_open = self._day_open_eq.get(_dk)
+        if _day_open and (_day_open - self.equity) / _day_open * 100 >= config.MAX_DAILY_LOSS_PCT:
+            return
+        if self._consec_losses >= config.MAX_CONSECUTIVE_LOSSES:
+            return
+        if self.news.nearest_impact(now) in ("Medium", "Critical", "High"):
+            return
+        cnt = getattr(self, "_gold_pb_count", None)
+        if cnt is None:
+            cnt = self._gold_pb_count = {}
+        if cnt.get(_dk, 0) >= config.GOLD_PB_MAX_PER_DAY:
+            return
+        g["gold_pb_checked"] = g.get("gold_pb_checked", 0) + 1
+        d, stop_ref = self._gold_pb_signal(pair, t)
+        if d == 0:
+            g[f"gold_pb_{stop_ref}"] = g.get(f"gold_pb_{stop_ref}", 0) + 1
+            return
+        if config.GOLD_PB_DXY and self._dxy_bias(t) == d:
+            g["gold_pb_dxy_opposes"] = g.get("gold_pb_dxy_opposes", 0) + 1
+            return
+        bars5 = self.bars_up_to(pair, "5T", t)
+        px = bars5[-1].Close
+        spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        entry = px + d * (spread + config.SLIPPAGE_PIPS) * pip_size(pair)
+        risk = abs(entry - stop_ref)
+        if risk < config.GOLD_PB_STOP_MIN:
+            stop_ref, risk = entry - d * config.GOLD_PB_STOP_MIN, config.GOLD_PB_STOP_MIN
+        if risk > config.GOLD_PB_STOP_MAX:
+            g["gold_pb_stop_wide"] = g.get("gold_pb_stop_wide", 0) + 1
+            return
+        target = entry + d * config.GOLD_PB_RR * risk
+        equity_usd = self._size_equity() / config.USD_ZAR
+        pct = config.GOLD_RISK_PCT or config.RISK_PER_TRADE_PCT
+        floor = max(1, int((config.GOLD_MIN_LOT or 0.01) * self._contract_units(pair)))
+        units = max(int(equity_usd * pct / 100.0 / risk), floor)
+        cap_pct = config.GOLD_MAX_RISK_PCT or config.MAX_RISK_PER_TRADE_PCT
+        if units * risk * unit_value(pair) * config.USD_ZAR > self.equity * cap_pct / 100.0:
+            g["gold_pb_risk_cap"] = g.get("gold_pb_risk_cap", 0) + 1
+            return
+        leg = {"entry": entry, "stop": stop_ref, "init_stop": stop_ref, "units": units,
+               "leg_idx": 1, "opened_at": t, "entry_type": "gold_pb", "tp1": None,
+               "tp1_hit": True, "_units_tp1": 0, "_units_tp2": units,
+               "runner_be_after_tp1": False}
+        self.active[pair] = {
+            "direction": d, "mfe_price": entry, "target": target,
+            "target_type": "gold_pb_rr", "legs": [leg], "max_legs": 1, "draw_score": 0,
+            "entry_model": "gold_pb", "profile": self._session_label(t),
+            "stop_reason": "gold_pb_swing", "im_scenario": "G-pb",
+        }
+        cnt[_dk] = cnt.get(_dk, 0) + 1
+        g["gold_pb_opened"] = g.get("gold_pb_opened", 0) + 1
 
     def _mm_open_position(self, pair, direction, entry, stop, target, target_type,
                           tag, units, t):

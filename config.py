@@ -1019,6 +1019,26 @@ GOLD_RISK_PCT     = _envf("GOLD_RISK_PCT", 0)      # risk-based size % (0 = RISK
 GOLD_MAX_RISK_PCT = _envf("GOLD_MAX_RISK_PCT", 0)  # per-trade cap % (0 = MAX_RISK_PER_TRADE_PCT)
 GOLD_SESSIONS     = _os.environ.get("GOLD_SESSIONS", "")   # "" both / "ny" / "london"
 GOLD_STOP_MAX     = _envf("GOLD_STOP_MAX", 0)      # $ cap on the structural stop (0 = none)
+# P110 — gold's OWN entry model (Perdices: trend pullback + RSI, enter on structure).
+# Independent of the FX AMD/consolidation path and the DXY+silver+AUD all-agree gate.
+# Trend = close vs a rising/falling EMA(GOLD_PB_EMA) of completed GOLD_PB_TREND_TF bars; pullback = RSI on
+# GOLD_PB_RSI_TF dipped to <= LO (long) / >= HI (short) in the last GOLD_PB_RSI_WIN bars;
+# trigger = a completed M5 close through the last M5 swing in the trend direction.
+GOLD_PB_ENABLED     = _envi("GOLD_PB_ENABLED", 0)
+GOLD_PB_TREND_TF    = _os.environ.get("GOLD_PB_TREND_TF", "240T")
+GOLD_PB_EMA         = _envi("GOLD_PB_EMA", 50)       # trend = close above a RISING EMA (mirror short)
+GOLD_PB_RSI_TF      = _os.environ.get("GOLD_PB_RSI_TF", "15T")
+GOLD_PB_RSI_LEN     = _envi("GOLD_PB_RSI_LEN", 14)
+GOLD_PB_RSI_LO      = _envf("GOLD_PB_RSI_LO", 40)
+GOLD_PB_RSI_HI      = _envf("GOLD_PB_RSI_HI", 60)
+GOLD_PB_RSI_WIN     = _envi("GOLD_PB_RSI_WIN", 8)
+GOLD_PB_SWING_LB    = _envi("GOLD_PB_SWING_LB", 12)     # M5 bars for the trigger swing / stop
+GOLD_PB_FRESH       = _envi("GOLD_PB_FRESH", 2)         # trigger close within N M5 bars
+GOLD_PB_STOP_MIN    = _envf("GOLD_PB_STOP_MIN", 3.0)    # $
+GOLD_PB_STOP_MAX    = _envf("GOLD_PB_STOP_MAX", 20.0)   # $ (skip if the swing stop is wider)
+GOLD_PB_RR          = _envf("GOLD_PB_RR", 2.0)
+GOLD_PB_DXY         = _envi("GOLD_PB_DXY", 1)           # 1 = skip when DXY H1 runs WITH gold's direction
+GOLD_PB_MAX_PER_DAY = _envi("GOLD_PB_MAX_PER_DAY", 2)
 if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
     PAIRS = PAIRS + (GOLD_PAIR,)
 

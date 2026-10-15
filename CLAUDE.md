@@ -24,6 +24,30 @@ cache-bug post-mortem.)
 
 ---
 
+## 🥇 P110 — gold's OWN entry model: trend pullback (BUILT 2026-10-15, RUNNING)
+
+**Exness XAUUSDm spec (trader screenshot 2026-10-15):** contract 100 (0.01 lot = 1 oz), min
+0.01, step 0.01, digits 3, swap long −500 points / short 0 (triple Wednesday), market execution,
+fill FOK/IOC, stop level 0, ZAR account 1:2000. Symbol name `XAUUSDm`.
+
+**Why gold traded so little (gold-only funnel, P107 gonlyny full):** 26,158 in-killzone news-clear
+checks -> `intermarket_signal` 662 (DXY + silver + AUD all agree) -> MSS 223 -> consolidation 41
+-> 57 entries. The FX AMD path (all-agree gate + tight consolidation + Judas sweep) starves gold,
+which trends. Trader expects >= 3 gold trades a week.
+
+**Build:** `_gold_pullback_entry` / `_gold_pb_signal` / `_rsi` — a separate channel (runs after
+the other channels, gold only, same killzone/news/circuit breakers, P107 broker-min sizing):
+trend = close vs a rising/falling EMA(`GOLD_PB_EMA`=50) of completed H4 bars (NOT `htf_bias`,
+which reads flat during a pullback — it only fires on a fresh break); pullback = M15 RSI(14)
+<= 40 (long) / >= 60 (short) in the last 8 completed bars; trigger = a completed M5 close
+through the last M5 3-bar swing in the trend direction, first break (fresh); stop = extreme
+of the last 12 M5 bars ∓ $0.5, min $3, skip if > $20; target `GOLD_PB_RR`=2R; skip if DXY H1
+bias runs WITH gold (`GOLD_PB_DXY`); max `GOLD_PB_MAX_PER_DAY`=2. Counters `gold_pb_checked`,
+`gold_pb_<reason>`, `gold_pb_opened`; `entry_model` = `gold_pb`. Fixture-verified long, short
+(mirror), no-pullback, no-trigger, stale trigger, forming bar ignored. Default off.
+Arms `gpbny`, `gpb2`, `gpbnodxy`, `gpbonly` (gold alone R10k, NY), `gpbonly2` (both) ×
+is/oos/full/y26 -> `data/mm_golden_*_p110_*`. Not in the live loop yet (backtest first).
+
 ## 🔀 P109 — three systems (FX / gold / indices) + session allocator (BUILT 2026-10-15, RUNNING)
 
 Trader's design: FX, gold and indices are the three systems; the algo should pick the most
