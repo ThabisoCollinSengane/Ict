@@ -93,6 +93,26 @@ Flags (default off, FX byte-identical): `GOLD_MIN_LOT` (broker floor, 0.01), `GO
 `g1ny`, `g1ny10` (10% cap), `g1ny15s` ($15 stop cap), `g1ny075` (2-of-3 gate), `gonlyny`
 (gold alone from R10k) × is/oos/full/y26 -> `data/mm_golden_*_p107_*`. Control = p93.
 
+**P107 RESULT (RAN 2026-10-15) — 🟢 gold is a real system once sized as gold.** Gold P&L
+positive in EVERY arm, both halves, and 2026. Withdrawn R k IS / OOS / full, headline DD
+full / OOS, working DD full, 2026 P&L; gold trades n / WR / PF / P&L (full):
+- p93 control: 60.8 / 85.0 / 176.0, −15.66 / −9.87, 31.6, +R3,596.
+- `g1` (both sessions): **77.4** / 77.9 / **182.3**, **−22.76** (IS) / −12.35, 29.5, +R3,737;
+  gold 104 / 35% / 3.22 / +R17.8k (IS PF 4.89, OOS 1.33). London gold 53 tr WR 25% PF 1.50;
+  **NY gold 51 tr WR 45% PF 6.38 +R15.2k**. By year PF 2.98 / 6.98 / 1.16 / 3.15.
+- `g1ny` (NY only): 63.1 / 85.7 / 182.1, −15.66 / −19.12, 30.8, +R2,849; gold 57 / 39% /
+  3.53 / +R9.7k (IS PF 6.94, OOS 1.88); by year PF 4.81 / 9.49 / 1.74 / 2.36. **Only arm with
+  more money in BOTH halves AND the full-run headline DD unchanged** — but OOS headline DD
+  −9.87 -> −19.12 and 2026 −R747.
+- `g1ny10` (10% cap) / `g1ny15s` ($15 stop cap): ≈ g1ny (the cap and stop cap barely bind).
+- `g1ny075` (2-of-3 gate): 144 gold trades but PF 2.47, book withdraws less (171.7k). Keep im 1.0.
+- `gonlyny` (gold ALONE from R10k): 61 trades / WR 38% / PF 3.12 (IS 3.56, OOS 2.39, 2026 9 tr
+  PF 6.06), headline DD −4.6 / −6.2%, R12.9k withdrawn over 4 yr — real edge, ~15 trades a year.
+Weekly P&L corr gold vs FX +0.12-0.13 (adds diversification). Gold avg win R613-718 vs avg loss
+R109-118. `risk_cap_skip` 181 -> 211-279 (gold setups still skipped at small equity).
+**Not shipped (trader's call).** Next: Perdices gold trend-pullback entries to raise gold
+frequency; gold NY-only is the session to build on (London gold PF 1.5).
+
 ## 🎲 P100 — Monte Carlo drawdown study + Unger wide-range-bar filter (2026-10-14)
 
 **Monte Carlo (`scripts/monte_carlo.py` -> `data/monte_carlo_report.md`, RAN).** 876 p93 trades
