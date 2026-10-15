@@ -48,6 +48,41 @@ bias runs WITH gold (`GOLD_PB_DXY`); max `GOLD_PB_MAX_PER_DAY`=2. Counters `gold
 Arms `gpbny`, `gpb2`, `gpbnodxy`, `gpbonly` (gold alone R10k, NY), `gpbonly2` (both) ×
 is/oos/full/y26 -> `data/mm_golden_*_p110_*`. Not in the live loop yet (backtest first).
 
+**P110 v1 RESULT (RAN 2026-10-15) — 🔴 crashed + v1 entries lose.** 16 of 20 runs crashed:
+`self._dxy_bias(t)` — the HistdataBacktester override is `_dxy_bias(tf, t)`; the documented
+override trap again (must be `_dxy_bias_1h(t)`). Only `gpbnodxy` ran: gold_pb 141 IS / 159 OOS /
+16 2026 trades (~1.5/week), **WR 18%, PF 0.46 / 0.48 / 0.30**, book headline DD −49%. Diagnosis
+(300 trades): 243 stops / 54 targets; median stop $5.35; **losers' median MFE $1** — straight
+against us; spread+slippage $1.50 = ~30% of risk. The M5-extreme stop sat inside gold's noise.
+**v2 (P110b):** DXY call fixed (`_dxy_bias_1h`), stop = extreme of the last 8 COMPLETED M15 bars
+(`GOLD_PB_STOP_TF`/`_BARS`) ∓ $1, min $8, max $25, plus a wrong-side-stop guard
+(`gold_pb_stop_wrong_side`). Whole `_gold_pullback_entry` driven end-to-end on a stub this time
+(opens 1 oz long, $8.6 stop, R159 risk, 2R target; DXY-same-way path blocks). Same 5 arms ->
+`data/mm_golden_*_p110b_*`.
+
+**P109 RESULT (RAN 2026-10-15) — indices at 0.01-lot sizing.** Control p93 IS 60.8 / OOS 85.0 /
+full 176.0k, DD −15.66 / −9.87, working 31.6, 2026 +3,596 / −19.4. Withdrawn R k IS/OOS/full,
+DD full / OOS, working DD, 2026 P&L / DD; index trades n / WR / PF / P&L (full):
+- `ix1` ($1/pt): 65.0 / 72.1 / 164.2, −16.1 / −13.5, 26.2, +5,372 / −32.8; idx **416** / 44% /
+  4.04 / +15.7k (IS PF 5.51, OOS 1.95, 2026 73 tr PF 2.68).
+- `ix10` ($10/pt): 71.0 / 71.2 / **179.5**, −14.4 / −9.9, 28.0, +5,882 / −29.5; idx 417 / 44% / 2.85.
+- `ix1ny` (NY only): 64.1 / 75.2 / 178.4, −15.0 / **−9.25**, **working 16.6**, +5,204 / −33.1;
+  idx 248 / 42% / 4.49 (IS 5.66, OOS 2.22, 2026 42 tr PF 11.6).
+- `ixonly` (indices alone, R1k): 460 tr (~2.2/wk) / 43.5% / PF 2.64 (IS 3.80, OOS 2.23, 2026 3.88),
+  DD −10.3%, +R4.9k from R1k (never reached R6k — 1 unit sizing is small).
+- `all3` (FX + gold 1 oz both sessions + idx): **94.2** / 71.7 / **199.8** (+R23.8k vs p93),
+  DD −19.9 / −12.2, working 31.7, 1,373 trades (~6.6/wk), 2026 +5,346 / −28.9.
+Index edge real in every period but fades (PF ~5.5 IS -> ~2 OOS). Index sizing now trades
+(`index_own_sized`, risk_cap_skip back to 88-291). 2026 DD deeper (−29..−33) in all index arms.
+
+**P108b RESULT (RAN 2026-10-15) — wider stop, size down instead of skip (`RISK_CAP_HALVE=1`).**
+- `stop20h`: WR **46.8%**, PF 3.80; 69.4 / 87.0 / 175.7 (= p93), **headline DD −10.25** (vs
+  −15.66) / −9.86, **working DD 20.5** (vs 31.6); 2026 **+5,643** / −29.7; halved 157 trades.
+- `stop15h`: WR 45.3%, 65.8 / 79.7 / 165.1, DD −14.84, working 23.9; 2026 +4,773 / −36.2.
+- `tx8s15h`: 69.1 / 74.2 / 164.8; 2026 +6,598 / −32.8.
+**stop20h = same money, a third less drawdown over 4 years, higher WR** — the cleanest risk
+improvement of the session; but the 2026 (R1k start) drawdown is deeper (−29.7 vs −19.4).
+
 ## 🔀 P109 — three systems (FX / gold / indices) + session allocator (BUILT 2026-10-15, RUNNING)
 
 Trader's design: FX, gold and indices are the three systems; the algo should pick the most

@@ -1034,8 +1034,11 @@ GOLD_PB_RSI_HI      = _envf("GOLD_PB_RSI_HI", 60)
 GOLD_PB_RSI_WIN     = _envi("GOLD_PB_RSI_WIN", 8)
 GOLD_PB_SWING_LB    = _envi("GOLD_PB_SWING_LB", 12)     # M5 bars for the trigger swing / stop
 GOLD_PB_FRESH       = _envi("GOLD_PB_FRESH", 2)         # trigger close within N M5 bars
-GOLD_PB_STOP_MIN    = _envf("GOLD_PB_STOP_MIN", 3.0)    # $
-GOLD_PB_STOP_MAX    = _envf("GOLD_PB_STOP_MAX", 20.0)   # $ (skip if the swing stop is wider)
+GOLD_PB_STOP_MIN    = _envf("GOLD_PB_STOP_MIN", 8.0)    # $ (v1 was 3)
+GOLD_PB_STOP_MAX    = _envf("GOLD_PB_STOP_MAX", 25.0)   # $ (skip if the swing stop is wider; v1 20)
+GOLD_PB_STOP_TF     = _os.environ.get("GOLD_PB_STOP_TF", "15T")   # v1 = "5T" (last SWING_LB M5 bars)
+GOLD_PB_STOP_BARS   = _envi("GOLD_PB_STOP_BARS", 8)
+GOLD_PB_STOP_BUF    = _envf("GOLD_PB_STOP_BUF", 1.0)    # $ beyond the extreme (v1 0.5)
 GOLD_PB_RR          = _envf("GOLD_PB_RR", 2.0)
 GOLD_PB_DXY         = _envi("GOLD_PB_DXY", 1)           # 1 = skip when DXY H1 runs WITH gold's direction
 GOLD_PB_MAX_PER_DAY = _envi("GOLD_PB_MAX_PER_DAY", 2)

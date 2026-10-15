@@ -5426,8 +5426,14 @@ class Backtester:
         broke_before = any((c > lvl) if d > 0 else (c < lvl) for c in cl[:-1])
         if not broke_now or broke_before:
             return 0, "no_trigger"
-        ext = min(b.Low for b in win) if d > 0 else max(b.High for b in win)
-        return d, ext - d * 0.5
+        # stop beyond the PULLBACK extreme on GOLD_PB_STOP_TF (v2: M15 — the M5 extreme sat
+        # inside gold's noise; losers' median favourable excursion was $1 on a $5 stop)
+        sb = (self.bars_up_to(pair, config.GOLD_PB_STOP_TF, t)[:-1]
+              [-config.GOLD_PB_STOP_BARS:] if config.GOLD_PB_STOP_TF != "5T" else win)
+        if not sb:
+            return 0, "no_stop_bars"
+        ext = min(b.Low for b in sb) if d > 0 else max(b.High for b in sb)
+        return d, ext - d * config.GOLD_PB_STOP_BUF
 
     def _gold_pullback_entry(self, pair, t):
         """P110 — gold's own entry channel (Perdices trend pullback). Same killzone
@@ -5457,13 +5463,16 @@ class Backtester:
         if d == 0:
             g[f"gold_pb_{stop_ref}"] = g.get(f"gold_pb_{stop_ref}", 0) + 1
             return
-        if config.GOLD_PB_DXY and self._dxy_bias(t) == d:
+        if config.GOLD_PB_DXY and self._dxy_bias_1h(t) == d:
             g["gold_pb_dxy_opposes"] = g.get("gold_pb_dxy_opposes", 0) + 1
             return
         bars5 = self.bars_up_to(pair, "5T", t)
         px = bars5[-1].Close
         spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         entry = px + d * (spread + config.SLIPPAGE_PIPS) * pip_size(pair)
+        if (entry - stop_ref) * d <= 0:
+            g["gold_pb_stop_wrong_side"] = g.get("gold_pb_stop_wrong_side", 0) + 1
+            return
         risk = abs(entry - stop_ref)
         if risk < config.GOLD_PB_STOP_MIN:
             stop_ref, risk = entry - d * config.GOLD_PB_STOP_MIN, config.GOLD_PB_STOP_MIN
