@@ -56,7 +56,13 @@ override trap again (must be `_dxy_bias_1h(t)`). Only `gpbnodxy` ran: gold_pb 14
 against us; spread+slippage $1.50 = ~30% of risk. The M5-extreme stop sat inside gold's noise.
 **v2 (P110b):** DXY call fixed (`_dxy_bias_1h`), stop = extreme of the last 8 COMPLETED M15 bars
 (`GOLD_PB_STOP_TF`/`_BARS`) ∓ $1, min $8, max $25, plus a wrong-side-stop guard
-(`gold_pb_stop_wrong_side`). Whole `_gold_pullback_entry` driven end-to-end on a stub this time
+(`gold_pb_stop_wrong_side`). **P110b RESULT (5 of 20 runs in, gold-only arms) — 🔴 still loses:**
+gpbonly2 full 130 gold_pb trades in 4 yr (~0.6/week, NOT 3), WR 23%, PF 0.70; gpbonly (NY) full 47 /
+15% / 0.44; OOS 61-62 tr, PF 0.40-0.47; 2026 46 tr, PF 0.35. Median stop = the $8 floor. MFE in R:
+only 37-40% of entries ever reach +1R, 11-23% reach +2R, and **26-39% never get +0.25R** — so even a
+1R target would be ~38% WR, about −0.3R per trade after costs. Worse than a random entry: buying the
+M5 close through the swing buys the local top of the bounce. The mechanical trend-pullback entry
+has no edge here. Whole `_gold_pullback_entry` driven end-to-end on a stub this time
 (opens 1 oz long, $8.6 stop, R159 risk, 2R target; DXY-same-way path blocks). Same 5 arms ->
 `data/mm_golden_*_p110b_*`.
 
