@@ -17,6 +17,15 @@ def pip_size(symbol: str) -> float:
     return 0.01 if symbol.endswith("JPY") else 0.0001
 
 
+def unit_value(symbol: str) -> float:
+    """USD per 1.0 price move per unit. 1.0 for FX/gold (P&L = move x units). Indices:
+    INDEX_UNIT_VALUE lets one unit be a fraction of a contract (P109: with INDEX_LOT_UNITS=100
+    and INDEX_UNIT_VALUE=0.01, 0.01 lot = 1 unit = $0.01 per point on a $1/point contract)."""
+    if symbol in config.INDEX_PAIRS:
+        return config.INDEX_UNIT_VALUE
+    return 1.0
+
+
 def position_size(equity: float, entry: float, stop: float, symbol: str) -> float:
     """Units to trade so that |entry - stop| equals RISK_PER_TRADE_PCT of equity.
 
@@ -27,7 +36,7 @@ def position_size(equity: float, entry: float, stop: float, symbol: str) -> floa
     if equity <= 0:
         return 0.0                       # never size on a non-positive balance
     risk_amt = equity * (config.RISK_PER_TRADE_PCT / 100.0)
-    per_unit = abs(entry - stop)
+    per_unit = abs(entry - stop) * unit_value(symbol)
     if per_unit <= 0:
         return 0.0
     return risk_amt / per_unit

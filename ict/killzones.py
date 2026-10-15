@@ -39,6 +39,9 @@ def _kz_list(pair: str | None):
     if (config.GOLD_SESSIONS and config.GOLD_ENABLED and pair == config.GOLD_PAIR):
         key = "London" if config.GOLD_SESSIONS == "london" else "New York"
         return [z for z in _KZ if key in z[0]]
+    if (config.INDEX_SESSIONS and config.INDICES_ENABLED and pair in config.INDEX_PAIRS):
+        key = "London" if config.INDEX_SESSIONS == "london" else "New York"
+        return [z for z in _KZ if key in z[0]]
     return _KZ_AUD if pair in _AUD_ONLY_PAIRS else _KZ
 
 

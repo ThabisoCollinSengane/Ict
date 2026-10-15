@@ -24,6 +24,35 @@ cache-bug post-mortem.)
 
 ---
 
+## 🔀 P109 — three systems (FX / gold / indices) + session allocator (BUILT 2026-10-15, RUNNING)
+
+Trader's design: FX, gold and indices are the three systems; the algo should pick the most
+probable one per session. **Index numbers so far (P104 idx05 = 1 unit/point, i.e. wrong
+size):** 183 trades, WR 39.3%, PF 3.77, +R31.4k; by year 48 / 64 / 42 / 26 / **3 (2026)**;
+London 93 tr WR 38.7% PF 3.40, NY 90 tr WR 40.0% PF 4.09; SPX NY best (69 tr, WR 43.5%,
+PF 4.00), NSX London 27 tr WR 51.9%. **Why index trades shrink every year:** `risk_cap_skip`
+1,328 vs 304 in the plain bot — at 1 unit = $1/point a 30-point stop is over the 8% cap at
+R6k, and stops in points grew as SPX 3.8k -> 7.4k and NSX 12k -> 30k. Same class of bug as
+gold (P107): wrong size, not a weak market.
+
+**Fix:** `risk.unit_value(sym)` / `INDEX_UNIT_VALUE` ($ per point per unit) lets one unit be
+a fraction of a contract; applied in position_size, the P&L, every risk-cap check and the
+live /positions P&L. `INDEX_LOT_UNITS=100, INDEX_UNIT_VALUE=0.01` = 0.01 lot = 1 unit on a
+$1/point contract. `INDEX_MIN_LOT` (broker floor, not the FX tier lot), `INDEX_SESSIONS`.
+Default 1.0 / 0 / "" -> byte-identical. Every leg now records `init_stop` (true R from P109
+on). Live stub clean with gold + indices on. Account: ZAR, 1:2000 (margin never binds;
+risk is lot x stop). Arms `ix1`, `ix10` ($10/pt), `ix1ny`, `ixonly` (R1k), `all3`
+(FX + gold 1 oz + indices) × is/oos/full/y26 -> `data/mm_golden_*_p109_*`.
+
+**Allocator study (`scripts/system_allocator_study.py` -> `data/system_allocator_report.md`,
+first read on the OLD dumps, R by proxy):** keeping only one system per session (by the IS
+prior or by setup quality) earns LESS than taking every system's trades in IS, OOS and 2026,
+and does not beat a random pick. Daily correlation FX-indices +0.16, FX-gold 0.0 — the
+systems mostly win on DIFFERENT days, so the value of three systems is running them together.
+Sizing UP the session's best system (indices) instead of excluding the others: +17% R IS,
++4% OOS, flat 2026, slightly deeper drawdown. Re-run on the `all3` dumps (true R, correct
+sizes) before concluding.
+
 ## 🏆 P108 — Robbins winners' ideas INTEGRATED into the FX core (BUILT 2026-10-15, RUNNING)
 
 Trader (2026-10-15): the mission is to take what the championship winners do and build it

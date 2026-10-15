@@ -53,7 +53,7 @@ from intermarket import (
     resolve_index_direction,
 )
 from news_filter import NewsCalendar
-from risk import position_size, pip_size
+from risk import position_size, pip_size, unit_value
 from trade_log import TradeLog
 
 
@@ -518,7 +518,7 @@ class Backtester:
             _spread = max(_spread, config.NEWS_HIGH_SPREAD_PIPS)
         _exit_friction = (_spread / 2) * pip_size(pair)
         effective_exit = exit_price - direction * _exit_friction
-        pnl_usd = (effective_exit - leg["entry"]) * leg["units"] * direction
+        pnl_usd = (effective_exit - leg["entry"]) * leg["units"] * direction * unit_value(pair)
         pnl_zar = pnl_usd * config.USD_ZAR
         self.equity += pnl_zar
         # Update peak equity and consecutive loss counter after every close.
@@ -533,6 +533,7 @@ class Backtester:
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
             "entry": leg["entry"], "exit": effective_exit, "units": leg["units"],
             "stop": leg["stop"], "target": st["target"],
+            "init_stop": leg.get("init_stop", ""),
             "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
             "reason": reason, "entry_type": leg.get("entry_type", "unknown"),
             "session_side": leg.get("session_side", "no_open"),
@@ -664,6 +665,7 @@ class Backtester:
             "pair": pair, "leg_idx": leg["leg_idx"], "direction": direction,
             "entry": leg["entry"], "exit": eff_exit, "units": units_tp1,
             "stop": leg["stop"], "target": st["target"],
+            "init_stop": leg.get("init_stop", ""),
             "pnl": pnl_zar, "opened_at": leg["opened_at"], "closed_at": t,
             "reason": "tp1_partial",
             "entry_type": leg.get("entry_type", "unknown"),
@@ -4672,6 +4674,11 @@ class Backtester:
             risk_units = int(equity_usd * _gpct / 100.0 / max(abs(entry - stop), 1e-9))
             min_units  = max(1, int(config.GOLD_MIN_LOT * self._contract_units(pair)))
             g["gold_own_sized"] = g.get("gold_own_sized", 0) + 1
+        elif (config.INDEX_MIN_LOT > 0 and config.INDICES_ENABLED
+                and pair in config.INDEX_PAIRS):
+            # P109: indices floor at the broker min lot, not the FX tier lot.
+            min_units = max(1, int(config.INDEX_MIN_LOT * self._contract_units(pair)))
+            g["index_own_sized"] = g.get("index_own_sized", 0) + 1
         units = max(risk_units, min_units)
         # Draw-weighted sizing: scale up the highest-edge setups (3/3 cascade, PF 6.17)
         # so they carry more capital. Applied to the risk-based size, then floored at
@@ -4809,14 +4816,14 @@ class Backtester:
         if _gold_own and config.GOLD_MAX_RISK_PCT > 0:
             _cap_pct = config.GOLD_MAX_RISK_PCT
         _risk_cap = self.equity * (_cap_pct / 100.0)
-        trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
+        trade_risk_zar = units * abs(entry - stop) * unit_value(pair) * config.USD_ZAR
         if trade_risk_zar > _risk_cap:
             if config.RISK_CAP_HALVE:
                 # size DOWN (halve to the broker min) so the setup is TAKEN, not skipped
                 _floor = max(1, int(config.MIN_LOT_SIZE * self._contract_units(pair)))
-                while units > _floor and units * abs(entry - stop) * config.USD_ZAR > _risk_cap:
+                while units > _floor and units * abs(entry - stop) * unit_value(pair) * config.USD_ZAR > _risk_cap:
                     units = max(_floor, units // 2)
-                trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
+                trade_risk_zar = units * abs(entry - stop) * unit_value(pair) * config.USD_ZAR
                 g["risk_cap_halved"] = g.get("risk_cap_halved", 0) + 1
             else:
                 g["risk_cap_skip"] = g.get("risk_cap_skip", 0) + 1
@@ -4866,7 +4873,7 @@ class Backtester:
 
         _active_target = _runner_tp2 if _runner_applies else target
         leg = {
-            "entry": entry, "stop": stop, "units": units,
+            "entry": entry, "stop": stop, "init_stop": stop, "units": units,
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
             "session_side": _so_side,
             "tp1":       (target if _runner_applies else
@@ -5353,7 +5360,7 @@ class Backtester:
                           tag, units, t):
         """Open a standalone MM position (mirrors the base open's essential fields;
         analytics fields default via .get in consumers)."""
-        leg = {"entry": entry, "stop": stop, "units": units, "leg_idx": 1,
+        leg = {"entry": entry, "stop": stop, "init_stop": stop, "units": units, "leg_idx": 1,
                "opened_at": t, "entry_type": tag, "tp1": None, "tp1_hit": True,
                "_units_tp1": 0, "_units_tp2": units, "runner_be_after_tp1": False}
         self.active[pair] = {
@@ -6757,11 +6764,11 @@ class Backtester:
 
         # Max-risk-per-trade guard.
         _risk_cap = self.equity * (config.MAX_RISK_PER_TRADE_PCT / 100.0)
-        trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
+        trade_risk_zar = units * abs(entry - stop) * unit_value(pair) * config.USD_ZAR
         if trade_risk_zar > _risk_cap:
             if config.RISK_CAP_HALVE:
                 _floor = max(1, int(config.MIN_LOT_SIZE * self._contract_units(pair)))
-                while units > _floor and units * abs(entry - stop) * config.USD_ZAR > _risk_cap:
+                while units > _floor and units * abs(entry - stop) * unit_value(pair) * config.USD_ZAR > _risk_cap:
                     units = max(_floor, units // 2)
             else:
                 g["mm_golden_risk_cap"] = g.get("mm_golden_risk_cap", 0) + 1
@@ -6812,7 +6819,7 @@ class Backtester:
         entry_type = f"amd_{pattern_tag}"
         _session_label = self._session_label(t)
         leg = {
-            "entry": entry, "stop": stop, "units": units,
+            "entry": entry, "stop": stop, "init_stop": stop, "units": units,
             "leg_idx": 1, "opened_at": t, "entry_type": entry_type,
             "session_side": "golden",
             "tp1": None, "tp1_hit": True,
@@ -7157,7 +7164,7 @@ class Backtester:
                     int(tier_lots[-1] * self._contract_units(pair)))
         st["legs"][-1]["stop"] = st["legs"][-1]["entry"]   # prior leg → breakeven
         st["legs"].append({
-            "entry": entry, "stop": stop, "units": units,
+            "entry": entry, "stop": stop, "init_stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
             "entry_type": f"mm_{pat_tag}_ifvg{zone[0]}",
             "tp1": None, "tp1_hit": True, "_units_tp1": 0, "_units_tp2": units,
@@ -7329,7 +7336,7 @@ class Backtester:
         _units_tp2   = units - _units_tp1
         _so_applies  = _so_applies and _units_tp1 > 0
         leg = {
-            "entry": entry, "stop": stop, "units": units,
+            "entry": entry, "stop": stop, "init_stop": stop, "units": units,
             "leg_idx": len(st["legs"]) + 1, "opened_at": t,
             "entry_type": f"pyramid_{wamd_tag}{news_tag}{im_score:.1f}_{pyr_pattern}",
             "tp1":       (entry + config.SCALE_OUT_PIPS * _pip_sz * st["direction"])

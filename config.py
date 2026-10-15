@@ -1040,6 +1040,9 @@ INDEX_LOT_UNITS   = int(_os.environ.get("INDEX_LOT_UNITS", 1))         # PROVISI
 INDEX_STOP_TF       = _os.environ.get("INDEX_STOP_TF", "5T")            # structural stop TF
 INDEX_STOP_LOOKBACK = int(_os.environ.get("INDEX_STOP_LOOKBACK", 120))
 INDEX_SIZE_MULT   = float(_os.environ.get("INDEX_SIZE_MULT", 1.0))      # DD-fit lever; 1.0=off
+INDEX_UNIT_VALUE  = _envf("INDEX_UNIT_VALUE", 1.0)   # P109: USD per point per unit (1.0 = old)
+INDEX_MIN_LOT     = _envf("INDEX_MIN_LOT", 0)      # P109: broker min lot floor (0 = FX tier lot)
+INDEX_SESSIONS    = _os.environ.get("INDEX_SESSIONS", "")   # P109: "" both / "ny" / "london"
 # --- Index frequency levers (more trades = more income) ---
 # Indices are POINT-priced, so the FX pip thresholds are wrong-scaled and starve
 # the index Judas/AMD path: the 35-"pip" consolidation cap reads as 35 POINTS,

@@ -49,7 +49,7 @@ from intermarket import (
 from ict import market_structure as mstruct
 from ict.killzones import can_open_new_trade
 from news_filter import NewsCalendar
-from risk import pip_size
+from risk import pip_size, unit_value
 from trade_log import TradeLog
 import live.mt5_connector as mt
 from live.session_inputs import SessionInputs
@@ -1713,7 +1713,7 @@ class LiveTrader(Backtester):
             lines.append(f"{p} {'LONG' if d > 0 else 'SHORT'}  {lots_total} lots  ({n} leg{'s' if n != 1 else ''})")
             if price is not None:
                 pips = (price - avg_entry) * d / pip
-                zar = sum((price - l["entry"]) * l["units"] for l in legs) * d * config.USD_ZAR
+                zar = sum((price - l["entry"]) * l["units"] for l in legs) * d * unit_value(p) * config.USD_ZAR
                 lines.append(f"  now {price:.5f}   {pips:+.1f} pips avg  (R{zar:+,.2f})")
                 if tgt != avg_entry:
                     prog = max(0.0, min(100.0, (price - avg_entry) / (tgt - avg_entry) * 100))

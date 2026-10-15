@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [p93, cs, csd, tx24, tx8, stop15, stop20]
+        mode: [ix1, ix10, ix1ny, ixonly, all3]
     env:
       NO_PUSH: "1"
     steps:
@@ -84,6 +84,11 @@ jobs:
           # P101: cmp4/cmpd = breakout after a compressed H4/D bar sized 1.25x (Unger);
           #       volx/volx15 = 0.75x size when yesterday's range > 1.8x/1.5x the 20-day mean (Serafini).
           case "${{ matrix.mode }}" in cmp4) export COMPRESS_MULT=1.25 COMPRESS_TF=240T;; cmpd) export COMPRESS_MULT=1.25 COMPRESS_TF=D;; volx) export VOLX_MULT=0.75 VOLX_RATIO=1.8;; volx15) export VOLX_MULT=0.75 VOLX_RATIO=1.5;; esac
+          # P109: indices at the BROKER min lot with fractional units (1 unit = 0.01 lot).
+          #       ix1 = $1/point contract, ix10 = $10/point; ix1ny = NY only; ixonly = indices alone
+          #       from R1k; all3 = FX + gold (P107 1 oz) + indices -> feeds the system allocator.
+          case "${{ matrix.mode }}" in ix*|all3) export INDICES_ENABLED=1 INDEX_PAIRS="SPXUSD NSXUSD" INDEX_AMD_MAX_RANGE_PCT=0.8 INDEX_MAX_TRADES_PER_DAY=3 INDEX_LOT_UNITS=100 INDEX_UNIT_VALUE=0.01 INDEX_MIN_LOT=0.01;; esac
+          case "${{ matrix.mode }}" in ix10) export INDEX_UNIT_VALUE=0.1;; ix1ny) export INDEX_SESSIONS=ny;; ixonly) export TRADE_PAIRS="SPXUSD NSXUSD";; all3) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
           # P108: Robbins winners integrated. cs/csd = Magala currency strength 1.25x (H4 x6 / D x5);
           #       tx24/tx8 = Unger time exit (hours); stop15/stop20 = Unger wider fixed stop cap.
           case "${{ matrix.mode }}" in cs) export CS_MULT=1.25;; csd) export CS_MULT=1.25 CS_TF=D CS_BARS=5;; tx24) export TIME_EXIT_HOURS=24;; tx8) export TIME_EXIT_HOURS=8;; stop15) export FIXED_STOP_PIPS=15;; stop20) export FIXED_STOP_PIPS=20;; esac
@@ -125,7 +130,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p108
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p109
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
