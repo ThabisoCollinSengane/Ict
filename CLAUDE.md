@@ -11,7 +11,7 @@ DXY (USD direction)
   └─ AUDNZD (selects NZD vs AUD family)   → NZDUSD (AUDUSD excluded: poor WR)
 ```
 
-**Live account target:** Exness ZAR-denominated, R1,000 start, manual funding.
+**Live account target:** Exness ZAR-denominated, R1,000 start, manual funding. Leverage 1:2000 (trader, 2026-10-15); gold and indices tradeable at 0.01 lot.
 **Backtest result (4 years, 2022–2025, realistic income mode):** 736 trades, WR 43.9%, PF 4.01,
 MaxDD -13.24%, R1,000 start → R132k withdrawn (37 withdrawals) + R8.6k working balance.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
