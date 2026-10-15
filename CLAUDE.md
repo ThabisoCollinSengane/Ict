@@ -71,7 +71,29 @@ size-up, Serafini volatility size-down. New, all default off (FX byte-identical)
 - **Unger wider fixed stop**: `FIXED_STOP_PIPS` now env-overridable (his best FX stop was a
   fixed 40 pips; ours is a 10-pip cap).
 Arms `p93` (control 876 / R176,034), `cs`, `csd` (D x5), `tx24`, `tx8`, `stop15`, `stop20`
-× is/oos/full/y26 -> `data/mm_golden_*_p108_*`. Not yet built: Perdices's gold trend-pullback
+× is/oos/full/y26 -> `data/mm_golden_*_p108_*`.
+
+**P108 RESULT (RAN 2026-10-15).** Control p93 exact (876 / R176,034; IS 60.8k / OOS 85.0k; 2026
++R3,596). Withdrawn R k IS / OOS / full, headline DD full / OOS, working DD full, 2026 P&L / DD:
+- `cs` (H4 strength 1.25x): 55.5 / 80.5 / 166.6, −15.66 / −15.29, 32.3, +3,531 / −21.4. 🔴
+- `csd` (daily strength): 57.8 / 85.8 / 174.6, −15.66 / −13.04, 31.9, +1,929 / −26.1. 🔴
+  **Finding:** trades on the pair that is the STRONGEST expression of the dollar move are WORSE
+  in every period (cs aligned vs not: IS PF 2.82 vs 3.15, OOS WR 38% / PF 2.97 vs 45% / 4.08,
+  2026 WR 18% / PF 0.56 vs 41% / 2.02; csd same shape). Fits a reversal book: the strongest pair
+  has already run. Magala's rule is a TREND-pullback rule and inverts here. Not shipped.
+- `tx24` (24h time exit): fires 5x in 4 yr, R174.6k; 2026 +1,998 / DD −13.1. Neutral.
+- `tx8` (8h time exit): 29 trades closed; 61.5 / 84.3 / **177.1**, −15.66 / −14.16, 31.6;
+  **2026 +R5,507 / DD −15.6** (vs +3,596 / −19.4). Small plus in full + IS + 2026, small minus OOS.
+- `stop15` (15-pip cap): WR 45.6%, PF 3.79, **63.7** / 75.0 / 156.3, **−14.84** / −9.78,
+  **working DD 19.8** (vs 31.6); 2026 +4,133 / −36.4. `risk_cap_skip` 181 -> 591.
+- `stop20`: WR 45.9%, PF 3.87, 50.5 / 69.8 / 142.8, **−11.82** / −9.73, working DD 21.8; 2026
+  +5,016 / −27.9. `risk_cap_skip` 715.
+  **Finding:** Unger's wider stop raises WR (+2.5pp) and cuts the account's own drawdown by a
+  third, but the wider stop at the FX tier lot breaks the 8% cap and SKIPS ~400-530 trades, so
+  income falls. P108b re-runs it with `RISK_CAP_HALVE=1` (size down instead of skip):
+  `stop15h`, `stop20h`, `tx8s15h` -> `data/mm_golden_*_p108b_*`.
+
+Not yet built: Perdices's gold trend-pullback
 + RSI system (gold-specific, after P107 sizing results); Misino's "pause once leading" (a
 month-target lock; P105 says pausing on form does not help, but pausing on a TARGET is
 different and untested).

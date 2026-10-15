@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [ix1, ix10, ix1ny, ixonly, all3]
+        mode: [stop15h, stop20h, tx8s15h]
     env:
       NO_PUSH: "1"
     steps:
@@ -84,6 +84,9 @@ jobs:
           # P101: cmp4/cmpd = breakout after a compressed H4/D bar sized 1.25x (Unger);
           #       volx/volx15 = 0.75x size when yesterday's range > 1.8x/1.5x the 20-day mean (Serafini).
           case "${{ matrix.mode }}" in cmp4) export COMPRESS_MULT=1.25 COMPRESS_TF=240T;; cmpd) export COMPRESS_MULT=1.25 COMPRESS_TF=D;; volx) export VOLX_MULT=0.75 VOLX_RATIO=1.8;; volx15) export VOLX_MULT=0.75 VOLX_RATIO=1.5;; esac
+          # P108b: Unger wider stop, but size DOWN (halve) instead of skipping when the wider stop
+          #        breaks the 8% cap; tx8s15h = 8h time exit + 15-pip stop + halving.
+          case "${{ matrix.mode }}" in stop15h) export FIXED_STOP_PIPS=15 RISK_CAP_HALVE=1;; stop20h) export FIXED_STOP_PIPS=20 RISK_CAP_HALVE=1;; tx8s15h) export TIME_EXIT_HOURS=8 FIXED_STOP_PIPS=15 RISK_CAP_HALVE=1;; esac
           # P109: indices at the BROKER min lot with fractional units (1 unit = 0.01 lot).
           #       ix1 = $1/point contract, ix10 = $10/point; ix1ny = NY only; ixonly = indices alone
           #       from R1k; all3 = FX + gold (P107 1 oz) + indices -> feeds the system allocator.
@@ -130,7 +133,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p109
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p108b
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
