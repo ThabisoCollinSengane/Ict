@@ -1,0 +1,35 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2026–2026)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, XAUUSD, XAGUSD
+
+Loading and resampling to 5-minute bars (2026)...
+  GBPUSD: 276,426 M1 → 55,554 M5 bars  2026-01-01 – 2026-10-01  close 1.32581
+  EURUSD: 276,701 M1 → 55,580 M5 bars  2026-01-01 – 2026-10-01  close 1.13289
+  EURGBP: 276,784 M1 → 55,685 M5 bars  2026-01-01 – 2026-10-01  close 0.85445
+  UDXUSD: 235,958 M1 → 48,354 M5 bars  2026-01-02 – 2026-10-01  close 101.28800
+  AUDUSD: 276,456 M1 → 55,592 M5 bars  2026-01-01 – 2026-10-01  close 0.69537
+  NZDUSD: 276,755 M1 → 55,681 M5 bars  2026-01-01 – 2026-10-01  close 0.56259
+  AUDNZD: 277,230 M1 → 55,624 M5 bars  2026-01-01 – 2026-10-01  close 1.23588
+  XAUUSD: 264,191 M1 → 52,847 M5 bars  2026-01-01 – 2026-10-01  close 4175.57500
+  XAGUSD: 263,362 M1 → 52,708 M5 bars  2026-01-01 – 2026-10-01  close 61.13700
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 55554 5-min bars...
+    bar 1000/55554 (2026-01-07 09:20:00+00:00) - active=0 trades=0 equity=1000
+    bar 2000/55554 (2026-01-12 20:40:00+00:00) - active=0 trades=1 equity=962
+Traceback (most recent call last):
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 1749, in <module>
+    main()
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 160, in main
+    _main(_real_stdout)
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 283, in _main
+    backtester.run()
+  File "/home/runner/work/Ict/Ict/backtest.py", line 306, in run
+    self._gold_pullback_entry(pair, t)   # P110 gold's own model
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/Ict/Ict/backtest.py", line 5460, in _gold_pullback_entry
+    if config.GOLD_PB_DXY and self._dxy_bias(t) == d:
+                              ^^^^^^^^^^^^^^^^^
+TypeError: HistdataBacktester._dxy_bias() missing 1 required positional argument: 't'
