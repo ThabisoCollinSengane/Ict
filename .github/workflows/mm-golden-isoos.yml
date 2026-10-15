@@ -1,0 +1,160 @@
+name: MM golden channel — IS / OOS / full (HistData M1, on GitHub's runner)
+
+# The never-run test from CLAUDE.md P58-P63: MM_GOLDEN_ENABLED=1, quadrant on,
+# on IS 2022-23, OOS 2024-25 and the full 4yr path. Base strategy untouched;
+# the MM channel is additive. Each arm runs in parallel and commits its own
+# report/console/trade dump under data/mm_golden_<arm>_*.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/mm-golden-isoos.yml"
+      - ".github/mm-golden.trigger"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [is, oos, full, y26]
+        mode: [gpbny, gpb2, gpbnodxy, gpbonly, gpbonly2]
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download HistData M1 2022-2025 (all pairs)
+        run: |
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
+                 --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD XAUUSD XAGUSD SPXUSD NSXUSD --dest /tmp/hd 2>&1 | tail -30
+          # P97: this year too — 2026 Jan-Sep (HistData serves completed months only).
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 \
+                 --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD XAUUSD XAGUSD SPXUSD NSXUSD --dest /tmp/hd 2>&1 | tail -30
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+      - name: Backtest (${{ matrix.arm }} / ${{ matrix.mode }})
+        continue-on-error: true
+        run: |
+          case "${{ matrix.arm }}" in
+            is)   Y="--years 2022 2023" ;;
+            oos)  Y="--years 2024 2025" ;;
+            full) Y="" ;;
+            y26)  Y="--years 2026" ;;
+            base) Y="" ;;
+          esac
+          # P90: controls use the MM_PRESET switch (p88 must reproduce 817, p89 846).
+          case "${{ matrix.mode }}" in
+            p88*) export MM_PRESET=p88 ;;
+            p89*) export MM_PRESET=p89 ;;
+            m1*)  export MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1 ;;
+            f10x*) export MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1 MM_GOLDEN_M1_MSS_FRESH=10 ;;
+            f20x*) export MM_GOLDEN_ENABLED=1 MM_GOLDEN_M1_MSS=1 MM_GOLDEN_M1_MSS_FRESH=20 ;;
+          esac
+          # P92: *x1 record only (must reproduce P87 f20), *x2 require 2-of-3 key-swing shift + SMT,
+          #      *x3 require the shift only. All without the old DXY-only check.
+          case "${{ matrix.mode }}" in *x1) export MM_GOLDEN_M1_SMTX=1;; *x2) export MM_GOLDEN_M1_SMTX=2;; *x3) export MM_GOLDEN_M1_SMTX=3;; esac
+          # P93 (default is now MM_PRESET=p92): p92 = default control (869 / R167.1k),
+          # base = MM off (736 / R132.0k), jt = target at the consolidation the Judas left,
+          # jtfx = same with a fixed exit (no BE/trail), fx2r = fixed 2R + fixed exit.
+          case "${{ matrix.mode }}" in base) export MM_PRESET=base;; esac
+          # P94 (default is now MM_PRESET=p93): h1be50 = H1 Judas-origin target + break-even only
+          # at halfway to target; be50 = normal target + break-even at halfway.
+          case "${{ matrix.mode }}" in h1be*) export MM_GOLDEN_JUDAS_TARGET=1 MM_GOLDEN_JT_TFS=60T;; esac
+          case "${{ matrix.mode }}" in *be50*) export MM_GOLDEN_BE_FRAC=0.5;; esac
+          # P96: closed = old EU/GU SMT gate on completed bars only; dxy3 = old gate read EU/GU/DXY
+          # three-way; closeddxy3 = both; hsize = old gate kept + anchored top-down SMT as a 1.25x size-up.
+          case "${{ matrix.mode }}" in closed) export MM_GOLDEN_OB_SMT_CLOSED=1;; dxy3) export MM_GOLDEN_OB_SMT_DXY=1;; closeddxy3) export MM_GOLDEN_OB_SMT_CLOSED=1 MM_GOLDEN_OB_SMT_DXY=1;; hsize) export MM_GOLDEN_HSMT=1 MM_GOLDEN_HSMT_MULT=1.25;; esac
+          # P97: *sbe = stop to entry (if in profit) once the entry session is over; *scl = close at
+          #      session end; *nws = close before High-impact news (incl. NFP/CPI/FOMC) due within 15 min.
+          case "${{ matrix.mode }}" in *sbe) export MM_GOLDEN_SESSION_EXIT=1;; *scl) export MM_GOLDEN_SESSION_EXIT=2;; *nws) export MM_GOLDEN_NEWS_EXIT=2;; esac
+          # P100: Unger wide-range-bar filter on breakouts. wrbd = yesterday wider than the day before;
+          #       wrb15 / wrb60 = last M15 / H1 bar wider than 1.5x the mean of the prior 20.
+          case "${{ matrix.mode }}" in wrbd) export WRB_FILTER=1 WRB_TF=D WRB_MULT=1.0 WRB_LOOKBACK=1;; wrb15) export WRB_FILTER=1 WRB_TF=15T WRB_MULT=1.5 WRB_LOOKBACK=20;; wrb60) export WRB_FILTER=1 WRB_TF=60T WRB_MULT=1.5 WRB_LOOKBACK=20;; esac
+          # P101: cmp4/cmpd = breakout after a compressed H4/D bar sized 1.25x (Unger);
+          #       volx/volx15 = 0.75x size when yesterday's range > 1.8x/1.5x the 20-day mean (Serafini).
+          case "${{ matrix.mode }}" in cmp4) export COMPRESS_MULT=1.25 COMPRESS_TF=240T;; cmpd) export COMPRESS_MULT=1.25 COMPRESS_TF=D;; volx) export VOLX_MULT=0.75 VOLX_RATIO=1.8;; volx15) export VOLX_MULT=0.75 VOLX_RATIO=1.5;; esac
+          # P110: gold's OWN entry model (trend pullback + RSI + M5 structure trigger) on top of
+          #       P107 gold sizing. gpbny = FX + gold, NY; gpb2 = both sessions; gpbnodxy = no DXY
+          #       filter; gpbonly / gpbonly2 = gold alone from R10k (NY / both) -> trades per week.
+          case "${{ matrix.mode }}" in gpb*) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0 GOLD_PB_ENABLED=1;; esac
+          case "${{ matrix.mode }}" in gpbny|gpbnodxy|gpbonly) export GOLD_SESSIONS=ny;; esac
+          case "${{ matrix.mode }}" in gpbnodxy) export GOLD_PB_DXY=0;; gpbonly|gpbonly2) export TRADE_PAIRS=XAUUSD STARTING_CASH=10000;; esac
+          # P108b: Unger wider stop, but size DOWN (halve) instead of skipping when the wider stop
+          #        breaks the 8% cap; tx8s15h = 8h time exit + 15-pip stop + halving.
+          case "${{ matrix.mode }}" in stop15h) export FIXED_STOP_PIPS=15 RISK_CAP_HALVE=1;; stop20h) export FIXED_STOP_PIPS=20 RISK_CAP_HALVE=1;; tx8s15h) export TIME_EXIT_HOURS=8 FIXED_STOP_PIPS=15 RISK_CAP_HALVE=1;; esac
+          # P109: indices at the BROKER min lot with fractional units (1 unit = 0.01 lot).
+          #       ix1 = $1/point contract, ix10 = $10/point; ix1ny = NY only; ixonly = indices alone
+          #       from R1k; all3 = FX + gold (P107 1 oz) + indices -> feeds the system allocator.
+          case "${{ matrix.mode }}" in ix*|all3) export INDICES_ENABLED=1 INDEX_PAIRS="SPXUSD NSXUSD" INDEX_AMD_MAX_RANGE_PCT=0.8 INDEX_MAX_TRADES_PER_DAY=3 INDEX_LOT_UNITS=100 INDEX_UNIT_VALUE=0.01 INDEX_MIN_LOT=0.01;; esac
+          case "${{ matrix.mode }}" in ix10) export INDEX_UNIT_VALUE=0.1;; ix1ny) export INDEX_SESSIONS=ny;; ixonly) export TRADE_PAIRS="SPXUSD NSXUSD";; all3) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
+          # P108: Robbins winners integrated. cs/csd = Magala currency strength 1.25x (H4 x6 / D x5);
+          #       tx24/tx8 = Unger time exit (hours); stop15/stop20 = Unger wider fixed stop cap.
+          case "${{ matrix.mode }}" in cs) export CS_MULT=1.25;; csd) export CS_MULT=1.25 CS_TF=D CS_BARS=5;; tx24) export TIME_EXIT_HOURS=24;; tx8) export TIME_EXIT_HOURS=8;; stop15) export FIXED_STOP_PIPS=15;; stop20) export FIXED_STOP_PIPS=20;; esac
+          # P107: gold sized as GOLD (Exness 0.01 lot = 1 oz floor, not the FX tier lot).
+          case "${{ matrix.mode }}" in g1*|gonly*) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
+          case "${{ matrix.mode }}" in *ny*) export GOLD_SESSIONS=ny;; esac
+          case "${{ matrix.mode }}" in g1ny10) export GOLD_MAX_RISK_PCT=10;; g1ny15s) export GOLD_STOP_MAX=15;; g1ny075) export GOLD_MIN_IMSCORE=0.75;; gonlyny) export TRADE_PAIRS=XAUUSD STARTING_CASH=10000;; esac
+          # P103: gold as a second system on the current engine. gold = FX + XAUUSD (DXY+silver+AUD
+          #       all agree); gold075 = 2-of-3 breadth; gold05 = gold at half size; goldonly = XAUUSD alone.
+          case "${{ matrix.mode }}" in gold) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0;; gold075) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=0.75;; gold05) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 GOLD_SIZE_MULT=0.5;; goldonly) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 TRADE_PAIRS=XAUUSD STARTING_CASH=10000;; esac
+          # P104: US indices (S&P 500 = SPXUSD, Nasdaq = NSXUSD) as another system. idx = FX + indices,
+          #       idx05 = indices at half size, idxonly = indices alone. US30 confirmer not in HistData.
+          case "${{ matrix.mode }}" in idx*) export INDICES_ENABLED=1 INDEX_PAIRS="SPXUSD NSXUSD" INDEX_AMD_MAX_RANGE_PCT=0.8 INDEX_MAX_TRADES_PER_DAY=3;; esac
+          case "${{ matrix.mode }}" in idx05) export INDEX_SIZE_MULT=0.5;; idxonly) export TRADE_PAIRS="SPXUSD NSXUSD" STARTING_CASH=10000;; esac
+          # P93b: disp* = the pair's own M1 trigger must break the swing that caused the impulse.
+          case "${{ matrix.mode }}" in disp*) export MM_GOLDEN_M1_MSS_DISP=1;; esac
+          case "${{ matrix.mode }}" in dispjt*) export MM_GOLDEN_JUDAS_TARGET=1;; esac
+          # P93c: *jt1* = Judas-origin target from the H1 chart only (no H4 fallback).
+          case "${{ matrix.mode }}" in *jt1*) export MM_GOLDEN_JT_TFS=60T;; esac
+          case "${{ matrix.mode }}" in jt*) export MM_GOLDEN_JUDAS_TARGET=1;; esac
+          case "${{ matrix.mode }}" in *fx*) export MM_GOLDEN_FIXED_EXIT=1;; esac
+          case "${{ matrix.mode }}" in fx2r) export MM_GOLDEN_FIXED_RR=2;; esac
+          case "${{ matrix.mode }}" in *smt3*) export MM_GOLDEN_M1_SMT3=1;; esac
+          # P91: *z = record SMT-at-the-tap on every MM trade (must reproduce 817 / 846);
+          #      *smtz = require SMT at the tap.
+          case "${{ matrix.mode }}" in *smtz*) export MM_GOLDEN_M1_SMTZ=2;; *z*) export MM_GOLDEN_M1_SMTZ=1;; esac
+          case "${{ matrix.mode }}" in *min*) export MM_GOLDEN_M1_SMTZ_REF=min MM_GOLDEN_M1_SMTZ_PRIOR=${{ matrix.mode }}; export MM_GOLDEN_M1_SMTZ_PRIOR=${MM_GOLDEN_M1_SMTZ_PRIOR##*min};; esac
+          python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX,'JT',c.MM_GOLDEN_JUDAS_TARGET,'FX',c.MM_GOLDEN_FIXED_EXIT,'RR',c.MM_GOLDEN_FIXED_RR,'DISP',c.MM_GOLDEN_M1_MSS_DISP,'JTF',c.MM_GOLDEN_JT_TFS,'BEF',c.MM_GOLDEN_BE_FRAC,'HSMT',c.MM_GOLDEN_HSMT,'OBSMT',c.MM_GOLDEN_OB_SMT_REQUIRED,'SESS',c.MM_GOLDEN_SESSION_EXIT,'NEWS',c.MM_GOLDEN_NEWS_EXIT,'WRB',c.WRB_FILTER,'CMP',c.COMPRESS_MULT,c.COMPRESS_TF,'VOLX',c.VOLX_MULT,c.VOLX_RATIO,'GOLD',c.GOLD_ENABLED,c.GOLD_MIN_IMSCORE,c.GOLD_SIZE_MULT,'IDX',c.INDICES_ENABLED,c.INDEX_SIZE_MULT,'PAIRS',c.PAIRS)"
+          python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
+          tail -150 /tmp/run.txt
+          for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
+            [ -f "$d" ] && { python scripts/news_session_reach.py --dump "$d" --out /tmp/news_report.md > /dev/null || true; break; }
+          done
+          if [ -f data/histdata/mm_smtx_events.csv ]; then
+            python scripts/smtx_study.py --events data/histdata/mm_smtx_events.csv --out /tmp/smtx_report.md || true
+          fi
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p110b
+          [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
+          [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
+          cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
+          cp /tmp/smtx_report.md data/mm_golden_${A}_smtx_report.md 2>/dev/null || true
+          cp /tmp/news_report.md data/mm_golden_${A}_news_report.md 2>/dev/null || true
+          cp data/histdata/mm_smtx_events.csv data/mm_golden_${A}_smtx_events.csv 2>/dev/null || true
+          for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
+            [ -f "$d" ] && { cp "$d" data/mm_golden_${A}_trades.csv; break; }
+          done
+          git checkout -- data/backtest_report.md data/backtest_console.txt 2>/dev/null || true
+          git add -f data/mm_golden_${A}_*
+          git diff --cached --quiet && exit 0
+          git commit -m "MM golden ${A} run [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1

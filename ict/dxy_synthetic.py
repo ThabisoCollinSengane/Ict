@@ -31,30 +31,45 @@ WEIGHTS = {
 }
 
 
+# Direction anchor + minimum coverage. Robust to a broker missing a minor
+# constituent (e.g. Exness without USDSEK, 4.2% weight): a FLAT DXY halts ALL
+# trading, which is far worse than a tiny-weight approximation — the gate only reads
+# DXY *direction* (BOS), not its absolute value. EURUSD (57.6%) must be present.
+_REQUIRED = ("EURUSD",)
+_MIN_CONSTITUENTS = 4
+
+
 def compute_dxy(prices):
-    """Return synthetic DXY at a single point in time, or None if any input missing."""
+    """Synthetic DXY, robust to a missing constituent. Computes over whatever IS
+    present as long as EURUSD and ≥ _MIN_CONSTITUENTS are available; else None.
+    With all 6 present (backtest) this is byte-identical to the strict formula."""
     value = DXY_CONSTANT
+    used = 0
     for sym, w in WEIGHTS.items():
         p = prices.get(sym)
         if p is None or p <= 0:
-            return None
+            continue                       # skip an unavailable constituent
         value *= p ** w
+        used += 1
+    if used < _MIN_CONSTITUENTS:
+        return None
+    for r in _REQUIRED:
+        p = prices.get(r)
+        if p is None or p <= 0:
+            return None
     return value
 
 
 def compute_dxy_range(highs, lows):
-    """Return (dxy_high, dxy_low) using sign-aware constituent extremes.
-
-    `highs` / `lows` are dicts of constituent prices for a single bar.
-    Returns (None, None) if any constituent is missing.
-    """
+    """(dxy_high, dxy_low) from sign-aware constituent extremes; skips any missing
+    constituent (compute_dxy enforces the EURUSD + min-coverage requirement)."""
     high_inputs = {}
     low_inputs = {}
     for sym, w in WEIGHTS.items():
         h = highs.get(sym)
         l = lows.get(sym)
         if h is None or l is None or h <= 0 or l <= 0:
-            return None, None
+            continue                       # skip an unavailable constituent
         # DXY-high: maximise positively-weighted, minimise negatively-weighted.
         high_inputs[sym] = h if w > 0 else l
         low_inputs[sym] = l if w > 0 else h

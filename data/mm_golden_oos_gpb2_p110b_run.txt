@@ -1,0 +1,1359 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2024–2025)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, XAUUSD, XAGUSD
+
+Loading and resampling to 5-minute bars (2024 + 2025)...
+  GBPUSD: 743,078 M1 → 149,526 M5 bars  2024-01-01 – 2025-12-31  close 1.34740
+  EURUSD: 744,403 M1 → 149,551 M5 bars  2024-01-01 – 2025-12-31  close 1.17455
+  EURGBP: 741,485 M1 → 149,501 M5 bars  2024-01-01 – 2025-12-31  close 0.87158
+  UDXUSD: 633,537 M1 → 129,567 M5 bars  2024-01-02 – 2025-12-31  close 97.96900
+  AUDUSD: 741,851 M1 → 149,377 M5 bars  2024-01-01 – 2025-12-31  close 0.66733
+  NZDUSD: 741,401 M1 → 149,363 M5 bars  2024-01-01 – 2025-12-31  close 0.57549
+  AUDNZD: 743,372 M1 → 149,389 M5 bars  2024-01-01 – 2025-12-31  close 1.15922
+  XAUUSD: 709,543 M1 → 141,943 M5 bars  2024-01-01 – 2025-12-31  close 4318.37900
+  XAGUSD: 706,960 M1 → 141,772 M5 bars  2024-01-01 – 2025-12-31  close 71.54200
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 149526 5-min bars...
+    bar 2000/149526 (2024-01-10 20:45:00+00:00) - active=0 trades=2 equity=1119
+    bar 3000/149526 (2024-01-16 08:05:00+00:00) - active=0 trades=7 equity=1146
+    bar 4000/149526 (2024-01-19 19:25:00+00:00) - active=0 trades=9 equity=1180
+    bar 5000/149526 (2024-01-25 07:45:00+00:00) - active=0 trades=14 equity=1379
+    bar 6000/149526 (2024-01-30 19:05:00+00:00) - active=0 trades=20 equity=1301
+    bar 7000/149526 (2024-02-05 06:25:00+00:00) - active=0 trades=20 equity=1301
+    bar 8000/149526 (2024-02-08 17:45:00+00:00) - active=0 trades=25 equity=1366
+    bar 9000/149526 (2024-02-14 05:05:00+00:00) - active=0 trades=30 equity=1302
+    bar 10000/149526 (2024-02-19 16:25:00+00:00) - active=2 trades=34 equity=1669
+    bar 11000/149526 (2024-02-23 03:45:00+00:00) - active=0 trades=42 equity=1861
+    bar 12000/149526 (2024-02-28 15:05:00+00:00) - active=0 trades=44 equity=1727
+    bar 13000/149526 (2024-03-05 02:25:00+00:00) - active=0 trades=45 equity=1694
+    bar 14000/149526 (2024-03-08 13:45:00+00:00) - active=1 trades=47 equity=1922
+    bar 15000/149526 (2024-03-14 00:05:00+00:00) - active=0 trades=54 equity=1799
+    bar 16000/149526 (2024-03-19 11:25:00+00:00) - active=1 trades=56 equity=1954
+    bar 17000/149526 (2024-03-24 22:45:00+00:00) - active=0 trades=63 equity=2380
+    bar 18000/149526 (2024-03-28 10:05:00+00:00) - active=0 trades=66 equity=2561
+    bar 19000/149526 (2024-04-02 23:25:00+00:00) - active=0 trades=70 equity=3036
+    bar 20000/149526 (2024-04-08 10:45:00+00:00) - active=0 trades=73 equity=2565
+    bar 21000/149526 (2024-04-11 22:05:00+00:00) - active=0 trades=77 equity=2284
+    bar 22000/149526 (2024-04-17 09:25:00+00:00) - active=1 trades=85 equity=2325
+    bar 23000/149526 (2024-04-22 20:45:00+00:00) - active=0 trades=89 equity=2282
+    bar 24000/149526 (2024-04-26 08:05:00+00:00) - active=0 trades=95 equity=2282
+    bar 25000/149526 (2024-05-01 19:30:00+00:00) - active=0 trades=100 equity=3008
+    bar 26000/149526 (2024-05-07 06:50:00+00:00) - active=0 trades=104 equity=2683
+    bar 27000/149526 (2024-05-10 18:10:00+00:00) - active=0 trades=112 equity=2158
+    bar 28000/149526 (2024-05-16 05:30:00+00:00) - active=0 trades=115 equity=2003
+    bar 29000/149526 (2024-05-21 16:55:00+00:00) - active=0 trades=117 equity=1844
+    bar 30000/149526 (2024-05-27 04:20:00+00:00) - active=1 trades=123 equity=1917
+    bar 31000/149526 (2024-05-30 15:40:00+00:00) - active=1 trades=127 equity=1723
+    bar 32000/149526 (2024-06-05 03:00:00+00:00) - active=0 trades=131 equity=1783
+    bar 33000/149526 (2024-06-10 14:20:00+00:00) - active=0 trades=133 equity=1716
+    bar 34000/149526 (2024-06-14 01:40:00+00:00) - active=0 trades=139 equity=2032
+    bar 35000/149526 (2024-06-19 13:00:00+00:00) - active=0 trades=145 equity=1772
+    bar 36000/149526 (2024-06-25 00:20:00+00:00) - active=0 trades=149 equity=1958
+    bar 37000/149526 (2024-06-28 11:40:00+00:00) - active=2 trades=155 equity=2323
+    bar 38000/149526 (2024-07-03 23:00:00+00:00) - active=0 trades=163 equity=2027
+    bar 39000/149526 (2024-07-09 10:20:00+00:00) - active=0 trades=166 equity=1822
+    bar 40000/149526 (2024-07-12 21:40:00+00:00) - active=0 trades=173 equity=1738
+    bar 41000/149526 (2024-07-18 09:00:00+00:00) - active=0 trades=177 equity=1557
+    bar 42000/149526 (2024-07-23 20:20:00+00:00) - active=0 trades=179 equity=1565
+    bar 43000/149526 (2024-07-29 07:40:00+00:00) - active=0 trades=181 equity=1569
+    bar 44000/149526 (2024-08-01 19:00:00+00:00) - active=0 trades=184 equity=1794
+    bar 45000/149526 (2024-08-07 06:20:00+00:00) - active=0 trades=186 equity=1876
+    bar 46000/149526 (2024-08-12 17:40:00+00:00) - active=0 trades=191 equity=1694
+    bar 47000/149526 (2024-08-16 05:00:00+00:00) - active=0 trades=192 equity=1693
+    bar 48000/149526 (2024-08-21 16:20:00+00:00) - active=0 trades=194 equity=1774
+    bar 49000/149526 (2024-08-27 03:50:00+00:00) - active=0 trades=197 equity=1806
+    bar 50000/149526 (2024-08-30 15:10:00+00:00) - active=1 trades=201 equity=2052
+    bar 51000/149526 (2024-09-05 02:30:00+00:00) - active=0 trades=204 equity=1702
+    bar 52000/149526 (2024-09-10 13:50:00+00:00) - active=0 trades=207 equity=1770
+    bar 53000/149526 (2024-09-16 01:20:00+00:00) - active=0 trades=208 equity=1768
+    bar 54000/149526 (2024-09-19 12:40:00+00:00) - active=0 trades=210 equity=1747
+    bar 55000/149526 (2024-09-25 00:00:00+00:00) - active=0 trades=213 equity=2147
+    bar 56000/149526 (2024-09-30 11:20:00+00:00) - active=0 trades=217 equity=2141
+    bar 57000/149526 (2024-10-03 22:40:00+00:00) - active=0 trades=221 equity=1782
+    bar 58000/149526 (2024-10-09 10:00:00+00:00) - active=2 trades=224 equity=1851
+    bar 59000/149526 (2024-10-14 21:20:00+00:00) - active=0 trades=228 equity=1788
+    bar 60000/149526 (2024-10-18 08:40:00+00:00) - active=0 trades=231 equity=1764
+    bar 61000/149526 (2024-10-23 20:00:00+00:00) - active=0 trades=236 equity=1719
+    bar 62000/149526 (2024-10-29 06:20:00+00:00) - active=0 trades=239 equity=1616
+    bar 63000/149526 (2024-11-01 17:40:00+00:00) - active=0 trades=240 equity=1612
+    bar 64000/149526 (2024-11-07 07:00:00+00:00) - active=0 trades=243 equity=1857
+    bar 65000/149526 (2024-11-12 22:20:00+00:00) - active=0 trades=249 equity=1844
+    bar 66000/149526 (2024-11-18 09:40:00+00:00) - active=0 trades=252 equity=1959
+    bar 67000/149526 (2024-11-21 21:00:00+00:00) - active=0 trades=259 equity=2367
+    bar 68000/149526 (2024-11-27 08:20:00+00:00) - active=0 trades=266 equity=2410
+    bar 69000/149526 (2024-12-02 19:40:00+00:00) - active=0 trades=268 equity=2288
+    bar 70000/149526 (2024-12-06 07:00:00+00:00) - active=0 trades=268 equity=2288
+    bar 71000/149526 (2024-12-11 18:20:00+00:00) - active=0 trades=271 equity=2645
+    bar 72000/149526 (2024-12-17 05:40:00+00:00) - active=1 trades=274 equity=3171
+    bar 73000/149526 (2024-12-20 17:00:00+00:00) - active=0 trades=281 equity=3198
+    bar 74000/149526 (2024-12-26 21:00:00+00:00) - active=0 trades=284 equity=3170
+    bar 75000/149526 (2025-01-02 08:20:00+00:00) - active=0 trades=285 equity=3013
+    bar 76000/149526 (2025-01-07 19:40:00+00:00) - active=0 trades=291 equity=2961
+    bar 77000/149526 (2025-01-13 07:00:00+00:00) - active=0 trades=294 equity=3364
+    bar 78000/149526 (2025-01-16 18:20:00+00:00) - active=0 trades=297 equity=3306
+    bar 79000/149526 (2025-01-22 05:40:00+00:00) - active=0 trades=301 equity=3560
+    bar 80000/149526 (2025-01-27 17:00:00+00:00) - active=0 trades=307 equity=3690
+    bar 81000/149526 (2025-01-31 04:20:00+00:00) - active=0 trades=313 equity=4669
+    bar 82000/149526 (2025-02-05 15:40:00+00:00) - active=0 trades=317 equity=5609
+    bar 83000/149526 (2025-02-11 03:00:00+00:00) - active=0 trades=318 equity=5600
+    bar 84000/149526 (2025-02-14 14:20:00+00:00) - active=3 trades=324 equity=5345
+    bar 85000/149526 (2025-02-20 01:40:00+00:00) - active=0 trades=329 equity=5952
+    bar 86000/149526 (2025-02-25 13:00:00+00:00) - active=0 trades=336 equity=5058
+    bar 87000/149526 (2025-03-03 00:25:00+00:00) - active=0 trades=336 equity=5058
+    bar 88000/149526 (2025-03-06 11:45:00+00:00) - active=0 trades=336 equity=5058
+    bar 89000/149526 (2025-03-11 22:10:00+00:00) - active=1 trades=340 equity=4761
+    bar 90000/149526 (2025-03-17 09:30:00+00:00) - active=0 trades=344 equity=5741
+    bar 91000/149526 (2025-03-20 20:50:00+00:00) - active=1 trades=349 equity=6755
+    bar 92000/149526 (2025-03-26 08:10:00+00:00) - active=0 trades=355 equity=7844
+    bar 93000/149526 (2025-03-31 21:30:00+00:00) - active=0 trades=359 equity=8164
+    bar 94000/149526 (2025-04-04 08:50:00+00:00) - active=0 trades=365 equity=7167
+    bar 95000/149526 (2025-04-09 20:35:00+00:00) - active=0 trades=373 equity=5430
+    bar 96000/149526 (2025-04-15 08:00:00+00:00) - active=0 trades=373 equity=5430
+    bar 97000/149526 (2025-04-18 19:20:00+00:00) - active=0 trades=373 equity=5430
+    bar 98000/149526 (2025-04-24 06:40:00+00:00) - active=0 trades=376 equity=5188
+    bar 99000/149526 (2025-04-29 18:00:00+00:00) - active=0 trades=379 equity=5218
+    bar 100000/149526 (2025-05-05 05:30:00+00:00) - active=0 trades=382 equity=4628
+    bar 101000/149526 (2025-05-08 16:50:00+00:00) - active=0 trades=382 equity=4628
+    bar 102000/149526 (2025-05-14 04:10:00+00:00) - active=0 trades=389 equity=5910
+    bar 103000/149526 (2025-05-19 15:30:00+00:00) - active=0 trades=396 equity=6841
+    bar 104000/149526 (2025-05-23 02:50:00+00:00) - active=0 trades=402 equity=6190
+    bar 105000/149526 (2025-05-28 14:10:00+00:00) - active=0 trades=408 equity=9658
+    bar 106000/149526 (2025-06-03 01:40:00+00:00) - active=0 trades=411 equity=11529
+    bar 107000/149526 (2025-06-06 13:00:00+00:00) - active=1 trades=415 equity=6310
+    bar 108000/149526 (2025-06-12 00:20:00+00:00) - active=0 trades=422 equity=5424
+    bar 109000/149526 (2025-06-17 11:40:00+00:00) - active=0 trades=423 equity=5124
+    bar 110000/149526 (2025-06-22 23:00:00+00:00) - active=0 trades=423 equity=5124
+    bar 111000/149526 (2025-06-26 10:25:00+00:00) - active=0 trades=427 equity=4530
+    bar 112000/149526 (2025-07-01 21:45:00+00:00) - active=0 trades=430 equity=4326
+    bar 113000/149526 (2025-07-07 09:05:00+00:00) - active=0 trades=430 equity=4326
+    bar 114000/149526 (2025-07-10 20:25:00+00:00) - active=0 trades=433 equity=4346
+    bar 115000/149526 (2025-07-16 07:45:00+00:00) - active=1 trades=436 equity=3742
+    bar 116000/149526 (2025-07-21 19:10:00+00:00) - active=0 trades=437 equity=3691
+    bar 117000/149526 (2025-07-25 06:30:00+00:00) - active=0 trades=437 equity=3691
+    bar 118000/149526 (2025-07-30 17:50:00+00:00) - active=0 trades=445 equity=4355
+    bar 119000/149526 (2025-08-05 05:10:00+00:00) - active=0 trades=450 equity=4341
+    bar 120000/149526 (2025-08-08 16:30:00+00:00) - active=0 trades=457 equity=4890
+    bar 121000/149526 (2025-08-14 03:50:00+00:00) - active=0 trades=462 equity=6947
+    bar 122000/149526 (2025-08-19 15:10:00+00:00) - active=1 trades=469 equity=7814
+    bar 123000/149526 (2025-08-25 02:30:00+00:00) - active=0 trades=473 equity=7920
+    bar 124000/149526 (2025-08-28 13:50:00+00:00) - active=1 trades=478 equity=8423
+    bar 125000/149526 (2025-09-03 01:10:00+00:00) - active=0 trades=486 equity=10060
+    bar 126000/149526 (2025-09-08 12:30:00+00:00) - active=0 trades=491 equity=6575
+    bar 127000/149526 (2025-09-11 23:50:00+00:00) - active=0 trades=497 equity=6301
+    bar 128000/149526 (2025-09-17 11:15:00+00:00) - active=1 trades=503 equity=7557
+    bar 129000/149526 (2025-09-22 22:35:00+00:00) - active=0 trades=509 equity=7857
+    bar 130000/149526 (2025-09-26 09:55:00+00:00) - active=0 trades=514 equity=11070
+    bar 131000/149526 (2025-10-01 21:15:00+00:00) - active=0 trades=519 equity=12296
+    bar 132000/149526 (2025-10-07 08:35:00+00:00) - active=1 trades=522 equity=6368
+    bar 133000/149526 (2025-10-10 19:55:00+00:00) - active=0 trades=527 equity=8821
+    bar 134000/149526 (2025-10-16 07:15:00+00:00) - active=0 trades=532 equity=10151
+    bar 135000/149526 (2025-10-21 18:35:00+00:00) - active=0 trades=536 equity=9791
+    bar 136000/149526 (2025-10-27 05:00:00+00:00) - active=0 trades=541 equity=10078
+    bar 137000/149526 (2025-10-30 16:20:00+00:00) - active=0 trades=547 equity=14943
+    bar 138000/149526 (2025-11-05 04:40:00+00:00) - active=0 trades=555 equity=6417
+    bar 139000/149526 (2025-11-10 16:00:00+00:00) - active=0 trades=556 equity=6408
+    bar 140000/149526 (2025-11-14 03:20:00+00:00) - active=0 trades=558 equity=6797
+    bar 141000/149526 (2025-11-19 14:40:00+00:00) - active=0 trades=564 equity=5544
+    bar 142000/149526 (2025-11-25 02:00:00+00:00) - active=0 trades=564 equity=5544
+    bar 143000/149526 (2025-11-28 13:20:00+00:00) - active=0 trades=565 equity=5392
+    bar 144000/149526 (2025-12-04 00:40:00+00:00) - active=0 trades=570 equity=6000
+    bar 145000/149526 (2025-12-09 12:00:00+00:00) - active=0 trades=575 equity=5025
+    bar 146000/149526 (2025-12-14 23:20:00+00:00) - active=0 trades=575 equity=5025
+    bar 147000/149526 (2025-12-18 10:40:00+00:00) - active=0 trades=575 equity=5025
+    bar 148000/149526 (2025-12-23 22:05:00+00:00) - active=0 trades=579 equity=5581
+    bar 149000/149526 (2025-12-30 02:10:00+00:00) - active=0 trades=582 equity=5673
+
+=== Gate funnel (entries passing each filter) ===
+  checks                            84462  ████████████████████████████████████████
+  in_killzone                       84462  ████████████████████████████████████████
+  news_clear                        70999  █████████████████████████████████
+  nfp_fomc_ok                       60967  ████████████████████████████
+  intermarket_signal                 2410  █
+  pair_matches                       2410  █
+  mss_h1_m15_m5_ok                    883  
+  daily_bias_ok                       883  
+  h1_bias_ok                          883  
+  h4_bias_ok                          883  
+  dealing_range_ok                     79  
+  consolidation_found                 411  
+  manipulation_correct_dir            354  
+  m5_fvg_correct_dir                  475  
+  target_found                        475  
+  rr_ok                               475  
+  units_nonzero                       475  
+  limit_placed                          0  
+  entry_opened                        355  
+  pyramid_added                         3  
+  pyramid_blocked_min_target          637  
+  drawdown_halt                     11041  █████
+  daily_loss_halt                    1534  
+  consec_loss_pause                     0  
+  weekly_cap                            0  
+  weekly_pair_cap                       0  
+  daily_cap                           757  
+  daily_pair_cap                     1018  
+  weekly_amd_confirmed                130  
+  session_handover_closed               6  
+  htf_draw_full_cascade                74  
+  htf_draw_partial                    381  
+  htf_draw_counter                    225  
+  htf_fvg_5050_hit                     39  
+  ote_zone                              3  
+  choch_confirmed                      38  
+  low_conviction                        0  
+  judas_divergence                      0  
+  ny_continuation                     186  
+  pm_gate_pair_news                     0  
+  dxy_flat                          47250  ██████████████████████
+  mm_quad_1a                         6468  ███
+  mm_quad_selected                  13295  ██████
+  mm_golden_checked                 13295  ██████
+  mm_golden_amd_ok                   6081  ██
+  mm_golden_ob_no_raid                179  
+  mm_golden_via_own_ob                900  
+  mm_golden_smt_rung_1T               324  
+  mm_golden_smt_yes                  2999  █
+  mm_golden_ifvg_zone_60T            2006  
+  mm_golden_pd_ob                     364  
+  mm_golden_pd_ob_15T                 364  
+  mm_golden_no_m1_shift              2277  █
+  mm_quad_other_pair                14931  ███████
+  gold_pb_checked                   19321  █████████
+  gold_pb_no_trend_bars               263  
+  mm_golden_no_smt                   1136  
+  mm_golden_wrong_sweep              4282  ██
+  mm_quad_2a                         7224  ███
+  mm_golden_smt_rung_5T               438  
+  mm_golden_no_ifvg                   259  
+  dxy_directional                   11942  █████
+  eurgbp_directional                 3979  █
+  im_score_low                       2817  █
+  breakout_confirmed                  341  
+  soj_retest                          296  
+  soj_sweep                           437  
+  crt_turtle_soup                     217  
+  golden_rule_no                      182  
+  mstruct_align                       456  
+  phase_ny_judas                      240  
+  gt_pool_sweep                       272  
+  gt_disp_wick                        360  
+  structure_stop_used                 440  
+  stop_capped_10pip                   226  
+  risk_cap_ok                         355  
+  mm_golden_other_pair_open           967  
+  pyramid_blocked_favour             3251  █
+  mm_quad_1b                         8401  ███
+  mm_quad_none_eurgbp_flat           6228  ██
+  mm_quad_none_dxy_flat              7589  ███
+  mm_golden_ifvg_zone_15T             529  
+  mm_golden_m1_shift                  310  
+  mm_golden_m1_smtx_s1                122  
+  mm_golden_m1_smtx_blocked_shift     137  
+  mm_quad_2b                         6133  ██
+  mm_golden_via_cascade              3235  █
+  mm_golden_smt_rung_60T              444  
+  mm_golden_pd_ifvg                  1905  
+  mm_golden_pd_ifvg_60T               946  
+  eurgbp_flat                        2279  █
+  eurgbp_flat_gbp_blocked            1664  
+  mm_golden_pd_ifvg_15T               587  
+  golden_rule_yes                     168  
+  phase_london_judas                  241  
+  gt_mp_discount                       75  
+  gt_mp_extreme                        16  
+  mm_golden_ob_failed                1623  
+  soj_judas                           141  
+  mstruct_minor_sweep                  58  
+  london_judas_ny_echo                  9  
+  pyramid_blocked_low_im             2128  █
+  gold_pb_no_pullback               12593  █████
+  smt_pair_opposing                    31  
+  target_rung_far                     192  
+  gold_pb_no_trigger                 4800  ██
+  gold_pb_risk_cap                    176  
+  mm_golden_smt_rung_240T             602  
+  mm_golden_m1_smtx_s3                 92  
+  mm_golden_m1_smtx_s2p_smt            55  
+  mm_golden_no_draw                   110  
+  mm_golden_m1_smtx_s2                 81  
+  sr_attempted                        860  
+  sr_prev_session_ok                  860  
+  sr_enough_bars                      860  
+  sr_consol_found                     759  
+  sr_consol_no_sweep                  320  
+  sr_fail_no_sweep                    216  
+  sr_pdliq_attempted                  421  
+  sr_pdliq_width_ok                    66  
+  sr_pdliq_sweep                       58  
+  sr_breakout_found                   304  
+  session_range_found                  51  
+  mm_golden_pd_fvg                    225  
+  mm_golden_pd_fvg_60T                124  
+  gold_pb_trend_flat                 1119  
+  mm_golden_pd_ifvg_5T                372  
+  mm_golden_smt_rung_15T              513  
+  gold_pb_no_swing                    170  
+  gt_macro_window                      67  
+  mm_golden_smt_rung_D                678  
+  mm_golden_ob_untested               323  
+  smt_pair_confirmed                   94  
+  gold_own_sized                       94  
+  mm_golden_corr_block               1369  
+  mm_golden_m1_smtx_s2p_cont           77  
+  mm_golden_opened                     54  
+  m1_stop_used                         35  
+  mm_golden_pd_ob2                     93  
+  mm_golden_pd_ob2_15T                 28  
+  mm_golden_m1_smtx_s0                 15  
+  mm_golden_daily_cap                 313  
+  mm_golden_no_amd                    283  
+  mm_golden_no_retrace                319  
+  risk_cap_skip                       120  
+  dxy_fvg_room                         85  
+  mm_golden_pd_ob2_60T                 15  
+  sr_fail_high_swept_no_close_back     65  
+  gt_judas_reversal                    55  
+  gold_pb_stop_wide                    12  
+  gold_pb_dxy_opposes                  13  
+  mm_golden_ifvg_zone_5T              205  
+  ny_continuation_gated                21  
+  mm_golden_no_pd                     153  
+  mm_golden_pd_fvg_5T                  21  
+  gold_pb_opened                      175  
+  sr_fail_low_swept_no_close_back      39  
+  mm_golden_pd_ob2_5T                  50  
+  mm_golden_m1_smtx_s2p_none           15  
+  mm_golden_m1_smtx_s2p_noref          26  
+  phase_london_breakout                 3  
+  phase_ny_extend                       1  
+  mm_golden_pd_fvg_15T                 80  
+  pyramid_blocked_no_pattern            3  
+  target_score_sized                   86  
+  golden_rule_sized                    95  
+  pdliq_sweep_sized                    68  
+  phase_london_watch                    6  
+  crt_sweep_sized                      43  
+  mm_golden_risk_cap                    9  
+  htf_fvg_breakout_sized                4  
+
+=== Results ===
+  trades                    587
+  win_rate_pct              35.8
+  profit_factor             1.99
+  starting_equity_ZAR       1000
+  ending_equity_ZAR         36868.15
+  pnl_ZAR                   35868.15
+  pnl_pct                   3586.82
+  max_drawdown_pct          -49.63
+  avg_win_ZAR               343.93
+  avg_loss_ZAR              -96.44
+  withdrawn_total_ZAR       30333.74
+  withdrawal_count          6
+  working_balance_ZAR       6534.41
+  working_max_drawdown_pct  49.63
+
+=== Withdrawals (income) per year — amount, frequency, avg ===
+  2025: R      30,334  (  6 withdrawals, ~1 / 61d, avg R5,056)
+  TOTAL income: R30,334 across 6 withdrawals (avg R5,056 each)
+  final working balance: R6,534  (keep-level R6,000)
+[P92 events -> 310 rows]
+
+[trade dump → /home/runner/work/Ict/Ict/data/histdata/trades_dump.csv]
+
+=== Trade log (587 trades) ===
+                opened_at                 closed_at   pair  direction  leg_idx       entry        exit  units         pnl           reason session_side            entry_type
+2024-01-08 14:30:00+00:00 2024-01-08 16:10:00+00:00 GBPUSD          1        1    1.272660    1.275910   2000  120.250000           target     momentum             amd_ob_m5
+2024-01-10 09:00:00+00:00 2024-01-10 11:35:00+00:00 EURUSD          1        1    1.094290    1.094250   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-01-11 09:00:00+00:00 2024-01-11 11:00:00+00:00 GBPUSD         -1        1    1.275830    1.274880   2000   35.150000             stop     momentum        amd_breaker_m5
+2024-01-11 13:50:00+00:00 2024-01-11 13:55:00+00:00 GBPUSD         -1        1    1.271120    1.272170   2000  -38.850000             stop     momentum            amd_fvg_m5
+2024-01-12 12:00:00+00:00 2024-01-12 13:25:00+00:00 EURUSD         -1        1    1.094900    1.094940   2000   -1.480000             stop        judas            amd_fvg_m5
+2024-01-15 09:00:00+00:00 2024-01-15 10:50:00+00:00 GBPUSD         -1        1    1.273770    1.272820   2000   35.150000             stop     momentum            amd_fvg_m5
+2024-01-15 09:00:00+00:00 2024-01-15 11:00:00+00:00 NZDUSD         -1        1    0.619685    0.619760   2000   -2.775000             stop     momentum            amd_fvg_m5
+2024-01-16 08:30:00+00:00 2024-01-16 11:35:00+00:00 EURUSD         -1        1    1.090110    1.089150   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-01-18 13:00:00+00:00 2024-01-18 13:35:00+00:00 EURUSD         -1        1    1.087390    1.087430   2000   -1.480000             stop     momentum           amd_fvg_m15
+2024-01-22 08:00:00+00:00 2024-01-22 12:10:00+00:00 EURUSD         -1        1    1.089390    1.089430   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-01-23 14:00:00+00:00 2024-01-23 15:40:00+00:00 GBPUSD         -1        1    1.269740    1.266130   2000  133.570000           target     momentum            amd_fvg_h1
+2024-01-24 09:00:00+00:00 2024-01-24 09:30:00+00:00 GBPUSD          1        1    1.271490    1.274940   2000  127.650000             stop     momentum            amd_fvg_m5
+2024-01-24 09:00:00+00:00 2024-01-24 14:35:00+00:00 XAUUSD          1        1 2031.825000 2026.605000      1  -96.570000             stop     momentum             mss_ob_m5
+2024-01-24 13:00:00+00:00 2024-01-24 14:45:00+00:00 EURUSD          1        1    1.090230    1.091190   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-01-25 08:10:00+00:00 2024-01-25 10:05:00+00:00 GBPUSD         -1        1    1.272940    1.273810   2000  -32.190000             stop       golden       amd_m1_shift_ob
+2024-01-25 08:30:00+00:00 2024-01-25 12:25:00+00:00 NZDUSD          1        1    0.611565    0.611490   2000   -2.775000             stop     momentum             amd_ob_m5
+2024-01-25 13:25:00+00:00 2024-01-25 13:35:00+00:00 EURUSD         -1        1    1.088860    1.089900   2000  -38.480000             stop       golden     amd_m1_shift_ifvg
+2024-01-29 09:00:00+00:00 2024-01-29 12:20:00+00:00 EURUSD         -1        1    1.082960    1.083000   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-01-29 14:00:00+00:00 2024-01-29 17:00:00+00:00 EURUSD         -1        1    1.081880    1.080920   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-01-30 13:10:00+00:00 2024-01-30 14:25:00+00:00 EURUSD         -1        1    1.083970    1.085010   2000  -38.480000             stop       golden     amd_m1_shift_ifvg
+2024-02-05 12:00:00+00:00 2024-02-05 12:25:00+00:00 GBPUSD         -1        1    1.256500    1.257550   2000  -38.850000             stop     momentum            amd_fvg_m5
+2024-02-05 09:15:00+00:00 2024-02-05 15:40:00+00:00 EURUSD         -1        1    1.076150    1.072407   2000  138.485820           target     momentum             amd_ob_m5
+2024-02-06 09:15:00+00:00 2024-02-06 11:45:00+00:00 EURUSD         -1        1    1.074080    1.074120   2000   -1.480000             stop     momentum           amd_fvg_m15
+2024-02-08 08:15:00+00:00 2024-02-08 10:00:00+00:00 EURUSD         -1        1    1.077680    1.078540   2000  -31.820000             stop     momentum            amd_fvg_m5
+2024-02-08 12:15:00+00:00 2024-02-08 14:30:00+00:00 EURUSD         -1        1    1.075770    1.075810   2000   -1.480000             stop     momentum            amd_fvg_h1
+2024-02-09 09:00:00+00:00 2024-02-09 13:30:00+00:00 EURUSD         -1        1    1.077280    1.077800   2000  -19.240000             stop     momentum            amd_fvg_m5
+2024-02-12 08:10:00+00:00 2024-02-12 10:50:00+00:00 EURUSD         -1        1    1.078850    1.077890   2000   35.520000             stop     momentum             amd_ob_m5
+2024-02-12 09:30:00+00:00 2024-02-12 16:10:00+00:00 EURUSD         -1        2    1.077180    1.077220   2000   -1.480000             stop      no_open  pyramid_im0.8_fvg_m5
+2024-02-12 08:10:00+00:00 2024-02-12 17:55:00+00:00 NZDUSD         -1        1    0.612885    0.613960   2000  -39.775000             stop     momentum            amd_fvg_m5
+2024-02-13 13:50:00+00:00 2024-02-13 14:15:00+00:00 EURUSD         -1        1    1.070710    1.071750   2000  -38.480000             stop     momentum            amd_fvg_m5
+2024-02-14 08:00:00+00:00 2024-02-14 10:55:00+00:00 GBPUSD         -1        1    1.255700    1.254750   2000   35.150000             stop     momentum            amd_fvg_m5
+2024-02-15 12:15:00+00:00 2024-02-15 14:30:00+00:00 EURUSD          1        1    1.074030    1.077490   2000  128.020000             stop     momentum             amd_ob_m5
+2024-02-16 12:00:00+00:00 2024-02-16 13:30:00+00:00 GBPUSD         -1        1    1.259770    1.256320   2640  168.498000             stop       golden     amd_m1_shift_ifvg
+2024-02-16 13:00:00+00:00 2024-02-16 13:30:00+00:00 EURUSD         -1        1    1.076830    1.075870   2000   35.520000             stop     momentum            mss_ob_m15
+2024-02-19 12:35:00+00:00 2024-02-19 17:25:00+00:00 EURUSD         -1        1    1.077330    1.077370   2000   -1.480000             stop     momentum             mss_ob_m5
+2024-02-19 14:30:00+00:00 2024-02-19 21:30:00+00:00 GBPUSD         -1        1    1.259210    1.260060   2000  -31.450000             stop     momentum            mss_fvg_h1
+2024-02-20 13:00:00+00:00 2024-02-20 14:30:00+00:00 EURUSD          1        1    1.080130    1.083638   2000  129.786380           target     momentum            mss_fvg_h1
+2024-02-20 13:10:00+00:00 2024-02-20 20:00:00+00:00 XAUUSD          1        1 2028.855000 2023.655000      1  -96.200000             stop     momentum             amd_ob_m5
+2024-02-20 09:00:00+00:00 2024-02-20 21:15:00+00:00 NZDUSD          1        1    0.615315    0.616240   2000   34.225000             stop     momentum           mss_fvg_m15
+2024-02-21 08:45:00+00:00 2024-02-21 13:00:00+00:00 EURUSD         -1        1    1.080380    1.080420   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-02-22 08:00:00+00:00 2024-02-22 09:30:00+00:00 GBPUSD          1        1    1.267480    1.268430   2000   35.150000             stop     momentum            amd_fvg_m5
+2024-02-22 13:00:00+00:00 2024-02-22 13:55:00+00:00 GBPUSD         -1        1    1.266600    1.263285   2000  122.655000           target     momentum             amd_ob_m5
+2024-02-23 09:15:00+00:00 2024-02-23 11:20:00+00:00 XAUUSD         -1        1 2016.908000 2024.045000      1 -132.034500             stop     momentum            amd_fvg_h1
+2024-02-27 14:00:00+00:00 2024-02-27 15:45:00+00:00 EURUSD         -1        1    1.084590    1.084630   2000   -1.480000             stop     momentum            amd_fvg_h1
+2024-03-04 12:10:00+00:00 2024-03-04 14:50:00+00:00 EURUSD         -1        1    1.085000    1.085890   2000  -32.930000             stop     momentum             amd_ob_m5
+2024-03-06 08:00:00+00:00 2024-03-06 15:30:00+00:00 EURUSD          1        1    1.086290    1.089270   2035  112.189550           target     momentum             amd_ob_m5
+2024-03-07 14:20:00+00:00 2024-03-07 15:45:00+00:00 EURUSD          1        1    1.089560    1.092673   2000  115.187660           target     momentum            amd_fvg_m5
+2024-03-08 13:30:00+00:00 2024-03-08 13:55:00+00:00 GBPUSD          1        1    1.286890    1.286840   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-03-11 08:00:00+00:00 2024-03-11 09:55:00+00:00 EURUSD          1        1    1.094060    1.093560   2255  -20.858750             stop       golden     amd_m1_shift_ifvg
+2024-03-11 12:25:00+00:00 2024-03-11 15:55:00+00:00 EURUSD         -1        1    1.093810    1.092850   2000   35.520000             stop     momentum        mss_breaker_m5
+2024-03-12 07:45:00+00:00 2024-03-12 10:30:00+00:00 GBPUSD         -1        1    1.280290    1.279340   2613   45.923475             stop     momentum            amd_fvg_m5
+2024-03-12 07:10:00+00:00 2024-03-12 12:15:00+00:00 XAUUSD          1        1 2177.808000 2169.308000      1 -157.250000             stop      no_open               gold_pb
+2024-03-12 08:00:00+00:00 2024-03-12 12:30:00+00:00 NZDUSD         -1        1    0.616765    0.617355   2030  -22.157450             stop        judas             amd_ob_m5
+2024-03-13 11:00:00+00:00 2024-03-13 14:00:00+00:00 EURUSD          1        1    1.093320    1.093280   2000   -1.480000             stop     momentum             mss_ob_m5
+2024-03-14 12:15:00+00:00 2024-03-14 12:40:00+00:00 EURUSD         -1        1    1.093700    1.094410   2000  -26.270000             stop     momentum             amd_ob_m5
+2024-03-18 13:00:00+00:00 2024-03-19 09:45:00+00:00 EURUSD         -1        1    1.089060    1.084160   2000  181.300000           target     momentum           amd_fvg_m15
+2024-03-20 08:00:00+00:00 2024-03-20 14:00:00+00:00 EURUSD         -1        1    1.085770    1.084810   2000   35.520000             stop     momentum             amd_ob_m5
+2024-03-20 08:00:00+00:00 2024-03-20 15:15:00+00:00 NZDUSD         -1        1    0.603745    0.603820   2000   -2.775000             stop     momentum            amd_fvg_h1
+2024-03-19 11:05:00+00:00 2024-03-20 18:05:00+00:00 XAUUSD          1        1 2155.895000 2171.395000      1  286.750000           target      no_open               gold_pb
+2024-03-21 08:30:00+00:00 2024-03-21 09:20:00+00:00 EURUSD         -1        1    1.090100    1.090140   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-03-21 13:15:00+00:00 2024-03-21 15:10:00+00:00 GBPUSD         -1        1    1.271920    1.268470   2000  127.650000             stop     momentum            amd_fvg_m5
+2024-03-22 07:15:00+00:00 2024-03-22 10:05:00+00:00 GBPUSD         -1        1    1.261660    1.257950   2000  137.270000           target     momentum           amd_fvg_m15
+2024-03-22 12:05:00+00:00 2024-03-22 17:20:00+00:00 XAUUSD          1        1 2169.215000 2160.715000      1 -157.250000             stop      no_open               gold_pb
+2024-03-25 11:15:00+00:00 2024-03-25 15:25:00+00:00 GBPUSD          1        1    1.262680    1.263630   2573   45.220475             stop     momentum            amd_fvg_m5
+2024-03-25 07:25:00+00:00 2024-03-26 01:45:00+00:00 XAUUSD          1        1 2168.175000 2167.675000      1   -9.250000             stop      no_open               gold_pb
+2024-03-28 07:00:00+00:00 2024-03-28 09:05:00+00:00 EURUSD         -1        1    1.081620    1.078565   2560  144.683853           target     momentum            mss_fvg_h1
+2024-04-01 12:15:00+00:00 2024-04-01 14:45:00+00:00 XAUUSD          1        1 2249.985000 2241.485000      1 -157.250000             stop      no_open               gold_pb
+2024-04-01 11:00:00+00:00 2024-04-01 15:00:00+00:00 GBPUSD         -1        1    1.261660    1.258600   2000  113.220000           target     momentum             amd_ob_m5
+2024-04-01 13:00:00+00:00 2024-04-01 16:45:00+00:00 EURUSD         -1        1    1.078450    1.073230   3460  334.132200           target     momentum             amd_ob_m5
+2024-04-02 11:45:00+00:00 2024-04-02 15:20:00+00:00 EURUSD          1        1    1.074220    1.077734   2853  185.451676           target        judas           mss_fvg_m15
+2024-04-03 11:40:00+00:00 2024-04-03 13:25:00+00:00 XAUUSD          1        1 2273.485000 2264.985000      1 -157.250000             stop      no_open               gold_pb
+2024-04-04 08:35:00+00:00 2024-04-04 10:00:00+00:00 XAUUSD          1        1 2298.718000 2290.218000      1 -157.250000             stop      no_open               gold_pb
+2024-04-04 11:10:00+00:00 2024-04-04 13:00:00+00:00 XAUUSD          1        1 2295.005000 2286.505000      1 -157.250000             stop      no_open               gold_pb
+2024-04-09 11:00:00+00:00 2024-04-09 15:25:00+00:00 GBPUSD          1        1    1.268280    1.269230   2000   35.150000             stop     momentum            amd_fvg_m5
+2024-04-10 11:35:00+00:00 2024-04-10 13:30:00+00:00 XAUUSD          1        1 2350.885000 2342.385000      1 -157.250000             stop      no_open               gold_pb
+2024-04-11 07:00:00+00:00 2024-04-11 08:10:00+00:00 EURUSD         -1        1    1.073930    1.073970   2095   -1.550300             stop     momentum             mss_ob_m5
+2024-04-11 08:25:00+00:00 2024-04-11 09:10:00+00:00 XAUUSD          1        1 2340.195000 2331.695000      1 -157.250000             stop      no_open               gold_pb
+2024-04-12 07:00:00+00:00 2024-04-12 10:20:00+00:00 EURUSD         -1        1    1.070580    1.066582   2000  147.923040           target     momentum            amd_fvg_h1
+2024-04-12 11:15:00+00:00 2024-04-12 15:00:00+00:00 EURUSD         -1        1    1.065570    1.064610   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-04-12 13:30:00+00:00 2024-04-12 15:20:00+00:00 GBPUSD         -1        1    1.246990    1.243235   2266  157.398263           target     momentum           amd_fvg_m15
+2024-04-15 11:05:00+00:00 2024-04-15 14:40:00+00:00 XAUUSD          1        1 2351.355000 2342.855000      1 -157.250000             stop      no_open               gold_pb
+2024-04-16 11:00:00+00:00 2024-04-16 11:05:00+00:00 XAUUSD          1        1 2373.835000 2372.805000      1  -19.055000 session_handover      no_open               gold_pb
+2024-04-16 12:15:00+00:00 2024-04-16 14:10:00+00:00 EURUSD          1        1    1.063200    1.063160   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-04-16 12:05:00+00:00 2024-04-16 14:55:00+00:00 XAUUSD          1        1 2373.895000 2365.395000      1 -157.250000             stop      no_open               gold_pb
+2024-04-17 07:20:00+00:00 2024-04-17 08:15:00+00:00 GBPUSD          1        1    1.244930    1.245880   2000   35.150000             stop     momentum            amd_fvg_m5
+2024-04-17 07:45:00+00:00 2024-04-17 13:40:00+00:00 XAUUSD          1        1 2379.415000 2378.915000      1   -9.250000             stop        judas        mss_breaker_m5
+2024-04-18 07:00:00+00:00 2024-04-18 09:00:00+00:00 EURUSD          1        1    1.068570    1.067770   2000  -29.600000             stop     momentum             mss_ob_m5
+2024-04-22 08:15:00+00:00 2024-04-22 08:55:00+00:00 GBPUSD         -1        1    1.236620    1.236670   2000   -1.850000             stop       golden     amd_m1_shift_ifvg
+2024-04-22 12:00:00+00:00 2024-04-22 13:20:00+00:00 GBPUSD         -1        1    1.232160    1.232210   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-04-23 07:00:00+00:00 2024-04-23 08:15:00+00:00 EURUSD         -1        1    1.064550    1.065540   2000  -36.630000             stop     momentum            amd_fvg_h1
+2024-04-24 07:00:00+00:00 2024-04-24 13:35:00+00:00 EURUSD         -1        1    1.070250    1.069290   3034   53.883840             stop     momentum             amd_ob_m5
+2024-04-24 07:30:00+00:00 2024-04-24 13:50:00+00:00 XAUUSD         -1        1 2323.298000 2323.798000      1   -9.250000             stop      no_open               gold_pb
+2024-04-25 07:00:00+00:00 2024-04-25 09:30:00+00:00 GBPUSD          1        1    1.247570    1.251641   2000  150.621080           target     momentum             amd_ob_m5
+2024-04-25 13:15:00+00:00 2024-04-25 13:30:00+00:00 EURUSD         -1        1    1.071350    1.071390   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-04-25 12:30:00+00:00 2024-04-25 13:50:00+00:00 XAUUSD         -1        1 2326.458000 2334.958000      1 -157.250000             stop      no_open               gold_pb
+2024-04-26 12:40:00+00:00 2024-04-26 13:30:00+00:00 EURUSD         -1        1    1.072260    1.073300   2000  -38.480000             stop     momentum             amd_ob_m5
+2024-04-26 11:25:00+00:00 2024-04-29 02:00:00+00:00 XAUUSD         -1        1 2344.955000 2328.529000      1  303.881000           target      no_open               gold_pb
+2024-04-29 11:40:00+00:00 2024-04-30 06:30:00+00:00 XAUUSD         -1        1 2339.178000 2323.678000      1  286.750000           target      no_open               gold_pb
+2024-04-30 13:00:00+00:00 2024-04-30 13:30:00+00:00 GBPUSD         -1        1    1.253660    1.253710   2000   -1.850000             stop     momentum             mss_ob_m5
+2024-04-30 13:00:00+00:00 2024-05-01 14:20:00+00:00 XAUUSD         -1        1 2310.515000 2301.015000      1  175.750000             stop     momentum             amd_ob_m5
+2024-05-03 07:00:00+00:00 2024-05-03 13:30:00+00:00 XAUUSD         -1        1 2303.735000 2312.235000      1 -157.250000             stop      no_open               gold_pb
+2024-05-06 07:45:00+00:00 2024-05-06 08:35:00+00:00 XAUUSD         -1        1 2311.445000 2319.945000      1 -157.250000             stop      no_open               gold_pb
+2024-05-06 13:30:00+00:00 2024-05-06 15:40:00+00:00 XAUUSD          1        1 2319.455000 2318.955000      1   -9.250000             stop        judas            mss_ob_m15
+2024-05-06 13:00:00+00:00 2024-05-06 16:10:00+00:00 EURUSD          1        1    1.077660    1.077620   2141   -1.584340             stop     momentum             amd_ob_m5
+2024-05-07 07:40:00+00:00 2024-05-07 09:10:00+00:00 XAUUSD          1        1 2322.215000 2313.715000      1 -157.250000             stop      no_open               gold_pb
+2024-05-07 13:15:00+00:00 2024-05-07 16:40:00+00:00 EURUSD          1        1    1.077230    1.077190   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-05-07 11:55:00+00:00 2024-05-08 02:35:00+00:00 XAUUSD          1        1 2316.705000 2308.205000      1 -157.250000             stop      no_open               gold_pb
+2024-05-08 08:05:00+00:00 2024-05-08 10:15:00+00:00 GBPUSD         -1        1    1.248110    1.248160   2000   -1.850000             stop     momentum            amd_ob_m15
+2024-05-09 07:00:00+00:00 2024-05-09 10:55:00+00:00 GBPUSD         -1        1    1.248840    1.248890   2719   -2.515075             stop     momentum             amd_ob_m5
+2024-05-09 08:30:00+00:00 2024-05-09 13:30:00+00:00 EURUSD         -1        1    1.073590    1.073630   2367   -1.751580             stop     momentum             amd_ob_m5
+2024-05-08 07:30:00+00:00 2024-05-09 13:30:00+00:00 XAUUSD         -1        1 2313.975000 2322.845000      1 -164.095000             stop      no_open               gold_pb
+2024-05-10 13:40:00+00:00 2024-05-10 14:20:00+00:00 GBPUSD         -1        1    1.251860    1.252910   2000  -38.850000             stop       golden     amd_m1_shift_ifvg
+2024-05-13 07:05:00+00:00 2024-05-13 09:25:00+00:00 XAUUSD          1        1 2353.058000 2344.558000      1 -157.250000             stop      no_open               gold_pb
+2024-05-14 11:00:00+00:00 2024-05-14 13:30:00+00:00 EURUSD          1        1    1.079360    1.078480   2000  -32.560000             stop        judas            amd_fvg_m5
+2024-05-15 12:20:00+00:00 2024-05-15 13:30:00+00:00 GBPUSD          1        1    1.261020    1.261970   2000   35.150000             stop       golden     amd_m1_shift_ifvg
+2024-05-16 08:25:00+00:00 2024-05-16 11:30:00+00:00 XAUUSD          1        1 2390.815000 2382.315000      1 -157.250000             stop      no_open               gold_pb
+2024-05-20 12:00:00+00:00 2024-05-20 15:30:00+00:00 EURUSD         -1        1    1.086900    1.086940   2000   -1.480000             stop        judas             amd_ob_m5
+2024-05-22 12:00:00+00:00 2024-05-22 13:05:00+00:00 GBPUSD         -1        1    1.272550    1.271600   2000   35.150000             stop     momentum            amd_fvg_h1
+2024-05-22 08:10:00+00:00 2024-05-22 17:15:00+00:00 EURUSD         -1        1    1.085280    1.084320   2000   35.520000             stop       golden     amd_m1_shift_ifvg
+2024-05-23 12:30:00+00:00 2024-05-23 14:45:00+00:00 EURUSD          1        1    1.084790    1.084750   2000   -1.480000             stop     momentum           mss_fvg_m15
+2024-05-24 07:25:00+00:00 2024-05-24 11:00:00+00:00 XAUUSD         -1        1 2335.325000 2338.265000      1  -54.390000 session_handover      no_open               gold_pb
+2024-05-24 11:00:00+00:00 2024-05-24 11:05:00+00:00 XAUUSD         -1        1 2336.265000 2339.535000      1  -60.495000 session_handover      no_open               gold_pb
+2024-05-24 08:00:00+00:00 2024-05-24 13:40:00+00:00 EURUSD          1        1    1.081750    1.084960   2000  118.770000           target     momentum             amd_ob_m5
+2024-05-24 13:40:00+00:00 2024-05-27 13:00:00+00:00 EURUSD          1        1    1.084990    1.084950   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-05-27 12:50:00+00:00 2024-05-27 14:20:00+00:00 XAUUSD         -1        1 2342.585000 2351.085000      1 -157.250000             stop      no_open               gold_pb
+2024-05-28 12:00:00+00:00 2024-05-28 14:10:00+00:00 EURUSD          1        1    1.088310    1.087400   2000  -33.670000             stop     momentum           amd_fvg_m15
+2024-05-29 07:05:00+00:00 2024-05-29 11:15:00+00:00 GBPUSD          1        1    1.275330    1.275280   2000   -1.850000             stop       golden      amd_m1_shift_ob2
+2024-05-30 13:30:00+00:00 2024-05-31 02:40:00+00:00 EURUSD          1        1    1.082610    1.082570   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-05-31 11:00:00+00:00 2024-05-31 14:55:00+00:00 XAUUSD          1        1 2343.645000 2343.145000      1   -9.250000             stop     momentum        mss_breaker_m5
+2024-06-03 08:15:00+00:00 2024-06-03 11:45:00+00:00 GBPUSD         -1        1    1.272590    1.271640   2000   35.150000             stop     momentum           mss_fvg_m15
+2024-06-03 08:10:00+00:00 2024-06-03 12:05:00+00:00 EURUSD         -1        1    1.085010    1.084050   2000   35.520000             stop       golden     amd_m1_shift_ifvg
+2024-06-10 07:05:00+00:00 2024-06-10 07:40:00+00:00 EURUSD         -1        1    1.074900    1.075670   2000  -28.490000             stop       golden     amd_m1_shift_ifvg
+2024-06-10 11:00:00+00:00 2024-06-10 12:45:00+00:00 EURUSD         -1        1    1.074020    1.075060   2000  -38.480000             stop     momentum            amd_fvg_m5
+2024-06-11 08:10:00+00:00 2024-06-11 10:50:00+00:00 EURUSD         -1        1    1.076270    1.075310   2000   35.520000             stop       golden     amd_m1_shift_ifvg
+2024-06-11 12:00:00+00:00 2024-06-11 18:00:00+00:00 EURUSD         -1        1    1.073970    1.074010   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-06-12 13:00:00+00:00 2024-06-12 13:30:00+00:00 GBPUSD          1        1    1.276250    1.281700   2000  201.650000             stop     momentum             amd_ob_m5
+2024-06-12 11:30:00+00:00 2024-06-12 13:30:00+00:00 EURUSD          1        1    1.075400    1.080860   2364  238.787640             stop     momentum             amd_ob_m5
+2024-06-13 11:45:00+00:00 2024-06-13 13:30:00+00:00 EURUSD         -1        1    1.080030    1.080070   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-06-13 11:55:00+00:00 2024-06-13 13:35:00+00:00 XAUUSD         -1        1 2314.718000 2323.218000      1 -157.250000             stop      no_open               gold_pb
+2024-06-14 08:25:00+00:00 2024-06-14 09:00:00+00:00 XAUUSD         -1        1 2310.015000 2318.515000      1 -157.250000             stop      no_open               gold_pb
+2024-06-17 07:00:00+00:00 2024-06-17 08:25:00+00:00 GBPUSD         -1        1    1.266640    1.267690   2000  -38.850000             stop     momentum           amd_fvg_m15
+2024-06-17 07:00:00+00:00 2024-06-17 14:30:00+00:00 NZDUSD         -1        1    0.611515    0.611590   2000   -2.775000             stop     momentum            mss_fvg_h1
+2024-06-18 08:20:00+00:00 2024-06-18 13:30:00+00:00 NZDUSD         -1        1    0.611545    0.611620   2000   -2.775000             stop        judas            amd_fvg_h1
+2024-06-19 07:35:00+00:00 2024-06-19 09:30:00+00:00 EURUSD         -1        1    1.073120    1.074160   2000  -38.480000             stop       golden      amd_m1_shift_ob2
+2024-06-19 11:20:00+00:00 2024-06-19 12:25:00+00:00 GBPUSD          1        1    1.273280    1.272740   2000  -19.980000             stop     momentum            mss_fvg_h1
+2024-06-20 07:00:00+00:00 2024-06-20 10:45:00+00:00 EURUSD         -1        1    1.073630    1.072670   2000   35.520000             stop     momentum             amd_ob_m5
+2024-06-21 08:00:00+00:00 2024-06-21 08:30:00+00:00 EURUSD         -1        1    1.070620    1.069660   2000   35.520000             stop     momentum            mss_fvg_m5
+2024-06-20 08:40:00+00:00 2024-06-21 12:55:00+00:00 NZDUSD         -1        1    0.612995    0.613070   2000   -2.775000             stop     momentum             amd_ob_m5
+2024-06-24 07:15:00+00:00 2024-06-24 12:55:00+00:00 EURUSD          1        1    1.070300    1.073490   2000  118.030000           target     momentum             amd_ob_m5
+2024-06-25 11:35:00+00:00 2024-06-25 16:30:00+00:00 XAUUSD         -1        1 2333.098000 2317.598000      1  286.750000           target      no_open               gold_pb
+2024-06-25 12:00:00+00:00 2024-06-25 18:25:00+00:00 EURUSD         -1        1    1.072010    1.071050   2000   35.520000             stop     momentum            mss_fvg_m5
+2024-06-26 11:00:00+00:00 2024-06-26 12:55:00+00:00 GBPUSD         -1        1    1.266570    1.265620   2000   35.150000             stop     momentum            amd_fvg_h1
+2024-06-26 07:00:00+00:00 2024-06-26 12:55:00+00:00 EURUSD         -1        1    1.070260    1.069300   2567   45.589920             stop     momentum             amd_ob_m5
+2024-06-26 07:15:00+00:00 2024-06-26 14:20:00+00:00 NZDUSD         -1        1    0.611435    0.608225   2000  118.770000           target        judas             mss_ob_m5
+2024-06-27 07:00:00+00:00 2024-06-27 09:40:00+00:00 XAUUSD         -1        1 2297.045000 2305.545000      1 -157.250000             stop      no_open               gold_pb
+2024-06-28 11:30:00+00:00 2024-06-28 12:25:00+00:00 EURUSD          1        1    1.070960    1.070210   2000  -27.750000             stop        judas            amd_fvg_m5
+2024-06-28 07:30:00+00:00 2024-06-28 14:30:00+00:00 XAUUSD          1        1 2327.975000 2327.475000      1   -9.250000             stop      no_open               gold_pb
+2024-07-01 07:00:00+00:00 2024-07-01 08:25:00+00:00 EURUSD          1        1    1.076750    1.075710   2000  -38.480000             stop     momentum            amd_ob_m15
+2024-07-01 11:00:00+00:00 2024-07-01 14:10:00+00:00 EURUSD         -1        1    1.075290    1.075330   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-07-01 07:05:00+00:00 2024-07-01 14:55:00+00:00 XAUUSD          1        1 2324.245000 2323.745000      1   -9.250000             stop      no_open               gold_pb
+2024-07-02 07:05:00+00:00 2024-07-02 08:20:00+00:00 XAUUSD          1        1 2333.058000 2323.285000      1 -180.800500             stop      no_open               gold_pb
+2024-07-02 08:00:00+00:00 2024-07-02 09:55:00+00:00 NZDUSD         -1        1    0.604885    0.605605   2000  -26.640000             stop     momentum            amd_ob_m15
+2024-07-02 07:35:00+00:00 2024-07-02 13:10:00+00:00 EURUSD         -1        1    1.072900    1.072940   2000   -1.480000             stop        judas             mss_ob_m5
+2024-07-04 07:55:00+00:00 2024-07-05 13:30:00+00:00 XAUUSD          1        1 2357.715000 2357.215000      1   -9.250000             stop      no_open               gold_pb
+2024-07-08 11:35:00+00:00 2024-07-08 16:35:00+00:00 XAUUSD          1        1 2372.935000 2364.435000      1 -157.250000             stop      no_open               gold_pb
+2024-07-08 13:00:00+00:00 2024-07-08 16:45:00+00:00 GBPUSD          1        1    1.283500    1.282450   2000  -38.850000             stop     momentum           amd_fvg_m15
+2024-07-09 12:05:00+00:00 2024-07-10 04:20:00+00:00 EURUSD         -1        1    1.081900    1.081940   2000   -1.480000             stop     momentum            mss_ob_m15
+2024-07-10 07:20:00+00:00 2024-07-10 09:00:00+00:00 EURUSD          1        1    1.081950    1.081330   2000  -22.940000             stop     momentum             amd_ob_m5
+2024-07-10 11:25:00+00:00 2024-07-10 14:30:00+00:00 GBPUSD          1        1    1.280960    1.280910   2000   -1.850000             stop       golden     amd_m1_shift_ifvg
+2024-07-11 12:45:00+00:00 2024-07-11 13:25:00+00:00 GBPUSD          1        1    1.287680    1.286930   2000  -27.750000             stop     momentum             mss_ob_m5
+2024-07-12 08:20:00+00:00 2024-07-12 10:40:00+00:00 GBPUSD          1        1    1.291370    1.294860   2000  129.130000           target       golden     amd_m1_shift_ifvg
+2024-07-12 11:05:00+00:00 2024-07-12 13:30:00+00:00 GBPUSD          1        1    1.295250    1.295200   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-07-12 12:15:00+00:00 2024-07-12 13:30:00+00:00 XAUUSD          1        1 2402.645000 2394.145000      1 -157.250000             stop      no_open               gold_pb
+2024-07-16 11:00:00+00:00 2024-07-16 13:30:00+00:00 GBPUSD          1        1    1.296890    1.295840   2000  -38.850000             stop       golden     amd_m1_shift_ifvg
+2024-07-16 13:30:00+00:00 2024-07-16 14:40:00+00:00 XAUUSD         -1        1 2437.915000 2445.415000      1 -138.750000             stop     momentum        mss_breaker_m5
+2024-07-16 13:30:00+00:00 2024-07-16 18:30:00+00:00 EURUSD         -1        1    1.089090    1.089130   2000   -1.480000             stop     momentum        amd_breaker_m5
+2024-07-17 08:00:00+00:00 2024-07-17 08:10:00+00:00 GBPUSD          1        1    1.298630    1.298580   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-07-18 12:15:00+00:00 2024-07-18 13:30:00+00:00 EURUSD         -1        1    1.092980    1.093730   2000  -27.750000             stop     momentum             amd_ob_m5
+2024-07-23 11:00:00+00:00 2024-07-23 16:40:00+00:00 EURUSD         -1        1    1.086720    1.085760   2000   35.520000             stop        judas             amd_ob_m5
+2024-07-24 12:30:00+00:00 2024-07-24 15:45:00+00:00 GBPUSD          1        1    1.290750    1.291700   2000   35.150000             stop        judas            amd_fvg_m5
+2024-07-26 07:00:00+00:00 2024-07-26 08:25:00+00:00 GBPUSD         -1        1    1.285800    1.286630   2000  -30.710000             stop       golden     amd_m1_shift_ifvg
+2024-07-29 08:00:00+00:00 2024-07-29 09:05:00+00:00 GBPUSD         -1        1    1.286370    1.282230   2000  153.180000           target     momentum           amd_fvg_m15
+2024-07-29 12:10:00+00:00 2024-07-29 16:05:00+00:00 EURUSD         -1        1    1.083160    1.082200   2000   35.520000             stop     momentum            amd_fvg_h1
+2024-07-30 13:00:00+00:00 2024-07-30 14:25:00+00:00 EURUSD         -1        1    1.082340    1.081380   2000   35.520000             stop     momentum            amd_fvg_h1
+2024-08-05 11:30:00+00:00 2024-08-05 13:35:00+00:00 EURUSD          1        1    1.094560    1.097840   2000  121.360000           target       golden     amd_m1_shift_ifvg
+2024-08-06 08:00:00+00:00 2024-08-06 08:05:00+00:00 GBPUSD         -1        1    1.273930    1.274980   2000  -38.850000             stop     momentum            amd_fvg_h1
+2024-08-07 08:05:00+00:00 2024-08-07 12:50:00+00:00 XAUUSD         -1        1 2391.175000 2399.675000      1 -157.250000             stop      no_open               gold_pb
+2024-08-08 07:00:00+00:00 2024-08-08 08:25:00+00:00 GBPUSD          1        1    1.269670    1.269620   2000   -1.850000             stop     momentum            amd_fvg_h1
+2024-08-08 13:30:00+00:00 2024-08-08 15:50:00+00:00 EURUSD         -1        1    1.091180    1.090220   2000   35.520000             stop     momentum            amd_fvg_h1
+2024-08-09 07:00:00+00:00 2024-08-09 11:05:00+00:00 GBPUSD          1        1    1.276140    1.275090   2000  -38.850000             stop     momentum             amd_ob_m5
+2024-08-12 13:30:00+00:00 2024-08-12 14:20:00+00:00 EURUSD         -1        1    1.091950    1.092480   2000  -19.610000             stop     momentum             amd_ob_m5
+2024-08-15 13:30:00+00:00 2024-08-15 13:35:00+00:00 EURUSD         -1        1    1.097330    1.097370   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-08-16 11:05:00+00:00 2024-08-16 13:40:00+00:00 GBPUSD          1        1    1.290730    1.289680   2000  -38.850000             stop     momentum           amd_fvg_m15
+2024-08-20 13:05:00+00:00 2024-08-20 15:50:00+00:00 GBPUSD          1        1    1.301140    1.304380   2000  119.880000           target     momentum            mss_fvg_m5
+2024-08-22 12:20:00+00:00 2024-08-23 02:40:00+00:00 EURUSD         -1        1    1.113490    1.112530   2000   35.520000             stop     momentum           mss_fvg_m15
+2024-08-23 07:30:00+00:00 2024-08-23 08:30:00+00:00 GBPUSD          1        1    1.311290    1.311240   2000   -1.850000             stop     momentum             amd_ob_m5
+2024-08-26 12:15:00+00:00 2024-08-26 15:25:00+00:00 EURUSD         -1        1    1.116900    1.116940   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-08-28 08:40:00+00:00 2024-08-28 08:55:00+00:00 EURUSD         -1        1    1.115180    1.115920   2000  -27.380000             stop       golden       amd_m1_shift_ob
+2024-08-28 11:00:00+00:00 2024-08-28 14:35:00+00:00 EURUSD         -1        1    1.113170    1.112210   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-08-29 12:35:00+00:00 2024-08-29 14:35:00+00:00 GBPUSD         -1        1    1.318670    1.315253   2000  126.415680           target       golden     amd_m1_shift_ifvg
+2024-08-30 13:30:00+00:00 2024-08-30 13:50:00+00:00 GBPUSD         -1        1    1.317480    1.314452   2000  112.033040           target     momentum             amd_ob_m5
+2024-08-30 07:10:00+00:00 2024-08-30 15:30:00+00:00 XAUUSD          1        1 2517.055000 2508.555000      1 -157.250000             stop      no_open               gold_pb
+2024-09-03 11:30:00+00:00 2024-09-03 12:35:00+00:00 EURUSD         -1        1    1.103330    1.104300   2000  -35.890000             stop     momentum            mss_fvg_m5
+2024-09-04 13:25:00+00:00 2024-09-04 15:00:00+00:00 XAUUSD         -1        1 2485.135000 2493.635000      1 -157.250000             stop      no_open               gold_pb
+2024-09-09 07:45:00+00:00 2024-09-09 08:35:00+00:00 GBPUSD         -1        1    1.310290    1.310340   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-09-09 07:45:00+00:00 2024-09-09 14:20:00+00:00 NZDUSD         -1        1    0.615265    0.614340   2000   34.225000             stop     momentum            amd_fvg_h1
+2024-09-09 08:00:00+00:00 2024-09-09 17:15:00+00:00 EURUSD         -1        1    1.105650    1.104690   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-09-11 13:00:00+00:00 2024-09-11 13:30:00+00:00 GBPUSD         -1        1    1.308440    1.308490   2000   -1.850000             stop     momentum            amd_ob_m15
+2024-09-16 07:00:00+00:00 2024-09-17 08:55:00+00:00 EURUSD          1        1    1.110060    1.113730   2000  135.790000           target     momentum            mss_fvg_h1
+2024-09-17 12:15:00+00:00 2024-09-17 16:25:00+00:00 XAUUSD          1        1 2576.065000 2567.565000      1 -157.250000             stop      no_open               gold_pb
+2024-09-23 08:00:00+00:00 2024-09-23 08:15:00+00:00 EURUSD         -1        1    1.114980    1.111863   2000  115.346760           target     momentum             amd_ob_m5
+2024-09-24 13:00:00+00:00 2024-09-24 14:40:00+00:00 GBPUSD          1        1    1.337650    1.337600   2000   -1.850000             stop        judas            amd_fvg_h1
+2024-09-24 13:25:00+00:00 2024-09-24 15:50:00+00:00 XAUUSD          1        1 2628.695000 2644.195000      1  286.750000           target      no_open               gold_pb
+2024-09-25 13:05:00+00:00 2024-09-25 15:00:00+00:00 GBPUSD          1        1    1.338170    1.339120   2000   35.150000             stop       golden     amd_m1_shift_ifvg
+2024-09-26 11:20:00+00:00 2024-09-26 13:05:00+00:00 GBPUSD          1        1    1.336930    1.336880   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-09-27 13:30:00+00:00 2024-09-27 13:55:00+00:00 EURUSD          1        1    1.116660    1.119856   2000  118.243120           target     momentum            amd_fvg_h1
+2024-09-27 11:25:00+00:00 2024-09-27 15:45:00+00:00 XAUUSD          1        1 2665.215000 2656.698000      1 -157.564500             stop      no_open               gold_pb
+2024-09-30 13:15:00+00:00 2024-09-30 14:40:00+00:00 XAUUSD          1        1 2641.535000 2632.805000      1 -161.505000             stop      no_open               gold_pb
+2024-10-01 08:00:00+00:00 2024-10-01 08:05:00+00:00 GBPUSD         -1        1    1.336810    1.336860   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-10-01 11:05:00+00:00 2024-10-01 12:05:00+00:00 EURUSD         -1        1    1.108900    1.109940   2000  -38.480000             stop     momentum            amd_fvg_m5
+2024-10-02 12:25:00+00:00 2024-10-02 13:25:00+00:00 XAUUSD          1        1 2652.955000 2644.455000      1 -157.250000             stop      no_open               gold_pb
+2024-10-08 08:30:00+00:00 2024-10-08 09:30:00+00:00 EURUSD          1        1    1.098420    1.098380   2000   -1.480000             stop        judas            amd_ob_m15
+2024-10-08 13:15:00+00:00 2024-10-08 17:15:00+00:00 EURUSD         -1        1    1.098440    1.097480   2000   35.520000             stop       golden     amd_m1_shift_ifvg
+2024-10-09 07:05:00+00:00 2024-10-09 08:25:00+00:00 GBPUSD         -1        1    1.308290    1.307340   2000   35.150000             stop     momentum            mss_ob_m15
+2024-10-09 08:00:00+00:00 2024-10-09 11:05:00+00:00 EURUSD         -1        1    1.095940    1.096930   2000  -36.630000             stop     momentum             amd_ob_m5
+2024-10-09 07:20:00+00:00 2024-10-09 15:40:00+00:00 NZDUSD         -1        1    0.609255    0.605679   2000  132.312000           target        judas            mss_ob_m15
+2024-10-10 07:45:00+00:00 2024-10-10 10:35:00+00:00 XAUUSD         -1        1 2610.345000 2618.845000      1 -157.250000             stop      no_open               gold_pb
+2024-10-14 11:00:00+00:00 2024-10-14 14:45:00+00:00 EURUSD         -1        1    1.092500    1.092540   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-10-16 07:30:00+00:00 2024-10-16 08:40:00+00:00 GBPUSD         -1        1    1.298890    1.299940   2000  -38.850000             stop     momentum            amd_fvg_m5
+2024-10-17 07:45:00+00:00 2024-10-17 10:40:00+00:00 EURUSD         -1        1    1.085440    1.085970   2000  -19.610000             stop        judas            mss_fvg_h1
+2024-10-18 07:00:00+00:00 2024-10-18 08:10:00+00:00 GBPUSD          1        1    1.304580    1.305530   2000   35.150000             stop     momentum             amd_ob_m5
+2024-10-21 08:00:00+00:00 2024-10-21 08:20:00+00:00 GBPUSD         -1        1    1.302110    1.303160   2000  -38.850000             stop     momentum            amd_fvg_h1
+2024-10-21 07:00:00+00:00 2024-10-21 13:30:00+00:00 EURUSD         -1        1    1.085730    1.085770   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-10-22 07:15:00+00:00 2024-10-22 09:25:00+00:00 GBPUSD          1        1    1.300470    1.299420   2000  -38.850000             stop     momentum             amd_ob_m5
+2024-10-23 07:10:00+00:00 2024-10-23 09:50:00+00:00 EURUSD         -1        1    1.080070    1.079110   2000   35.520000             stop     momentum       mss_breaker_m15
+2024-10-23 11:30:00+00:00 2024-10-23 14:25:00+00:00 EURUSD         -1        1    1.077920    1.077960   2000   -1.480000             stop     momentum            mss_fvg_h1
+2024-10-24 08:10:00+00:00 2024-10-24 08:20:00+00:00 GBPUSD          1        1    1.295890    1.294840   2000  -38.850000             stop     momentum            amd_fvg_m5
+2024-10-25 07:15:00+00:00 2024-10-25 08:30:00+00:00 EURUSD         -1        1    1.081870    1.082610   2000  -27.380000             stop     momentum             amd_ob_m5
+2024-10-25 13:30:00+00:00 2024-10-25 16:25:00+00:00 EURUSD          1        1    1.082970    1.081960   2000  -37.370000             stop     momentum            amd_ob_m15
+2024-10-29 11:00:00+00:00 2024-10-29 11:05:00+00:00 EURUSD         -1        1    1.080230    1.080330   2000   -3.700000 session_handover     momentum            amd_fvg_m5
+2024-11-05 08:30:00+00:00 2024-11-05 14:35:00+00:00 GBPUSD          1        1    1.298280    1.301950   2000  135.790000           target     momentum            amd_fvg_m5
+2024-11-06 09:25:00+00:00 2024-11-06 11:15:00+00:00 EURUSD         -1        1    1.075500    1.072500   2000  111.000000           target       golden     amd_m1_shift_ifvg
+2024-11-06 12:15:00+00:00 2024-11-06 13:10:00+00:00 EURUSD         -1        1    1.070590    1.070630   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-11-07 08:00:00+00:00 2024-11-07 12:35:00+00:00 XAUUSD         -1        1 2660.684000 2669.184000      1 -157.250000             stop      no_open               gold_pb
+2024-11-07 12:15:00+00:00 2024-11-07 14:35:00+00:00 EURUSD          1        1    1.076550    1.079620   2000  113.590000           target     momentum           news_fvg_m5
+2024-11-07 14:35:00+00:00 2024-11-07 16:00:00+00:00 GBPUSD          1        1    1.298740    1.298690   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-11-08 13:15:00+00:00 2024-11-08 13:50:00+00:00 EURUSD         -1        1    1.076710    1.075750   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-11-11 08:15:00+00:00 2024-11-11 10:30:00+00:00 EURUSD         -1        1    1.068830    1.068870   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-11-11 12:25:00+00:00 2024-11-11 14:25:00+00:00 EURUSD         -1        1    1.065700    1.065740   2000   -1.480000             stop     momentum           amd_fvg_m15
+2024-11-13 14:25:00+00:00 2024-11-13 14:30:00+00:00 EURUSD         -1        1    1.061970    1.062010   2000   -1.480000             stop     momentum             mss_ob_m5
+2024-11-14 09:00:00+00:00 2024-11-14 11:10:00+00:00 EURUSD         -1        1    1.053840    1.049640   2000  155.400000           target     momentum             amd_ob_m5
+2024-11-18 08:35:00+00:00 2024-11-18 09:20:00+00:00 GBPUSD         -1        1    1.262070    1.263120   2000  -38.850000             stop       golden     amd_m1_shift_ifvg
+2024-11-19 09:15:00+00:00 2024-11-19 10:05:00+00:00 EURUSD         -1        1    1.054380    1.055420   2000  -38.480000             stop     momentum            amd_fvg_m5
+2024-11-20 08:00:00+00:00 2024-11-20 12:30:00+00:00 EURUSD         -1        1    1.057160    1.056200   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-11-20 08:55:00+00:00 2024-11-20 14:20:00+00:00 XAUUSD          1        1 2625.595000 2641.095000      1  286.750000           target      no_open               gold_pb
+2024-11-20 14:05:00+00:00 2024-11-20 16:05:00+00:00 EURUSD         -1        1    1.054960    1.051450   2000  129.870000           target     momentum             mss_ob_m5
+2024-11-20 08:00:00+00:00 2024-11-21 00:50:00+00:00 NZDUSD         -1        1    0.589085    0.588160   2000   34.225000             stop     momentum           amd_fvg_m15
+2024-11-21 09:15:00+00:00 2024-11-21 09:20:00+00:00 EURUSD         -1        1    1.052580    1.052620   2000   -1.480000             stop     momentum             amd_ob_m5
+2024-11-21 09:20:00+00:00 2024-11-21 10:40:00+00:00 EURUSD         -1        1    1.051480    1.052520   2000  -38.480000             stop       golden     amd_m1_shift_ifvg
+2024-11-22 08:45:00+00:00 2024-11-22 08:55:00+00:00 EURUSD         -1        1    1.045750    1.045790   2000   -1.480000             stop     momentum            amd_fvg_m5
+2024-11-25 08:20:00+00:00 2024-11-25 14:05:00+00:00 XAUUSD          1        1 2671.945000 2671.445000      1   -9.250000             stop      no_open               gold_pb
+2024-11-25 13:15:00+00:00 2024-11-25 14:35:00+00:00 EURUSD          1        1    1.051440    1.051400   2000   -1.480000             stop     momentum           amd_fvg_m15
+2024-11-26 09:00:00+00:00 2024-11-26 09:25:00+00:00 EURUSD          1        1    1.050920    1.049880   2000  -38.480000             stop     momentum            amd_fvg_m5
+2024-11-26 12:00:00+00:00 2024-11-26 12:35:00+00:00 GBPUSD          1        1    1.258110    1.261260   2000  116.550000           target        judas            amd_fvg_h1
+2024-11-26 12:25:00+00:00 2024-11-26 13:05:00+00:00 XAUUSD         -1        1 2630.225000 2638.725000      1 -157.250000             stop      no_open               gold_pb
+2024-11-27 08:00:00+00:00 2024-11-27 08:20:00+00:00 EURUSD          1        1    1.050060    1.053668   2000  133.498220           target     momentum            amd_fvg_m5
+2024-11-27 13:30:00+00:00 2024-11-27 13:55:00+00:00 EURUSD          1        1    1.054780    1.055740   2000   35.520000             stop     momentum            amd_fvg_m5
+2024-12-02 12:30:00+00:00 2024-12-02 14:10:00+00:00 XAUUSD         -1        1 2640.764000 2649.264000      1 -157.250000             stop      no_open               gold_pb
+2024-12-09 13:10:00+00:00 2024-12-09 14:05:00+00:00 GBPUSD          1        1    1.276200    1.277150   2000   35.150000             stop       golden     amd_m1_shift_ifvg
+2024-12-10 08:00:00+00:00 2024-12-10 10:00:00+00:00 EURUSD         -1        1    1.054450    1.053490   2000   35.520000             stop     momentum           amd_fvg_m15
+2024-12-10 09:10:00+00:00 2024-12-10 13:55:00+00:00 XAUUSD          1        1 2665.545000 2681.045000      1  286.750000           target      no_open               gold_pb
+2024-12-12 12:05:00+00:00 2024-12-12 13:15:00+00:00 GBPUSD         -1        1    1.273210    1.273260   2000   -1.850000             stop     momentum            amd_fvg_m5
+2024-12-12 12:40:00+00:00 2024-12-13 09:00:00+00:00 XAUUSD         -1        1 2705.705000 2676.845000      1  533.910000           target     momentum            news_ob_m5
+2024-12-13 12:35:00+00:00 2024-12-13 12:40:00+00:00 EURUSD          1        1    1.050230    1.050190   7812   -5.780880             stop     momentum            amd_fvg_m5
+2024-12-16 09:25:00+00:00 2024-12-17 09:35:00+00:00 XAUUSD         -1        1 2656.498000 2640.998000      1  286.750000           target      no_open               gold_pb
+2024-12-17 08:10:00+00:00 2024-12-17 12:50:00+00:00 EURUSD         -1        1    1.049610    1.049650  23437  -17.343380             stop     momentum             amd_ob_m5
+2024-12-19 08:45:00+00:00 2024-12-19 10:30:00+00:00 GBPUSD          1        1    1.263660    1.264610   6250  109.843750             stop     momentum            amd_fvg_m5
+2024-12-19 08:05:00+00:00 2024-12-19 10:45:00+00:00 XAUUSD         -1        1 2614.065000 2623.935000      1 -182.595000             stop      no_open               gold_pb
+2024-12-19 09:00:00+00:00 2024-12-19 16:00:00+00:00 NZDUSD          1        1    0.564865    0.564790   5000   -6.937500             stop     momentum           mss_fvg_m15
+2024-12-20 09:05:00+00:00 2024-12-20 13:45:00+00:00 XAUUSD         -1        1 2604.148000 2612.648000      1 -157.250000             stop      no_open               gold_pb
+2024-12-20 13:30:00+00:00 2024-12-20 15:40:00+00:00 GBPUSD          1        1    1.254740    1.254690   6250   -5.781250             stop     momentum            amd_fvg_m5
+2024-12-23 08:00:00+00:00 2024-12-23 15:25:00+00:00 XAUUSD         -1        1 2626.305000 2610.805000      1  286.750000           target      no_open               gold_pb
+2024-12-24 08:05:00+00:00 2024-12-26 01:05:00+00:00 XAUUSD         -1        1 2616.255000 2624.755000      1 -157.250000             stop      no_open               gold_pb
+2024-12-26 08:35:00+00:00 2024-12-26 15:05:00+00:00 XAUUSD         -1        1 2624.298000 2632.798000      1 -157.250000             stop      no_open               gold_pb
+2024-12-27 09:20:00+00:00 2024-12-27 13:25:00+00:00 XAUUSD          1        1 2627.905000 2619.405000      1 -157.250000             stop      no_open               gold_pb
+2025-01-06 08:50:00+00:00 2025-01-06 13:35:00+00:00 XAUUSD          1        1 2630.495000 2629.995000      1   -9.250000             stop        judas             mss_ob_m5
+2025-01-06 14:10:00+00:00 2025-01-06 14:15:00+00:00 XAUUSD          1        1 2628.198000 2619.698000      1 -157.250000             stop      no_open               gold_pb
+2025-01-07 08:45:00+00:00 2025-01-07 10:00:00+00:00 EURUSD          1        1    1.042020    1.041980   2000   -1.480000             stop     momentum            amd_fvg_m5
+2025-01-07 08:00:00+00:00 2025-01-07 11:20:00+00:00 NZDUSD          1        1    0.567825    0.567750   2065   -2.865188             stop     momentum           amd_fvg_m15
+2025-01-07 14:00:00+00:00 2025-01-07 15:00:00+00:00 GBPUSD         -1        1    1.253950    1.250500   2000  127.650000             stop       golden     amd_m1_shift_ifvg
+2025-01-07 08:00:00+00:00 2025-01-07 15:05:00+00:00 XAUUSD          1        1 2644.305000 2643.805000      1   -9.250000             stop     momentum             mss_ob_m5
+2025-01-08 08:05:00+00:00 2025-01-08 08:15:00+00:00 GBPUSD         -1        1    1.245060    1.246110   2000  -38.850000             stop     momentum           amd_fvg_m15
+2025-01-08 08:50:00+00:00 2025-01-08 11:30:00+00:00 EURUSD         -1        1    1.032220    1.028150   2000  150.590000           target       golden     amd_m1_shift_ifvg
+2025-01-08 12:50:00+00:00 2025-01-08 16:50:00+00:00 XAUUSD          1        1 2652.798000 2668.546000      1  291.338000           target      no_open               gold_pb
+2025-01-13 09:15:00+00:00 2025-01-13 09:20:00+00:00 GBPUSD         -1        1    1.213290    1.213340  12500  -11.562500             stop     momentum           amd_fvg_m15
+2025-01-14 13:05:00+00:00 2025-01-14 13:35:00+00:00 XAUUSD          1        1 2670.805000 2662.305000      1 -157.250000             stop      no_open               gold_pb
+2025-01-16 12:00:00+00:00 2025-01-16 13:30:00+00:00 EURUSD         -1        1    1.028620    1.027660   6250  111.000000             stop     momentum             amd_ob_m5
+2025-01-17 08:50:00+00:00 2025-01-17 09:00:00+00:00 GBPUSD         -1        1    1.218660    1.219710  12500 -242.812500             stop       golden      amd_m1_shift_fvg
+2025-01-17 08:45:00+00:00 2025-01-17 09:50:00+00:00 XAUUSD          1        1 2712.735000 2704.235000      1 -157.250000             stop      no_open               gold_pb
+2025-01-20 13:30:00+00:00 2025-01-20 13:35:00+00:00 GBPUSD          1        1    1.229050    1.228000   2000  -38.850000             stop     momentum             amd_ob_m5
+2025-01-20 14:15:00+00:00 2025-01-22 01:15:00+00:00 XAUUSD          1        1 2711.945000 2749.375000      1  692.455000           target     momentum             mss_ob_m5
+2025-01-22 09:00:00+00:00 2025-01-22 12:25:00+00:00 EURUSD          1        1    1.042260    1.043220   6250  111.000000             stop     momentum            amd_fvg_m5
+2025-01-23 08:10:00+00:00 2025-01-23 09:35:00+00:00 GBPUSD         -1        1    1.230220    1.230880  12500 -152.625000             stop       golden     amd_m1_shift_ifvg
+2025-01-23 14:00:00+00:00 2025-01-24 02:00:00+00:00 XAUUSD          1        1 2744.105000 2762.485000      1  340.030000           target      no_open               gold_pb
+2025-01-27 09:00:00+00:00 2025-01-27 09:30:00+00:00 EURUSD          1        1    1.048170    1.047640  15625 -153.203125             stop     momentum            amd_fvg_m5
+2025-01-27 08:15:00+00:00 2025-01-27 13:00:00+00:00 XAUUSD          1        1 2758.825000 2758.325000      1   -9.250000             stop      no_open               gold_pb
+2025-01-27 12:45:00+00:00 2025-01-27 13:15:00+00:00 GBPUSD          1        1    1.250810    1.250760   6250   -5.781250             stop     momentum            amd_fvg_h1
+2025-01-28 08:55:00+00:00 2025-01-28 18:00:00+00:00 XAUUSD          1        1 2742.545000 2759.659000      1  316.609000           target      no_open               gold_pb
+2025-01-29 08:05:00+00:00 2025-01-29 13:15:00+00:00 XAUUSD          1        1 2762.505000 2754.005000      1 -157.250000             stop      no_open               gold_pb
+2025-01-29 09:00:00+00:00 2025-01-29 15:10:00+00:00 EURUSD         -1        1    1.041350    1.040390   6250  111.000000             stop     momentum            amd_fvg_m5
+2025-01-29 14:10:00+00:00 2025-01-29 15:25:00+00:00 XAUUSD          1        1 2760.325000 2750.595000      1 -180.005000             stop      no_open               gold_pb
+2025-01-30 13:15:00+00:00 2025-01-30 13:55:00+00:00 EURUSD          1        1    1.040560    1.044020  12500  800.125000             stop     momentum            amd_fvg_m5
+2025-01-30 13:45:00+00:00 2025-01-30 13:55:00+00:00 EURUSD          1        2    1.042270    1.043230   5000   88.800000             stop      no_open  pyramid_im1.0_fvg_m5
+2025-01-31 14:00:00+00:00 2025-01-31 14:50:00+00:00 GBPUSD         -1        1    1.241030    1.240080  18750  329.531250             stop        judas            amd_fvg_m5
+2025-02-03 12:15:00+00:00 2025-02-03 12:25:00+00:00 GBPUSD          1        1    1.232380    1.233330   6250  109.843750             stop     momentum            mss_fvg_m5
+2025-02-04 14:00:00+00:00 2025-02-04 14:35:00+00:00 EURUSD          1        1    1.034470    1.034430  12500   -9.250000             stop     momentum            amd_fvg_m5
+2025-02-04 08:15:00+00:00 2025-02-05 01:00:00+00:00 XAUUSD          1        1 2819.955000 2847.515000      1  509.860000           target      no_open               gold_pb
+2025-02-07 14:15:00+00:00 2025-02-07 16:15:00+00:00 XAUUSD          1        1 2870.358000 2869.858000      1   -9.250000             stop      no_open               gold_pb
+2025-02-11 14:00:00+00:00 2025-02-11 15:15:00+00:00 GBPUSD          1        1    1.240320    1.240270   6250   -5.781250             stop     momentum            amd_fvg_m5
+2025-02-11 14:10:00+00:00 2025-02-12 10:40:00+00:00 XAUUSD          1        1 2899.655000 2880.135000      1 -361.120000             stop      no_open               gold_pb
+2025-02-13 12:00:00+00:00 2025-02-13 13:35:00+00:00 EURUSD         -1        1    1.039470    1.040510   6250 -120.250000             stop     momentum            amd_fvg_m5
+2025-02-13 14:40:00+00:00 2025-02-14 08:20:00+00:00 XAUUSD          1        1 2915.715000 2937.549000      1  403.929000           target      no_open               gold_pb
+2025-02-14 08:10:00+00:00 2025-02-14 10:35:00+00:00 EURUSD          1        1    1.047160    1.047120  18750  -13.875000             stop     momentum            amd_fvg_m5
+2025-02-14 13:35:00+00:00 2025-02-14 13:40:00+00:00 XAUUSD          1        1 2931.678000 2923.178000      1 -157.250000             stop      no_open               gold_pb
+2025-02-14 13:00:00+00:00 2025-02-14 14:45:00+00:00 EURUSD          1        1    1.047580    1.051213  18750 1260.162188           target     momentum             mss_ob_m5
+2025-02-14 14:00:00+00:00 2025-02-14 15:15:00+00:00 GBPUSD          1        1    1.260990    1.260940   5000   -4.625000             stop     momentum           amd_fvg_m15
+2025-02-14 14:20:00+00:00 2025-02-14 15:15:00+00:00 XAUUSD          1        1 2927.505000 2912.605000      1 -275.650000             stop      no_open               gold_pb
+2025-02-17 08:00:00+00:00 2025-02-17 10:50:00+00:00 EURUSD         -1        1    1.047860    1.048900  11250 -216.450000             stop     momentum            amd_fvg_h1
+2025-02-19 12:40:00+00:00 2025-02-19 15:55:00+00:00 XAUUSD          1        1 2937.435000 2928.935000      1 -157.250000             stop      no_open               gold_pb
+2025-02-20 13:00:00+00:00 2025-02-20 13:45:00+00:00 XAUUSD          1        1 2944.805000 2936.305000      1 -157.250000             stop      no_open               gold_pb
+2025-02-20 14:35:00+00:00 2025-02-21 01:40:00+00:00 XAUUSD          1        1 2937.815000 2937.315000      1   -9.250000             stop      no_open               gold_pb
+2025-02-21 12:00:00+00:00 2025-02-21 13:35:00+00:00 EURUSD         -1        1    1.046800    1.047320  10177  -97.902740             stop     momentum            amd_fvg_h1
+2025-02-21 09:05:00+00:00 2025-02-21 15:15:00+00:00 XAUUSD          1        1 2927.305000 2926.805000      1   -9.250000             stop      no_open               gold_pb
+2025-02-24 09:25:00+00:00 2025-02-24 13:25:00+00:00 EURUSD         -1        1    1.047360    1.047400   5000   -3.700000             stop     momentum            mss_fvg_m5
+2025-02-25 08:30:00+00:00 2025-02-25 12:30:00+00:00 XAUUSD          1        1 2936.565000 2927.865000      1 -160.950000             stop      no_open               gold_pb
+2025-02-25 12:00:00+00:00 2025-02-25 12:45:00+00:00 GBPUSD          1        1    1.265740    1.264690  23437 -455.263725             stop     momentum            amd_fvg_m5
+2025-03-07 14:20:00+00:00 2025-03-07 15:35:00+00:00 XAUUSD          1        1 2918.885000 2918.385000      1   -9.250000             stop      no_open               gold_pb
+2025-03-10 07:00:00+00:00 2025-03-10 07:50:00+00:00 XAUUSD          1        1 2915.319000 2905.189000      1 -187.405000             stop      no_open               gold_pb
+2025-03-10 07:20:00+00:00 2025-03-10 09:15:00+00:00 EURUSD         -1        1    1.082950    1.081990   6250  111.000000             stop     momentum            mss_ob_m15
+2025-03-10 11:55:00+00:00 2025-03-10 17:00:00+00:00 XAUUSD          1        1 2905.359000 2893.925000      1 -211.529000             stop      no_open               gold_pb
+2025-03-11 08:00:00+00:00 2025-03-12 17:45:00+00:00 XAUUSD          1        1 2902.705000 2939.435000      1  679.505000           target     momentum             mss_ob_m5
+2025-03-13 07:30:00+00:00 2025-03-13 08:10:00+00:00 EURUSD         -1        1    1.086690    1.087730   5000  -96.200000             stop     momentum            amd_fvg_m5
+2025-03-13 11:45:00+00:00 2025-03-13 12:25:00+00:00 EURUSD         -1        1    1.086170    1.086210   6250   -4.625000             stop     momentum             amd_ob_m5
+2025-03-13 08:10:00+00:00 2025-03-13 14:40:00+00:00 XAUUSD          1        1 2942.865000 2964.559000      1  401.339000           target      no_open               gold_pb
+2025-03-19 07:00:00+00:00 2025-03-19 07:35:00+00:00 EURUSD         -1        1    1.091740    1.088760   7812  430.675560           target     momentum            amd_fvg_h1
+2025-03-20 07:15:00+00:00 2025-03-20 08:00:00+00:00 EURUSD         -1        1    1.088550    1.088590  14062  -10.405880             stop     momentum            amd_fvg_h1
+2025-03-19 11:25:00+00:00 2025-03-20 08:05:00+00:00 XAUUSD          1        1 3040.705000 3040.205000      1   -9.250000             stop      no_open               gold_pb
+2025-03-20 07:00:00+00:00 2025-03-20 09:30:00+00:00 NZDUSD         -1        1    0.577575    0.574635  11250  611.887500           target     momentum            amd_fvg_h1
+2025-03-20 13:15:00+00:00 2025-03-20 14:00:00+00:00 EURUSD         -1        1    1.083030    1.083070  11250   -8.325000             stop     momentum            amd_fvg_m5
+2025-03-20 11:00:00+00:00 2025-03-21 02:30:00+00:00 XAUUSD          1        1 3033.785000 3033.285000      1   -9.250000             stop      no_open               gold_pb
+2025-03-21 11:00:00+00:00 2025-03-21 12:40:00+00:00 EURUSD          1        1    1.083710    1.083670  14062  -10.405880             stop        judas            amd_fvg_m5
+2025-03-21 07:10:00+00:00 2025-03-21 13:35:00+00:00 XAUUSD          1        1 3032.805000 3019.805000      1 -240.500000             stop      no_open               gold_pb
+2025-03-24 13:00:00+00:00 2025-03-24 13:50:00+00:00 EURUSD         -1        1    1.082600    1.079310  28125 1711.828125           target     momentum           mss_fvg_m15
+2025-03-25 07:15:00+00:00 2025-03-25 09:00:00+00:00 EURUSD         -1        1    1.079580    1.079620  18000  -13.320000             stop     momentum             mss_ob_m5
+2025-03-25 12:45:00+00:00 2025-03-25 13:20:00+00:00 GBPUSD          1        1    1.295760    1.294710  18000 -349.650000             stop     momentum            mss_fvg_h1
+2025-03-26 11:15:00+00:00 2025-03-26 13:55:00+00:00 XAUUSD          1        1 3028.095000 3015.355000      1 -235.690000             stop      no_open               gold_pb
+2025-03-26 13:15:00+00:00 2025-03-26 14:10:00+00:00 EURUSD         -1        1    1.077520    1.078560  11250 -216.450000             stop     momentum             amd_ob_m5
+2025-03-28 13:00:00+00:00 2025-03-28 14:00:00+00:00 EURUSD          1        1    1.078750    1.081751  14062  780.571074           target     momentum           amd_fvg_m15
+2025-03-31 13:05:00+00:00 2025-03-31 14:05:00+00:00 EURUSD         -1        1    1.081390    1.081430  11250   -8.325000             stop     momentum        mss_breaker_m5
+2025-04-01 07:20:00+00:00 2025-04-01 08:45:00+00:00 XAUUSD          1        1 3136.065000 3124.809000      1 -208.236000             stop      no_open               gold_pb
+2025-04-01 12:00:00+00:00 2025-04-01 13:35:00+00:00 EURUSD         -1        1    1.079330    1.079370   9000   -6.660000             stop     momentum            amd_fvg_m5
+2025-04-02 12:30:00+00:00 2025-04-02 21:10:00+00:00 XAUUSD          1        1 3124.165000 3108.500000      1 -289.802500             stop      no_open               gold_pb
+2025-04-03 07:30:00+00:00 2025-04-03 07:35:00+00:00 EURUSD          1        1    1.096480    1.096440  22500  -16.650000             stop       golden     amd_m1_shift_ifvg
+2025-04-03 07:50:00+00:00 2025-04-03 11:05:00+00:00 XAUUSD          1        1 3129.548000 3114.675000      1 -275.150500             stop      no_open               gold_pb
+2025-04-03 12:55:00+00:00 2025-04-03 13:20:00+00:00 XAUUSD          1        1 3094.455000 3083.585000      1 -201.095000             stop      no_open               gold_pb
+2025-04-04 11:10:00+00:00 2025-04-04 11:25:00+00:00 XAUUSD          1        1 3096.645000 3096.145000      1   -9.250000             stop      no_open               gold_pb
+2025-04-07 08:00:00+00:00 2025-04-07 08:10:00+00:00 EURUSD          1        1    1.101830    1.102790  22500  399.600000             stop       golden      amd_m1_shift_fvg
+2025-04-07 12:55:00+00:00 2025-04-07 13:50:00+00:00 XAUUSD         -1        1 3029.325000 3029.825000      1   -9.250000             stop      no_open               gold_pb
+2025-04-08 07:00:00+00:00 2025-04-08 08:00:00+00:00 EURUSD          1        1    1.097250    1.097210  22500  -16.650000             stop        judas            mss_fvg_m5
+2025-04-08 08:05:00+00:00 2025-04-08 11:45:00+00:00 XAUUSD         -1        1 3009.925000 3010.425000      1   -9.250000             stop      no_open               gold_pb
+2025-04-08 13:25:00+00:00 2025-04-08 14:15:00+00:00 XAUUSD         -1        1 3008.065000 3020.845000      1 -236.430000             stop      no_open               gold_pb
+2025-04-09 11:15:00+00:00 2025-04-09 12:15:00+00:00 XAUUSD         -1        1 3037.045000 3052.455000      1 -285.085000             stop      no_open               gold_pb
+2025-04-09 13:25:00+00:00 2025-04-09 14:35:00+00:00 XAUUSD         -1        1 3052.065000 3074.395000      1 -413.105000             stop      no_open               gold_pb
+2025-04-21 08:20:00+00:00 2025-04-21 08:55:00+00:00 EURUSD          1        1    1.152630    1.153590  12500  222.000000             stop     momentum             amd_ob_m5
+2025-04-22 13:00:00+00:00 2025-04-22 13:05:00+00:00 EURUSD         -1        1    1.148800    1.148840   5000   -3.700000             stop     momentum            amd_fvg_m5
+2025-04-22 11:05:00+00:00 2025-04-22 13:40:00+00:00 XAUUSD          1        1 3466.155000 3441.275000      1 -460.280000             stop      no_open               gold_pb
+2025-04-25 07:30:00+00:00 2025-04-25 09:05:00+00:00 XAUUSD          1        1 3301.655000 3301.155000      1   -9.250000             stop      no_open               gold_pb
+2025-04-28 07:05:00+00:00 2025-04-28 07:55:00+00:00 EURUSD         -1        1    1.136780    1.133729   7812  440.942403           target     momentum        amd_breaker_m5
+2025-04-29 07:30:00+00:00 2025-04-29 13:20:00+00:00 XAUUSD          1        1 3324.905000 3303.215000      1 -401.265000             stop      no_open               gold_pb
+2025-04-30 13:30:00+00:00 2025-04-30 13:35:00+00:00 EURUSD          1        1    1.137310    1.136830  16025 -142.302000             stop       golden       amd_m1_shift_ob
+2025-05-02 07:40:00+00:00 2025-05-02 08:35:00+00:00 XAUUSD         -1        1 3249.825000 3263.605000      1 -254.930000             stop      no_open               gold_pb
+2025-05-02 11:10:00+00:00 2025-05-02 12:45:00+00:00 XAUUSD         -1        1 3257.975000 3268.385000      1 -192.585000             stop      no_open               gold_pb
+2025-05-12 07:30:00+00:00 2025-05-12 08:00:00+00:00 EURUSD         -1        1    1.122720    1.119260  15625 1000.156250             stop       golden     amd_m1_shift_ifvg
+2025-05-12 08:00:00+00:00 2025-05-12 08:05:00+00:00 EURUSD         -1        1    1.118150    1.119190   5000  -96.200000             stop     momentum            amd_fvg_m5
+2025-05-12 08:00:00+00:00 2025-05-12 08:10:00+00:00 NZDUSD         -1        1    0.591355    0.592430   6250 -124.296875             stop     momentum        amd_breaker_m5
+2025-05-12 11:00:00+00:00 2025-05-12 11:20:00+00:00 EURUSD         -1        1    1.110970    1.110010   5000   88.800000             stop     momentum           amd_fvg_m15
+2025-05-13 07:10:00+00:00 2025-05-13 07:45:00+00:00 XAUUSD         -1        1 3249.505000 3262.045000      1 -231.990000             stop      no_open               gold_pb
+2025-05-13 08:15:00+00:00 2025-05-13 13:15:00+00:00 XAUUSD         -1        1 3257.625000 3240.565000      1  315.610000           target      no_open               gold_pb
+2025-05-13 13:05:00+00:00 2025-05-13 13:50:00+00:00 GBPUSD          1        1    1.322020    1.322970  18750  329.531250             stop     momentum             amd_ob_m5
+2025-05-14 08:35:00+00:00 2025-05-14 09:00:00+00:00 EURUSD          1        1    1.120850    1.121810  15625  277.500000             stop     momentum             amd_ob_m5
+2025-05-14 11:35:00+00:00 2025-05-14 12:15:00+00:00 GBPUSD          1        1    1.334120    1.333420  28125 -364.218750             stop       golden     amd_m1_shift_ifvg
+2025-05-15 11:00:00+00:00 2025-05-15 11:05:00+00:00 XAUUSD         -1        1 3165.705000 3174.205000      1 -157.250000             stop      no_open               gold_pb
+2025-05-15 12:35:00+00:00 2025-05-15 13:00:00+00:00 XAUUSD         -1        1 3171.665000 3181.345000      1 -179.080000             stop      no_open               gold_pb
+2025-05-19 07:00:00+00:00 2025-05-19 08:20:00+00:00 EURUSD          1        1    1.118650    1.121910   7812  471.141720           target     momentum             mss_ob_m5
+2025-05-19 08:00:00+00:00 2025-05-19 08:30:00+00:00 GBPUSD          1        1    1.332530    1.335745  15000  892.162500           target     momentum            amd_fvg_m5
+2025-05-19 11:05:00+00:00 2025-05-19 15:30:00+00:00 XAUUSD         -1        1 3234.185000 3234.685000      1   -9.250000             stop      no_open               gold_pb
+2025-05-20 08:00:00+00:00 2025-05-20 09:15:00+00:00 EURUSD          1        1    1.126070    1.126030  22500  -16.650000             stop     momentum             amd_ob_m5
+2025-05-20 13:10:00+00:00 2025-05-20 13:30:00+00:00 XAUUSD         -1        1 3234.755000 3243.255000      1 -157.250000             stop      no_open               gold_pb
+2025-05-20 13:00:00+00:00 2025-05-20 14:45:00+00:00 GBPUSD         -1        1    1.335990    1.335040  14062  247.139650             stop     momentum             amd_ob_m5
+2025-05-21 08:35:00+00:00 2025-05-21 09:40:00+00:00 EURUSD          1        1    1.132920    1.131880  28125 -541.125000             stop       golden     amd_m1_shift_ifvg
+2025-05-22 08:25:00+00:00 2025-05-22 09:15:00+00:00 XAUUSD          1        1 3331.205000 3322.305000      1 -164.650000             stop      no_open               gold_pb
+2025-05-22 11:15:00+00:00 2025-05-22 12:45:00+00:00 XAUUSD         -1        1 3302.805000 3303.305000      2  -18.500000             stop     momentum           mss_fvg_m15
+2025-05-23 08:00:00+00:00 2025-05-23 10:35:00+00:00 NZDUSD          1        1    0.592235    0.595332  27000 1546.921530           target     momentum             amd_ob_m5
+2025-05-23 08:00:00+00:00 2025-05-23 11:15:00+00:00 EURUSD          1        1    1.131650    1.135617  14062 1032.081193           target        judas            amd_fvg_m5
+2025-05-23 12:35:00+00:00 2025-05-23 12:40:00+00:00 GBPUSD          1        1    1.351440    1.350390  33750 -655.593750             stop       golden      amd_m1_shift_ob2
+2025-05-26 13:15:00+00:00 2025-05-26 14:35:00+00:00 EURUSD         -1        1    1.137210    1.138250   9000 -173.160000             stop     momentum             amd_ob_m5
+2025-05-26 11:10:00+00:00 2025-05-27 02:40:00+00:00 XAUUSD          1        1 3333.348000 3332.848000      1   -9.250000             stop      no_open               gold_pb
+2025-05-27 07:45:00+00:00 2025-05-27 08:55:00+00:00 EURUSD         -1        1    1.137910    1.133760  22500 1727.337600           target        judas           amd_fvg_m15
+2025-05-29 11:15:00+00:00 2025-05-29 12:40:00+00:00 EURUSD          1        1    1.128790    1.127750  14062 -270.552880             stop     momentum            amd_fvg_h1
+2025-06-02 07:00:00+00:00 2025-06-02 08:05:00+00:00 GBPUSD          1        1    1.350410    1.353897  27000 1741.576680           target     momentum            amd_fvg_h1
+2025-06-02 08:00:00+00:00 2025-06-02 09:25:00+00:00 EURUSD          1        1    1.140700    1.141660  22500  399.600000             stop     momentum            amd_fvg_m5
+2025-06-03 11:05:00+00:00 2025-06-03 15:00:00+00:00 EURUSD         -1        1    1.140530    1.137394  28125 1631.554312           target     momentum            amd_ob_m15
+2025-06-04 07:30:00+00:00 2025-06-04 12:20:00+00:00 XAUUSD          1        1 3357.255000 3346.245000      1 -203.685000             stop      no_open               gold_pb
+2025-06-04 13:20:00+00:00 2025-06-04 15:40:00+00:00 XAUUSD          1        1 3355.698000 3381.698000      1  481.000000           target      no_open               gold_pb
+2025-06-05 07:15:00+00:00 2025-06-05 10:25:00+00:00 XAUUSD          1        1 3368.548000 3385.294000      1  309.801000           target      no_open               gold_pb
+2025-06-06 11:55:00+00:00 2025-06-06 13:30:00+00:00 XAUUSD          1        1 3361.995000 3351.165000      1 -200.355000             stop      no_open               gold_pb
+2025-06-09 07:20:00+00:00 2025-06-09 11:00:00+00:00 EURUSD          1        1    1.142480    1.142440  14062  -10.405880             stop     momentum             mss_ob_m5
+2025-06-09 07:40:00+00:00 2025-06-09 13:10:00+00:00 NZDUSD          1        1    0.604465    0.604390  33750  -46.828125             stop     momentum             amd_ob_m5
+2025-06-09 13:20:00+00:00 2025-06-09 15:10:00+00:00 EURUSD         -1        1    1.140600    1.140640  14062  -10.405880             stop     momentum             amd_ob_m5
+2025-06-09 11:25:00+00:00 2025-06-09 15:15:00+00:00 XAUUSD         -1        1 3315.115000 3326.985000      1 -219.595000             stop      no_open               gold_pb
+2025-06-10 07:15:00+00:00 2025-06-10 07:45:00+00:00 EURUSD          1        1    1.140860    1.139820  12500 -240.500000             stop       golden       amd_m1_shift_ob
+2025-06-10 08:25:00+00:00 2025-06-10 09:15:00+00:00 XAUUSD         -1        1 3326.048000 3334.548000      1 -157.250000             stop      no_open               gold_pb
+2025-06-12 11:15:00+00:00 2025-06-12 11:20:00+00:00 EURUSD          1        1    1.158720    1.157680  15625 -300.625000             stop     momentum            amd_fvg_m5
+2025-06-23 13:10:00+00:00 2025-06-23 14:40:00+00:00 XAUUSD         -1        1 3367.398000 3383.348000      1 -295.075000             stop      no_open               gold_pb
+2025-06-25 07:15:00+00:00 2025-06-25 08:45:00+00:00 XAUUSD         -1        1 3328.698000 3337.198000      1 -157.250000             stop      no_open               gold_pb
+2025-06-25 13:15:00+00:00 2025-06-25 14:15:00+00:00 GBPUSD         -1        1    1.360100    1.361050   7812 -137.295900             stop     momentum            amd_fvg_m5
+2025-06-26 08:00:00+00:00 2025-06-26 08:30:00+00:00 GBPUSD          1        1    1.372240    1.372190   5000   -4.625000             stop     momentum            amd_fvg_m5
+2025-06-27 11:50:00+00:00 2025-06-27 13:30:00+00:00 EURUSD          1        1    1.171030    1.171990  15625  277.500000             stop       golden     amd_m1_shift_ifvg
+2025-06-27 13:30:00+00:00 2025-06-27 14:25:00+00:00 EURUSD          1        1    1.173730    1.172690  12500 -240.500000             stop     momentum           amd_fvg_m15
+2025-06-30 07:30:00+00:00 2025-06-30 09:00:00+00:00 EURUSD          1        1    1.173380    1.172340  12500 -240.500000             stop       golden     amd_m1_shift_ifvg
+2025-07-10 11:45:00+00:00 2025-07-10 12:00:00+00:00 EURUSD          1        1    1.173180    1.172670  12500 -117.937500             stop       golden      amd_m1_shift_fvg
+2025-07-10 13:30:00+00:00 2025-07-10 14:00:00+00:00 GBPUSD         -1        1    1.355710    1.356760  12206 -237.101550             stop     momentum            amd_fvg_m5
+2025-07-10 12:00:00+00:00 2025-07-10 14:30:00+00:00 EURUSD         -1        1    1.172690    1.169450   6250  374.625000           target     momentum        amd_breaker_m5
+2025-07-11 07:00:00+00:00 2025-07-11 08:25:00+00:00 GBPUSD         -1        1    1.354330    1.355380  12500 -242.812500             stop       golden     amd_m1_shift_ifvg
+2025-07-15 08:30:00+00:00 2025-07-15 11:20:00+00:00 EURUSD          1        1    1.168890    1.167850   6250 -120.250000             stop     momentum            amd_fvg_m5
+2025-07-15 12:15:00+00:00 2025-07-15 13:30:00+00:00 EURUSD         -1        1    1.167390    1.168430  12500 -240.500000             stop     momentum             amd_ob_m5
+2025-07-16 07:30:00+00:00 2025-07-16 08:35:00+00:00 EURUSD          1        1    1.162240    1.161800   6320  -51.444800             stop     momentum             mss_ob_m5
+2025-07-28 07:00:00+00:00 2025-07-28 08:30:00+00:00 EURUSD         -1        1    1.173660    1.170555   6250  359.015625           target     momentum            mss_fvg_h1
+2025-07-28 07:25:00+00:00 2025-07-28 14:45:00+00:00 XAUUSD         -1        1 3337.725000 3321.385000      1  302.290000           target      no_open               gold_pb
+2025-07-29 07:25:00+00:00 2025-07-29 07:30:00+00:00 EURUSD         -1        1    1.157250    1.157290   5000   -3.700000             stop     momentum             amd_ob_m5
+2025-07-29 07:40:00+00:00 2025-07-29 09:10:00+00:00 XAUUSD         -1        1 3317.515000 3326.015000      1 -157.250000             stop      no_open               gold_pb
+2025-07-29 07:30:00+00:00 2025-07-29 09:55:00+00:00 NZDUSD         -1        1    0.596065    0.596140   6250   -8.671875             stop     momentum             mss_ob_m5
+2025-07-29 13:00:00+00:00 2025-07-29 14:45:00+00:00 EURUSD         -1        1    1.153620    1.153660   5000   -3.700000             stop     momentum            amd_fvg_m5
+2025-07-29 11:10:00+00:00 2025-07-29 16:00:00+00:00 XAUUSD         -1        1 3322.485000 3331.235000      1 -161.875000             stop      no_open               gold_pb
+2025-07-30 12:10:00+00:00 2025-07-30 14:25:00+00:00 XAUUSD         -1        1 3325.425000 3307.145000      1  338.180000           target      no_open               gold_pb
+2025-07-31 07:45:00+00:00 2025-07-31 08:45:00+00:00 XAUUSD         -1        1 3299.198000 3307.698000      1 -157.250000             stop      no_open               gold_pb
+2025-07-31 11:15:00+00:00 2025-08-01 04:05:00+00:00 XAUUSD         -1        1 3303.075000 3293.575000      1  175.750000             stop      no_open               gold_pb
+2025-08-01 08:05:00+00:00 2025-08-01 11:00:00+00:00 XAUUSD         -1        1 3290.375000 3295.485000      1  -94.535000 session_handover      no_open               gold_pb
+2025-08-01 12:35:00+00:00 2025-08-01 13:25:00+00:00 GBPUSD         -1        1    1.316280    1.315330  12500  219.687500             stop       golden     amd_m1_shift_ifvg
+2025-08-01 12:50:00+00:00 2025-08-01 13:30:00+00:00 XAUUSD         -1        1 3296.745000 3305.245000      1 -157.250000             stop      no_open               gold_pb
+2025-08-05 08:10:00+00:00 2025-08-05 10:30:00+00:00 XAUUSD          1        1 3370.785000 3362.285000      1 -157.250000             stop      no_open               gold_pb
+2025-08-05 13:20:00+00:00 2025-08-05 15:00:00+00:00 XAUUSD          1        1 3359.005000 3379.237000      1  374.292000           target      no_open               gold_pb
+2025-08-06 07:00:00+00:00 2025-08-06 08:20:00+00:00 XAUUSD          1        1 3377.685000 3369.005000      1 -160.580000             stop      no_open               gold_pb
+2025-08-06 11:00:00+00:00 2025-08-06 14:05:00+00:00 EURUSD          1        1    1.158840    1.162300   6250  400.062500             stop     momentum             amd_ob_m5
+2025-08-06 12:25:00+00:00 2025-08-06 21:35:00+00:00 XAUUSD          1        1 3367.515000 3367.015000      1   -9.250000             stop      no_open               gold_pb
+2025-08-07 07:15:00+00:00 2025-08-07 09:05:00+00:00 EURUSD          1        1    1.167280    1.168240   6250  111.000000             stop     momentum             mss_ob_m5
+2025-08-08 12:45:00+00:00 2025-08-08 13:45:00+00:00 XAUUSD          1        1 3388.195000 3387.695000      1   -9.250000             stop      no_open               gold_pb
+2025-08-11 07:20:00+00:00 2025-08-11 09:30:00+00:00 EURUSD         -1        1    1.166630    1.165670  12500  222.000000             stop       golden     amd_m1_shift_ifvg
+2025-08-11 12:10:00+00:00 2025-08-11 15:00:00+00:00 EURUSD         -1        1    1.164140    1.161120  10000  558.700000           target        judas            mss_fvg_m5
+2025-08-13 07:00:00+00:00 2025-08-13 09:15:00+00:00 EURUSD          1        1    1.168540    1.171719  12500  735.254750           target     momentum             mss_ob_m5
+2025-08-13 07:00:00+00:00 2025-08-13 10:20:00+00:00 NZDUSD          1        1    0.595805    0.598780  10000  550.375000           target        judas       amd_breaker_m15
+2025-08-13 07:00:00+00:00 2025-08-13 19:00:00+00:00 XAUUSD          1        1 3352.245000 3351.745000      1   -9.250000             stop        judas             mss_ob_m5
+2025-08-14 08:15:00+00:00 2025-08-14 10:10:00+00:00 EURUSD         -1        1    1.168400    1.168440   9000   -6.660000             stop     momentum            amd_fvg_h1
+2025-08-14 08:30:00+00:00 2025-08-14 10:15:00+00:00 XAUUSD         -1        1 3357.615000 3358.115000      3  -27.750000             stop     momentum            mss_ob_m15
+2025-08-14 13:15:00+00:00 2025-08-14 13:30:00+00:00 EURUSD         -1        1    1.168220    1.165040   9000  529.470000           target        judas             amd_ob_m5
+2025-08-15 08:00:00+00:00 2025-08-15 11:00:00+00:00 XAUUSD         -1        1 3340.148000 3341.935000      1  -33.059500 session_handover      no_open               gold_pb
+2025-08-15 07:00:00+00:00 2025-08-15 13:35:00+00:00 EURUSD          1        1    1.167230    1.168190  17577  312.167520             stop     momentum             amd_ob_m5
+2025-08-19 07:45:00+00:00 2025-08-19 11:10:00+00:00 XAUUSD         -1        1 3334.705000 3343.205000      1 -157.250000             stop      no_open               gold_pb
+2025-08-19 07:30:00+00:00 2025-08-19 13:30:00+00:00 EURUSD          1        1    1.166430    1.167390  14062  249.741120             stop     momentum             mss_ob_m5
+2025-08-19 11:45:00+00:00 2025-08-19 15:45:00+00:00 XAUUSD         -1        1 3341.205000 3325.705000      1  286.750000           target      no_open               gold_pb
+2025-08-20 11:25:00+00:00 2025-08-20 13:00:00+00:00 XAUUSD         -1        1 3325.119000 3333.619000      1 -157.250000             stop      no_open               gold_pb
+2025-08-20 13:05:00+00:00 2025-08-20 15:20:00+00:00 EURUSD          1        1    1.165180    1.165140  14062  -10.405880             stop     momentum            mss_fvg_m5
+2025-08-21 07:05:00+00:00 2025-08-21 08:15:00+00:00 EURUSD         -1        1    1.164220    1.164260  18000  -13.320000             stop     momentum             amd_ob_m5
+2025-08-25 11:15:00+00:00 2025-08-25 12:55:00+00:00 EURUSD         -1        1    1.169370    1.169950   9000  -96.570000             stop        judas            amd_fvg_m5
+2025-08-25 12:10:00+00:00 2025-08-26 00:10:00+00:00 XAUUSD          1        1 3368.148000 3359.648000      1 -157.250000             stop      no_open               gold_pb
+2025-08-26 12:00:00+00:00 2025-08-26 13:30:00+00:00 EURUSD          1        1    1.164880    1.164840  14062  -10.405880             stop     momentum            amd_fvg_m5
+2025-08-27 08:10:00+00:00 2025-08-27 14:50:00+00:00 EURUSD         -1        1    1.160980    1.160020  22500  399.600000             stop     momentum            amd_ob_m15
+2025-08-27 07:15:00+00:00 2025-08-28 12:25:00+00:00 XAUUSD          1        1 3382.885000 3402.765000      1  367.780000           target      no_open               gold_pb
+2025-08-28 11:15:00+00:00 2025-08-28 13:55:00+00:00 EURUSD          1        1    1.165830    1.166790  14062  249.741120             stop     momentum             amd_ob_m5
+2025-08-29 08:05:00+00:00 2025-08-29 12:10:00+00:00 XAUUSD          1        1 3412.205000 3403.705000      1 -157.250000             stop      no_open               gold_pb
+2025-08-29 12:00:00+00:00 2025-08-29 14:00:00+00:00 GBPUSD         -1        1    1.345280    1.346330  14062 -273.154350             stop     momentum            amd_fvg_m5
+2025-08-29 12:20:00+00:00 2025-08-29 14:35:00+00:00 XAUUSD          1        1 3406.905000 3422.405000      1  286.750000           target      no_open               gold_pb
+2025-09-01 12:10:00+00:00 2025-09-01 12:55:00+00:00 GBPUSD          1        1    1.352940    1.352180  42187 -593.149220             stop       golden     amd_m1_shift_ifvg
+2025-09-02 08:25:00+00:00 2025-09-02 08:40:00+00:00 GBPUSD         -1        1    1.344190    1.344240  28125  -26.015625             stop     momentum            amd_fvg_m5
+2025-09-02 08:00:00+00:00 2025-09-02 08:50:00+00:00 NZDUSD         -1        1    0.588635    0.585448  42187 2487.064273           target        judas             amd_ob_m5
+2025-09-02 08:20:00+00:00 2025-09-02 15:05:00+00:00 XAUUSD         -1        1 3480.375000 3498.595000      1 -337.070000             stop     momentum            mss_fvg_h1
+2025-09-04 07:25:00+00:00 2025-09-04 15:00:00+00:00 XAUUSD          1        1 3538.915000 3538.415000      1   -9.250000             stop      no_open               gold_pb
+2025-09-05 11:55:00+00:00 2025-09-05 13:30:00+00:00 XAUUSD          1        1 3553.175000 3562.675000      1  175.750000             stop      no_open               gold_pb
+2025-09-08 08:30:00+00:00 2025-09-08 09:25:00+00:00 EURUSD          1        1    1.172830    1.172790  28125  -20.812500             stop     momentum            amd_fvg_m5
+2025-09-08 08:00:00+00:00 2025-09-08 10:25:00+00:00 NZDUSD          1        1    0.591975    0.591900  18000  -24.975000             stop     momentum           amd_fvg_m15
+2025-09-08 07:15:00+00:00 2025-09-08 11:10:00+00:00 XAUUSD          1        1 3592.105000 3616.645000      1  453.990000           target      no_open               gold_pb
+2025-09-09 13:30:00+00:00 2025-09-09 14:15:00+00:00 EURUSD         -1        1    1.172950    1.173990  11250 -216.450000             stop     momentum            amd_fvg_m5
+2025-09-09 07:45:00+00:00 2025-09-09 15:00:00+00:00 XAUUSD          1        1 3647.445000 3671.085000      1  437.340000           target      no_open               gold_pb
+2025-09-11 07:45:00+00:00 2025-09-11 10:05:00+00:00 XAUUSD          1        1 3636.635000 3620.895000      1 -291.190000             stop      no_open               gold_pb
+2025-09-11 07:00:00+00:00 2025-09-11 13:25:00+00:00 EURUSD         -1        1    1.168770    1.168810   9000   -6.660000             stop     momentum             amd_ob_m5
+2025-09-11 07:00:00+00:00 2025-09-11 13:30:00+00:00 NZDUSD         -1        1    0.592995    0.593895  11250 -187.312500             stop     momentum             amd_ob_m5
+2025-09-11 11:20:00+00:00 2025-09-11 13:30:00+00:00 XAUUSD          1        1 3624.075000 3623.575000      1   -9.250000             stop      no_open               gold_pb
+2025-09-12 11:05:00+00:00 2025-09-15 01:00:00+00:00 XAUUSD          1        1 3648.298000 3635.875000      1 -229.825500             stop      no_open               gold_pb
+2025-09-15 08:35:00+00:00 2025-09-15 14:40:00+00:00 XAUUSD          1        1 3642.305000 3661.477000      1  354.682000           target      no_open               gold_pb
+2025-09-15 11:00:00+00:00 2025-09-15 14:50:00+00:00 GBPUSD          1        1    1.359770    1.359720  27000  -24.975000             stop     momentum            amd_fvg_m5
+2025-09-15 13:00:00+00:00 2025-09-15 15:00:00+00:00 EURUSD          1        1    1.176400    1.175470  22500 -387.112500             stop     momentum             amd_ob_m5
+2025-09-16 08:00:00+00:00 2025-09-16 09:40:00+00:00 NZDUSD          1        1    0.597655    0.596595  11250 -220.612500             stop     momentum             amd_ob_m5
+2025-09-16 07:00:00+00:00 2025-09-16 10:40:00+00:00 EURUSD          1        1    1.178170    1.181560  28125 1763.859375           target     momentum            amd_fvg_h1
+2025-09-17 08:05:00+00:00 2025-09-17 14:05:00+00:00 EURUSD         -1        1    1.184640    1.184680   9000   -6.660000             stop     momentum            amd_fvg_m5
+2025-09-17 12:25:00+00:00 2025-09-17 19:00:00+00:00 XAUUSD          1        1 3669.395000 3678.895000      1  175.750000             stop      no_open               gold_pb
+2025-09-19 07:00:00+00:00 2025-09-19 07:30:00+00:00 GBPUSD         -1        1    1.353070    1.350050  14062  785.643940           target     momentum            amd_ob_m15
+2025-09-19 07:00:00+00:00 2025-09-19 08:15:00+00:00 NZDUSD         -1        1    0.586325    0.587375  28125 -546.328125             stop     momentum           amd_fvg_m15
+2025-09-19 12:00:00+00:00 2025-09-19 14:00:00+00:00 EURUSD         -1        1    1.175580    1.174620  18000  319.680000             stop     momentum             amd_ob_m5
+2025-09-22 12:30:00+00:00 2025-09-22 15:10:00+00:00 EURUSD          1        1    1.177810    1.176780  22500 -428.737500             stop       golden     amd_m1_shift_ifvg
+2025-09-24 07:45:00+00:00 2025-09-24 08:40:00+00:00 NZDUSD         -1        1    0.584975    0.585775  11250 -166.500000             stop     momentum             amd_ob_m5
+2025-09-24 07:15:00+00:00 2025-09-24 11:10:00+00:00 EURUSD         -1        1    1.179420    1.175900  22500 1465.200000           target     momentum            amd_fvg_m5
+2025-09-24 11:10:00+00:00 2025-09-25 02:00:00+00:00 EURUSD         -1        1    1.175810    1.174850  28125  499.500000             stop     momentum            amd_fvg_m5
+2025-09-25 12:00:00+00:00 2025-09-25 13:30:00+00:00 GBPUSD         -1        1    1.344340    1.340890  22500 1436.062500             stop       golden     amd_m1_shift_ifvg
+2025-09-25 13:30:00+00:00 2025-09-25 14:30:00+00:00 GBPUSD         -1        1    1.339320    1.339370  22500  -20.812500             stop     momentum            amd_fvg_m5
+2025-09-26 11:15:00+00:00 2025-09-26 12:50:00+00:00 EURUSD         -1        1    1.167440    1.167480  22500  -16.650000             stop     momentum             amd_ob_m5
+2025-09-29 13:35:00+00:00 2025-09-29 14:20:00+00:00 EURUSD          1        1    1.173930    1.173890  11250   -8.325000             stop     momentum            amd_fvg_m5
+2025-09-30 07:15:00+00:00 2025-09-30 11:10:00+00:00 EURUSD          1        1    1.173410    1.174370  14062  249.741120             stop     momentum           amd_fvg_m15
+2025-09-30 11:05:00+00:00 2025-09-30 15:05:00+00:00 XAUUSD          1        1 3805.825000 3833.225000      1  506.900000           target      no_open               gold_pb
+2025-10-01 13:20:00+00:00 2025-10-01 14:50:00+00:00 GBPUSD          1        1    1.350470    1.351420  28125  494.296875             stop       golden     amd_m1_shift_ifvg
+2025-10-03 07:20:00+00:00 2025-10-03 15:10:00+00:00 XAUUSD          1        1 3860.615000 3870.115000      1  175.750000             stop      no_open               gold_pb
+2025-10-06 07:00:00+00:00 2025-10-06 08:10:00+00:00 EURUSD         -1        1    1.171420    1.170460  22500  399.600000             stop     momentum            amd_fvg_m5
+2025-10-06 08:40:00+00:00 2025-10-06 13:30:00+00:00 NZDUSD         -1        1    0.582605    0.582680  22500  -31.218750             stop     momentum             amd_ob_m5
+2025-10-07 07:15:00+00:00 2025-10-07 11:40:00+00:00 EURUSD         -1        1    1.168500    1.167540  28125  499.500000             stop       golden     amd_m1_shift_ifvg
+2025-10-07 11:40:00+00:00 2025-10-07 14:00:00+00:00 XAUUSD          1        1 3960.135000 3981.475000      1  394.790000           target      no_open               gold_pb
+2025-10-09 07:00:00+00:00 2025-10-09 07:30:00+00:00 GBPUSD         -1        1    1.340310    1.337175  28125 1631.179688           target     momentum             amd_ob_m5
+2025-10-09 07:40:00+00:00 2025-10-09 10:00:00+00:00 NZDUSD         -1        1    0.577085    0.577160  33750  -46.828125             stop     momentum           amd_fvg_m15
+2025-10-10 11:40:00+00:00 2025-10-10 13:00:00+00:00 GBPUSD         -1        1    1.327990    1.328040  28125  -26.015625             stop       golden     amd_m1_shift_ifvg
+2025-10-13 08:00:00+00:00 2025-10-13 12:40:00+00:00 EURUSD         -1        1    1.161010    1.157650  33750 2097.900000           target     momentum           amd_fvg_m15
+2025-10-13 12:40:00+00:00 2025-10-13 14:40:00+00:00 EURUSD         -1        1    1.157320    1.157360  33750  -24.975000             stop     momentum            amd_fvg_h1
+2025-10-14 08:15:00+00:00 2025-10-14 09:30:00+00:00 GBPUSD         -1        1    1.327250    1.327300  42187  -39.022975             stop     momentum            amd_fvg_m5
+2025-10-15 07:50:00+00:00 2025-10-15 11:05:00+00:00 EURUSD          1        1    1.163770    1.162730  14062 -270.552880             stop     momentum            amd_fvg_m5
+2025-10-15 12:50:00+00:00 2025-10-15 14:50:00+00:00 EURUSD         -1        1    1.162070    1.163110  22500 -432.900000             stop       golden     amd_m1_shift_ifvg
+2025-10-16 11:00:00+00:00 2025-10-16 11:40:00+00:00 GBPUSD          1        1    1.343820    1.343110  22500 -295.537500             stop       golden     amd_m1_shift_ifvg
+2025-10-17 13:00:00+00:00 2025-10-17 15:40:00+00:00 EURUSD         -1        1    1.168120    1.167160  11250  199.800000             stop     momentum             amd_ob_m5
+2025-10-21 07:15:00+00:00 2025-10-21 08:20:00+00:00 XAUUSD          1        1 4329.495000 4328.995000      1   -9.250000             stop      no_open               gold_pb
+2025-10-21 12:15:00+00:00 2025-10-21 12:55:00+00:00 XAUUSD          1        1 4261.518000 4247.685000      1 -255.910500             stop      no_open               gold_pb
+2025-10-22 11:30:00+00:00 2025-10-22 11:35:00+00:00 XAUUSD         -1        1 4083.098000 4083.598000      2  -18.500000             stop        judas            mss_fvg_m5
+2025-10-22 08:00:00+00:00 2025-10-22 12:40:00+00:00 GBPUSD         -1        1    1.332850    1.331900  28125  494.296875             stop     momentum            amd_fvg_m5
+2025-10-23 07:40:00+00:00 2025-10-23 08:35:00+00:00 XAUUSD         -1        1 4120.555000 4111.055000      1  175.750000             stop      no_open               gold_pb
+2025-10-23 11:30:00+00:00 2025-10-23 13:30:00+00:00 EURUSD         -1        1    1.159210    1.159650   9000  -73.260000             stop     momentum             amd_ob_m5
+2025-10-23 11:30:00+00:00 2025-10-23 13:40:00+00:00 XAUUSD         -1        1 4111.045000 4126.745000      1 -290.450000             stop      no_open               gold_pb
+2025-10-27 11:45:00+00:00 2025-10-27 13:40:00+00:00 EURUSD          1        1    1.164310    1.163450  17577 -279.650070             stop     momentum             amd_ob_m5
+2025-10-28 12:00:00+00:00 2025-10-28 13:30:00+00:00 GBPUSD         -1        1    1.330860    1.326063  33750 2994.918750           target     momentum            mss_fvg_h1
+2025-10-29 07:40:00+00:00 2025-10-29 07:55:00+00:00 XAUUSD         -1        1 3993.065000 4001.565000      1 -157.250000             stop      no_open               gold_pb
+2025-10-29 08:00:00+00:00 2025-10-29 09:30:00+00:00 GBPUSD         -1        1    1.322020    1.321070  33750  593.156250             stop     momentum            amd_fvg_h1
+2025-10-29 11:15:00+00:00 2025-10-29 14:00:00+00:00 XAUUSD         -1        1 4017.775000 4018.275000      1   -9.250000             stop      no_open               gold_pb
+2025-10-30 11:00:00+00:00 2025-10-30 12:40:00+00:00 EURUSD         -1        1    1.160370    1.157060  28125 1722.234375           target     momentum            mss_fvg_h1
+2025-10-31 13:00:00+00:00 2025-10-31 13:40:00+00:00 EURUSD         -1        1    1.155300    1.154340  27000  479.520000             stop     momentum            mss_fvg_m5
+2025-10-31 13:40:00+00:00 2025-10-31 18:10:00+00:00 XAUUSD         -1        1 4014.155000 4004.655000      1  175.750000             stop      no_open               gold_pb
+2025-11-03 08:15:00+00:00 2025-11-03 09:45:00+00:00 XAUUSD         -1        1 4017.865000 3996.365000      1  397.750000           target      no_open               gold_pb
+2025-11-03 14:10:00+00:00 2025-11-03 14:45:00+00:00 XAUUSD         -1        1 4014.335000 4022.835000      1 -157.250000             stop      no_open               gold_pb
+2025-11-03 08:00:00+00:00 2025-11-03 15:55:00+00:00 EURUSD         -1        1    1.153290    1.152330  18000  319.680000             stop     momentum             mss_ob_m5
+2025-11-03 08:35:00+00:00 2025-11-03 16:00:00+00:00 EURUSD         -1        2    1.151610    1.152650   9000 -173.160000             stop      no_open pyramid_im1.0_fvg_m15
+2025-11-03 08:00:00+00:00 2025-11-03 17:15:00+00:00 NZDUSD         -1        1    0.571945    0.571020  22500  385.031250             stop     momentum             mss_ob_m5
+2025-11-04 09:10:00+00:00 2025-11-04 14:05:00+00:00 XAUUSD         -1        1 3989.945000 3967.385000      1  417.360000           target      no_open               gold_pb
+2025-11-05 09:05:00+00:00 2025-11-05 13:25:00+00:00 XAUUSD         -1        1 3976.715000 3977.215000      1   -9.250000             stop      no_open               gold_pb
+2025-11-11 13:00:00+00:00 2025-11-11 19:50:00+00:00 EURUSD          1        1    1.157660    1.158620  22500  399.600000             stop     momentum             mss_ob_m5
+2025-11-13 08:00:00+00:00 2025-11-13 09:35:00+00:00 EURUSD          1        1    1.161450    1.161410  14062  -10.405880             stop     momentum            amd_fvg_m5
+2025-11-14 12:45:00+00:00 2025-11-14 13:00:00+00:00 GBPUSD          1        1    1.316890    1.316840  11250  -10.406250             stop     momentum            amd_fvg_m5
+2025-11-14 14:25:00+00:00 2025-11-14 14:30:00+00:00 XAUUSD          1        1 4054.725000 4035.665000      1 -352.610000             stop      no_open               gold_pb
+2025-11-17 08:40:00+00:00 2025-11-17 11:35:00+00:00 XAUUSD         -1        1 4076.005000 4076.505000      1   -9.250000             stop      no_open               gold_pb
+2025-11-17 13:05:00+00:00 2025-11-17 16:15:00+00:00 EURUSD         -1        1    1.159180    1.160080  18000 -299.700000             stop     momentum             amd_ob_m5
+2025-11-18 09:05:00+00:00 2025-11-18 09:55:00+00:00 XAUUSD         -1        1 4032.815000 4044.015000      1 -207.200000             stop      no_open               gold_pb
+2025-11-18 12:25:00+00:00 2025-11-18 13:25:00+00:00 XAUUSD         -1        1 4031.455000 4051.685000      1 -374.255000             stop      no_open               gold_pb
+2025-11-28 08:00:00+00:00 2025-11-28 09:20:00+00:00 GBPUSD         -1        1    1.321230    1.321800  14405 -151.900725             stop     momentum           amd_fvg_m15
+2025-11-28 14:00:00+00:00 2025-12-01 01:10:00+00:00 EURUSD          1        1    1.158080    1.161280  15625  925.000000           target     momentum             amd_ob_m5
+2025-12-01 12:00:00+00:00 2025-12-01 13:20:00+00:00 EURUSD          1        1    1.162980    1.163940  22500  399.600000             stop     momentum            amd_fvg_m5
+2025-12-02 08:15:00+00:00 2025-12-02 09:20:00+00:00 XAUUSD          1        1 4214.525000 4201.485000      1 -241.240000             stop      no_open               gold_pb
+2025-12-03 08:45:00+00:00 2025-12-03 09:05:00+00:00 XAUUSD          1        1 4209.105000 4198.565000      1 -194.990000             stop      no_open               gold_pb
+2025-12-03 12:00:00+00:00 2025-12-03 14:00:00+00:00 XAUUSD          1        1 4208.698000 4238.784000      1  556.591000           target      no_open               gold_pb
+2025-12-04 08:05:00+00:00 2025-12-04 09:00:00+00:00 GBPUSD          1        1    1.333770    1.333720  33750  -31.218750             stop       golden      amd_m1_shift_ob2
+2025-12-04 09:35:00+00:00 2025-12-04 14:40:00+00:00 XAUUSD          1        1 4195.485000 4194.985000      1   -9.250000             stop      no_open               gold_pb
+2025-12-08 12:40:00+00:00 2025-12-08 13:50:00+00:00 XAUUSD          1        1 4213.745000 4197.918000      1 -292.799500             stop      no_open               gold_pb
+2025-12-08 14:10:00+00:00 2025-12-08 14:45:00+00:00 XAUUSD          1        1 4211.015000 4196.025000      1 -277.315000             stop      no_open               gold_pb
+2025-12-09 09:15:00+00:00 2025-12-09 09:35:00+00:00 GBPUSD          1        1    1.335290    1.334240  18750 -364.218750             stop     momentum           amd_fvg_m15
+2025-12-22 08:30:00+00:00 2025-12-22 14:25:00+00:00 GBPUSD          1        1    1.341450    1.344580   6250  361.906250           target     momentum            mss_fvg_m5
+2025-12-22 13:00:00+00:00 2025-12-22 16:35:00+00:00 EURUSD          1        1    1.174430    1.175390  18750  333.000000             stop     momentum            amd_fvg_h1
+2025-12-23 08:00:00+00:00 2025-12-23 09:20:00+00:00 GBPUSD          1        1    1.350760    1.349710   6250 -121.406250             stop     momentum            amd_fvg_h1
+2025-12-23 09:00:00+00:00 2025-12-23 12:50:00+00:00 EURUSD          1        1    1.178940    1.178900  23437  -17.343380             stop     momentum             amd_ob_m5
+2025-12-26 13:25:00+00:00 2025-12-26 14:40:00+00:00 XAUUSD          1        1 4519.008000 4518.508000      1   -9.250000             stop      no_open               gold_pb
+2025-12-26 13:00:00+00:00 2025-12-26 14:45:00+00:00 GBPUSD          1        1    1.349840    1.350790   6250  109.843750             stop     momentum             amd_ob_m5
+2025-12-29 12:10:00+00:00 2025-12-29 13:20:00+00:00 XAUUSD          1        1 4453.725000 4453.225000      1   -9.250000             stop      no_open               gold_pb
+2025-12-30 13:20:00+00:00 2025-12-30 14:40:00+00:00 XAUUSD         -1        1 4393.225000 4370.179000      1  426.351000           target      no_open               gold_pb
+2025-12-30 13:00:00+00:00 2025-12-30 15:10:00+00:00 GBPUSD         -1        1    1.349510    1.346310   7812  462.470400           target     momentum            amd_fvg_m5
+2025-12-30 12:00:00+00:00 2025-12-30 16:20:00+00:00 EURUSD         -1        1    1.176260    1.176300   5000   -3.700000             stop     momentum             amd_ob_m5
+2025-12-31 08:15:00+00:00 2025-12-31 11:15:00+00:00 GBPUSD         -1        1    1.345710    1.344760  14062  247.139650             stop        judas        amd_breaker_m5
+2025-12-31 12:00:00+00:00 2025-12-31 13:50:00+00:00 EURUSD          1        1    1.175150    1.174110  14062 -270.552880             stop     momentum            amd_fvg_h1
+
+=== Per-pair P&L (ZAR) ===
+  EURUSD: 240 trades  wins=102  losses=138  P&L=R26474.77
+  GBPUSD: 123 trades  wins=55  losses=68  P&L=R11136.83
+  NZDUSD: 31 trades  wins=10  losses=21  P&L=R4416.44
+  XAUUSD: 193 trades  wins=43  losses=150  P&L=R-6159.89
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2024       285   103  36.1%      2013.18   -49.6%
+  2025       302   107  35.4%     33854.97   -29.6%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  EURUSD   2024       127    51  40.2%
+  EURUSD   2025       113    51  45.1%
+  GBPUSD   2024        75    36  48.0%
+  GBPUSD   2025        48    19  39.6%
+  NZDUSD   2024        15     5  33.3%
+  NZDUSD   2025        16     5  31.2%
+  XAUUSD   2024        68    11  16.2%
+  XAUUSD   2025       125    32  25.6%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  amd_breaker_m15            1     1 100.0%     550.37
+  amd_breaker_m5             6     4  66.7%     162.01
+  amd_fvg_h1                35    16  45.7%     140.52
+  amd_fvg_m15               29    11  37.9%     139.81
+  amd_fvg_m5               105    36  34.3%      51.45
+  amd_m1_shift_fvg           3     1  33.3%      12.95
+  amd_m1_shift_ifvg         43    21  48.8%      39.10
+  amd_m1_shift_ob            4     0   0.0%    -110.59
+  amd_m1_shift_ob2           4     0   0.0%    -181.79
+  amd_ob_m15                 9     3  33.3%     301.01
+  amd_ob_m5                 94    39  41.5%     103.16
+  gold_pb                  175    39  22.3%     -41.83
+  mss_breaker_m15            1     1 100.0%      35.52
+  mss_breaker_m5             5     1  20.0%     -26.01
+  mss_fvg_h1                13     6  46.2%     363.42
+  mss_fvg_m15                8     5  62.5%     246.91
+  mss_fvg_m5                12     7  58.3%     134.65
+  mss_ob_m15                 7     4  57.1%      39.36
+  mss_ob_m5                 28    12  42.9%     188.48
+  news_fvg_m5                1     1 100.0%     113.59
+  news_ob_m5                 1     1 100.0%     533.91
+  pyramid_im0.8_fvg_m5       1     0   0.0%      -1.48
+  pyramid_im1.0_fvg_m15       1     0   0.0%    -173.16
+  pyramid_im1.0_fvg_m5       1     1 100.0%      88.80
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  FVG            209    84  40.2%     22756.53     108.88   3.98
+  OB             143    59  41.3%     18050.12     126.22   5.75
+  BREAKER         13     7  53.8%      1427.92     109.84   5.90
+  other          222    60  27.0%     -6366.42     -28.68   0.74
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  BREAKER M15            2     2 100.0%    inf
+  BREAKER M5            11     5  45.5%   3.89
+  FVG ?                  3     1  33.3%   1.11
+  FVG H1                48    22  45.8%   5.71
+  FVG M15               38    16  42.1%   4.27
+  FVG M5               120    45  37.5%   3.09
+  OB ?                   4     0   0.0%   0.00
+  OB M15                16     7  43.8%  21.42
+  OB M5                123    52  42.3%   5.83
+  other ?              222    60  27.0%   0.74
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  BREAKER EURUSD             6     4  66.7%  90.42
+  BREAKER GBPUSD             2     2 100.0%    inf
+  BREAKER NZDUSD             2     1  50.0%   4.43
+  BREAKER XAUUSD             3     0   0.0%   0.00
+  FVG EURUSD               118    50  42.4%   5.69
+  FVG GBPUSD                73    30  41.1%   3.29
+  FVG NZDUSD                14     4  28.6%   1.05
+  FVG XAUUSD                 4     0   0.0%   0.00
+  OB EURUSD                 94    37  39.4%   4.21
+  OB GBPUSD                 23    13  56.5%  21.43
+  OB NZDUSD                 15     5  33.3%   6.53
+  OB XAUUSD                 11     4  36.4%   8.08
+  other EURUSD              22    11  50.0%   1.35
+  other GBPUSD              25    10  40.0%   1.12
+  other XAUUSD             175    39  22.3%   0.64
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  m15_range              366   155  42.3%   3.94
+  session_range           25    12  48.0%   1.14
+  (no AMD)               196    43  21.9%   0.71
+
+  Session-range widths (n=860): median=39.2 p75=58.8 p90=91.9 pips (cap=35.0)
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  0/3              206    46  22.3%     -7832.16     -38.02   0.64
+  1/3              161    71  44.1%      9107.65      56.57   3.00
+  2/3              170    74  43.5%     21531.82     126.66   3.88
+  3/3               50    19  38.0%     13060.84     261.22   5.86
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+  1a           DXY↑ + H1 EUR>GBP → GBPUSD short        18     8  44.4%      3071.37   8.20
+  1b           DXY↑ + H1 GBP>EUR → EURUSD short        44    17  38.6%      4398.23   6.61
+  2a           DXY↓ + H1 EUR>GBP → EURUSD long         14     6  42.9%      1868.32   4.23
+  2b           DXY↓ + H1 GBP>EUR → GBPUSD long         16     9  56.2%       541.90   3.62
+  3a           DXY↑ + cross flat → EURUSD short        73    25  34.2%      7719.16   6.11
+  3b           DXY↓ + cross flat → EURUSD long         64    30  46.9%      8639.42   4.92
+  1a_h4        DXY↑ + H4 EUR>GBP → GBPUSD short         8     4  50.0%      3899.50  62.54
+  1b_h4        DXY↑ + H4 GBP>EUR → EURUSD short        11     7  63.6%      3119.47  11.18
+  2b_h4        DXY↓ + H4 GBP>EUR → GBPUSD long          6     2  33.3%        -7.17   0.98
+  1a_ip        DXY↑ + IP EUR>GBP → GBPUSD short        23    13  56.5%       947.82   2.31
+  1b_ip        DXY↑ + IP GBP>EUR → EURUSD short         7     5  71.4%       197.69   1.80
+  2b_ip        DXY↓ + IP GBP>EUR → GBPUSD long         25     9  36.0%      2665.20   3.57
+  N-long       DXY↓ + NZD strong → NZDUSD long          9     3  33.3%      1826.53   6.99
+  N-short      DXY↑ + NZD weak  → NZDUSD short         14     4  28.6%      -457.86   0.56
+  N-short_h4   DXY↑ + H4 NZD weak  → NZDUSD short       8     3  37.5%      3047.77  17.61
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  breakout         161    67  41.6%       15140.30       94.04   3.62
+  gold_pb          175    39  22.3%       -7320.64      -41.83   0.64
+  judas            197    82  41.6%       27497.80      139.58   6.33
+  mm_golden         54    22  40.7%         550.69       10.20   1.11
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  london     breakout          80    35  43.8%       12220.90   6.80
+  london     gold_pb           82    18  22.0%       -2592.28   0.70
+  london     judas            100    43  43.0%       12897.62   5.58
+  london     mm_golden         28    10  35.7%         651.15   1.33
+  ny         breakout          81    32  39.5%        2919.40   1.80
+  ny         gold_pb           93    21  22.6%       -4728.36   0.59
+  ny         judas             97    39  40.2%       14600.18   7.23
+  ny         mm_golden         26    12  46.2%        -100.46   0.97
+  ----------------------------------------------------------------
+  london     TOTAL            290   106  36.6%       23177.40   2.49
+  ny         TOTAL            297   104  35.0%       12690.75   1.61
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  london_judas               178    78  43.8%       25137.02   6.13
+  london_breakout              2     0   0.0%         -18.50   0.00
+  ny_judas                   177    71  40.1%       17528.83   3.92
+  ny_extend                    1     0   0.0%          -9.25   0.00
+  unknown                    175    39  22.3%       -7320.64   0.64
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  yes                   11     5  45.5%        1848.83  10.48
+  no                   576   205  35.6%       34019.32   1.94
+  -- captured NY continuations by entry_model --
+     judas          11 trades  WR 45.5%  P&L R     1848.83
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG              11     5  45.5%        1750.96  24.08
+  D1 FVG               3     0   0.0%         -17.39   0.00
+  H4 FVG              10     0   0.0%        -433.95   0.00
+  none               563   205  36.4%       34568.53   1.96
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG              14     7  50.0%        2554.50   3.40
+  D1 FVG              25     7  28.0%        2930.14   4.02
+  H4 FVG              30     7  23.3%         186.74   1.13
+  none               518   189  36.5%       30196.77   1.92
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1      220    56  25.5%       -5629.13   0.76     -25.59
+  score=2      101    37  36.6%        5337.47   2.45      52.85
+  score=3      111    51  45.9%       17266.42   6.28     155.55
+  score=4       99    38  38.4%       12754.48   4.08     128.83
+  score=5       40    19  47.5%        3283.35   3.52      82.08
+  score=6       15     9  60.0%        2858.33   4.45     190.56
+  score=7        1     0   0.0%          -2.78   0.00      -2.78
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct agrees         212    85  40.1%       27723.27    5.49
+  HTF struct disagrees      375   125  33.3%        8144.88    1.27
+  minor-sweep (Judas)        47     7  14.9%        1769.00    1.76
+  no minor-sweep            540   203  37.6%       34099.15    2.00
+  ── highest intact-structure timeframe ──
+  intact @ W                 41    17  41.5%        7424.36    5.28
+  intact @ D                109    41  37.6%       15003.64    6.92
+  intact @ 240T              62    27  43.5%        8605.30    5.66
+  intact @ 60T               48    15  31.2%        1350.95    1.87
+  intact @ 15T               38    21  55.3%        6530.13    6.04
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range           101    39  38.6%       12069.76   4.45
+  H4 range            56    26  46.4%        8894.69   5.08
+  no sweep           430   145  33.7%       14903.70   1.49
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+  confirmed           84    32  38.1%       10103.95   7.15       20.1
+  opposing            30    17  56.7%        4098.58   8.23       24.0
+  no divergence      249   108  43.4%       23409.07   3.04       20.8
+
+  --- SMT confirmed by pair ---
+    EURUSD        52 trades  WR  42.3%  PF   4.75  P&L      3737.29
+    GBPUSD        32 trades  WR  31.2%  PF  10.83  P&L      6366.66
+
+  --- SMT confirmed by direction ---
+    LONG          35 trades  WR  37.1%  PF  12.80  P&L      4408.62
+    SHORT         49 trades  WR  38.8%  PF   5.49  P&L      5695.34
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+  follows rule         181    83  45.9%       18977.13   3.07       21.4
+  against rule         182    74  40.7%       18634.47   5.15       20.5
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+    EURUSD LONG               89  43.8%   3.11      9557.59     GOLDEN
+    EURUSD SHORT             151  41.7%   5.85     16917.18    against
+    GBPUSD LONG               60  41.7%   1.54      1946.53    against
+    GBPUSD SHORT              63  47.6%   5.54      9190.29     GOLDEN
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+    golden + confirmed              37  40.5%  12.53
+    golden + opposing               13  76.9%   8.65
+    golden + no div                131  44.3%   2.02
+    against + confirmed             47  36.2%   2.95
+    against + opposing              17  41.2%   7.75
+    against + no div               118  42.4%   5.55
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  0            175    39  22.3%       -7320.64   0.64
+  1             17     8  47.1%          80.24   1.08
+  2             90    36  40.0%        8763.22   4.24
+  3            196    85  43.4%       23831.40   4.97
+  4             98    36  36.7%        6972.18   2.15
+  5             11     6  54.5%        3541.74  11.96
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile           293  42.7%   4.00       294  28.9%   1.06
+  NFP week Mon/Tue          45  46.7%   6.00       542  34.9%   1.80
+  Rate decision             26  57.7%   5.89       561  34.8%   1.92
+  PD prov (sweep)          354  38.7%   2.97       233  31.3%   1.27
+  Seasonal lean              0   0.0%   0.00       587  35.8%   1.99
+  HTF OB Context           145  40.7%   3.95       442  34.2%   1.55
+  D1 Draw                  369  41.2%   3.70       218  26.6%   0.84
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  inside                 4     2  50.0%       527.92   4.03   131.98
+  continuation         141    57  40.4%     18913.81   3.94   134.14
+  (none)               442   151  34.2%     16426.43   1.55    37.16
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  breaker               16  25.0%   0.85
+  d1_fvg                84  41.7%   5.61
+  ob                     4 100.0%    inf
+  pdhl                  21  42.9%   0.75
+  w_fvg                 20  35.0%   3.91
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  d1_fvg                 2     0   0.0%       -38.85   0.00
+  equal_hl             367   152  41.4%     39430.39   3.71
+  (none)               218    58  26.6%     -3523.39   0.84
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  equal_hl                39    19  48.7%     10101.07     259.00
+  fib_extension          181    81  44.8%     26116.29     144.29
+  gold_pb_rr             175    39  22.3%     -7320.64     -41.83
+  ith_liquidity            5     2  40.0%       701.24     140.25
+  itl_liquidity           19     7  36.8%       765.03      40.26
+  pdh_pdl                 54    17  31.5%      3181.59      58.92
+  pwh_pwl                  6     0   0.0%      -954.95    -159.16
+  round_number            32    14  43.8%      1004.41      31.39
+  swing                   76    31  40.8%      2274.10      29.92
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  equal_hl              19       9.0%     10920.15
+  fib_extension         81      38.6%     32093.24
+  gold_pb_rr            39      18.6%     12923.69
+  ith_liquidity          2       1.0%      1092.05
+  itl_liquidity          7       3.3%      1365.55
+  pdh_pdl               17       8.1%      5079.68
+  round_number          14       6.7%      2550.17
+  swing                 31      14.8%      6200.60
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   equal_hl              19  48.7%     10920.15
+  initial (L1)   fib_extension         81  44.8%     32093.24
+  initial (L1)   gold_pb_rr            39  22.3%     12923.69
+  initial (L1)   ith_liquidity          2  40.0%      1092.05
+  initial (L1)   itl_liquidity          7  38.9%      1365.55
+  initial (L1)   pdh_pdl               16  30.8%      4990.88
+  initial (L1)   round_number          14  43.8%      2550.17
+  initial (L1)   swing                 31  40.8%      6200.60
+  pyramid (L2+)  pdh_pdl                1  50.0%        88.80
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  London Open   equal_hl               7      6000.91
+  London Open   fib_extension         42     17792.86
+  London Open   gold_pb_rr            18      6082.91
+  London Open   itl_liquidity          6      1031.42
+  London Open   pdh_pdl                6      1395.18
+  London Open   round_number           8      1843.47
+  London Open   swing                 19      4594.08
+  New York AM   equal_hl              12      4919.24
+  New York AM   fib_extension         39     14300.38
+  New York AM   gold_pb_rr            21      6840.78
+  New York AM   ith_liquidity          2      1092.05
+  New York AM   itl_liquidity          1       334.13
+  New York AM   pdh_pdl               11      3684.51
+  New York AM   round_number           6       706.70
+  New York AM   swing                 12      1606.52
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  London Open     106      50.5%     38740.84
+  New York AM     104      49.5%     33484.32
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  below open        32    14      18  43.8%     7793.70     243.55
+  above open       323   134     189  41.5%    34930.23     108.14
+  no session       178    40     138  22.5%    -7406.48     -41.61
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)           90    31  34.4%       6612.13   2.52
+  SOJ single reference (+1)          231   102  44.2%      28960.89   5.85
+  no SOJ pattern                     266    77  28.9%        295.13   1.01

@@ -1,0 +1,86 @@
+name: Recent-window run (Yahoo, on GitHub's runner)
+
+# The Claude Code cloud container cannot reach market data (egress policy), and
+# the trader no longer has a VM. GitHub's runners can. This runs the recent-window
+# analyses there and commits the reports back so they can be read from the repo.
+#
+# Re-run any time: edit .github/recent-run.trigger and push, or use
+# "Run workflow" in the Actions tab (days input).
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "replay: days of trades to report (60d warm-up behind it)"
+        default: "20"
+      clock_days:
+        description: "fix-clock window (max 58; Yahoo caps 5m data at 60d)"
+        default: "58"
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/recent-run.yml"
+      - ".github/recent-run.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recent-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NO_PUSH: "1"
+      DAYS: ${{ github.event.inputs.days || '20' }}
+      # The clock needs every day it can get — 20 days cannot resolve ~2bp/day.
+      CLOCK_DAYS: ${{ github.event.inputs.clock_days || '58' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: pip install -r requirements.txt yfinance
+
+      - name: 1) Trades the algo would have taken (replay, 60d warm-up, report last DAYS)
+        continue-on-error: true
+        run: python run_yahoo_recent.py 60d --full --since "$DAYS" 2>&1 | tee data/yahoo_recent_console.txt
+
+      - name: 2) Institutional clock on the recent window
+        continue-on-error: true
+        run: python scripts/fx_clock_study.py --yahoo "$CLOCK_DAYS" 2>&1 | tee data/fx_clock_recent_console.txt
+
+      - name: 2b) Fundamentals scorecard — COT, US yields, high/medium news (P79)
+        continue-on-error: true
+        run: python scripts/fundamentals_scorecard.py 2>&1 | tee data/fundamentals_scorecard_console.txt
+
+      - name: 3a) US 2-year yield from FRED
+        continue-on-error: true
+        run: python scripts/fetch_fred.py --series DGS2 --start 2025-01-01 --end "$(date -u +%F)"
+
+      - name: 3b) Morning brief for today
+        continue-on-error: true
+        run: python scripts/fundamental_brief.py --no-push 2>&1 | tee data/brief_console.txt
+
+      - name: Commit reports back to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in data/yahoo_recent_report.md data/fx_clock_recent_report.md \
+                   data/fundamental_brief.md data/yahoo_recent_console.txt \
+                   data/fx_clock_recent_console.txt data/brief_console.txt \
+                   data/fundamentals_scorecard.md data/fundamentals_scorecard_console.txt; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          git commit -m "Recent-window run (${DAYS}d) on GitHub runner [$(date -u +%F)]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
