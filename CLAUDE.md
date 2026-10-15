@@ -62,7 +62,10 @@ gpbonly2 full 130 gold_pb trades in 4 yr (~0.6/week, NOT 3), WR 23%, PF 0.70; gp
 only 37-40% of entries ever reach +1R, 11-23% reach +2R, and **26-39% never get +0.25R** — so even a
 1R target would be ~38% WR, about −0.3R per trade after costs. Worse than a random entry: buying the
 M5 close through the swing buys the local top of the bounce. The mechanical trend-pullback entry
-has no edge here. Whole `_gold_pullback_entry` driven end-to-end on a stub this time
+has no edge here. **All 20 runs in (FX + gold book):** gpbny full 259 gold_pb trades WR 21% PF 0.56,
+book withdrawn R132.4k (vs p93 R176.0k), OOS headline DD −50.9%; gpb2 397 tr PF 0.58, R128.1k, OOS
+DD −49.6%; gpbnodxy 275 tr PF 0.58, R126.9k, OOS DD −46.2%; 2026 all arms 11-16 gold_pb, 0 wins.
+Costs R44-48k and triples the drawdown. **Closed — keep `GOLD_PB_ENABLED=0`.** Whole `_gold_pullback_entry` driven end-to-end on a stub this time
 (opens 1 oz long, $8.6 stop, R159 risk, 2R target; DXY-same-way path blocks). Same 5 arms ->
 `data/mm_golden_*_p110b_*`.
 
