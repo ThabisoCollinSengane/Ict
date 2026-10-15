@@ -4506,6 +4506,11 @@ class Backtester:
             if abs(entry - stop) > _max_stop:
                 stop = entry - _max_stop if direction > 0 else entry + _max_stop
                 g["stop_capped_10pip"] = g.get("stop_capped_10pip", 0) + 1
+        elif (config.GOLD_STOP_MAX > 0 and config.GOLD_ENABLED and pair == config.GOLD_PAIR
+                and abs(entry - stop) > config.GOLD_STOP_MAX):
+            # P107: gold's own stop cap in dollars (the FX 10-pip cap stays off for gold).
+            stop = entry - config.GOLD_STOP_MAX if direction > 0 else entry + config.GOLD_STOP_MAX
+            g["gold_stop_capped"] = g.get("gold_stop_capped", 0) + 1
 
         # P20: escalate to premium liquidity draws when high-conviction signals fire.
         # CRT-D/W (HTF Judas on Daily/Weekly), draw≥2 (2+ HTF levels agree), or
@@ -4619,6 +4624,14 @@ class Backtester:
         if _pt_mult != 1.0:
             risk_units = int(risk_units * _pt_mult)
             min_units  = max(1, int(min_units * _pt_mult))
+        _gold_own = (config.GOLD_MIN_LOT > 0 and config.GOLD_ENABLED
+                     and pair == config.GOLD_PAIR)
+        if _gold_own:
+            # P107: floor at the BROKER min lot, risk-based size at gold's own %.
+            _gpct = config.GOLD_RISK_PCT or config.RISK_PER_TRADE_PCT
+            risk_units = int(equity_usd * _gpct / 100.0 / max(abs(entry - stop), 1e-9))
+            min_units  = max(1, int(config.GOLD_MIN_LOT * self._contract_units(pair)))
+            g["gold_own_sized"] = g.get("gold_own_sized", 0) + 1
         units = max(risk_units, min_units)
         # Draw-weighted sizing: scale up the highest-edge setups (3/3 cascade, PF 6.17)
         # so they carry more capital. Applied to the risk-based size, then floored at
@@ -4745,7 +4758,10 @@ class Backtester:
         # stop would cost more than MAX_RISK_PER_TRADE_PCT of equity, the account is
         # too small to trade this stop width safely — skip it. Prevents the 10%+
         # single-trade losses that build the early-account drawdown.
-        _risk_cap = self.equity * (config.MAX_RISK_PER_TRADE_PCT / 100.0)
+        _cap_pct = config.MAX_RISK_PER_TRADE_PCT
+        if _gold_own and config.GOLD_MAX_RISK_PCT > 0:
+            _cap_pct = config.GOLD_MAX_RISK_PCT
+        _risk_cap = self.equity * (_cap_pct / 100.0)
         trade_risk_zar = units * abs(entry - stop) * config.USD_ZAR
         if trade_risk_zar > _risk_cap:
             if config.RISK_CAP_HALVE:
@@ -7247,6 +7263,8 @@ class Backtester:
         base_units = int(tier_lots[lot_idx] * self._contract_units(pair))
         units = max(int(base_units * im_score),
                     int(tier_lots[-1] * self._contract_units(pair)))
+        if config.GOLD_MIN_LOT > 0 and config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+            units = st["legs"][0]["units"]   # P107: gold adds at the first leg's size, not the FX tier
 
         # Promote prior leg stop to breakeven before adding new leg.
         prior = st["legs"][-1]

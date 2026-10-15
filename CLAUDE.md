@@ -24,6 +24,23 @@ cache-bug post-mortem.)
 
 ---
 
+## 🥇 P107 — gold sized as GOLD, not as FX (BUILT 2026-10-15, RUNNING)
+
+**Trader (2026-10-15): stop "failing" things on FX settings; the plan is multiple systems
+interacting with FX as the core.** Correct — the P103/P104b gold "RED" was a sizing artifact:
+gold's floor was the FX tier lot (0.02/0.05/0.09 lot = 2/5/9 oz), so at R6k a $21 structural
+stop = ~R3.5k risk and the 8% cap skipped nearly every setup. Gold's 1% risk size is < 1 oz,
+so it ALWAYS sat on that wrong floor. At the real Exness min (0.01 lot = 1 oz) a $21 stop is
+~R390 = 6.5% of R6k — inside the cap. **Rule going forward: a new instrument gets its own
+sizing / session / stop before any verdict; a verdict on FX defaults is not a verdict.**
+
+Flags (default off, FX byte-identical): `GOLD_MIN_LOT` (broker floor, 0.01), `GOLD_RISK_PCT`,
+`GOLD_MAX_RISK_PCT`, `GOLD_SESSIONS` (ny/london; P106 says gold moves far more in NY),
+`GOLD_STOP_MAX` ($ cap). Gold pyramid legs use the first leg's size. Counters `gold_own_sized`,
+`gold_stop_capped`. Live stub clean. Arms (FX + gold unless noted): `g1` both sessions,
+`g1ny`, `g1ny10` (10% cap), `g1ny15s` ($15 stop cap), `g1ny075` (2-of-3 gate), `gonlyny`
+(gold alone from R10k) × is/oos/full/y26 -> `data/mm_golden_*_p107_*`. Control = p93.
+
 ## 🎲 P100 — Monte Carlo drawdown study + Unger wide-range-bar filter (2026-10-14)
 
 **Monte Carlo (`scripts/monte_carlo.py` -> `data/monte_carlo_report.md`, RAN).** 876 p93 trades

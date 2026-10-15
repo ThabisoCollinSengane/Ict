@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [idxonly, goldonly]
+        mode: [g1, g1ny, g1ny10, g1ny15s, g1ny075, gonlyny]
     env:
       NO_PUSH: "1"
     steps:
@@ -84,6 +84,10 @@ jobs:
           # P101: cmp4/cmpd = breakout after a compressed H4/D bar sized 1.25x (Unger);
           #       volx/volx15 = 0.75x size when yesterday's range > 1.8x/1.5x the 20-day mean (Serafini).
           case "${{ matrix.mode }}" in cmp4) export COMPRESS_MULT=1.25 COMPRESS_TF=240T;; cmpd) export COMPRESS_MULT=1.25 COMPRESS_TF=D;; volx) export VOLX_MULT=0.75 VOLX_RATIO=1.8;; volx15) export VOLX_MULT=0.75 VOLX_RATIO=1.5;; esac
+          # P107: gold sized as GOLD (Exness 0.01 lot = 1 oz floor, not the FX tier lot).
+          case "${{ matrix.mode }}" in g1*|gonly*) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
+          case "${{ matrix.mode }}" in *ny*) export GOLD_SESSIONS=ny;; esac
+          case "${{ matrix.mode }}" in g1ny10) export GOLD_MAX_RISK_PCT=10;; g1ny15s) export GOLD_STOP_MAX=15;; g1ny075) export GOLD_MIN_IMSCORE=0.75;; gonlyny) export TRADE_PAIRS=XAUUSD STARTING_CASH=10000;; esac
           # P103: gold as a second system on the current engine. gold = FX + XAUUSD (DXY+silver+AUD
           #       all agree); gold075 = 2-of-3 breadth; gold05 = gold at half size; goldonly = XAUUSD alone.
           case "${{ matrix.mode }}" in gold) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0;; gold075) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=0.75;; gold05) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 GOLD_SIZE_MULT=0.5;; goldonly) export GOLD_ENABLED=1 GOLD_MIN_IMSCORE=1.0 TRADE_PAIRS=XAUUSD STARTING_CASH=10000;; esac
@@ -118,7 +122,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p104b
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p107
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

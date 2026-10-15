@@ -1002,6 +1002,14 @@ GOLD_MIN_IMSCORE   = float(_os.environ.get("GOLD_MIN_IMSCORE", 1.0))
 # Gold position multiplier — trade gold at a fraction of FX size to cap its
 # drawdown contribution (edge exists, but it clusters DD). 1.0 = off.
 GOLD_SIZE_MULT     = float(_os.environ.get("GOLD_SIZE_MULT", 1.0))
+# P107 — gold sized as GOLD, not as FX. Until P107 the gold floor was the FX tier lot
+# (0.02 / 0.05 / 0.09 lot = 2 / 5 / 9 oz), so at R6k a $21 structural stop meant ~R3.5k
+# of risk and the 8% cap skipped every gold setup. All default off (byte-identical).
+GOLD_MIN_LOT      = _envf("GOLD_MIN_LOT", 0)       # broker min lot (Exness 0.01 = 1 oz); >0 = floor
+GOLD_RISK_PCT     = _envf("GOLD_RISK_PCT", 0)      # risk-based size % (0 = RISK_PER_TRADE_PCT)
+GOLD_MAX_RISK_PCT = _envf("GOLD_MAX_RISK_PCT", 0)  # per-trade cap % (0 = MAX_RISK_PER_TRADE_PCT)
+GOLD_SESSIONS     = _os.environ.get("GOLD_SESSIONS", "")   # "" both / "ny" / "london"
+GOLD_STOP_MAX     = _envf("GOLD_STOP_MAX", 0)      # $ cap on the structural stop (0 = none)
 if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
     PAIRS = PAIRS + (GOLD_PAIR,)
 

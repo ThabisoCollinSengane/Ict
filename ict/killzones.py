@@ -35,6 +35,10 @@ def _kz_list(pair: str | None):
     # EUR/GBP: London Open + NY AM.
     if pair in _NZD_ONLY_PAIRS:
         return _KZ_NZD
+    # P107: gold in its own session (P106: gold's moves are far bigger in NY).
+    if (config.GOLD_SESSIONS and config.GOLD_ENABLED and pair == config.GOLD_PAIR):
+        key = "London" if config.GOLD_SESSIONS == "london" else "New York"
+        return [z for z in _KZ if key in z[0]]
     return _KZ_AUD if pair in _AUD_ONLY_PAIRS else _KZ
 
 
