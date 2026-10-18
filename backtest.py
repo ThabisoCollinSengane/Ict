@@ -271,6 +271,12 @@ class Backtester:
         timestamps = self.data_5m["GBPUSD"].index
 
         warmup_end = timestamps[0] + pd.Timedelta(days=5)
+        if config.TRADE_FROM:   # P111: trade a single window, earlier bars = history only
+            _tf = pd.Timestamp(config.TRADE_FROM)
+            if timestamps.tz is not None and _tf.tzinfo is None:
+                _tf = _tf.tz_localize(timestamps.tz)
+            warmup_end = max(warmup_end, _tf)
+            print(f"  TRADE_FROM {config.TRADE_FROM}: last bar in data {timestamps[-1]}")
         total = len(timestamps)
         print(f"  Iterating {total} 5-min bars...")
 

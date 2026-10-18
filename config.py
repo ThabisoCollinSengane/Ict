@@ -23,6 +23,9 @@ def _envi(name, default):
 
 # --- Capital + risk ---
 STARTING_CASH = _envi("STARTING_CASH", 1000)  # ZAR starting capital (env-overridable)
+# P111: no entries before this UTC date ("YYYY-MM-DD"); earlier bars are warm-up history only.
+# "" = off (the normal 5-day warm-up) -> byte-identical.
+TRADE_FROM = _os.environ.get("TRADE_FROM", "")
 ACCOUNT_CURRENCY = "ZAR"          # account denomination
 
 # --- Profit withdrawal model (realistic account, no runaway compounding) ---
