@@ -24,6 +24,16 @@ cache-bug post-mortem.)
 
 ---
 
+## 📅 P111 — single-month backtest from R3,000 (RAN 2026-10-18)
+
+`TRADE_FROM` (config, default "" = off) = no entries before that UTC date; earlier bars are
+history only. Workflow `.github/workflows/month-backtest.yml` (2026 Jun-Oct loaded) ->
+`data/month_<win>26_<fx|all3>_p111_*`. HistData's October file ends **Fri 9 Oct 2026**.
+- **October 1-9, FX alone:** 9 trades, 4 wins (44%), PF 2.99, R3,000 -> R4,234 (+41%), max DD −9.4%.
+- **October 1-9, FX + gold + indices:** 10 trades (+1 SPX win, no gold), R4,363 (+45%), DD −9.4%.
+- September (fallback window, 1 Sep - 9 Oct): FX 14 Sep trades, WR 36%, +R103 in Sep; indices
+  5 Sep trades 4 wins +R72; full window FX R4,337, all3 R4,538.
+
 ## 🥇 P110 — gold's OWN entry model: trend pullback (BUILT 2026-10-15, RUNNING)
 
 **Exness XAUUSDm spec (trader screenshot 2026-10-15):** contract 100 (0.01 lot = 1 oz), min
