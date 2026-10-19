@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [p93, ixds, gds, allds, allfvg, alltime, dseu, ixdsonly, gdsonly]
+        mode: [ixds1r, gds1r, allds1r, dseu1r, ixdsonly1r, gdsonly1r]
     env:
       NO_PUSH: "1"
     steps:
@@ -129,11 +129,13 @@ jobs:
           #       gds = FX + gold 1 oz + DS on gold; allds = FX + gold + indices + DS on both;
           #       allfvg / alltime = allds with the M5 FVG entry / the noon time exit; dseu = DS on
           #       EURUSD+GBPUSD only; ixdsonly / gdsonly = that instrument alone from R3,000.
-          case "${{ matrix.mode }}" in ixds|allds|allfvg|alltime|ixdsonly) export INDICES_ENABLED=1 INDEX_PAIRS="SPXUSD NSXUSD" INDEX_AMD_MAX_RANGE_PCT=0.8 INDEX_MAX_TRADES_PER_DAY=3 INDEX_LOT_UNITS=100 INDEX_UNIT_VALUE=0.01 INDEX_MIN_LOT=0.01;; esac
-          case "${{ matrix.mode }}" in gds|allds|allfvg|alltime|gdsonly) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
+          case "${{ matrix.mode }}" in ixds|allds|allfvg|alltime|ixdsonly|ixds1r|allds1r|ixdsonly1r) export INDICES_ENABLED=1 INDEX_PAIRS="SPXUSD NSXUSD" INDEX_AMD_MAX_RANGE_PCT=0.8 INDEX_MAX_TRADES_PER_DAY=3 INDEX_LOT_UNITS=100 INDEX_UNIT_VALUE=0.01 INDEX_MIN_LOT=0.01;; esac
+          case "${{ matrix.mode }}" in gds|allds|allfvg|alltime|gdsonly|gds1r|allds1r|gdsonly1r) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
           case "${{ matrix.mode }}" in *ds*|allfvg|alltime) export DS_ENABLED=1;; esac
-          case "${{ matrix.mode }}" in dseu) export DS_PAIRS="EURUSD GBPUSD";; allfvg) export DS_ENTRY=fvg;; alltime) export DS_TARGET=time;; esac
-          case "${{ matrix.mode }}" in ixdsonly) export TRADE_PAIRS="SPXUSD NSXUSD" STARTING_CASH=3000;; gdsonly) export TRADE_PAIRS=XAUUSD STARTING_CASH=3000;; esac
+          case "${{ matrix.mode }}" in dseu|dseu1r) export DS_PAIRS="EURUSD GBPUSD";; allfvg) export DS_ENTRY=fvg;; alltime) export DS_TARGET=time;; esac
+          # P112b: *1r = the same arms with a fixed 1R target (DS_TARGET=rr DS_RR=1).
+          case "${{ matrix.mode }}" in *1r) export DS_TARGET=rr DS_RR=1.0;; esac
+          case "${{ matrix.mode }}" in ixdsonly|ixdsonly1r) export TRADE_PAIRS="SPXUSD NSXUSD" STARTING_CASH=3000;; gdsonly|gdsonly1r) export TRADE_PAIRS=XAUUSD STARTING_CASH=3000;; esac
           python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX,'JT',c.MM_GOLDEN_JUDAS_TARGET,'FX',c.MM_GOLDEN_FIXED_EXIT,'RR',c.MM_GOLDEN_FIXED_RR,'DISP',c.MM_GOLDEN_M1_MSS_DISP,'JTF',c.MM_GOLDEN_JT_TFS,'BEF',c.MM_GOLDEN_BE_FRAC,'HSMT',c.MM_GOLDEN_HSMT,'OBSMT',c.MM_GOLDEN_OB_SMT_REQUIRED,'SESS',c.MM_GOLDEN_SESSION_EXIT,'NEWS',c.MM_GOLDEN_NEWS_EXIT,'WRB',c.WRB_FILTER,'CMP',c.COMPRESS_MULT,c.COMPRESS_TF,'VOLX',c.VOLX_MULT,c.VOLX_RATIO,'GOLD',c.GOLD_ENABLED,c.GOLD_MIN_IMSCORE,c.GOLD_SIZE_MULT,'IDX',c.INDICES_ENABLED,c.INDEX_SIZE_MULT,'DS',c.DS_ENABLED,c.DS_ENTRY,c.DS_TARGET,'PAIRS',c.PAIRS)"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
@@ -148,7 +150,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p112
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p112b
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
