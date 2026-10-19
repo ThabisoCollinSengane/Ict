@@ -24,7 +24,37 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — P112 JadeCap "Daily Sweep" / SFP model (SPEC SAVED 2026-10-19, NOT BUILT)
+## 🎯 P112 JadeCap "Daily Sweep" / SFP model (BUILT 2026-10-19, RUNNING)
+
+**Build:** `_daily_sweep_entry` / `_ds_signal` / `_ds_bias` / `_ds_levels` / `_ds_target` /
+`_ds_try_fvg_fill` / `_ds_open` in backtest.py, flags `DS_*` in config.py (default OFF, FX
+byte-identical). Runs after the other channels with its OWN window (`DS_WINDOW` 08:00-12:00 ET =
+the SFP candle's close), shared circuit breakers + news gate, P107/P109 broker-min sizing, max 1
+per instrument per day. Bias `DS_BIAS` d2s (default) = yesterday vs day before (HH+HL / LH+LL;
+outside bar = its body direction; inside bar = no trade) AND the daily Ep-12 swing structure not
+opposed; d2 = pass 2 only; h4 = Ep-12 on completed H4. Levels `DS_LEVELS` all = PDH/PDL +
+prior-day H1 swing points + today's Asia (20:00-03:00 ET) and London (03:00-07:00 ET) high/low;
+a level only counts if nothing traded through it between when it formed and the SFP candle
+(fresh). SFP = the last COMPLETED `DS_TF` (H1) candle wicks past the level and closes back
+inside, in the bias direction; deepest swept level wins. Entry `DS_ENTRY` close (SFP close +
+spread) / fvg (first M5 FVG after the SFP, filled on a completed-bar touch, waits
+`DS_FVG_WAIT`=24 M5 bars, cancelled if the stop trades first). Stop = SFP wick ∓ `DS_STOP_BUF`
+(1 pip). Target `DS_TARGET` liq = PDH/PDL if ≥ `DS_MIN_RR` (1R) away, else the nearest marked
+level that is (skip if none) / rr (`DS_RR`=2) / time (exit at `DS_EXIT_ET` 12:00 ET). Fixed exit
+(no FX pip trailing). Counters `ds_*` (outside_window, no_bias, no_sfp, sfp_<kind>, news,
+no_target, risk_cap, armed, fvg_expired/invalid, opened, time_exit); `entry_model`=daily_sweep,
+`stop_reason`/`im_scenario` carry the swept level kind. Fixture-driven end to end (synthetic gold
+day: bullish d2s bias, 09:00 ET candle sweeps the London low and closes back above -> long on the
+close, stop under the wick, target hit; short = exact mirror; fvg fill; time exit at noon; rr).
+Live stub clean (`python -m live.test_live_stub --days 2`). Not in the live loop yet.
+Arms (workflow `mm-golden-isoos.yml`, suffix `_p112`): `p93` control (876 / R176,034), `ixds`
+(FX + indices P109 ix1 + DS on indices; compare P109 ix1 R164.2k), `gds` (FX + gold 1 oz + DS on
+gold; compare P107 g1 R182.3k), `allds` (all3 + DS on gold+indices; compare all3 R199.8k),
+`allfvg`, `alltime`, `dseu` (DS on EURUSD/GBPUSD), `ixdsonly` / `gdsonly` (alone from R3,000)
+× is/oos/full/y26. Read the `daily_sweep` rows of each dump (trades/week, WR, PF by instrument,
+by level kind) and the book delta vs its comparison arm.
+
+### Original spec (saved 2026-10-19)
 
 Trader sent ~28 screenshots of JadeCap (ICT-style, NQ trader) "Module 7 · Model 01 — The Daily
 Sweep" and asked to cross-reference it with our algo and build it. Trader: "this is more of the

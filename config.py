@@ -1048,6 +1048,29 @@ GOLD_PB_MAX_PER_DAY = _envi("GOLD_PB_MAX_PER_DAY", 2)
 if GOLD_ENABLED and GOLD_PAIR not in PAIRS:
     PAIRS = PAIRS + (GOLD_PAIR,)
 
+# P112 — JadeCap "Daily Sweep": bias from the instrument's OWN higher timeframe, a sweep of a
+# marked level (PDH/PDL, prior-day swing points, today's London/Asia range) that FAILS to hold
+# (Swing Failure Pattern: a completed DS_TF candle wicks through and closes back inside), entry
+# on that close (or the first M5 FVG retrace), stop beyond the SFP wick, target the opposite
+# daily level / fixed RR / a noon time exit. Separate channel, default OFF (byte-identical).
+DS_ENABLED      = _envi("DS_ENABLED", 0)
+DS_PAIRS        = tuple(_os.environ.get("DS_PAIRS", "").split())  # "" = gold + indices that are on
+DS_BIAS         = _os.environ.get("DS_BIAS", "d2s")   # d2 = yesterday vs day before; d2s = d2 and
+                                                       # the daily swing structure not opposed; h4
+DS_TF           = _os.environ.get("DS_TF", "60T")     # the SFP candle
+DS_LEVELS       = _os.environ.get("DS_LEVELS", "all")  # pd | pdsw (+prior-day swings) | all (+sessions)
+DS_WINDOW       = _os.environ.get("DS_WINDOW", "08:00-12:00")   # ET; SFP candle CLOSE inside it
+DS_ENTRY        = _os.environ.get("DS_ENTRY", "close")  # close | fvg
+DS_FVG_WAIT     = _envi("DS_FVG_WAIT", 24)              # M5 bars to wait for the FVG fill
+DS_TARGET       = _os.environ.get("DS_TARGET", "liq")   # liq | rr | time
+DS_RR           = _envf("DS_RR", 2.0)
+DS_MIN_RR       = _envf("DS_MIN_RR", 1.0)               # liq target must sit >= this many R away
+DS_EXIT_ET      = _os.environ.get("DS_EXIT_ET", "12:00")   # time mode: close here (ET)
+DS_STOP_BUF     = _envf("DS_STOP_BUF", 1.0)             # pips beyond the SFP wick
+DS_MIN_PIERCE   = _envf("DS_MIN_PIERCE", 0.0)           # pips the wick must run past the level
+DS_MAX_PER_DAY  = _envi("DS_MAX_PER_DAY", 1)            # per instrument
+DS_MAX_RISK_PCT = _envf("DS_MAX_RISK_PCT", 0)           # 0 = MAX_RISK_PER_TRADE_PCT
+
 # --- US index intermarket gate — US500 + US100 traded, US30 + DXY confirm ---
 # Indices move INVERSE to the dollar (weak USD -> risk-on -> indices up), so the
 # SAME 3-market breadth logic as gold applies: DXY (primary, sign-flipped) + the

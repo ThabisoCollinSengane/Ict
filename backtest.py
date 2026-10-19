@@ -310,6 +310,8 @@ class Backtester:
                         self._mm_standalone(pair, t)
                     if pair not in self.active and config.GOLD_PB_ENABLED:
                         self._gold_pullback_entry(pair, t)   # P110 gold's own model
+                if config.DS_ENABLED and pair not in self.active:
+                    self._daily_sweep_entry(pair, t)        # P112 JadeCap daily sweep (own window)
 
             if i % 1000 == 0 and i > 0:
                 print(f"    bar {i}/{total} ({t}) - active={len(self.active)} "
@@ -360,6 +362,13 @@ class Backtester:
             if st.get("sess_exit") or st.get("news_exit"):   # P97: session-end / pre-news MM exits
                 if self._mm_time_exit(pair, st, bar, t, pip):
                     return
+            if st.get("ds_exit_at") is not None and t >= st["ds_exit_at"]:   # P112 noon exit
+                for leg in list(st["legs"]):
+                    self._exit_leg(pair, leg, bar.Close, t, "time_exit")
+                if not self.active.get(pair, {}).get("legs"):
+                    self.active.pop(pair, None)
+                self.gate["ds_time_exit"] = self.gate.get("ds_time_exit", 0) + 1
+                return
             if config.TIME_EXIT_HOURS > 0 and st.get("legs"):   # P108 (Unger): time exit
                 _op = st["legs"][0].get("opened_at")
                 if _op is not None and (t - _op) >= timedelta(hours=config.TIME_EXIT_HOURS):
@@ -5506,6 +5515,281 @@ class Backtester:
         }
         cnt[_dk] = cnt.get(_dk, 0) + 1
         g["gold_pb_opened"] = g.get("gold_pb_opened", 0) + 1
+
+    # ── P112: JadeCap "Daily Sweep" (bias → swing failure at a marked level → enter on close) ──
+    def _ds_pairs(self):
+        if config.DS_PAIRS:
+            return tuple(p for p in config.DS_PAIRS if p in config.PAIRS)
+        out = ()
+        if config.GOLD_ENABLED:
+            out += (config.GOLD_PAIR,)
+        if config.INDICES_ENABLED:
+            out += tuple(config.INDEX_PAIRS)
+        return out
+
+    @staticmethod
+    def _ds_d2(y, p):
+        """Pass 2 — yesterday vs the day before. +1 HH+HL, -1 LH+LL, outside bar = its own
+        body direction (strong), inside bar / mixed = 0 (indecision)."""
+        if y.High > p.High and y.Low > p.Low:
+            return 1
+        if y.High < p.High and y.Low < p.Low:
+            return -1
+        if y.High > p.High and y.Low < p.Low:          # outside bar
+            return 1 if y.Close > y.Open else (-1 if y.Close < y.Open else 0)
+        return 0                                        # inside bar
+
+    def _ds_bias(self, pair, t):
+        """Identification on COMPLETED higher-timeframe bars only. Returns +1 / -1 / 0."""
+        mode = config.DS_BIAS
+        if mode == "h4":
+            hb = self.bars_up_to(pair, "240T", t, max_bars=301)[:-1]
+            if len(hb) < 30:
+                return 0
+            return mstruct.structure_direction(mstruct.classify(hb))
+        db = self.bars_up_to(pair, "D", t, max_bars=81)[:-1]
+        if len(db) < 3:
+            return 0
+        d = self._ds_d2(db[-1], db[-2])
+        if d == 0 or mode == "d2":
+            return d
+        # d2s — pass 1: the bigger picture (daily swing structure) must not point the other way
+        big = mstruct.structure_direction(mstruct.classify(db)) if len(db) >= 20 else 0
+        return 0 if big == -d else d
+
+    def _ds_levels(self, pair, t, side):
+        """Marked liquidity on one side ('low' or 'high'): list of (price, valid_from, kind).
+        valid_from = the first time the level may be swept (anything before is how it formed)."""
+        import pytz as _pytz
+        ny = _pytz.timezone("America/New_York")
+        out = []
+        di = self.tf_index.get((pair, "D"))
+        db = self.bars_up_to(pair, "D", t)
+        if di is None or len(db) < 2:
+            return out
+        pos = di.searchsorted(t, side="right") - 1          # forming daily bar
+        today0, prev0 = di[pos], di[pos - 1]
+        pdb = db[-2]                                         # the previous COMPLETED day
+        out.append(((pdb.Low if side == "low" else pdb.High), today0, "pd"))
+        hi = self.tf_index.get((pair, "60T"))
+        hb = self.tf_bars.get((pair, "60T"))
+        if config.DS_LEVELS in ("pdsw", "all") and hi is not None:
+            a, b = hi.searchsorted(prev0), hi.searchsorted(today0)
+            seg = hb[a:b]
+            for i in range(1, len(seg) - 1):
+                if side == "low" and seg[i].Low < seg[i - 1].Low and seg[i].Low < seg[i + 1].Low:
+                    out.append((seg[i].Low, today0, "pdsw"))
+                if side == "high" and seg[i].High > seg[i - 1].High and seg[i].High > seg[i + 1].High:
+                    out.append((seg[i].High, today0, "pdsw"))
+        if config.DS_LEVELS == "all" and hi is not None:
+            day = pd.Timestamp(t).tz_convert(ny).normalize()   # today 00:00 New York
+            for name, s, e in (("asia", day - pd.Timedelta(hours=4), day + pd.Timedelta(hours=3)),
+                               ("london", day + pd.Timedelta(hours=3), day + pd.Timedelta(hours=7))):
+                s_u, e_u = s.tz_convert("UTC"), e.tz_convert("UTC")
+                if e_u > t:
+                    continue
+                i0, i1 = hi.searchsorted(s_u), hi.searchsorted(e_u)
+                seg = hb[i0:i1]
+                if seg:
+                    lvl = min(x.Low for x in seg) if side == "low" else max(x.High for x in seg)
+                    out.append((lvl, e_u, name))
+        return out
+
+    def _ds_signal(self, pair, t):
+        """Returns (direction, sfp_bar, level, kind, sfp_close_time) or (0, reason)."""
+        import pytz as _pytz
+        hi = self.tf_index.get((pair, config.DS_TF))
+        if hi is None:
+            return 0, "no_tf"
+        pos = hi.searchsorted(t, side="right") - 1          # forming candle
+        if pos < 2:
+            return 0, "no_bars"
+        s_open = hi[pos - 1]                                 # the last COMPLETED candle
+        s_close = hi[pos]
+        last = getattr(self, "_ds_seen", None)
+        if last is None:
+            last = self._ds_seen = {}
+        if last.get(pair) == s_open:
+            return 0, None                                   # this candle already judged
+        last[pair] = s_open
+        et = s_close.tz_convert("America/New_York")
+        w0, w1 = config.DS_WINDOW.split("-")
+        hm = et.hour * 60 + et.minute
+        if not (int(w0[:2]) * 60 + int(w0[3:]) <= hm <= int(w1[:2]) * 60 + int(w1[3:])):
+            return 0, "outside_window"
+        d = self._ds_bias(pair, t)
+        if d == 0:
+            return 0, "no_bias"
+        s = self.tf_bars[(pair, config.DS_TF)][pos - 1]
+        pip = pip_size(pair)
+        side = "low" if d > 0 else "high"
+        hidx = self.tf_index[(pair, "60T")]
+        hbars = self.tf_bars[(pair, "60T")]
+        best = None
+        for lvl, vfrom, kind in self._ds_levels(pair, t, side):
+            run = (lvl - s.Low) if d > 0 else (s.High - lvl)
+            back = (s.Close > lvl) if d > 0 else (s.Close < lvl)
+            if run <= config.DS_MIN_PIERCE * pip or not back:
+                continue
+            # fresh: nothing traded through the level between valid_from and this candle
+            a, b = hidx.searchsorted(vfrom), hidx.searchsorted(s_open)
+            seg = hbars[a:b]
+            if seg and ((d > 0 and min(x.Low for x in seg) < lvl)
+                        or (d < 0 and max(x.High for x in seg) > lvl)):
+                continue
+            # the deepest (outermost) level swept wins
+            if best is None or (lvl < best[0] if d > 0 else lvl > best[0]):
+                best = (lvl, kind)
+        if best is None:
+            return 0, "no_sfp"
+        return d, s, best[0], best[1], s_close
+
+    def _ds_target(self, pair, d, entry, risk, t):
+        if config.DS_TARGET == "rr":
+            return entry + d * config.DS_RR * risk, "ds_rr"
+        side = "high" if d > 0 else "low"
+        lv = self._ds_levels(pair, t, side)
+        need = config.DS_MIN_RR * risk
+        ahead = [(p, k) for p, _, k in lv if (p - entry) * d >= need]
+        if not ahead:
+            return None, None
+        pdl = [x for x in ahead if x[1] == "pd"]       # the outer extreme is the primary target
+        p, k = pdl[0] if pdl else min(ahead, key=lambda x: abs(x[0] - entry))
+        return p, f"ds_{k}"
+
+    def _daily_sweep_entry(self, pair, t):
+        """P112 — JadeCap Daily Sweep channel. Own time window (DS_WINDOW), the shared circuit
+        breakers and news gate, instrument-native sizing (P107/P109 floors)."""
+        if pair not in self._ds_pairs() or pair in self.active:
+            return
+        g = self.gate
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        _dk = now.date()
+        if self._drawdown_halt_until is not None and _dk < self._drawdown_halt_until:
+            return
+        _day_open = self._day_open_eq.get(_dk)
+        if _day_open and (_day_open - self.equity) / _day_open * 100 >= config.MAX_DAILY_LOSS_PCT:
+            return
+        if self._consec_losses >= config.MAX_CONSECUTIVE_LOSSES:
+            return
+        cnt = getattr(self, "_ds_count", None)
+        if cnt is None:
+            cnt = self._ds_count = {}
+            self._ds_pending = {}
+        if cnt.get((pair, _dk), 0) >= config.DS_MAX_PER_DAY:
+            return
+        pip = pip_size(pair)
+        spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        cost = (spread + config.SLIPPAGE_PIPS) * pip
+        pend = self._ds_pending.get(pair)
+        if pend is not None:                                  # FVG mode: waiting for the fill
+            self._ds_try_fvg_fill(pair, t, pend, cost)
+            return
+        sig = self._ds_signal(pair, t)
+        if sig[0] == 0:
+            if sig[1]:
+                g[f"ds_{sig[1]}"] = g.get(f"ds_{sig[1]}", 0) + 1
+            return
+        d, s, lvl, kind, s_close = sig
+        g["ds_sfp"] = g.get("ds_sfp", 0) + 1
+        g[f"ds_sfp_{kind}"] = g.get(f"ds_sfp_{kind}", 0) + 1
+        if self.news.nearest_impact(now) in ("Medium", "Critical", "High"):
+            g["ds_news"] = g.get("ds_news", 0) + 1
+            return
+        stop = (s.Low - config.DS_STOP_BUF * pip) if d > 0 else (s.High + config.DS_STOP_BUF * pip)
+        if config.DS_ENTRY == "fvg":
+            self._ds_pending[pair] = {"d": d, "stop": stop, "kind": kind, "since": s_close,
+                                      "bars": 0}
+            g["ds_armed"] = g.get("ds_armed", 0) + 1
+            return
+        self._ds_open(pair, t, d, s.Close + d * cost, stop, kind)
+
+    def _ds_try_fvg_fill(self, pair, t, pend, cost):
+        g = self.gate
+        d, stop = pend["d"], pend["stop"]
+        mi = self.tf_index[(pair, "5T")]
+        mb = self.tf_bars[(pair, "5T")]
+        pos = mi.searchsorted(t, side="right") - 1          # forming M5 bar
+        a = mi.searchsorted(pend["since"])
+        done = mb[a:pos]                                    # completed M5 bars since the SFP close
+        pend["bars"] = len(done)
+        if done and ((d > 0 and min(x.Low for x in done) <= stop)
+                     or (d < 0 and max(x.High for x in done) >= stop)):
+            self._ds_pending.pop(pair, None)
+            g["ds_fvg_invalid"] = g.get("ds_fvg_invalid", 0) + 1
+            return
+        if len(done) > config.DS_FVG_WAIT:
+            self._ds_pending.pop(pair, None)
+            g["ds_fvg_expired"] = g.get("ds_fvg_expired", 0) + 1
+            return
+        # first FVG in our direction formed after the SFP close, then a later completed bar
+        # trading back into it = the fill
+        for i in range(2, len(done)):
+            top, bot = ((done[i].Low, done[i - 2].High) if d > 0
+                        else (done[i - 2].Low, done[i].High))
+            if top <= bot:
+                continue
+            edge = top if d > 0 else bot                     # near edge of the gap
+            later = done[i + 1:]
+            if not later:
+                return
+            touched = (min(x.Low for x in later) <= edge) if d > 0 else (max(x.High for x in later) >= edge)
+            if touched:
+                last = later[-1].Close
+                entry = (max(edge, last) if d > 0 else min(edge, last)) + d * cost
+                self._ds_pending.pop(pair, None)
+                self._ds_open(pair, t, d, entry, stop, pend["kind"])
+            return
+
+    def _ds_open(self, pair, t, d, entry, stop, kind):
+        g = self.gate
+        if (entry - stop) * d <= 0:
+            g["ds_stop_wrong_side"] = g.get("ds_stop_wrong_side", 0) + 1
+            return
+        risk = abs(entry - stop)
+        exit_at = None
+        if config.DS_TARGET == "time":
+            target = entry + d * 50 * risk                     # the clock decides, not a level
+            ttype = "ds_time"
+            et = t.tz_convert("America/New_York")
+            hh, mm = config.DS_EXIT_ET.split(":")
+            ex = et.normalize() + pd.Timedelta(hours=int(hh), minutes=int(mm))
+            if ex <= et:
+                g["ds_too_late"] = g.get("ds_too_late", 0) + 1
+                return
+            exit_at = ex.tz_convert("UTC")
+        else:
+            target, ttype = self._ds_target(pair, d, entry, risk, t)
+            if target is None:
+                g["ds_no_target"] = g.get("ds_no_target", 0) + 1
+                return
+        equity_usd = self._size_equity() / config.USD_ZAR
+        if config.GOLD_ENABLED and pair == config.GOLD_PAIR:
+            pct, minlot = (config.GOLD_RISK_PCT or config.RISK_PER_TRADE_PCT), (config.GOLD_MIN_LOT or 0.01)
+        elif config.INDICES_ENABLED and pair in config.INDEX_PAIRS:
+            pct, minlot = config.RISK_PER_TRADE_PCT, (config.INDEX_MIN_LOT or 0.01)
+        else:
+            pct, minlot = config.RISK_PER_TRADE_PCT, 0.01
+        floor = max(1, int(minlot * self._contract_units(pair)))
+        uv = unit_value(pair)
+        units = max(int(equity_usd * pct / 100.0 / (risk * uv)), floor)
+        cap_pct = config.DS_MAX_RISK_PCT or config.MAX_RISK_PER_TRADE_PCT
+        if units * risk * uv * config.USD_ZAR > self.equity * cap_pct / 100.0:
+            g["ds_risk_cap"] = g.get("ds_risk_cap", 0) + 1
+            return
+        leg = {"entry": entry, "stop": stop, "init_stop": stop, "units": units,
+               "leg_idx": 1, "opened_at": t, "entry_type": "daily_sweep", "tp1": None,
+               "tp1_hit": True, "_units_tp1": 0, "_units_tp2": units,
+               "runner_be_after_tp1": False}
+        self.active[pair] = {
+            "direction": d, "mfe_price": entry, "target": target, "target_type": ttype,
+            "legs": [leg], "max_legs": 1, "draw_score": 0, "entry_model": "daily_sweep",
+            "profile": self._session_label(t), "stop_reason": f"ds_{kind}",
+            "im_scenario": f"DS-{kind}", "fixed_exit": True, "ds_exit_at": exit_at,
+        }
+        now = t.to_pydatetime() if hasattr(t, "to_pydatetime") else t
+        self._ds_count[(pair, now.date())] = self._ds_count.get((pair, now.date()), 0) + 1
+        g["ds_opened"] = g.get("ds_opened", 0) + 1
 
     def _mm_open_position(self, pair, direction, entry, stop, target, target_type,
                           tag, units, t):
