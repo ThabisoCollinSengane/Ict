@@ -24,6 +24,12 @@ cache-bug post-mortem.)
 
 ---
 
+## 🎯 NEXT SESSION START HERE — collect P112 results (36 files `data/mm_golden_*_p112_run.txt`)
+`git pull`, then per arm: book withdrawn IS/OOS/full + DD vs its comparison arm, and the
+`entry_model == "daily_sweep"` rows of each `_trades.csv` (trades/week, WR, PF by instrument, by
+`stop_reason` level kind, by year). Report plainly. Trader decisions still open: stop20h default?
+FX+indices NY vs all three? Live account: R3,000 start considered.
+
 ## 🎯 P112 JadeCap "Daily Sweep" / SFP model (BUILT 2026-10-19, RUNNING)
 
 **Build:** `_daily_sweep_entry` / `_ds_signal` / `_ds_bias` / `_ds_levels` / `_ds_target` /
