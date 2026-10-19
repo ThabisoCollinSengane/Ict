@@ -78,7 +78,7 @@ stop beyond the range, target impulse origin (fade) / range height x1 (breakout)
 spread cost. Split AT weekly VAH/VAL vs ELSEWHERE (the control) x IS/OOS/2026, EU/GU/NZ/gold/SPX/NSX.
 Ship gate: AT-VA beats ELSEWHERE in every period; then an engine channel / 1.25x size-up.
 
-## 🚨 P115 RESULT (18 of 20 runs, 2026-10-19) — THE BACKTEST EDGE IS THE FORMING-BAR LOOKAHEAD
+## 🚨 P115 RESULT (all 20 runs, 2026-10-19) — THE BACKTEST EDGE IS THE FORMING-BAR LOOKAHEAD
 n / WR / PF / P&L / headline DD (IS | OOS | 2026); p93 = current default:
 - p93:   424 / 42.2% / 3.13 / +R66.7k / −15.66 | 445 / 44.0% / 3.95 / +R93.2k / −9.87 | 131 / 36.6% / 1.90 / +R3.6k / −19.4
 - **hon** (forming HTF bar truncated to open..now = what live sees): **71 / 14.1% / 0.45 / −R516 / −51.6** |
@@ -87,13 +87,13 @@ n / WR / PF / P&L / headline DD (IS | OOS | 2026); p93 = current default:
   (PF 0.33) by a different, fair method -> two independent fixes agree.
 - **audit** (all three fixes): 73 / 13.7% / 0.52 | 241 / 23.2% / 0.81 | 127 / 21.3% / 0.68 — same.
 - sbx (same-bar stop fix alone): 429 / 46.2% / 3.92 / +R106.2k | 433 / 47.6% / 4.69 / +R117.7k | 138 / 36.2% /
-  1.54, DD −34.5 — the same-bar issue was NOT inflating results (fix helps IS/OOS, hurts 2026).
-- slip (0.5 pip on stops): 396 / 40.9% / 2.44 / +R45.5k / −31.7 | 438 / 43.6% / 3.47 | 145 / 35.9% / 1.75.
+  1.54, DD −34.5 — the same-bar issue was NOT inflating results (fix helps IS/OOS, hurts 2026). Full: 868 / 46.8% / 4.24 / R236.9k withdrawn / DD −13.79 / working 19.0.
+- slip (0.5 pip on stops): 396 / 40.9% / 2.44 / +R45.5k / −31.7 | 438 / 43.6% / 3.47 | 145 / 35.9% / 1.75. Full: 840 / 42.4% / 3.06 / R144.7k / DD −31.7.
 **Meaning: the HTF reads (draw cascade 0/3 gate + 2x/3x sizing, htf_bias/DXY gate, CRT, HTF FVG, M15
 AMD sweep, MM D/H4 SMT…) were reading the rest of the candle. The live MT5 bot sees partial bars, so
 LIVE ≈ the `hon` arm, not p93. DO NOT FUND on the p93 numbers.** Next: verify `_partial_bar` once more
 (it is the only change in `hon`), find WHICH reads carry the edge (turn HONEST_HTF on per timeframe /
-per function), and rebuild the gates on completed bars only. sbx/slip full still pending.
+per function), and rebuild the gates on completed bars only. All 20 runs in.
 
 ## 🔎 P115 — HONESTY AUDIT of the base engine (BUILT 2026-10-19, RUNNING) — trader: "it can't be that good"
 The strategy beat every theory tested (P112-P114) — but those studies used COMPLETED bars and
