@@ -60,6 +60,22 @@ avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Ne
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
 
+## 📋 P117 PLAN — order flow on the algo's own trades (trader asked 2026-10-19; NOT BUILT YET)
+Test Nill's missing piece (footprint / order flow at the level) ON THE ALGO, not on the price skeleton.
+**Data reality:** HistData FX/CFD has NO exchange volume. Its free TICK product (bid/ask quotes, monthly
+zips, `timeframe=T`, ~50-100 MB/month/pair) gives tick COUNT + up/down-tick direction only — the
+P39 pipeline (`scripts/p39_volume_analysis.py aggregate`) already turns ticks into M5 tick-count +
+Lee-Ready delta, and P39 found it RED on the algo's sweeps (no low-volume bucket, delta flips IS/OOS).
+Real footprint (bid/ask volume per price) needs CME futures data (6E / 6B / GC / ES / NQ) from a paid
+vendor (e.g. Databento) — trader's call on cost.
+**Build:** (1) extend `scripts/fetch_histdata.py` with `--tick` (form timeframe=T, monthly), stream
+each month -> per-M1 features (tick count, up/down ticks, delta, footprint by price bucket) -> delete
+the zip (runner disk ~14 GB; matrix by year, 6h job cap). (2) features AT each algo entry: delta in
+the trade direction over the sweep/retrace, absorption (high ticks, small range at the zone), delta
+divergence at the sweep extreme, cumulative-delta vs price SMT. (3) Score the algo's trades by them
+(record-only), IS/OOS/2026, vs control; **only on the HONEST engine (`HONEST_HTF=1`)** — on the leaky
+p93 engine any result is meaningless. Prerequisite: fix / locate the P115 leak first.
+
 ## 🔴 P116 RESULT (RAN 2026-10-19) — mechanical Nill P/b has no edge; the weekly value area adds nothing
 `data/nill_report.md`, EU/GU/NZ/gold/SPX/NSX 2022-Oct 2026, ~5,900 setups. n / WR / avg R (spread
 incl.) / PF, AT VA vs ELSE (IS | OOS | 2026): fade-all 618/17%/−0.29 vs 2053/15%/−0.36 | 676/16%/−0.37 vs
