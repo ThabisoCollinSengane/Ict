@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — collect P113 (24 files `data/mm_golden_*_p113_run.txt`); P114/P114b CLOSED (no winner); P112 CLOSED
+## 🎯 NEXT SESSION START HERE — P113 CLOSED (alignment adds nothing; 2 full runs pending: tfa3, tfa1ob); P114/P114b CLOSED; P112 CLOSED
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,22 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🔴 P113 RESULT (RAN 2026-10-19, 22 of 24 runs; tfa3/tfa1ob full still running) — alignment adds nothing
+Inside the FULL engine (DXY x EURGBP gate, MSS 2-of-3, AMD, and the MM channel's HTF EU/GU SMT gate
+all applied first). `tfa1` record-only = p93 exactly (876 / R176,034). First legs, n / WR / PF, IS | OOS | 2026:
+- aligned 203/46%/3.87 | 224/48%/5.67 | 67/31%/1.71; misaligned 35/51%/5.20 | 30/40%/2.18 | 6/17%/6.12;
+  target not on any gap 106/42%/3.74 | 122/41%/4.75 | 37/49%/3.09. Aligned-vs-misaligned flips sign.
+- By draw TF: **H1 draw is the weakest** — 18/44%/1.13 | 18/50%/4.67 | 4/25%/0.36 (H1 draw + M5 entry
+  0.67 | 3.03 | 0.41); D draw best IS/OOS (5.85 / 7.04) but weakest in 2026 (1.15); W 3.35/5.40/5.18;
+  H4 5.88/2.59/3.83; no gap 2.44/3.04/2.07. Small n on H1 (18 per half).
+- By entry TF: none fails (M5 4.15/4.44/1.97, M15 3.31/5.98/3.20, H1 3.78/5.67/3.84).
+- MM trades (only `tfa1ob` IS ran with the MM extension, OB draws included): aligned 37/27%/1.66,
+  misaligned 18/33%/2.03, no gap 15/33%/1.90 — no edge, tiny n.
+- Engine arms, withdrawn R k IS / OOS / full: p93 60.8 / 85.0 / 176.0; `tfa2` (aligned 1.25x)
+  42.4 / 73.0 / 137.6 — the size-up converted into risk-cap SKIPS (181 -> 388, 876 -> 789 trades,
+  the P70 ARM-1 shape); `tfa3` (skip misaligned) 47.6 / 77.6 / (pending); `tfa4` (aligned only)
+  43.9 / 38.4 / 110.7, DD −17.8. **Every arm loses money. Keep TFA_MODE=0.**
 
 ## ⏱️ P113 — JadeCap timeframe alignment on the FX core (BUILT 2026-10-19, RUNNING)
 Trader: test the case study's timeframe alignment on the real algo's FVG draws + entries.
