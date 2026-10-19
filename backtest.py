@@ -248,6 +248,8 @@ class Backtester:
             # 11:00 high — three hours of future data. Every HTF read (draw cascade,
             # HTF FVG, market structure, CRT, ITH/ITL, OB context) sat on this.
             pos -= 1
+        elif config.DROP_TFS and tf in config.DROP_TFS:
+            pos -= 1                       # P115c: completed bars only on this timeframe
         if pos <= 0:
             return []
         bars = self.tf_bars[(sym, tf)]

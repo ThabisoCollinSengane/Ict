@@ -1226,6 +1226,7 @@ STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "0")))
 # close moved it (trail / BE / lock / milestone); STOP_SLIP_PIPS adverse slippage on stop fills.
 HONEST_HTF     = bool(int(_os.environ.get("HONEST_HTF", "0")))
 HONEST_TFS     = tuple(x for x in _os.environ.get("HONEST_TFS", "").split(",") if x)   # "" = every HTF; else only these (e.g. "15T,60T")
+DROP_TFS       = tuple(x for x in _os.environ.get("DROP_TFS", "").split(",") if x)     # P115c: drop the forming bar on these TFs only (completed bars)
 SAMEBAR_EXIT   = bool(int(_os.environ.get("SAMEBAR_EXIT", "0")))
 STOP_SLIP_PIPS = float(_os.environ.get("STOP_SLIP_PIPS", "0"))
 

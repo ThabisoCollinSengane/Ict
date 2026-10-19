@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🚨 P115/P115b: DXY/EURGBP H1 gate reads the forming H1 close (future). with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🚨 collect P115c (`_p115c`): `clean` = first fully honest strategy. P115b: the H1 forming bar is the leak. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,20 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🚨 P115b RESULT (all 20 runs, 2026-10-19) — the H1 forming bar is THE leak
+n / WR / PF / P&L / DD (IS | OOS | full | 2026), honest forming bar on ONE timeframe only:
+- **hon60 (H1): 113/16.8%/0.62/−R514/−51 | 263/23.6%/0.81 | halts | 144/19.4%/0.69 — collapse.**
+- hon15 (M15): 397/35.8%/1.58/+R14.3k/−37.5 | 409/35.7%/2.15/+R34.3k | 798/36.2%/2.09/+R71.4k | 147/25.2%/1.22.
+- hon240 (H4): 404/39.4%/2.08/+R32.4k/−20.1 | 411/39.4%/2.43 | 812/39.5%/2.38/+R98.0k | 135/39.3%/2.37/+R7.2k.
+- honD (D): 417/42.2%/3.32 | 438/44.3%/3.91 | 866/43.3%/3.65/+R177.9k | 144/34.7%/1.73 — no leak.
+- honHTF (H1+H4+D): same collapse as hon60.
+The H1 read (DXY / EURGBP / AUDNZD `htf_bias` on the forming H1 close + H1 FVG entries) carries the
+leak; M15 and H4 shave PF ~3.6 -> ~2.1-2.4 but stay profitable; D is clean.
+**P115c (BUILT, RUNNING):** `DROP_TFS` (config) = completed bars only on listed TFs. Arms `d60` (H1 on
+completed bars, rest as before), `clean` (H1 completed + honest 15T/240T/D = no lookahead anywhere),
+`clean15` (H1+M15 completed, honest 240T/D) × is/oos/full/y26 -> `data/mm_golden_*_p115c_*`. `clean` is
+the first fully honest version of the strategy.
 
 ## 🎯 P115b FIRST READ — THE CORE INTERMARKET GATE READS THE FUTURE (found 2026-10-19)
 `hon60` (honest H1 only) IS: 113 tr / 16.8% / PF 0.62 / account halved — the H1 bar alone collapses it.
