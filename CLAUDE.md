@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🚨 P115: with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🚨 P115/P115b: DXY/EURGBP H1 gate reads the forming H1 close (future). with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,15 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🎯 P115b FIRST READ — THE CORE INTERMARKET GATE READS THE FUTURE (found 2026-10-19)
+`hon60` (honest H1 only) IS: 113 tr / 16.8% / PF 0.62 / account halved — the H1 bar alone collapses it.
+Mechanism, confirmed in code: `ict.bias.htf_bias` returns BOS from `candles[-1].Close`; the DXY H1 gate
+(`_dxy_bias("60T", t)` -> HistdataBacktester -> `bars_up_to("UDXUSD","60T",t)`) and the EURGBP /
+AUDNZD H1 gates (`_sym_bias(...,"60T",t)`) pass the FORMING H1 bar, whose Close in the backtest is the
+price up to ~55 minutes LATER. So the dollar direction every trade is gated on = "will DXY close this
+hour beyond its swing" — known only in the future. Also H1 FVG entries (`bars1h`, lines ~2846/4011/
+7221/7860) and the MM IFVG 60T rung. Every result since P1 sits on this.
 
 ## 🔧 P115b — WHICH timeframe carries the leak (BUILT 2026-10-19, RUNNING; trader: fix the leak first)
 `HONEST_TFS` (config) limits HONEST_HTF to listed TFs. Arms (suffix `_p115b`): `hon15` (M15 only),
