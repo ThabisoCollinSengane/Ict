@@ -50,9 +50,24 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 DATA = os.path.join(ROOT, "data", "histdata")
 PAIRS = ["EURUSD", "GBPUSD", "NZDUSD"]
-COMBOS = [("C1", "W", "D", "60min"), ("C2", "D", "240min", "15min"), ("C3", "D", "60min", "5min"),
-          ("C4", "240min", "60min", "15min"), ("C5", "60min", "15min", "5min")]
-LABEL = {"W": "W1", "D": "D1", "240min": "H4", "60min": "H1", "15min": "M15", "5min": "M5"}
+COMBOS = [
+    # the familiar ladder
+    ("C1", "W", "D", "60min"), ("C2", "D", "240min", "15min"), ("C3", "D", "60min", "5min"),
+    ("C4", "240min", "60min", "15min"), ("C5", "60min", "15min", "5min"),
+    # odd timeframes (trader, 2026-10-19), every intraday candle anchored to the killzones
+    ("C6", "D", "480min", "30min"),        # D  > H8  > M30 > M1
+    ("C7", "720min", "240min", "15min"),   # H12 > H4 > M15 > M1
+    ("C8", "480min", "120min", "10min"),   # H8  > H2  > M10 > M1
+    ("C9", "360min", "120min", "15min"),   # H6  > H2  > M15 > M1
+    ("C10", "180min", "30min", "5min"),    # H3  > M30 > M5  > M1
+]
+LABEL = {"W": "W1", "D": "D1", "720min": "H12", "480min": "H8", "360min": "H6", "240min": "H4",
+         "180min": "H3", "120min": "H2", "60min": "H1", "30min": "M30", "15min": "M15",
+         "10min": "M10", "5min": "M5"}
+# Intraday candles open on a grid anchored at 07:00 New York time (the NY killzone open), so
+# H2/H4 also open at 03:00 (London killzone), H3 at 04:00/07:00/10:00, H6 01-07 / 07-13,
+# H8 23-07 (Asia + London) / 07-15 (NY) / 15-23, H12 07-19 / 19-07.
+ANCHOR_ET_MIN = 7 * 60
 PIP = 0.0001
 COST_PIPS = 1.0
 BUF_PIPS = 1.0
@@ -166,7 +181,9 @@ def null_frame(seed, days=1460):
 
 
 def bars(df, rule):
-    """Resampled bars + the time each bar is COMPLETE (= next bar's open, or open + span)."""
+    """Resampled bars + the time each bar is COMPLETE. Intraday candles are built on a New York
+    clock anchored at 07:00 ET so their opens line up with the killzones."""
+    import numpy as np
     import pandas as pd
     agg = {"o": "first", "h": "max", "l": "min", "c": "last"}
     if rule == "W":
@@ -178,8 +195,16 @@ def bars(df, rule):
         b = b[cnt.reindex(b.index).fillna(0) >= 120]
         span = pd.Timedelta(days=1)
     else:
-        b = df.resample(rule, label="left", closed="left").agg(agg).dropna()
         span = pd.Timedelta(rule)
+        sm = int(span.total_seconds() // 60)
+        et = df.index.tz_convert(NY)
+        mins = et.hour * 60 + et.minute
+        rel = (mins - ANCHOR_ET_MIN) % 1440
+        start_et = et.floor("min") - pd.to_timedelta(rel % sm, unit="m")
+        key = start_et.tz_convert("UTC")
+        g = df.groupby(key)
+        b = pd.DataFrame({"o": g["o"].first(), "h": g["h"].max(), "l": g["l"].min(),
+                          "c": g["c"].last()}).dropna()
     b["done"] = b.index + span
     return b
 
@@ -448,7 +473,7 @@ def main():
             e = events_for(sym, df)
             print(f"  events {len(e)}", flush=True)
             ev += e
-        title = "P114 — timeframe combos W1 -> M1: which alignment gives the best intraday entries?"
+        title = "P114b — 10 timeframe combos W1 -> M1 (odd TFs, killzone-anchored candles): best intraday entries?"
     if not ev:
         print("no events")
         return
