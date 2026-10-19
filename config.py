@@ -1221,6 +1221,12 @@ TELEGRAM_CHAT_ID   = ""   # e.g. "987654321"  (your personal chat ID)
 # Full 4yr came back 60 trades / WR 11.7% / PF 0.33 / -51.7%.
 # 1 = drop the forming bar (measurement only, KNOWN BROKEN). 0 = pre-existing behaviour.
 STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "0")))
+# P115 honesty audit: HONEST_HTF=1 truncates the forming bar to open..now (what live sees);
+# SAMEBAR_EXIT=1 checks this bar's stop hit against the stop as it stood BEFORE this bar's
+# close moved it (trail / BE / lock / milestone); STOP_SLIP_PIPS adverse slippage on stop fills.
+HONEST_HTF     = bool(int(_os.environ.get("HONEST_HTF", "0")))
+SAMEBAR_EXIT   = bool(int(_os.environ.get("SAMEBAR_EXIT", "0")))
+STOP_SLIP_PIPS = float(_os.environ.get("STOP_SLIP_PIPS", "0"))
 
 # --- P51: unified structural bias + IFVG cascade (all instruments alike) ---
 # htf_bias asks "is this bar closing beyond the whole prior N-bar range right now" --

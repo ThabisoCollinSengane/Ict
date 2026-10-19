@@ -251,9 +251,51 @@ class Backtester:
         if pos <= 0:
             return []
         bars = self.tf_bars[(sym, tf)]
-        if max_bars is not None:
-            return bars[max(0, pos - max_bars):pos]
-        return bars[:pos]
+        out = bars[max(0, pos - max_bars):pos] if max_bars is not None else bars[:pos]
+        if (config.HONEST_HTF and not config.STRICT_BAR_CLOSE and out
+                and tf not in self._RIGHT_LABELLED_TFS and tf not in self._EXEC_TFS):
+            # P115: the forming bar holds only what has traded up to now (open..t),
+            # exactly what a live chart shows, instead of its whole window.
+            part = self._partial_bar(sym, tf, pos - 1, t)
+            if part is not None:
+                out = list(out)
+                out[-1] = part
+        return out
+
+    def _partial_bar(self, sym, tf, i, t):
+        """P115 — HTF bar i truncated to the M5 bars traded so far (bar open .. the M5 bar
+        at t, whose close is the engine's 'now'). Built once per (sym, tf) as running
+        within-bucket high/low aligned on the M5 index."""
+        key = (sym, tf)
+        cache = self.__dict__.setdefault("_partial_cache", {})
+        arr = cache.get(key)
+        if arr is None:
+            mi = self.tf_index.get((sym, "5T"))
+            mb = self.tf_bars.get((sym, "5T"))
+            hi = self.tf_index.get(key)
+            if mi is None or mb is None or hi is None or len(mi) == 0:
+                cache[key] = arr = False
+            else:
+                import numpy as np
+                bucket = hi.searchsorted(mi, side="right") - 1
+                h = np.array([b.High for b in mb], dtype=float)
+                lo = np.array([b.Low for b in mb], dtype=float)
+                c = np.array([b.Close for b in mb], dtype=float)
+                o = np.array([b.Open for b in mb], dtype=float)
+                ph, pl, po = h.copy(), lo.copy(), o.copy()
+                for k in range(1, len(h)):
+                    if bucket[k] == bucket[k - 1]:
+                        ph[k] = max(ph[k - 1], h[k])
+                        pl[k] = min(pl[k - 1], lo[k])
+                        po[k] = po[k - 1]
+                cache[key] = arr = (mi, bucket, po, ph, pl, c)
+        if arr is False:
+            return None
+        mi, bucket, po, ph, pl, c = arr
+        k = mi.searchsorted(t, side="right") - 1
+        if k < 0 or bucket[k] != i:
+            return None
+        return Bar(po[k], ph[k], pl[k], c[k])
 
     def _bar_at(self, sym, tf, t):
         idx = self.tf_index.get((sym, tf))
@@ -337,6 +379,9 @@ class Backtester:
             direction = st["direction"]
             target = st["target"]
             pip = pip_size(pair)
+            if config.SAMEBAR_EXIT:            # P115: remember the stop as it stood at bar open
+                for _lg in st["legs"]:
+                    _lg["_stop0"] = _lg["stop"]
 
             # MFE (max favorable excursion) — analytics only, so the draw-ladder
             # study can ask "did price reach the 3-day / 30-day / 60-day pool?".
@@ -425,6 +470,10 @@ class Backtester:
 
             for leg in list(st["legs"]):
                 sl = leg["stop"]
+                if config.SAMEBAR_EXIT and "_stop0" in leg:
+                    # P115: this bar's low/high is checked against the stop it carried INTO
+                    # the bar; a stop moved by this bar's close only applies from the next bar.
+                    sl = leg["_stop0"]
                 # Skip fixed TP when trail is engaged (either via STRUCTURE_TRAIL or TRAIL_AT_TP).
                 let_run = leg.get("trail_engaged") and (
                     config.STRUCTURE_TRAIL_LET_RUN or config.TRAIL_AT_TP
@@ -440,7 +489,7 @@ class Backtester:
                                and not sl_hit and bar.Low <= leg["tp1"])
                     tp_hit  = (not let_run) and bar.Low <= target
                 if sl_hit:
-                    self._exit_leg(pair, leg, sl, t, "stop")
+                    self._exit_leg(pair, leg, sl - direction * config.STOP_SLIP_PIPS * pip, t, "stop")
                 elif tp1_hit:
                     self._partial_exit_leg(pair, leg, leg["tp1"], t)
                     # If TP2 also hit on the same bar (big candle), close the runner

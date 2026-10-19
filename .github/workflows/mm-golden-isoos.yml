@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [p93, tfa1, tfa2, tfa3, tfa4, tfa1ob]
+        mode: [p93, hon, sbx, slip, audit]
     env:
       NO_PUSH: "1"
     steps:
@@ -133,6 +133,11 @@ jobs:
           case "${{ matrix.mode }}" in gds|allds|allfvg|alltime|gdsonly|gds1r|allds1r|gdsonly1r) export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0;; esac
           case "${{ matrix.mode }}" in *ds*|allfvg|alltime) export DS_ENABLED=1;; esac
           case "${{ matrix.mode }}" in dseu|dseu1r) export DS_PAIRS="EURUSD GBPUSD";; allfvg) export DS_ENTRY=fvg;; alltime) export DS_TARGET=time;; esac
+          # P115 honesty audit: hon = forming HTF bar truncated to open..now (what live sees);
+          #   sbx = stop checked against the stop carried INTO the bar; slip = 0.5 pip on stop fills; audit = all three.
+          case "${{ matrix.mode }}" in hon|audit) export HONEST_HTF=1;; esac
+          case "${{ matrix.mode }}" in sbx|audit) export SAMEBAR_EXIT=1;; esac
+          case "${{ matrix.mode }}" in slip|audit) export STOP_SLIP_PIPS=0.5;; esac
           # P113: JadeCap timeframe alignment on the FX core. tfa1 record only (must = p93),
           #       tfa2 size aligned 1.25x, tfa3 skip misaligned, tfa4 skip unless aligned, tfa1ob record incl. OB draws.
           case "${{ matrix.mode }}" in tfa1*) export TFA_MODE=1;; tfa2) export TFA_MODE=2;; tfa3) export TFA_MODE=3;; tfa4) export TFA_MODE=4;; esac
@@ -154,7 +159,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p113
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p115
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true
