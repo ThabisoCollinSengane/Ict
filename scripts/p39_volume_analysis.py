@@ -118,7 +118,7 @@ def _parse_tick_ts(field: str) -> int | None:
     return int((dt + EST_OFFSET).timestamp())
 
 
-def aggregate_month(zip_path: str, out_path: str) -> tuple[int, int]:
+def aggregate_month(zip_path: str, out_path: str, bin_secs: int | None = None) -> tuple[int, int]:
     """Stream one pair-month of ticks into M5 bins. Returns (ticks, bins).
 
     Memory-safe: reads line by line and only ever holds the per-bin counters,
@@ -129,6 +129,7 @@ def aggregate_month(zip_path: str, out_path: str) -> tuple[int, int]:
     is neutral. The ~34% neutral rate is expected and left unclassified rather
     than forced to a side.
     """
+    width = bin_secs or M5                # P117: bin_secs=60 for M1 order-flow bins
     bins: dict[int, list[int]] = {}       # bin_start → [ticks, buy, sell, neutral]
     prev_bid: float | None = None
     n_ticks = 0
@@ -150,7 +151,7 @@ def aggregate_month(zip_path: str, out_path: str) -> tuple[int, int]:
                 except (ValueError, IndexError):
                     continue
 
-                slot = bins.setdefault(ts - (ts % M5), [0, 0, 0, 0])
+                slot = bins.setdefault(ts - (ts % width), [0, 0, 0, 0])
                 slot[0] += 1
                 if prev_bid is not None:
                     if bid > prev_bid:
@@ -163,7 +164,9 @@ def aggregate_month(zip_path: str, out_path: str) -> tuple[int, int]:
                 n_ticks += 1
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, "w", newline="") as f:
+    import gzip
+    opener = (lambda p: gzip.open(p, "wt", newline="")) if out_path.endswith(".gz") else (lambda p: open(p, "w", newline=""))
+    with opener(out_path) as f:
         w = csv.writer(f)
         w.writerow(["bin_utc", "ticks", "buy", "sell", "neutral"])
         for b in sorted(bins):

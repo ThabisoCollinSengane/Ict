@@ -53,10 +53,14 @@ def _platform_of(pair: str) -> str:
     return "MT" if pair in MT_PAIRS else "ASCII"
 
 
+TICK = False   # --tick: the ASCII TICK product (bid/ask quotes, monthly zips only)
+
+
 def _referer(pair: str, year: int, month: int | None) -> str:
     seg = "ascii" if _platform_of(pair) == "ASCII" else "metatrader"
+    prod = "tick-data-quotes" if TICK else "1-minute-bar-quotes"
     tail = f"{pair.lower()}/{year}" + (f"/{month}" if month else "")
-    return f"{BASE}/download-free-forex-historical-data/?/{seg}/1-minute-bar-quotes/{tail}"
+    return f"{BASE}/download-free-forex-historical-data/?/{seg}/{prod}/{tail}"
 
 
 def parse_form_fields(html: str) -> dict:
@@ -81,7 +85,7 @@ def _opener() -> urllib.request.OpenerDirector:
 def _out_name(pair: str, year: int, month: int | None) -> str:
     plat = _platform_of(pair)
     stamp = f"{year}{month:02d}" if month else f"{year}"
-    return f"HISTDATA_COM_{plat}_{pair}_M1{stamp}.zip"
+    return f"HISTDATA_COM_{plat}_{pair}_{'T' if TICK else 'M1'}{stamp}.zip"
 
 
 def download_one(pair: str, year: int, month: int | None, dest: str,
@@ -137,6 +141,11 @@ def _selftest() -> int:
     assert _out_name("UDXUSD", 2026, 3) == "HISTDATA_COM_MT_UDXUSD_M1202603.zip"
     assert "metatrader" in _referer("UDXUSD", 2025, None)
     assert "ascii" in _referer("EURUSD", 2026, 6)
+    global TICK
+    TICK = True
+    assert _out_name("EURUSD", 2024, 1) == "HISTDATA_COM_ASCII_EURUSD_T202401.zip"
+    assert "tick-data-quotes" in _referer("EURUSD", 2024, 1)
+    TICK = False
     print("selftest OK — form parsing, naming, referer routing all pass")
     return 0
 
@@ -149,7 +158,11 @@ def main() -> int:
     ap.add_argument("--pairs", nargs="+", default=list(ALL_PAIRS))
     ap.add_argument("--dest", default="/tmp/histdata_dl")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--tick", action="store_true",
+                    help="download the TICK product (monthly only; pass --months)")
     a = ap.parse_args()
+    global TICK
+    TICK = a.tick
     if a.selftest:
         return _selftest()
 
