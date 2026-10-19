@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🚨 collect P115c (`_p115c`): `clean` = first fully honest strategy. P115b: the H1 forming bar is the leak. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🚨 P115c: leak-free the strategy LOSES (clean PF 0.2-0.73; H1-only fix ≈ break-even). Next: random-direction control on the clean engine, then redesign on completed bars. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,21 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🚨 P115c RESULT (all 12 runs, 2026-10-19) — LEAK-FREE, THE STRATEGY HAS NO EDGE
+n / WR / PF / P&L from R1k / headline DD (IS | OOS | full | 2026):
+- `d60` (H1 reads on COMPLETED bars, other TFs still leaky): 295/26.1%/0.99/−R36/−33.9 | 304/28.9%/1.27/+R1.0k/
+  −26.7 | 612/28.3%/1.18/+R1.6k/−33.9 | 95/21.1%/0.76/−R229/−25.0 — about break-even over 4 years.
+- **`clean` (no lookahead anywhere: H1 completed + honest 15T/240T/D): 52/9.6%/0.20/−R537/−51.8 |
+  135/20.0%/0.63/−R510/−49.1 | halts | 101/16.8%/0.73/−R435/−57.1.**
+- `clean15` (H1+M15 completed, honest 240T/D): 53/11.3%/0.29 | 137/17.5%/0.62 | halts | 110/19.1%/0.61.
+**Verdict:** without future data the current design loses money; with only the H1 fixed it is break-
+even. ⚠️ `clean` WR 10-20% is WORSE than random entries at these R multiples (~25%), so before
+concluding, (1) run a RANDOM-DIRECTION control through the clean engine (same entries, coin-flip side)
+— if random beats it, some honest read is systematically picking the wrong side (e.g. the partial M15
+"closed back inside" firing mid-move) or there is still a mechanical bug; (2) compare the clean engine
+bar-by-bar with the live MT5 path (`live/run_live.py` uses completed bars via get_bars). Live trading
+on the current design is NOT supported by any honest number.
 
 ## 🚨 P115b RESULT (all 20 runs, 2026-10-19) — the H1 forming bar is THE leak
 n / WR / PF / P&L / DD (IS | OOS | full | 2026), honest forming bar on ONE timeframe only:
