@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — P113 CLOSED (alignment adds nothing; 2 full runs pending: tfa3, tfa1ob); P114/P114b CLOSED; P112 CLOSED
+## 🎯 NEXT SESSION START HERE — collect P115 HONESTY AUDIT (20 files `data/mm_golden_*_p115_run.txt`) — this decides how real the backtest is; P113/P114/P112 CLOSED
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,26 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🔎 P115 — HONESTY AUDIT of the base engine (BUILT 2026-10-19, RUNNING) — trader: "it can't be that good"
+The strategy beat every theory tested (P112-P114) — but those studies used COMPLETED bars and
+1-pip costs, while the engine has three known optimistic biases. Audit flags, all default off:
+1. **`HONEST_HTF=1`** — `bars_up_to` replaces the still-forming HTF bar (15T/60T/240T/D and MM
+   extras; not W, not 1T/5T) with the bar TRUNCATED to open..now (`_partial_bar`: running
+   within-bucket high/low on the M5 index, close = the M5 close at t). This is the "truncated"
+   state STRICT_BAR_CLOSE's note said was never built. Fixture: at 08:20 the D bar with the flag
+   OFF already held a 12:30 jump (High 1.11307, Close 1.11287); ON = 1.1012 / 1.101 = the live
+   price. Reads that already slice `[:-1]` are unchanged. STRICT_BAR_CLOSE=1 (drop it) gave
+   PF 0.33 — this is the fair version of that test. Affects the draw cascade 0/3 gate + 2x/3x sizing,
+   htf_bias / DXY H1 gate, CRT, HTF FVG, market structure, M15 AMD sweep detection, MM SMT D/H4.
+2. **`SAMEBAR_EXIT=1`** — `_update_orders` moved BE / +10 lock / milestone stops on THIS bar's
+   close, then checked THIS bar's low/high against the moved stop: a bar that dipped through the
+   original stop and closed +20 exited at +10 instead of −1R. Now the hit is checked against the
+   stop carried INTO the bar (`_stop0`).
+3. **`STOP_SLIP_PIPS=0.5`** — stop fills were at the exact stop price.
+Also: 2024-25 "OOS" has been used for ~100 decisions, so it is no longer out-of-sample; 2026
+(p93 PF 1.90 / WR 36.6% vs 3.64 / 43.3% in 2022-25) is the only untouched holdout.
+Arms `p93`, `hon`, `sbx`, `slip`, `audit` (all three) × is/oos/full/y26 -> `data/mm_golden_*_p115_*`.
 
 ## 🔴 P113 RESULT (RAN 2026-10-19, 22 of 24 runs; tfa3/tfa1ob full still running) — alignment adds nothing
 Inside the FULL engine (DXY x EURGBP gate, MSS 2-of-3, AMD, and the MM channel's HTF EU/GU SMT gate
