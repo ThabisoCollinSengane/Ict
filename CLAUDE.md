@@ -24,9 +24,27 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — collect P113 (24 files `data/mm_golden_*_p113_run.txt`); P112 CLOSED
+## 🎯 NEXT SESSION START HERE — collect P113 (24 files `data/mm_golden_*_p113_run.txt`) + P114 (`data/tf_combo_report.md`); then engine arms with the P114 winner; P112 CLOSED
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
+
+## 🧪 P114 — which timeframe COMBO (W1 -> M1) gives the best intraday entries? (BUILT 2026-10-19, RUNNING)
+Trader: put time + candlestick theory into it, loop 5 combos from W1 to M1, find the best for entries
+and risk management; THEN run the full strategy with the winner. M1 is always the execution layer.
+`scripts/tf_combo_study.py` (workflow `tf-combo-study.yml` -> `data/tf_combo_report.md`, `_null.md`),
+pure price, EURUSD/GBPUSD/NZDUSD 2022-2026 (loader reads `SYM_YYYY.csv` AND `SYM_YYYY_MM.csv` — the
+P112c loader missed the 2026 monthly files). Combos (bias > draw > setup > M1): C1 W>D>H1, C2 D>H4>M15,
+C3 D>H1>M5, C4 H4>H1>M15, C5 H1>M15>M5. Recipe, completed bars only: bias = last completed bias candle
+vs the one before (HH+HL / LH+LL / outside = body / inside = none); setup = FIRST touch of an unfilled
+setup-TF FVG inside a killzone (London 03-05, NY 07-10 ET); exec = first M1 close through the last M1
+swing formed after the touch (<= 60 bars, before the killzone ends; invalid on a close through the
+gap's far side), stop = pullback extreme ∓ 1 pip, entry + 1 pip cost; draw = nearest unfilled draw-TF
+gap ahead (>= 1R) = target; exit by 16:00 ET. Control = AGAINST (same machinery, setup against the bias).
+Also a fixed-2R target on the same entries, discount/premium vs the forming bias candle's open, and
+London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within ~1.5 SE, mixed signs;
+avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
+draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
+zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
 
 ## ⏱️ P113 — JadeCap timeframe alignment on the FX core (BUILT 2026-10-19, RUNNING)
 Trader: test the case study's timeframe alignment on the real algo's FVG draws + entries.
