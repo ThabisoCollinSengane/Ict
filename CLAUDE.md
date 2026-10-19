@@ -24,6 +24,57 @@ cache-bug post-mortem.)
 
 ---
 
+## 🎯 NEXT SESSION START HERE — P112 JadeCap "Daily Sweep" / SFP model (SPEC SAVED 2026-10-19, NOT BUILT)
+
+Trader sent ~28 screenshots of JadeCap (ICT-style, NQ trader) "Module 7 · Model 01 — The Daily
+Sweep" and asked to cross-reference it with our algo and build it. Trader: "this is more of the
+Judas swing in depth." **Full rule set, as shown on his slides/charts:**
+
+1. **Identification (bias) — the instrument's OWN chart, not DXY.** Day trading: HTF = 4H/1H (or
+   Daily), LTF = 15M/5M; short-term: Daily bias / 1H execution; swing: Weekly / 4H. Two passes:
+   (a) bigger picture: HH+HL = up, LH+LL = down, neither = ranging; (b) recent candles: yesterday vs
+   the day before (HH+HL bullish, LH+LL bearish; outside bar = strong confirmation, inside bar =
+   indecision). On the daily he marks the last **bullish swing point** (3-candle swing low) and
+   **bearish swing point** (swing high). Bullish -> only hunt a sweep of a LOW; bearish -> only a
+   sweep of a HIGH (trade WITH the trend). Ranging/unclear -> no bias -> **no trade**.
+2. **Confirmation — mark levels, then wait for a Swing Failure Pattern (SFP).** Day trading:
+   previous daily high/low (PDH/PDL) + all intra-day swing highs/lows of the prior day; scalping:
+   previous session high/low + intra-session swings; swing: previous week. Outer extremes = primary
+   targets, internal levels = what price picks off on the way. **SFP = a candle (1H in his NQ
+   examples) wicks through the swing level and CLOSES back inside.** "No sweep, no trade. Expect
+   it a few times a week, not every session."
+3. **Execution — "you don't need an entry model."** Enter at the **close of the SFP candle**; stop
+   beyond the **wick that made the SFP**. If price reclaims that wick, the premise is gone.
+   (Variant in his live NQ replays, 9 Feb / 27 Jan 2026: 1H SFP of the London/Asia low around
+   09:30-10:00 ET, then a 5M FVG retrace entry (blue box), stop under the sweep low, ~2.0-2.2R.)
+4. **Take profit — pick ONE before entry:** time-based (enter AM session, manage/exit around lunch —
+   "volume drops, trends stall") or liquidity-based (previous daily high/low or next resting pool —
+   "the level you marked in step two is the target"). Worked example (30 Apr 2026 NQ 1H, bullish):
+   1H SFP of an intraday low, entry 27,652 on the close, stop 27,455 below the wick, target PDH 27,918.
+5. His theme slide: "Your strategy doesn't refuse anything" — the edge is what it REFUSES (no bias,
+   no sweep -> no trade), not stacking ICT concepts.
+
+**Cross-reference with our algo (already told the trader):** PDH/PDL liquidity = our targets + P41
+(sweep of PDH/PDL sized 1.25x, our best both-years sweep signal); previous-session H/L = P45; SFP =
+our Judas sweep on an M15 range and P19 H4/D CRT Turtle Soup (sizing only); FVG entry = ours; stop
+beyond sweep ≈ our M1 structural stop (ours capped at 10 pips, often tighter than his wick).
+**Main difference: his bias is the instrument's own HH/HL structure; ours is DXY H1 + EURGBP, plus
+consolidation + MSS 2-of-3 + draw gate.** That stack is why US100/gold rarely fire (they go through
+the FX chain). Caution from our own record: raw raids are ~50% (P65/P66); P110 mechanical gold
+pullback lost money (bought the top). Test in the FULL engine with the default untouched.
+
+**P112 build plan (default OFF, FX byte-identical):** new channel `_daily_sweep_entry`, for indices
+(SPXUSD/NSXUSD) + gold first (optionally FX as a separate arm). Bias = own completed H4 (and Daily)
+HH/HL vs LH/LL via the Ep-12 classifier (`ict.market_structure`) or last two completed daily bars;
+levels = PDH/PDL + prior-day intraday 1H swing points (+ previous session H/L); trigger = a
+COMPLETED 1H candle wicks beyond the level and closes back inside, in the bias direction; entry =
+that close (arm A) or the first 5M FVG retrace after it (arm B); stop = beyond the SFP wick + buffer;
+target = opposite PDH/PDL / next swing level (arm L) or close at 12:00 ET (arm T); NY session only
+(P106: indices/gold move in NY); index/gold sizing from P107/P109 (0.01 lot floors). Counters per
+step so the funnel shows WHY it refuses. Arms vs control p93 × is/oos/full/y26 + an indices-alone
+and gold-alone arm (R3k start) to read trades/week, WR, PF. **Read completed bars only** (the
+forming-bar lookahead has bitten this project 9 times).
+
 ## 📅 P111 — single-month backtest from R3,000 (RAN 2026-10-18)
 
 `TRADE_FROM` (config, default "" = off) = no entries before that UTC date; earlier bars are
