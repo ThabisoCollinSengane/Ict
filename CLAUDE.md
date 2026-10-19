@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — collect P115 HONESTY AUDIT (20 files `data/mm_golden_*_p115_run.txt`) — decides how real the backtest is; then P116 Nill study (`data/nill_report.md`); P113/P114/P112 CLOSED
+## 🎯 NEXT SESSION START HERE — 🚨 P115: with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. Also collect P116 Nill study (`data/nill_report.md`).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -77,6 +77,23 @@ within N bars, then a range (>= R bars, width <= W x impulse); fade-edge and bre
 stop beyond the range, target impulse origin (fade) / range height x1 (breakout), max hold 3 days,
 spread cost. Split AT weekly VAH/VAL vs ELSEWHERE (the control) x IS/OOS/2026, EU/GU/NZ/gold/SPX/NSX.
 Ship gate: AT-VA beats ELSEWHERE in every period; then an engine channel / 1.25x size-up.
+
+## 🚨 P115 RESULT (18 of 20 runs, 2026-10-19) — THE BACKTEST EDGE IS THE FORMING-BAR LOOKAHEAD
+n / WR / PF / P&L / headline DD (IS | OOS | 2026); p93 = current default:
+- p93:   424 / 42.2% / 3.13 / +R66.7k / −15.66 | 445 / 44.0% / 3.95 / +R93.2k / −9.87 | 131 / 36.6% / 1.90 / +R3.6k / −19.4
+- **hon** (forming HTF bar truncated to open..now = what live sees): **71 / 14.1% / 0.45 / −R516 / −51.6** |
+  **232 / 21.6% / 0.79 / −R502 / −48.8** | **121 / 21.5% / 0.64 / −R512 / −51.4** — the account halves and
+  the engine stops trading (full run = IS run: halted in 2022). Same collapse as STRICT_BAR_CLOSE=1
+  (PF 0.33) by a different, fair method -> two independent fixes agree.
+- **audit** (all three fixes): 73 / 13.7% / 0.52 | 241 / 23.2% / 0.81 | 127 / 21.3% / 0.68 — same.
+- sbx (same-bar stop fix alone): 429 / 46.2% / 3.92 / +R106.2k | 433 / 47.6% / 4.69 / +R117.7k | 138 / 36.2% /
+  1.54, DD −34.5 — the same-bar issue was NOT inflating results (fix helps IS/OOS, hurts 2026).
+- slip (0.5 pip on stops): 396 / 40.9% / 2.44 / +R45.5k / −31.7 | 438 / 43.6% / 3.47 | 145 / 35.9% / 1.75.
+**Meaning: the HTF reads (draw cascade 0/3 gate + 2x/3x sizing, htf_bias/DXY gate, CRT, HTF FVG, M15
+AMD sweep, MM D/H4 SMT…) were reading the rest of the candle. The live MT5 bot sees partial bars, so
+LIVE ≈ the `hon` arm, not p93. DO NOT FUND on the p93 numbers.** Next: verify `_partial_bar` once more
+(it is the only change in `hon`), find WHICH reads carry the edge (turn HONEST_HTF on per timeframe /
+per function), and rebuild the gates on completed bars only. sbx/slip full still pending.
 
 ## 🔎 P115 — HONESTY AUDIT of the base engine (BUILT 2026-10-19, RUNNING) — trader: "it can't be that good"
 The strategy beat every theory tested (P112-P114) — but those studies used COMPLETED bars and
