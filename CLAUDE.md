@@ -24,11 +24,27 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — collect P112 results (36 files `data/mm_golden_*_p112_run.txt`)
-`git pull`, then per arm: book withdrawn IS/OOS/full + DD vs its comparison arm, and the
-`entry_model == "daily_sweep"` rows of each `_trades.csv` (trades/week, WR, PF by instrument, by
-`stop_reason` level kind, by year). Report plainly. Trader decisions still open: stop20h default?
-FX+indices NY vs all three? Live account: R3,000 start considered.
+## 🎯 NEXT SESSION START HERE — P112 Daily Sweep CLOSED (all 60 runs in, 2026-10-19)
+Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
+start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
+
+## 🔴 P112 / P112b RESULT (RAN 2026-10-19) — Daily Sweep loses in every arm, both targets
+Withdrawn R k IS / OOS / full, headline DD full / OOS; daily_sweep trades full n / WR / PF / rand.
+Comparisons: p93 60.8 / 85.0 / 176.0 (−15.66 / −9.87); P109 ix1 164.2k; P107 g1 182.3k; all3 199.8k.
+- `ixds` (liq target): 69.7 / 66.0 / 170.4, −17.09 / −23.78; DS 403 / 23% / 0.87 / −2.0k.
+- `ixds1r` (1R): 65.9 / 66.6 / 175.4, −17.85 / −13.05; DS 511 / 42% / 0.67 / −5.2k.
+- `gds`: 71.3 / 31.7 / 166.8, −27.81 / −49.3; DS 146 / 25% / 0.56. `gds1r`: 171.4k, DS 45% / 0.66.
+- `allds`: 80.0 / 37.2 / 167.8, −28.13 / −58.83; DS 532 / 24% / 0.77. `allds1r`: 173.1k, DS 40% / 0.61.
+- `allfvg` (M5 FVG entry): 183.9k, DD −20.92 / −34.12; DS 187 / 29% / 0.82 (2026 PF 0.17).
+- `alltime` (noon exit): 172.6k; DS 585 / 28% / 0.61.
+- `dseu` (DS on EU/GU): 47.9 / 85.0 / 149.7, −10.66 / −12.7; DS 331 / 26% / **1.04** (1.00 / 1.11)
+  — the only break-even arm, and it costs the book R26k. `dseu1r`: 158.4k, DS 48% / 0.83.
+- `ixdsonly` (R3k): DS 440 / 23% / 0.86, ~2.2/week; `ixdsonly1r` 545 / 42% / 0.66.
+- `gdsonly` (R3k): DS 156 / 24% / 0.55, DD −40.9; `gdsonly1r` 193 / 44% / 0.71, DD −45.5.
+- 2026 every arm: DS PF 0.0-0.63.
+**1R raises WR to 40-49% but PF FALLS** (0.55-0.83): at 1:1 you need > 50% plus costs. Matches P112c:
+the SFP reaches 1R ~45% of the time, the same as any candle. Level kind is not recorded in
+`stop_reason` (close-record whitelist); `im_scenario` carries it (DS-london / -asia / -pd / -pdsw).
 
 ## 🔍 P112c — does the SFP PICK THE REVERSAL? (RAN 2026-10-19) — 🔴 no better than an ordinary candle
 
@@ -73,7 +89,7 @@ no_target, risk_cap, armed, fvg_expired/invalid, opened, time_exit); `entry_mode
 day: bullish d2s bias, 09:00 ET candle sweeps the London low and closes back above -> long on the
 close, stop under the wick, target hit; short = exact mirror; fvg fill; time exit at noon; rr).
 Live stub clean (`python -m live.test_live_stub --days 2`). Not in the live loop yet.
-Arms (workflow `mm-golden-isoos.yml`, suffix `_p112`): `p93` control (876 / R176,034), `ixds`
+Arms (workflow `mm-golden-isoos.yml`, suffix `_p112`; 1R arms `*1r` suffix `_p112b`): `p93` control (876 / R176,034), `ixds`
 (FX + indices P109 ix1 + DS on indices; compare P109 ix1 R164.2k), `gds` (FX + gold 1 oz + DS on
 gold; compare P107 g1 R182.3k), `allds` (all3 + DS on gold+indices; compare all3 R199.8k),
 `allfvg`, `alltime`, `dseu` (DS on EURUSD/GBPUSD), `ixdsonly` / `gdsonly` (alone from R3,000)
