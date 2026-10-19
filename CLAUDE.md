@@ -24,9 +24,23 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — collect P113 (24 files `data/mm_golden_*_p113_run.txt`) + P114 (`data/tf_combo_report.md`); then engine arms with the P114 winner; P112 CLOSED
+## 🎯 NEXT SESSION START HERE — collect P113 (24 files `data/mm_golden_*_p113_run.txt`); P114/P114b CLOSED (no winner); P112 CLOSED
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
+
+## 🔴 P114 / P114b RESULT (RAN 2026-10-19) — no timeframe ladder has an entry edge; alignment adds nothing
+`data/tf_combo_report.md` (5 familiar combos, UTC candles) + `data/tf_combo2_report.md` (10 combos incl.
+H2/H3/H6/H8/H12/M10/M30, killzone-anchored NY-clock candles: H2/H4 open 03:00 + 07:00 ET, H3 04/07/10,
+H6 01-07 / 07-13, H8 23-07 / 07-15 / 15-23, H12 07-19). EURUSD/GBPUSD/NZDUSD Jan 2022 - Oct 2026,
+~10.9k setups. WITH-bias avg R per trade net of 1 pip (IS / OOS / 2026): every combo negative except
+C2 OOS +0.03, C6 OOS +0.01, C10 2026 +0.20 — none in two periods. ~41-49% reach 1R, ~23-35% reach 2R,
+the same as any candle (P112c). Median M1 stop 6.5-8.4 pips, 19-33% stopped inside 15 min; the 1-pip
+cost alone is ~0.13R. Fixed 2R target: no combo PF > 1 in two periods. WITH-minus-AGAINST gap: 30
+cells, 2 beyond 2 SE (C2 OOS +0.30 ± 0.13, C10 2026 +0.56 ± 0.18), neither repeats — chance expects
+~1.5. Discount/premium vs the bias candle's open and London vs NY flip sign. **No winning combo to
+carry into the engine.** The algo's edge (PF ~3.6 on the same pairs) is in what this recipe leaves out:
+the DXY x EURGBP gate, consolidation + Judas sweep, and the managed exits. Closed; P113 (alignment
+INSIDE the algo's own trades) is the remaining test.
 
 ## 🧪 P114 — which timeframe COMBO (W1 -> M1) gives the best intraday entries? (BUILT 2026-10-19, RUNNING)
 Trader: put time + candlestick theory into it, loop 5 combos from W1 to M1, find the best for entries
