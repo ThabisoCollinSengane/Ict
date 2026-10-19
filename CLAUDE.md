@@ -30,6 +30,26 @@ cache-bug post-mortem.)
 `stop_reason` level kind, by year). Report plainly. Trader decisions still open: stop20h default?
 FX+indices NY vs all three? Live account: R3,000 start considered.
 
+## 🔍 P112c — does the SFP PICK THE REVERSAL? (RAN 2026-10-19) — 🔴 no better than an ordinary candle
+
+Trader: "how good is it at picking reversals — this is mainly a Judas swing; win rate later."
+`scripts/ds_reversal_study.py` (workflow `ds-reversal-study.yml` -> `data/ds_reversal_report.md`,
+`_null.md`). Pure price, 2022-25, SPX/NSX/gold/EU/GU. Every H1 SFP closing 08:00-12:00 ET (same
+levels/freshness/bias as `_ds_*`), entered at the close, stop beyond the wick; measured = how far
+price runs our way BEFORE reclaiming the wick (hit1/hit2 = 1R/2R first; held = wick intact to
+16:00 ET). Control = every other window H1 candle, same construction (stop beyond its own
+extreme), matched on R/ATR quintiles. Null (random walk) reads hit-lift ~0, held ~−4 (geometry).
+- **All SFPs (n ≈ 2,000 per half): lift hit1 −0.3 ± 1.2 IS / +0.2 ± 1.1 OOS; hit2 −0.2 / +0.8.**
+  A sweep-and-close-back candle turns exactly as often as any candle with the same stop. Raw
+  rates 45% / 26% for BOTH.
+- With the bias (the traded set): hit1 −2.0 IS / +3.9 OOS — sign flips. Against the bias:
+  −3.4 / −2.3. The d2s bias adds nothing measurable either.
+- Held: −2.0 / −4.3 = the null's geometric −4. No level kind (pd/pdsw/asia/london) or hour holds
+  a positive lift in both halves (London OOS +6.6, IS −2.6). NSX no-bias +5.6 / +4.8 is one cell
+  of ~60 read. 2026 rows missing (2026 download did not land).
+**The SFP has no reversal-picking edge on these markets.** Why P112's trades lose: ~43% reach
+1R and ~26% reach 2R — the same as any candle — so every target is break-even before costs.
+
 ## 🎯 P112 JadeCap "Daily Sweep" / SFP model (BUILT 2026-10-19, RUNNING)
 
 **Build:** `_daily_sweep_entry` / `_ds_signal` / `_ds_bias` / `_ds_levels` / `_ds_target` /
