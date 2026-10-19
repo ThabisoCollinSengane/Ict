@@ -60,7 +60,20 @@ avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Ne
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
 
-## 📋 P117 PLAN — order flow on the algo's own trades (trader asked 2026-10-19; NOT BUILT YET)
+## 🔧 P115b — WHICH timeframe carries the leak (BUILT 2026-10-19, RUNNING; trader: fix the leak first)
+`HONEST_TFS` (config) limits HONEST_HTF to listed TFs. Arms (suffix `_p115b`): `hon15` (M15 only),
+`hon60`, `hon240`, `honD`, `honHTF` (60T+240T+D, i.e. everything except M15) × is/oos/full/y26.
+Prime suspect: M15 — `detect_amd_setup` judges the Judas sweep "closed back inside" on the FORMING
+M15 bar whose close is up to 10 min in the future of the M5 entry. If hon15 alone collapses and
+honHTF holds, the fix is local to the M15 AMD read; if honD/hon240 collapse, it is the draw gate.
+Then: rebuild the leaking read on completed / truncated bars and make HONEST_HTF the default.
+
+## 📋 P117 — order flow on the algo's own trades (trader chose FREE tick data, 2026-10-19; DATA RUNNING)
+Pipeline built: `scripts/fetch_histdata.py --tick` (HistData tick-data-quotes, monthly
+`HISTDATA_COM_ASCII_<PAIR>_T<YYYYMM>.zip`), `p39_volume_analysis.aggregate_month(zip, out.csv.gz,
+bin_secs=60)` -> per-minute ticks / buy (bid up-tick) / sell / neutral. Workflow `tick-agg.yml`
+(pair x year matrix, month by month, zip deleted) -> `data/tick_agg/<PAIR>_<YYYYMM>_m1.csv.gz`.
+Analysis script NOT written yet (needs the honest engine's trade dumps).
 Test Nill's missing piece (footprint / order flow at the level) ON THE ALGO, not on the price skeleton.
 **Data reality:** HistData FX/CFD has NO exchange volume. Its free TICK product (bid/ask quotes, monthly
 zips, `timeframe=T`, ~50-100 MB/month/pair) gives tick COUNT + up/down-tick direction only — the
