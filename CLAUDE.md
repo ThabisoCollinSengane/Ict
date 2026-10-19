@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — collect P115 HONESTY AUDIT (20 files `data/mm_golden_*_p115_run.txt`) — this decides how real the backtest is; P113/P114/P112 CLOSED
+## 🎯 NEXT SESSION START HERE — collect P115 HONESTY AUDIT (20 files `data/mm_golden_*_p115_run.txt`) — decides how real the backtest is; then P116 Nill study (`data/nill_report.md`); P113/P114/P112 CLOSED
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,24 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🧪 P116 — Patrick Nill "P/b" impulse->range at the WEEKLY VALUE AREA (BUILT 2026-10-19, RUNNING)
+Trader asked to investigate Patrick Nill (Robbins World Cup forex: 2025 202.1% 2nd, 2026 YTD 305.1% 1st
+per search; NOT the 672%/115% 2008-09 figures — those are Andrea Unger's). Method (third-party
+summaries of his videos/course "World Class Edge"; pages unreachable from the sandbox): big IMPULSE
+then a RANGE ("P" up / "b" down), traded either (a) ping-pong off the range edges back toward the
+impulse origin (counter-trend; "counter-trader") or (b) breakout + pullback continuation; strongest
+when the range sits at the WEEKLY Market Profile value area high/low; entry refined on 15m +
+footprint order flow (we have NO order flow — HistData has no real volume); stop beyond the zone
+fixed before entry; target near the impulse origin; hold 4h-3 days; risk 0.2-1% (2-3% in contests);
+expects 50-60% WR, 10-20 loss streaks, stops to review after ~15 losses; no >10-20% DD systems.
+Our algo has only a daily percentile VAH/VAL proxy (`_market_profile`), no weekly TPO value area.
+**Study** `scripts/nill_study.py` (workflow `nill-study.yml` -> `data/nill_report.md`, `_null.md`):
+prior-week TPO value area (time-at-price, 70%, M5 closes binned), impulse = M15 move >= K x daily ATR
+within N bars, then a range (>= R bars, width <= W x impulse); fade-edge and breakout-pullback trades,
+stop beyond the range, target impulse origin (fade) / range height x1 (breakout), max hold 3 days,
+spread cost. Split AT weekly VAH/VAL vs ELSEWHERE (the control) x IS/OOS/2026, EU/GU/NZ/gold/SPX/NSX.
+Ship gate: AT-VA beats ELSEWHERE in every period; then an engine channel / 1.25x size-up.
 
 ## 🔎 P115 — HONESTY AUDIT of the base engine (BUILT 2026-10-19, RUNNING) — trader: "it can't be that good"
 The strategy beat every theory tested (P112-P114) — but those studies used COMPLETED bars and
