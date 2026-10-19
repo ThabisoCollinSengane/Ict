@@ -75,6 +75,12 @@ all applied first). `tfa1` record-only = p93 exactly (876 / R176,034). First leg
   42.4 / 73.0 / 137.6 — the size-up converted into risk-cap SKIPS (181 -> 388, 876 -> 789 trades,
   the P70 ARM-1 shape); `tfa3` (skip misaligned) 47.6 / 77.6 / (pending); `tfa4` (aligned only)
   43.9 / 38.4 / 110.7, DD −17.8. **Every arm loses money. Keep TFA_MODE=0.**
+- `tfa1ob` full (record, FVG + OB draws) = p93 exactly. Counting OBs as draws, **aligned beats
+  misaligned in BOTH halves**: aligned 257/47%/4.40 | 313/48%/6.10, misaligned 31/35%/2.82 | 28/36%/2.03,
+  no draw 56/39%/2.71 | 33/27%/2.18 — but misaligned is small (59 trades in 4 yr) and still PF > 2, and
+  the algo is ALREADY aligned on ~80% of checks (713 of 899). Removing / up-sizing on it lost money
+  (tfa2/tfa3/tfa4). The current timeframe structure (entries M5/M15/H1, targets on H4/D/W gaps, M1 stop)
+  is what the data supports. `tfa3` full still running.
 
 ## ⏱️ P113 — JadeCap timeframe alignment on the FX core (BUILT 2026-10-19, RUNNING)
 Trader: test the case study's timeframe alignment on the real algo's FVG draws + entries.
