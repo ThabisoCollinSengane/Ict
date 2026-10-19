@@ -1334,6 +1334,16 @@ DXY_REV_LOOKBACK_TF = {"60T": 24, "D": 5}
 TARGET_PD_ENABLED = bool(int(_os.environ.get("TARGET_PD_ENABLED", "1")))
 TARGET_PD_TFS = tuple(_os.environ.get("TARGET_PD_TFS", "W,D,240T").split(","))
 
+# ── P113: JadeCap timeframe alignment on the FX core's FVG draw + entry ──────
+# Case-study pairing: day trading HTF 4H/1H (or Daily) -> LTF 15M/5M; short-term Daily -> 1H;
+# swing Weekly -> 4H. "aligned" = the target sits on an unfilled HTF gap (COMPLETED bars only)
+# whose timeframe pairs with the entry's timeframe. 0 off (byte-identical), 1 record only,
+# 2 size aligned x TFA_MULT (R3k floor), 3 skip misaligned, 4 skip anything not aligned.
+TFA_MODE  = int(_os.environ.get("TFA_MODE", "0"))
+TFA_MULT  = _envf("TFA_MULT", 1.25)
+TFA_TFS   = tuple(_os.environ.get("TFA_TFS", "W,D,240T,60T").split(","))
+TFA_KINDS = tuple(_os.environ.get("TFA_KINDS", "fvg,ifvg").split(","))
+
 # ── P70: target-rung lever (P67 measured, both splits) ────────────────────────
 # near PF 5.31/9.15 vs d3 0.78/0.80, d30 0.80/0.32, d60 0.23/0.45 — every far
 # rung below 1.0 in BOTH splits, on 234 of 740 trades. All three arms default to

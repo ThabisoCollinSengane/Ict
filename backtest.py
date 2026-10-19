@@ -558,6 +558,10 @@ class Backtester:
             "target_rung": st.get("target_rung", ""),
             "target_pd": st.get("target_pd", ""),
             "target_pd_tf": st.get("target_pd_tf", ""),
+            "tfa_draw_tf": st.get("tfa_draw_tf", ""),
+            "tfa_draw_kind": st.get("tfa_draw_kind", ""),
+            "tfa_entry_tf": st.get("tfa_entry_tf", ""),
+            "tfa_align": st.get("tfa_align", ""),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
@@ -691,6 +695,10 @@ class Backtester:
             "target_rung": st.get("target_rung", ""),
             "target_pd": st.get("target_pd", ""),
             "target_pd_tf": st.get("target_pd_tf", ""),
+            "tfa_draw_tf": st.get("tfa_draw_tf", ""),
+            "tfa_draw_kind": st.get("tfa_draw_kind", ""),
+            "tfa_entry_tf": st.get("tfa_entry_tf", ""),
+            "tfa_align": st.get("tfa_align", ""),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
@@ -2034,6 +2042,52 @@ class Backtester:
                         ob_hit = ("ob", tf)
                         break
         return ob_hit
+
+    # P113 — JadeCap timeframe alignment: which entry TFs each draw TF pairs with.
+    _TFA_PAIRS = {"240T": ("15T", "5T"), "60T": ("15T", "5T"),
+                  "D": ("60T", "15T", "5T"), "W": ("240T",)}
+    _TFA_EMPTY = {"tfa_draw_tf": "", "tfa_draw_kind": "", "tfa_entry_tf": "", "tfa_align": ""}
+
+    @staticmethod
+    def _tfa_entry_tf(entry_type):
+        s = str(entry_type)
+        for tag, tf in (("_h1", "60T"), ("_m15", "15T"), ("_m5", "5T"), ("m1_", "1T")):
+            if tag in s:
+                return tf
+        return ""
+
+    def _tfa_read(self, pair, target, entry_type, t):
+        """P113 — does the target sit on an unfilled HTF gap whose timeframe pairs with the
+        entry timeframe (case-study alignment)? COMPLETED bars only for detection AND
+        mitigation (the forming HTF bar holds the rest of its window in a backtest)."""
+        from ict.order_block import detect_order_blocks
+        tol = config.TARGET_CONFLUENCE_TOL_PIPS * pip_size(pair)
+        hits = []
+        for tf in config.TFA_TFS:
+            bars = self.bars_up_to(pair, tf, t)
+            if bars is None or len(bars) < 6:
+                continue
+            bars = bars[:-1]
+            kind = ""
+            for g in self._scan_htf_fvgs(bars, pair):
+                if not g.mitigated and g.bottom - tol <= target <= g.top + tol:
+                    k = "ifvg" if self._gap_inversion(bars, g) else "fvg"
+                    if k in config.TFA_KINDS:
+                        kind = k
+                        break
+            if not kind and "ob" in config.TFA_KINDS:
+                for ob in detect_order_blocks(bars):
+                    if not getattr(ob, "mitigated", False) and ob.bottom - tol <= target <= ob.top + tol:
+                        kind = "ob"
+                        break
+            if kind:
+                hits.append((tf, kind))
+        etf = self._tfa_entry_tf(entry_type)
+        if not hits:
+            return {"tfa_draw_tf": "", "tfa_draw_kind": "", "tfa_entry_tf": etf, "tfa_align": "no_draw"}
+        al = any(etf in self._TFA_PAIRS.get(tf, ()) for tf, _ in hits)
+        return {"tfa_draw_tf": "+".join(tf for tf, _ in hits), "tfa_draw_kind": hits[0][1],
+                "tfa_entry_tf": etf, "tfa_align": "aligned" if al else "misaligned"}
 
     # P74 — the entry side of the same question.
     _ENTRY_PD_EMPTY = {
@@ -4786,6 +4840,21 @@ class Backtester:
             if _vmod != 1.0:
                 units = max(int(units * _vmod), min_units)
                 g["vol_mod_applied"] = g.get("vol_mod_applied", 0) + 1
+        # P113: JadeCap timeframe alignment (draw TF of the target's FVG vs entry TF).
+        _tfa = None
+        if config.TFA_MODE:
+            _tfa = self._tfa_read(pair, target, entry_type, t)
+            _al = _tfa["tfa_align"]
+            g[f"tfa_{_al}"] = g.get(f"tfa_{_al}", 0) + 1
+            if (config.TFA_MODE == 2 and _al == "aligned"
+                    and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+                units = max(int(units * config.TFA_MULT), min_units)
+                g["tfa_sized"] = g.get("tfa_sized", 0) + 1
+            elif ((config.TFA_MODE == 3 and _al == "misaligned")
+                    or (config.TFA_MODE == 4 and _al != "aligned")):
+                g["tfa_skipped"] = g.get("tfa_skipped", 0) + 1
+                self._log_reject(t, pair, direction, f"P113 timeframe alignment: {_al}")
+                return
         # P10 London-Judas priority (REVERTED — downsize multiplier defaults to 1.0,
         # so this is a no-op + analytics counter). Hypothesis was that a NY-AM breakout
         # on a pair whose London Judas already fired today is the weaker echo and should
@@ -4923,6 +4992,7 @@ class Backtester:
             "target_type": target_type,
             "target_rung": _tgt_rung,
             "target_pd": _tgt_pd,
+            **(_tfa or self._TFA_EMPTY),   # P113
             "target_pd_tf": _tgt_pd_tf,
             "path_blocked": _path_blocked,
             "path_block_tf": _path_tf,
@@ -7270,6 +7340,7 @@ class Backtester:
             "target_type": target_type,
             "target_rung": "", "path_blocked": False, "path_block_tf": "",
             "target_pd": "", "target_pd_tf": "",
+            **self._TFA_EMPTY,   # P113
             **self._entry_pd_context(pair, direction, entry, t),   # P74
             "stop_reason": _stop_reason,
             "legs": [leg],
