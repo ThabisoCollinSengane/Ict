@@ -82,7 +82,9 @@ Pipeline built: `scripts/fetch_histdata.py --tick` (HistData tick-data-quotes, m
 `HISTDATA_COM_ASCII_<PAIR>_T<YYYYMM>.zip`), `p39_volume_analysis.aggregate_month(zip, out.csv.gz,
 bin_secs=60)` -> per-minute ticks / buy (bid up-tick) / sell / neutral. Workflow `tick-agg.yml`
 (pair x year matrix, month by month, zip deleted) -> `data/tick_agg/<PAIR>_<YYYYMM>_m1.csv.gz`.
-Analysis script NOT written yet (needs the honest engine's trade dumps).
+Analysis script NOT written yet (needs the honest engine's trade dumps). Trader (2026-10-19): Nill uses a VOLUME profile in places — once tick bins land, (a) re-run P116
+with a weekly TICK-VOLUME profile (each minute's ticks spread over its high-low) instead of the TPO
+time profile, (b) add VAH/VAL/POC from that profile to the P117 order-flow features.
 Test Nill's missing piece (footprint / order flow at the level) ON THE ALGO, not on the price skeleton.
 **Data reality:** HistData FX/CFD has NO exchange volume. Its free TICK product (bid/ask quotes, monthly
 zips, `timeframe=T`, ~50-100 MB/month/pair) gives tick COUNT + up/down-tick direction only — the
