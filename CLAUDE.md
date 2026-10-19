@@ -24,9 +24,31 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — P112 Daily Sweep CLOSED (all 60 runs in, 2026-10-19)
+## 🎯 NEXT SESSION START HERE — collect P113 (24 files `data/mm_golden_*_p113_run.txt`); P112 CLOSED
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
+
+## ⏱️ P113 — JadeCap timeframe alignment on the FX core (BUILT 2026-10-19, RUNNING)
+Trader: test the case study's timeframe alignment on the real algo's FVG draws + entries.
+Pairing (case study): day trading HTF 4H/1H (or D) -> LTF 15M/5M; short-term D -> 1H; swing
+W -> 4H. `_tfa_read`: does the TARGET sit on an unfilled W/D/H4/H1 gap (COMPLETED bars only for
+detection AND mitigation; `TFA_KINDS` fvg,ifvg[,ob]) whose TF pairs with the entry TF (from
+`entry_type`: _h1/_m15/_m5/m1_)? -> aligned / misaligned / no_draw. `TFA_MODE` 0 off (byte-
+identical), 1 record, 2 size aligned x1.25 (R3k floor), 3 skip misaligned, 4 skip unless aligned.
+Columns `tfa_draw_tf/_kind/_entry_tf/_align` (plumbed open + both close whitelists + MM block),
+counters `tfa_<align>`, `tfa_sized`, `tfa_skipped`. Fixture-verified incl. a forming bar that
+closes through the gap (ignored); live stub clean with TFA_MODE=2. Base `_maybe_open` only (MM
+trades not classified). Arms `p93`, `tfa1` (must = 876 / R176,034), `tfa2`, `tfa3`, `tfa4`,
+`tfa1ob` × is/oos/full/y26 -> `data/mm_golden_*_p113_*`.
+**Pre-read on the p93 dumps (old `target_pd_tf`, which reads the FORMING W/D/H4 bar — treat as
+indicative only):** first legs aligned IS 169 / 41% / PF 4.21, OOS 199 / 48% / 5.50, 2026 60 /
+33% / 2.26; misaligned 82 / 52% / 4.76, 98 / 40% / 4.20, 31 / 32% / 2.67; no draw 163 / 39% /
+2.11, 143 / 42% / 2.77, 34 / 47% / 1.56. Aligned vs misaligned flips sign; target-not-on-a-PD-
+array is the weakest bucket in all three periods. The algo has NO H4 entry, so a Weekly draw
+can never align (the case study's swing pairing is unreachable).
+**⚠️ `_target_pd_array` (analytics) reads the forming HTF bar** — gap detection and mitigation
+both see the rest of the day/week. Analytics-only (computed after sizing), so trades are
+unaffected, but every `target_pd*` table is contaminated. P113 uses completed bars.
 
 ## 🔴 P112 / P112b RESULT (RAN 2026-10-19) — Daily Sweep loses in every arm, both targets
 Withdrawn R k IS / OOS / full, headline DD full / OOS; daily_sweep trades full n / WR / PF / rand.
