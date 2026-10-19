@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, full, y26]
-        mode: [p93, hon, sbx, slip, audit]
+        mode: [hon15, hon60, hon240, honD, honHTF]
     env:
       NO_PUSH: "1"
     steps:
@@ -136,6 +136,8 @@ jobs:
           # P115 honesty audit: hon = forming HTF bar truncated to open..now (what live sees);
           #   sbx = stop checked against the stop carried INTO the bar; slip = 0.5 pip on stop fills; audit = all three.
           case "${{ matrix.mode }}" in hon|audit) export HONEST_HTF=1;; esac
+          # P115b: which timeframe carries the leak — honest forming bar on ONE timeframe at a time.
+          case "${{ matrix.mode }}" in hon15) export HONEST_HTF=1 HONEST_TFS=15T;; hon60) export HONEST_HTF=1 HONEST_TFS=60T;; hon240) export HONEST_HTF=1 HONEST_TFS=240T;; honD) export HONEST_HTF=1 HONEST_TFS=D;; honHTF) export HONEST_HTF=1 HONEST_TFS=60T,240T,D;; esac
           case "${{ matrix.mode }}" in sbx|audit) export SAMEBAR_EXIT=1;; esac
           case "${{ matrix.mode }}" in slip|audit) export STOP_SLIP_PIPS=0.5;; esac
           # P113: JadeCap timeframe alignment on the FX core. tfa1 record only (must = p93),
@@ -159,7 +161,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p115
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p115b
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

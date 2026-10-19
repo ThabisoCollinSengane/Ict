@@ -253,7 +253,8 @@ class Backtester:
         bars = self.tf_bars[(sym, tf)]
         out = bars[max(0, pos - max_bars):pos] if max_bars is not None else bars[:pos]
         if (config.HONEST_HTF and not config.STRICT_BAR_CLOSE and out
-                and tf not in self._RIGHT_LABELLED_TFS and tf not in self._EXEC_TFS):
+                and tf not in self._RIGHT_LABELLED_TFS and tf not in self._EXEC_TFS
+                and (not config.HONEST_TFS or tf in config.HONEST_TFS)):
             # P115: the forming bar holds only what has traded up to now (open..t),
             # exactly what a live chart shows, instead of its whole window.
             part = self._partial_bar(sym, tf, pos - 1, t)
