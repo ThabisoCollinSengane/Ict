@@ -1343,6 +1343,7 @@ TFA_MODE  = int(_os.environ.get("TFA_MODE", "0"))
 TFA_MULT  = _envf("TFA_MULT", 1.25)
 TFA_TFS   = tuple(_os.environ.get("TFA_TFS", "W,D,240T,60T").split(","))
 TFA_KINDS = tuple(_os.environ.get("TFA_KINDS", "fvg,ifvg").split(","))
+TFA_ALIGN = _os.environ.get("TFA_ALIGN", "")   # override pairing, e.g. "240T:15T/5T;D:60T"
 
 # ── P70: target-rung lever (P67 measured, both splits) ────────────────────────
 # near PF 5.31/9.15 vs d3 0.78/0.80, d30 0.80/0.32, d60 0.23/0.45 — every far

@@ -2056,7 +2056,22 @@ class Backtester:
                 return tf
         return ""
 
-    def _tfa_read(self, pair, target, entry_type, t):
+    def _tfa_pairs(self):
+        """TFA_ALIGN env overrides the pairing, e.g. "240T:15T/5T;D:60T" (draw TF: setup TFs)."""
+        spec = config.TFA_ALIGN
+        if not spec:
+            return self._TFA_PAIRS
+        cache = getattr(self, "_tfa_pairs_cache", None)
+        if cache is None or cache[0] != spec:
+            d = {}
+            for part in spec.split(";"):
+                if ":" in part:
+                    k, v = part.split(":", 1)
+                    d[k.strip()] = tuple(x.strip() for x in v.split("/") if x.strip())
+            cache = self._tfa_pairs_cache = (spec, d)
+        return cache[1]
+
+    def _tfa_read(self, pair, target, entry_type, t, etf=None):
         """P113 — does the target sit on an unfilled HTF gap whose timeframe pairs with the
         entry timeframe (case-study alignment)? COMPLETED bars only for detection AND
         mitigation (the forming HTF bar holds the rest of its window in a backtest)."""
@@ -2082,10 +2097,11 @@ class Backtester:
                         break
             if kind:
                 hits.append((tf, kind))
-        etf = self._tfa_entry_tf(entry_type)
+        etf = etf or self._tfa_entry_tf(entry_type)
         if not hits:
             return {"tfa_draw_tf": "", "tfa_draw_kind": "", "tfa_entry_tf": etf, "tfa_align": "no_draw"}
-        al = any(etf in self._TFA_PAIRS.get(tf, ()) for tf, _ in hits)
+        pairs = self._tfa_pairs()
+        al = any(etf in pairs.get(tf, ()) for tf, _ in hits)
         return {"tfa_draw_tf": "+".join(tf for tf, _ in hits), "tfa_draw_kind": hits[0][1],
                 "tfa_entry_tf": etf, "tfa_align": "aligned" if al else "misaligned"}
 
@@ -7264,6 +7280,21 @@ class Backtester:
         if (_target_score >= config.TARGET_SCORE_MULT_THRESHOLD
                 and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
             units = max(int(units * config.TARGET_SCORE_MULT), min_units)
+        # P113: timeframe alignment on the MM channel. Setup TF = the rung zone the entry
+        # retraced into (60T/15T/5T); the M1 shift is the execution layer, never the setup.
+        _tfa = None
+        if config.TFA_MODE:
+            _tfa = self._tfa_read(pair, target, "", t, etf=_pd_tf or "")
+            _al = _tfa["tfa_align"]
+            g[f"tfa_mm_{_al}"] = g.get(f"tfa_mm_{_al}", 0) + 1
+            if (config.TFA_MODE == 2 and _al == "aligned"
+                    and self.equity >= config.DRAW_SIZE_MIN_EQUITY):
+                units = max(int(units * config.TFA_MULT), min_units)
+                g["tfa_mm_sized"] = g.get("tfa_mm_sized", 0) + 1
+            elif ((config.TFA_MODE == 3 and _al == "misaligned")
+                    or (config.TFA_MODE == 4 and _al != "aligned")):
+                g["tfa_mm_skipped"] = g.get("tfa_mm_skipped", 0) + 1
+                return
         if units == 0:
             return
 
@@ -7340,7 +7371,7 @@ class Backtester:
             "target_type": target_type,
             "target_rung": "", "path_blocked": False, "path_block_tf": "",
             "target_pd": "", "target_pd_tf": "",
-            **self._TFA_EMPTY,   # P113
+            **(_tfa or self._TFA_EMPTY),   # P113
             **self._entry_pd_context(pair, direction, entry, t),   # P74
             "stop_reason": _stop_reason,
             "legs": [leg],
