@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🚨 P115: with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. Also collect P116 Nill study (`data/nill_report.md`).
+## 🎯 NEXT SESSION START HERE — 🚨 P115: with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,14 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🔴 P116 RESULT (RAN 2026-10-19) — mechanical Nill P/b has no edge; the weekly value area adds nothing
+`data/nill_report.md`, EU/GU/NZ/gold/SPX/NSX 2022-Oct 2026, ~5,900 setups. n / WR / avg R (spread
+incl.) / PF, AT VA vs ELSE (IS | OOS | 2026): fade-all 618/17%/−0.29 vs 2053/15%/−0.36 | 676/16%/−0.37 vs
+2160/15%/−0.38 | 276/15%/−0.38 vs 849/15%/−0.40 — gaps +0.07 / +0.01 / +0.01R, inside the null's
++0.00..+0.12 noise. Breakout-pullback 31-34% WR, avg −0.08..−0.15R, AT VA −0.04 / −0.04 / +0.02 vs ELSE.
+Every cell negative; no instrument positive in any period. Caveat: no order flow / footprint (his
+entry tool) and third-party rules — this tests the price-only skeleton, which has no edge. Closed.
 
 ## 🧪 P116 — Patrick Nill "P/b" impulse->range at the WEEKLY VALUE AREA (BUILT 2026-10-19, RUNNING)
 Trader asked to investigate Patrick Nill (Robbins World Cup forex: 2025 202.1% 2nd, 2026 YTD 305.1% 1st
