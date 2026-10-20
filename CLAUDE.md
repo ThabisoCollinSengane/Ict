@@ -76,7 +76,7 @@ breakers/floor/withdrawals off, R100k start (`MAX_DRAWDOWN_HALT_PCT`, `MAX_DAILY
 loses ~0.2R/trade = costs (~0.13R) + management. The 10-20% WR is that management on no-edge entries, not
 a backwards read. `_partial_bar` re-checked: correct (only flaw: missing M5 data keeps the full forming bar,
 which leaks in OUR favour). ⚠️ v1 used crc32 for the coin — linear, so seeds 1/2/3 gave the identical coin;
-fixed to sha256, `mcf2`/`mcf3` re-run. Next: rebuild the dollar/cross gate on completed bars and test new
+fixed to sha256, `mcf2`/`mcf3` re-run: KEPT minus FLIPPED avg R, seed 2 / 3: IS +0.14 / +0.03, OOS −0.07 / +0.02, 2026 −0.18 / +0.09 — mean over 3 seeds ≈ 0 in every period. Confirmed: no direction edge. Next: rebuild the dollar/cross gate on completed bars and test new
 entry ideas against this coin-flip control.
 
 ## 🚨 P115c RESULT (all 12 runs, 2026-10-19) — LEAK-FREE, THE STRATEGY HAS NO EDGE
