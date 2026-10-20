@@ -12,7 +12,7 @@ DXY (USD direction)
 ```
 
 **Live account target:** Exness ZAR-denominated, R1,000 start, manual funding. Leverage 1:2000 (trader, 2026-10-15); gold and indices tradeable at 0.01 lot.
-**Backtest result (4 years, 2022–2025, realistic income mode):** 736 trades, WR 43.9%, PF 4.01,
+**⚠️ VOID (P115-P119): the result below came from a forming-bar lookahead; on the honest default engine the strategy has no edge.** **Backtest result (4 years, 2022–2025, realistic income mode):** 736 trades, WR 43.9%, PF 4.01,
 MaxDD -13.24%, R1,000 start → R132k withdrawn (37 withdrawals) + R8.6k working balance.
 (Two entry models: Judas reversal + intermarket breakout continuation — see §5. Includes P9
 HTF-FVG 1.25× sizing bump, P16 fractal structural stop, P17 H4/D/W ITH/ITL liquidity-draw
@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,17 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🔒 P119 — THE HONEST ENGINE IS THE DEFAULT (trader, 2026-10-20)
+`config.py` defaults now: `HONEST_HTF=1`, `HONEST_TFS=15T,240T,D` (forming bar truncated to open..now),
+`DROP_TFS=60T` (H1 on completed bars), `SAMEBAR_EXIT=1`, `STOP_SLIP_PIPS=0.5`. **Every number above P115
+that quotes 876 / R176k / PF 3.6 (and 736 / R132k) was produced by the forming-bar lookahead — read it as
+history, not as evidence.** Old engine on demand: `HONEST_HTF=0 DROP_TFS= SAMEBAR_EXIT=0 STOP_SLIP_PIPS=0`
+(regression arm `leaky` must still give 876 / R176,034). Live MT5 unaffected (`LiveTrader.bars_up_to`
+is its own; live already reads completed bars, which is STRICTER than this default for M15/H4/D).
+Trader: the whole strategy will be reworked on this engine; every idea must beat the P118 coin-flip
+control (`COIN_FLIP=1`, kept-vs-flipped within the run) in IS, OOS and 2026. New anchors: workflow
+arms `hdef` (default) / `mhdef` (measurement mode) × is/oos/full/y26 -> `data/mm_golden_*_p119_*`.
 
 ## 🎲 P118 RESULT (RAN 2026-10-20) — coin flip = your direction on the leak-free engine; no bug, no edge
 `COIN_FLIP=1` (`_coin_flip`, after both base and MM opens): same entry moment, stop and target distance,

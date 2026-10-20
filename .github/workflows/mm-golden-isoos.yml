@@ -23,8 +23,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arm: [is, oos, y26]
-        mode: [mcf2, mcf3]
+        arm: [is, oos, full, y26]
+        mode: [hdef, mhdef, leaky]
     env:
       NO_PUSH: "1"
       MODE: ${{ matrix.mode }}
@@ -148,6 +148,10 @@ jobs:
           #   setup is counted; cfp93 = the leaky default flipped (sanity: should collapse).
           case "${{ matrix.mode }}" in cfclean*|mclean|mcf*) export DROP_TFS=60T HONEST_HTF=1 HONEST_TFS=15T,240T,D;; esac
           case "${{ matrix.mode }}" in cf*|mcf*) export COIN_FLIP=1 COIN_FLIP_SEED=${MODE: -1};; esac
+          # P119: honest engine is the default. hdef = new default as-is; mhdef = same in measurement
+          #   mode; leaky = the old engine (must reproduce 876 / R176,034).
+          case "${{ matrix.mode }}" in leaky) export HONEST_HTF=0 DROP_TFS= SAMEBAR_EXIT=0 STOP_SLIP_PIPS=0;; esac
+          case "${{ matrix.mode }}" in mhdef) export MAX_DRAWDOWN_HALT_PCT=1000 MAX_DAILY_LOSS_PCT=1000 MAX_CONSECUTIVE_LOSSES=99999 GROWTH_PHASE_FLOOR_ZAR=-1000000000 WITHDRAW_SCHEDULE=0 STARTING_CASH=100000;; esac
           case "${{ matrix.mode }}" in mclean|mcf*) export MAX_DRAWDOWN_HALT_PCT=1000 MAX_DAILY_LOSS_PCT=1000 MAX_CONSECUTIVE_LOSSES=99999 GROWTH_PHASE_FLOOR_ZAR=-1000000000 WITHDRAW_SCHEDULE=0 STARTING_CASH=100000;; esac
           case "${{ matrix.mode }}" in sbx|audit) export SAMEBAR_EXIT=1;; esac
           case "${{ matrix.mode }}" in slip|audit) export STOP_SLIP_PIPS=0.5;; esac
@@ -172,7 +176,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p118
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p119
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

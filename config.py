@@ -1224,11 +1224,17 @@ STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "0")))
 # P115 honesty audit: HONEST_HTF=1 truncates the forming bar to open..now (what live sees);
 # SAMEBAR_EXIT=1 checks this bar's stop hit against the stop as it stood BEFORE this bar's
 # close moved it (trail / BE / lock / milestone); STOP_SLIP_PIPS adverse slippage on stop fills.
-HONEST_HTF     = bool(int(_os.environ.get("HONEST_HTF", "0")))
-HONEST_TFS     = tuple(x for x in _os.environ.get("HONEST_TFS", "").split(",") if x)   # "" = every HTF; else only these (e.g. "15T,60T")
-DROP_TFS       = tuple(x for x in _os.environ.get("DROP_TFS", "").split(",") if x)     # P115c: drop the forming bar on these TFs only (completed bars)
-SAMEBAR_EXIT   = bool(int(_os.environ.get("SAMEBAR_EXIT", "0")))
-STOP_SLIP_PIPS = float(_os.environ.get("STOP_SLIP_PIPS", "0"))
+# P119 (trader, 2026-10-20): the HONEST engine is the DEFAULT. P115-P118 showed every earlier
+# result rode the forming-bar lookahead (H1 DXY/EURGBP/AUDNZD gate read the hour's close up to
+# ~55 min early). Defaults now = what a live chart can see:
+#   H1 on COMPLETED bars; M15/H4/D forming bar truncated to open..now; stop hit checked against
+#   the stop carried INTO the bar; 0.5 pip slippage on stop fills.
+# Old leaky engine (reproduces 876 / R176,034): HONEST_HTF=0 DROP_TFS= SAMEBAR_EXIT=0 STOP_SLIP_PIPS=0
+HONEST_HTF     = bool(int(_os.environ.get("HONEST_HTF", "1")))
+HONEST_TFS     = tuple(x for x in _os.environ.get("HONEST_TFS", "15T,240T,D").split(",") if x)   # "" = every HTF; else only these
+DROP_TFS       = tuple(x for x in _os.environ.get("DROP_TFS", "60T").split(",") if x)     # completed bars only on these TFs (P115c)
+SAMEBAR_EXIT   = bool(int(_os.environ.get("SAMEBAR_EXIT", "1")))
+STOP_SLIP_PIPS = float(_os.environ.get("STOP_SLIP_PIPS", "0.5"))
 # P118 random-direction control: same entries/stops/targets, side picked by a seeded coin.
 COIN_FLIP      = bool(int(_os.environ.get("COIN_FLIP", "0")))
 COIN_FLIP_SEED = int(_os.environ.get("COIN_FLIP_SEED", "1"))
