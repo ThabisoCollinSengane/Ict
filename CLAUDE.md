@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🟡 P122: Kronos predicts EXPANSION beyond ATR+hour (resid corr +0.14, both clean periods), NOT Judas-vs-breakout (worse than geometry). Next: longer-ATR baseline, then expansion filter in engine. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 pure direction study still running. 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🟡 P122: Kronos predicts EXPANSION beyond ATR+hour (resid corr +0.14, both clean periods), NOT Judas-vs-breakout (worse than geometry). Next: longer-ATR baseline, then expansion filter in engine. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 direction study: coin flip (clean +0.1 / −1.5pp). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -92,6 +92,12 @@ report -> `data/kronos_consol_report.md`). `kronos_bridge.paths()` returns the I
   both periods; Kronos picks −0.25 / −0.23 ≈ fade; coin −0.28. No positive cell.
 **Next:** (1) add a 64h/daily ATR baseline to Q1; (2) if Kronos still adds, use it as an expansion FILTER in the
 engine (trade only when Kronos's predicted 4h range is in the top third) vs the coin-flip control, 2025/2026.
+
+**P121 DIRECTION STUDY RESULT (RAN 2026-10-20, 13,878 forecasts) — 🔴 Kronos calls direction like a coin.**
+Race lift pp ± day-clustered SE / fwd 4h pips (all pairs): contaminated 2022-01..2024-06 +0.9±0.7 / +0.1;
+**CLEAN 2024-07..2025-12 +0.1±1.2 / +0.5±0.8; CLEAN 2026 −1.5±1.3 / −0.6±0.6.** Confident third: +2.9±2.2 /
++2.4±1.8 then −0.9±2.5 / −0.6±1.5 — flips. No pair beyond 2 SE. By year +1.0 / +0.5 / +0.3 / +0.6 / −1.5.
+(2025 job hit its time budget at ~193 days per pair.) Kronos has no direction edge on these pairs at 1-4h.
 
 **P121 ENGINE RESULT (all 28 runs, 2026-10-20; OOS mk2 92/20.7%/0.59) — 🔴 Kronos does not lift the honest win rate.**
 n / WR / PF (IS | OOS | 2025 | 2026), measurement mode: honest no-Kronos `mhdef` 316/21.2%/0.69 | 338/23.4%/0.73
