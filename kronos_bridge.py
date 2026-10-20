@@ -66,3 +66,54 @@ def forecast(frames, pred_len=4, samples=5, seed=0):
                               pred_len=pred_len, T=1.0, top_p=0.9, sample_count=samples,
                               verbose=False)
     return [float(o["close"].iloc[-1]) - lc for o, lc in zip(out, last)]
+
+
+def paths(frames, pred_len=16, samples=12, seed=0):
+    """P122 — the individual sampled futures, NOT their average. frames: list of equal-length
+    OHLC DataFrames of COMPLETED bars. Returns a numpy array (n_frames, samples, pred_len, 4)
+    in price units, columns open/high/low/close.
+
+    KronosPredictor.predict averages the paths inside auto_regressive_inference (np.mean over
+    the sample axis). Here we call auto_regressive_inference directly with the module's numpy
+    swapped for a shim whose mean(axis=1) is a no-op, and undo the per-series normalisation
+    ourselves exactly as predict() does."""
+    import numpy as np
+    import pandas as pd
+    import torch
+    p = _predictor()
+    import model.kronos as km   # the Kronos repo's module (put on sys.path by _predictor)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    xs, xst, yst, mus, sds = [], [], [], [], []
+    for f in frames:
+        f = f.rename(columns={"o": "open", "h": "high", "l": "low", "c": "close"})
+        idx = f.index.tz_convert(None) if f.index.tz is not None else f.index
+        x = np.zeros((len(f), 6), dtype=np.float32)
+        x[:, :4] = f[["open", "high", "low", "close"]].values
+        mu, sd = x.mean(axis=0), x.std(axis=0)
+        xs.append(np.clip((x - mu) / (sd + 1e-5), -p.clip, p.clip))
+        mus.append(mu)
+        sds.append(sd)
+        xst.append(km.calc_time_stamps(pd.Series(idx)).values.astype(np.float32))
+        yst.append(km.calc_time_stamps(_future_index(idx, pred_len)).values.astype(np.float32))
+
+    class _NP:
+        def __getattr__(self, name):
+            return getattr(np, name)
+
+        @staticmethod
+        def mean(a, axis=None, **k):
+            return a if axis == 1 else np.mean(a, axis=axis, **k)
+
+    real = km.np
+    km.np = _NP()
+    try:
+        z = km.auto_regressive_inference(
+            p.tokenizer, p.model, torch.from_numpy(np.stack(xs)), torch.from_numpy(np.stack(xst)),
+            torch.from_numpy(np.stack(yst)), p.max_context, pred_len, p.clip, 1.0, 0, 0.9, samples, False)
+    finally:
+        km.np = real
+    z = np.asarray(z)[:, :, -pred_len:, :4]          # (n, samples, pred_len, 4)
+    mu = np.stack(mus)[:, None, None, :4]
+    sd = np.stack(sds)[:, None, None, :4]
+    return z * (sd + 1e-5) + mu

@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🤖 P121 Kronos direction study + engine arms RUNNING (clean window = 2024-07+ only). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🧩 P122 Kronos consolidation/breakout study RUNNING; 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 pure direction study still running. 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,34 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🧩 P122 — Kronos on the CONSOLIDATION -> BREAKOUT cycle (BUILT 2026-10-20, RUNNING)
+Trader: can Kronos identify consolidations / time the breakout (the AMD cycle)? `scripts/kronos_consol_study.py`
+(workflow `kronos-consol-study.yml`: 12 jobs pair x half-year from 2024-07 = CLEAN window only, Kronos-mini
++ Tokenizer-2k, 256 completed M15 bars, 12 sampled paths, 16-bar = 4h horizon -> `data/kronos_consol/`,
+report -> `data/kronos_consol_report.md`). `kronos_bridge.paths()` returns the INDIVIDUAL sampled futures
+(calls `auto_regressive_inference` with the module's numpy swapped for a shim that skips the path average).
+- Q1 expansion timing: at 03/04/07/08/09 ET with a live unbroken range (engine `_find_best_range`, 8-96
+  bars, <= 35 pips, 2 touches), Kronos's median path range vs the realised 4h range; baselines ATR (last 16
+  bars) and HOUR; key number = Kronos's rank corr with the residual after log ATR + hour. Day-block bootstrap.
+- Q2 Judas vs breakout: first killzone M15 bar through one range edge (16-bar cooldown); outcome = close
+  half a range back inside (fakeout) vs half a range beyond (breakout), first; Kronos p_fake = share of
+  paths resolving fakeout. Baselines BASE / RULE (break bar closed back inside) / **NEAR (geometry — which
+  level the close is nearer; what a random walk gives)**. Trade sim fade vs follow, 2R, 1 pip.
+- ⚠️ v1 outcome was 'any close back inside' vs 'a full range beyond' — a random walk read 93% fakeouts;
+  fixed to equidistant levels + NEAR baseline. Stand-in random-path model on random walks: KRONOS - NEAR
+  −1.8 ± 7.8 (correct null).
+
+**P121 ENGINE RESULT (27 of 28 runs, 2026-10-20) — 🔴 Kronos does not lift the honest win rate.**
+n / WR / PF (IS | OOS | 2025 | 2026), measurement mode: honest no-Kronos `mhdef` 316/21.2%/0.69 | 338/23.4%/0.73
+| 148/23.0%/0.72 | 103/18.4%/0.81 (`mk1` record-only = identical, as it must be). `mk2` skip-disagree: 75/16.0%/
+0.48 | (pending) | 38/18.4%/0.26 | 22/9.1%/0.30. `mk3` follow Kronos's side: 318/21.1%/0.67 | 326/18.1%/0.60 |
+147/14.3%/0.36 | 103/19.4%/0.75. R1k accounts k2/k3 all halve to ~R490-695. Leaky reference 43-44% / PF 3.1-3.9.
+Inside `mk1`, trades Kronos AGREES with are WORSE every period (avg R −0.39 / −0.30 / −0.50 / −0.74) than
+those it disagrees with (−0.08 / −0.13 / −0.04 / −0.07). Why: Kronos-small is strongly mean-reverting vs the
+strategy's entries AND carries an upward bias (forecast up on 211 of 308 IS trades, mean +3..+6 pips) —
+short entries get "up" forecasts 159 vs 18; agreement is rare (22-27%) and lands on the worse trades.
+Following Kronos (mk3) is worse than the strategy. Not a lever.
 
 ## 🤖 P121 — KRONOS (K-line foundation model) as the direction source (BUILT 2026-10-20, RUNNING)
 Trader: test Kronos (github.com/shiyu-coder/Kronos, MIT; Kronos-small 24.7M params, HF
