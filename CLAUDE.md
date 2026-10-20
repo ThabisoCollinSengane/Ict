@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,23 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🔴 P120 RESULT (RAN 2026-10-20) — rework step 1: NO dollar read predicts the pairs on completed bars
+`scripts/dollar_read_study.py` (workflow `dollar-read-study.yml` -> `data/dollar_read_report.md`, `_null.md`).
+Every 15 min in the killzones, 10 DXY readers on COMPLETED bars (engine `htf_bias` on H1/H4/D, a 24-bar
+latch of it, 6h momentum, EMA50, prior daily candle, d2s), scored on EU/GU/NZ: +10/-10 race (coin 50%),
+1h / 4h forward pips (coin 0). **Day-clustered SE** — the naive SE let the random-walk null read +5..+14pp.
+Gate: same sign beyond 2 SE in IS, OOS AND 2026. Pooled lift (race pp ± SE) IS | OOS | 2026:
+- bos_h1 (the engine's gate) −4.0±1.6 | +1.8±2.2 | −2.2±3.9 — if anything backwards in 2022-23.
+- latch_h1 +0.1 | +0.5 | −1.3; bos_h4 −1.5 | −0.8 | −0.2; bos_d +0.3 | +1.3 | −1.6; mom_h1 −0.3 | 0.0 | +1.6;
+  ema_h1 −0.7 | 0.0 | +0.5; prev_d +0.1 | −0.4 | −0.5; d2s +0.4 | +1.0 | −1.2 — all within ~1 SE of a coin.
+- No reader x pair x measure cell is beyond even 1.5 SE with one sign in all three periods.
+- Pair selection (DXY x EURGBP quadrant, chosen minus other pair, 4h pips): nothing passes; latch_h4 picks
+  the WORSE pair in all three (−1.6±1.0 | −0.8±0.6 | −2.1±0.8), one cell of ~24 read — not acted on.
+**Meaning:** the dollar's own recent structure carries no information about the next 1-4h of the pairs.
+The intermarket gate was only ever "predictive" through the forming-bar lookahead. Exits/entries cannot
+create an edge with no direction edge underneath — the rework needs a NEW direction source, tested in
+this same harness against the coin.
 
 ## 🔒 P119 — THE HONEST ENGINE IS THE DEFAULT (trader, 2026-10-20)
 `config.py` defaults now: `HONEST_HTF=1`, `HONEST_TFS=15T,240T,D` (forming bar truncated to open..now),
