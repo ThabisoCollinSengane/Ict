@@ -1238,6 +1238,16 @@ STOP_SLIP_PIPS = float(_os.environ.get("STOP_SLIP_PIPS", "0.5"))
 # P118 random-direction control: same entries/stops/targets, side picked by a seeded coin.
 COIN_FLIP      = bool(int(_os.environ.get("COIN_FLIP", "0")))
 COIN_FLIP_SEED = int(_os.environ.get("COIN_FLIP_SEED", "1"))
+# P121 Kronos (K-line foundation model) as a direction read on COMPLETED bars. 0 off,
+# 1 record (columns kronos_dir/_pips/_agree), 2 skip trades Kronos disagrees with,
+# 3 take the side Kronos forecasts (mirror the trade when it disagrees). Needs the Kronos repo
+# (KRONOS_REPO) + torch; pretraining reportedly ends 2024-06, so only 2024-07+ is a clean test.
+KRONOS_MODE     = int(_os.environ.get("KRONOS_MODE", "0"))
+KRONOS_TF       = _os.environ.get("KRONOS_TF", "60T")
+KRONOS_CONTEXT  = int(_os.environ.get("KRONOS_CONTEXT", "400"))
+KRONOS_PRED_LEN = int(_os.environ.get("KRONOS_PRED_LEN", "4"))
+KRONOS_SAMPLES  = int(_os.environ.get("KRONOS_SAMPLES", "5"))
+KRONOS_MIN_PIPS = float(_os.environ.get("KRONOS_MIN_PIPS", "0"))
 
 # --- P51: unified structural bias + IFVG cascade (all instruments alike) ---
 # htf_bias asks "is this bar closing beyond the whole prior N-bar range right now" --

@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🤖 P121 Kronos direction study + engine arms RUNNING (clean window = 2024-07+ only). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,28 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🤖 P121 — KRONOS (K-line foundation model) as the direction source (BUILT 2026-10-20, RUNNING)
+Trader: test Kronos (github.com/shiyu-coder/Kronos, MIT; Kronos-small 24.7M params, HF
+`NeoQuasar/Kronos-small` + `Kronos-Tokenizer-base`, context 512) against the original 43% strategy and use
+it to lift the honest engine's ~20% WR. ⚠️ Pretraining corpus (12B candles, 45 exchanges, incl. FX)
+reportedly ends **June 2024** (third-party paper; arxiv/HF unreachable from the sandbox) -> anything
+before 2024-07 may be memorised; **only 2024-07+ (y25 arm, 2026) is a clean test.** The original 43% is
+the leaky engine — compared for reference only (`leaky` arm).
+- `kronos_bridge.py`: lazy load (repo cloned to KRONOS_REPO=/tmp/kronos, CPU), `forecast(frames, pred_len,
+  samples)` -> predicted close minus last close; `scripts/setup_kronos.sh` installs CPU torch + deps and
+  runs a smoke forecast (HF is proxy-blocked in this container — runs only on GitHub's runner).
+- Study `scripts/kronos_study.py` (workflow `kronos-study.yml`, one job per year -> `data/kronos_fc/`,
+  report -> `data/kronos_report.md`): P120 harness (race / 1h / 4h, day-clustered SE) at 03/04/07/08/09 ET,
+  400 completed H1 bars -> 4h forecast; rows split contaminated / CLEAN 2024-07..2025 / CLEAN 2026, plus a
+  confident-third cut. Stand-in model on random walks reads coin.
+- Engine: `_after_open` hook (both base + MM opens, BEFORE day/week counters): `_coin_flip`, then
+  `KRONOS_MODE` 1 record / 2 withdraw trades Kronos disagrees with / 3 mirror to Kronos's side
+  (`_mirror_side`, shared with P118). `_kronos_dir` = completed `KRONOS_TF` (60T) bars only, cached per bar.
+  Columns `kronos_dir/_pips/_agree/_flipped` (both close whitelists); counters `kronos_*`. Fixture-checked
+  all three modes with a stub model; live stub clean.
+- Arms `mhdef`, `leaky`, `mk1/mk2/mk3` (measurement mode), `k2/k3` (R1k account) × is / oos / **y25** / y26
+  -> `data/mm_golden_*_p121_*`. Read y25 + y26 first; kept-vs-disagree inside `mk1` is the direct test.
 
 ## 🔴 P120 RESULT (RAN 2026-10-20) — rework step 1: NO dollar read predicts the pairs on completed bars
 `scripts/dollar_read_study.py` (workflow `dollar-read-study.yml` -> `data/dollar_read_report.md`, `_null.md`).

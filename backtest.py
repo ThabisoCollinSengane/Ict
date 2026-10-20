@@ -283,6 +283,13 @@ class Backtester:
             self.gate["coin_kept"] = self.gate.get("coin_kept", 0) + 1
             return
         self.gate["coin_flipped"] = self.gate.get("coin_flipped", 0) + 1
+        self._mirror_side(pair)
+        st["coin_flipped"] = True
+
+    def _mirror_side(self, pair):
+        """Turn the position just opened to the other side: same entry moment, stop and target
+        distance; the flipped entry pays the spread on its own side (P118 / P121)."""
+        st = self.active[pair]
         d = st["direction"]
         spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
         leg = st["legs"][0]
@@ -299,7 +306,57 @@ class Backtester:
         leg["init_stop"] = mir(leg["init_stop"])
         if leg.get("tp1") is not None:
             leg["tp1"] = mir(leg["tp1"])
-        st["coin_flipped"] = True
+
+    def _kronos_dir(self, pair, t):
+        """P121 — Kronos forecast on COMPLETED KRONOS_TF bars: (+1/-1/0, predicted pips over
+        KRONOS_PRED_LEN bars). Cached per completed bar, so one model call per pair per bar."""
+        tf = config.KRONOS_TF
+        idx = self.tf_index.get((pair, tf))
+        if idx is None:
+            return 0, 0.0
+        pos = idx.searchsorted(t, side="right") - 1      # the bar still forming at t
+        ctx = config.KRONOS_CONTEXT
+        if pos < ctx:
+            return 0, 0.0
+        cache = self.__dict__.setdefault("_kronos_cache", {})
+        key = (pair, tf, pos)
+        if key not in cache:
+            import pandas as pd
+            import kronos_bridge
+            bars = self.tf_bars[(pair, tf)][pos - ctx:pos]
+            frame = pd.DataFrame({"o": [b.Open for b in bars], "h": [b.High for b in bars],
+                                  "l": [b.Low for b in bars], "c": [b.Close for b in bars]},
+                                 index=idx[pos - ctx:pos])
+            mv = kronos_bridge.forecast([frame], pred_len=config.KRONOS_PRED_LEN,
+                                        samples=config.KRONOS_SAMPLES)[0]
+            pips = mv / pip_size(pair)
+            d = (1 if pips > 0 else -1) if abs(pips) >= config.KRONOS_MIN_PIPS and pips != 0 else 0
+            cache[key] = (d, pips)
+            self.gate["kronos_calls"] = self.gate.get("kronos_calls", 0) + 1
+        return cache[key]
+
+    def _after_open(self, pair, t):
+        """Hooks on a position that was just placed in self.active, BEFORE the day/week
+        counters are charged. Returns True when the trade must be withdrawn (P121 skip)."""
+        self._coin_flip(pair, t)
+        if not config.KRONOS_MODE:
+            return False
+        st = self.active[pair]
+        kd, kp = self._kronos_dir(pair, t)
+        st["kronos_dir"], st["kronos_pips"] = kd, round(kp, 2)
+        agree = "agree" if kd == st["direction"] else ("flat" if kd == 0 else "against")
+        st["kronos_agree"] = agree
+        g = self.gate
+        g[f"kronos_{agree}"] = g.get(f"kronos_{agree}", 0) + 1
+        if config.KRONOS_MODE == 2 and agree != "agree":
+            del self.active[pair]
+            g["kronos_skipped"] = g.get("kronos_skipped", 0) + 1
+            return True
+        if config.KRONOS_MODE == 3 and agree == "against":
+            self._mirror_side(pair)
+            st["kronos_flipped"] = True
+            g["kronos_flipped"] = g.get("kronos_flipped", 0) + 1
+        return False
 
     def _partial_bar(self, sym, tf, i, t):
         """P115 — HTF bar i truncated to the M5 bars traded so far (bar open .. the M5 bar
@@ -651,6 +708,10 @@ class Backtester:
             "tfa_entry_tf": st.get("tfa_entry_tf", ""),
             "tfa_align": st.get("tfa_align", ""),
             "coin_flipped": st.get("coin_flipped", False),
+            "kronos_dir": st.get("kronos_dir", ""),
+            "kronos_pips": st.get("kronos_pips", ""),
+            "kronos_agree": st.get("kronos_agree", ""),
+            "kronos_flipped": st.get("kronos_flipped", False),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
@@ -789,6 +850,10 @@ class Backtester:
             "tfa_entry_tf": st.get("tfa_entry_tf", ""),
             "tfa_align": st.get("tfa_align", ""),
             "coin_flipped": st.get("coin_flipped", False),
+            "kronos_dir": st.get("kronos_dir", ""),
+            "kronos_pips": st.get("kronos_pips", ""),
+            "kronos_agree": st.get("kronos_agree", ""),
+            "kronos_flipped": st.get("kronos_flipped", False),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
@@ -5173,7 +5238,8 @@ class Backtester:
             "d1_draw_type": _d1_drw_type,
             "d1_draw_price": _d1_drw_price,
         }
-        self._coin_flip(pair, t)   # P118 control, no-op unless COIN_FLIP=1
+        if self._after_open(pair, t):   # P118 coin / P121 Kronos; True = withdrawn
+            return
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
         if not _is_breakout and _is_london:
@@ -7550,7 +7616,8 @@ class Backtester:
             "d1_draw_type": _d1_drw_type,
             "d1_draw_price": _d1_drw_price,
         }
-        self._coin_flip(pair, t)   # P118 control, no-op unless COIN_FLIP=1
+        if self._after_open(pair, t):   # P118 coin / P121 Kronos; True = withdrawn
+            return
         g["mm_golden_opened"] = g.get("mm_golden_opened", 0) + 1
         self._mm_golden_count[daykey] = self._mm_golden_count.get(daykey, 0) + 1
 
