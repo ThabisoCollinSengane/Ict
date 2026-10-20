@@ -70,6 +70,13 @@ is its own; live already reads completed bars, which is STRICTER than this defau
 Trader: the whole strategy will be reworked on this engine; every idea must beat the P118 coin-flip
 control (`COIN_FLIP=1`, kept-vs-flipped within the run) in IS, OOS and 2026. New anchors: workflow
 arms `hdef` (default) / `mhdef` (measurement mode) × is/oos/full/y26 -> `data/mm_golden_*_p119_*`.
+**P119 ANCHORS (RAN 2026-10-20)** — n / WR / PF / end equity / DD (IS | OOS | full | 2026):
+- `hdef` (default, R1k): 59 / 13.6% / 0.38 / R498 / −48.1 | 176 / 22.7% / 0.74 / R488 / −51.1 | = IS (halts
+  at the R500 floor in 2022) | 103 / 18.4% / 0.78 / R595 / −56.0.
+- `mhdef` (measurement, R100k, breakers off): 316 / 21.2% / 0.69 | 338 / 23.4% / 0.73 | 660 / 22.1% / 0.69,
+  R100k -> R3.9k, DD −96 | 103 / 18.4% / 0.81. ~3 trades/week; breakout 344, MM 190, judas 117 (full);
+  reach 1R 45.5%, median stop 10 pips. THIS is the honest starting point for the rework.
+- `leaky` regression: 876 / 43.3% / 3.64 / R176,034 withdrawn exactly — the default flip changed nothing else.
 
 ## 🎲 P118 RESULT (RAN 2026-10-20) — coin flip = your direction on the leak-free engine; no bug, no edge
 `COIN_FLIP=1` (`_coin_flip`, after both base and MM opens): same entry moment, stop and target distance,
