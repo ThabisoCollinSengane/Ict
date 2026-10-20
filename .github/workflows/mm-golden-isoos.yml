@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         arm: [is, oos, y26]
-        mode: [mclean, mcf1, mcf2, mcf3, cfclean1, cfp93]
+        mode: [mcf2, mcf3]
     env:
       NO_PUSH: "1"
       MODE: ${{ matrix.mode }}

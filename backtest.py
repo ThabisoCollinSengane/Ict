@@ -268,16 +268,18 @@ class Backtester:
     def _coin_flip(self, pair, t):
         """P118 — random-direction control. Keeps the entry moment, stop distance and
         target distance of the position just opened, but picks the side by a seeded coin
-        (crc32 of pair + time, so every run is reproducible). The flipped entry pays the
+        (sha256 of seed + pair + time, so every run is reproducible). The flipped entry pays the
         spread on its own side, stop and target are mirrored around it."""
         if not config.COIN_FLIP:
             return
-        import zlib
+        import hashlib
         st = self.active.get(pair)
         if not st:
             return
+        # sha256, not crc32: crc32 is linear, so changing only the seed flipped the low
+        # bit identically on every key and seeds 1/2/3 produced the same coin (P118 v1).
         key = f"{config.COIN_FLIP_SEED}|{pair}|{t}".encode()
-        if zlib.crc32(key) & 1 == 0:
+        if hashlib.sha256(key).digest()[0] & 1 == 0:
             self.gate["coin_kept"] = self.gate.get("coin_kept", 0) + 1
             return
         self.gate["coin_flipped"] = self.gate.get("coin_flipped", 0) + 1

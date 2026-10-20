@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🚨 P115c: leak-free the strategy LOSES (clean PF 0.2-0.73; H1-only fix ≈ break-even). Next: random-direction control on the clean engine, then redesign on completed bars. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -59,6 +59,25 @@ London vs NY. Null (random walk, 3 seeds × 4 yr): every WITH-AGAINST gap within
 avg R ≈ −0.3 on noise because a 1-pip cost on ~4-pip M1 stops is 0.25R. **Next:** put the winning
 draw->setup pairing into the engine via `TFA_ALIGN` (P113 now covers MM trades too: setup TF = the rung
 zone TF `_pd_tf`, M1 = execution) and run the full strategy arms.
+
+## 🎲 P118 RESULT (RAN 2026-10-20) — coin flip = your direction on the leak-free engine; no bug, no edge
+`COIN_FLIP=1` (`_coin_flip`, after both base and MM opens): same entry moment, stop and target distance,
+side picked by a seeded coin, spread paid on the flipped side; `coin_flipped` column. Measurement mode =
+breakers/floor/withdrawals off, R100k start (`MAX_DRAWDOWN_HALT_PCT`, `MAX_DAILY_LOSS_PCT`,
+`MAX_CONSECUTIVE_LOSSES` now env-overridable). Workflow modes `mclean`, `mcf<seed>`, `cfclean1`, `cfp93`
+-> `data/mm_golden_*_p118_*`. First leg, avg R ± SE (IS | OOS | 2026):
+- `mclean` (real direction, no breakers): n 309 / 337 / 101, WR 18.8 / 21.7 / 16.8%, avgR −0.21 / −0.22 / −0.19,
+  PF 0.61 / 0.65 / 0.73; reach 1R 45 / 48 / 39%, 2R 21 / 26 / 17% = what random entries do after costs.
+- `mcf1` same run, KEPT side vs FLIPPED side: IS −0.34±0.11 vs −0.22±0.11 | OOS −0.15±0.11 vs −0.07±0.13 |
+  2026 −0.35±0.19 vs −0.23±0.22. Flipped is never worse, every gap < 1 SE: **the side-picking adds nothing.**
+- Sanity `cfp93` (leaky default, flipped): kept PF 2.31 / 2.60 / 2.60 (reach 1R 72-84%), flipped PF 0.06 /
+  0.17 / 0.05 (reach 1R 13-16%, far BELOW random) — the leaky read predicts the next hour almost perfectly.
+**Verdict:** the honest engine is a random-direction entry with a 10-pip stop, BE at +10, lock at +20; it
+loses ~0.2R/trade = costs (~0.13R) + management. The 10-20% WR is that management on no-edge entries, not
+a backwards read. `_partial_bar` re-checked: correct (only flaw: missing M5 data keeps the full forming bar,
+which leaks in OUR favour). ⚠️ v1 used crc32 for the coin — linear, so seeds 1/2/3 gave the identical coin;
+fixed to sha256, `mcf2`/`mcf3` re-run. Next: rebuild the dollar/cross gate on completed bars and test new
+entry ideas against this coin-flip control.
 
 ## 🚨 P115c RESULT (all 12 runs, 2026-10-19) — LEAK-FREE, THE STRATEGY HAS NO EDGE
 n / WR / PF / P&L from R1k / headline DD (IS | OOS | full | 2026):
