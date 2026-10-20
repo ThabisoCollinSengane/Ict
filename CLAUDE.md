@@ -24,7 +24,7 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🧩 P122 Kronos consolidation/breakout study RUNNING; 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 pure direction study still running. 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🟡 P122: Kronos predicts EXPANSION beyond ATR+hour (resid corr +0.14, both clean periods), NOT Judas-vs-breakout (worse than geometry). Next: longer-ATR baseline, then expansion filter in engine. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 pure direction study still running. 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
@@ -77,7 +77,23 @@ report -> `data/kronos_consol_report.md`). `kronos_bridge.paths()` returns the I
   fixed to equidistant levels + NEAR baseline. Stand-in random-path model on random walks: KRONOS - NEAR
   −1.8 ± 7.8 (correct null).
 
-**P121 ENGINE RESULT (27 of 28 runs, 2026-10-20) — 🔴 Kronos does not lift the honest win rate.**
+**P122 RESULT (RAN 2026-10-20, 6,050 events, clean 2024-07..2026-10) — 🟡 Kronos SEES EXPANSION, 🔴 cannot call Judas vs breakout.**
+- Q1 expansion (3,823 checks with a live unbroken range): rank corr with the realised 4h range Kronos +0.51 vs
+  ATR +0.52 vs HOUR +0.27 — alone it is no better than recent bar size. But **what is LEFT after ATR + hour
+  correlates +0.145 ± 0.027 (2024-07..2025) and +0.136 ± 0.033 (2026) with Kronos** — ~5 SE, same size both
+  periods: the first honest, repeatable positive in the rework. Price leaves the range within 4h 83-84% of
+  the time in Kronos's top third vs 61-64% in its bottom third. ⚠️ Untested confound: Kronos sees 256 bars
+  (64h) while the ATR baseline is 16 bars (4h) — a longer-window ATR / daily-range baseline must be added
+  before calling it Kronos-specific.
+- Q2 Judas vs breakout (1,627 resolved breaks, fakeout share 47-49%): RULE 63.3 / 62.2%, NEAR (geometry)
+  identical, KRONOS 59.1 / 59.1% — Kronos is WORSE than plain geometry (−4.2 ± 1.8, −3.1 ± 2.5). Its p_fake
+  does order outcomes (fakeout 31-38% low tercile -> 56-58% high) but less well than where the close sits.
+- Trade sim (2R, 1 pip): every chooser loses; always FADE −0.25 / −0.23R beats always FOLLOW −0.30 / −0.30R in
+  both periods; Kronos picks −0.25 / −0.23 ≈ fade; coin −0.28. No positive cell.
+**Next:** (1) add a 64h/daily ATR baseline to Q1; (2) if Kronos still adds, use it as an expansion FILTER in the
+engine (trade only when Kronos's predicted 4h range is in the top third) vs the coin-flip control, 2025/2026.
+
+**P121 ENGINE RESULT (all 28 runs, 2026-10-20; OOS mk2 92/20.7%/0.59) — 🔴 Kronos does not lift the honest win rate.**
 n / WR / PF (IS | OOS | 2025 | 2026), measurement mode: honest no-Kronos `mhdef` 316/21.2%/0.69 | 338/23.4%/0.73
 | 148/23.0%/0.72 | 103/18.4%/0.81 (`mk1` record-only = identical, as it must be). `mk2` skip-disagree: 75/16.0%/
 0.48 | (pending) | 38/18.4%/0.26 | 22/9.1%/0.30. `mk3` follow Kronos's side: 318/21.1%/0.67 | 326/18.1%/0.60 |
