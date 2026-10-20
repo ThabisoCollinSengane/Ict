@@ -252,16 +252,16 @@ TELEGRAM_OPEN_VIEW  = int(_os.environ.get("TELEGRAM_OPEN_VIEW", "0"))
 #    R500 peak can exceed -15% (R75 down). During growth, use a hard ZAR floor
 #    instead: halt only when equity drops to GROWTH_PHASE_FLOOR_ZAR (half of
 #    starting capital). Normal % breaker resumes once equity >= GROWTH_PHASE_EQUITY.
-MAX_DRAWDOWN_HALT_PCT   = 15.0    # normal phase: -15% from peak → 10-day pause
+MAX_DRAWDOWN_HALT_PCT   = _envf("MAX_DRAWDOWN_HALT_PCT", 15.0)    # normal phase: -15% from peak → 10-day pause
 DRAWDOWN_PAUSE_DAYS     = 10      # 2-week break outlasts most short-term adverse regimes
 GROWTH_PHASE_EQUITY     = 3_000   # ZAR — below this the growth-phase floor applies
 GROWTH_PHASE_FLOOR_ZAR  = _envf("GROWTH_PHASE_FLOOR_ZAR", STARTING_CASH / 2)  # half of funding
 # 2. Daily loss cap: stop opening new trades for the rest of the calendar day once
 #    daily losses exceed this % of the account equity at day open.
-MAX_DAILY_LOSS_PCT      = 6.0     # ~2 full stop-losses at 0.03 lots
+MAX_DAILY_LOSS_PCT      = _envf("MAX_DAILY_LOSS_PCT", 6.0)     # ~2 full stop-losses at 0.03 lots
 # 3. Consecutive loss pause: after N straight losses, sit out the rest of the day.
 #    Counter resets automatically at the start of each new trading day.
-MAX_CONSECUTIVE_LOSSES  = 5
+MAX_CONSECUTIVE_LOSSES  = int(_envf("MAX_CONSECUTIVE_LOSSES", 5))
 
 # --- Trade frequency — no weekly cap; take every valid setup ---
 # Protection comes from conviction score, daily cap, and circuit breakers only.
@@ -1229,6 +1229,9 @@ HONEST_TFS     = tuple(x for x in _os.environ.get("HONEST_TFS", "").split(",") i
 DROP_TFS       = tuple(x for x in _os.environ.get("DROP_TFS", "").split(",") if x)     # P115c: drop the forming bar on these TFs only (completed bars)
 SAMEBAR_EXIT   = bool(int(_os.environ.get("SAMEBAR_EXIT", "0")))
 STOP_SLIP_PIPS = float(_os.environ.get("STOP_SLIP_PIPS", "0"))
+# P118 random-direction control: same entries/stops/targets, side picked by a seeded coin.
+COIN_FLIP      = bool(int(_os.environ.get("COIN_FLIP", "0")))
+COIN_FLIP_SEED = int(_os.environ.get("COIN_FLIP_SEED", "1"))
 
 # --- P51: unified structural bias + IFVG cascade (all instruments alike) ---
 # htf_bias asks "is this bar closing beyond the whole prior N-bar range right now" --

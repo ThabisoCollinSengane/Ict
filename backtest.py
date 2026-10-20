@@ -265,6 +265,40 @@ class Backtester:
                 out[-1] = part
         return out
 
+    def _coin_flip(self, pair, t):
+        """P118 — random-direction control. Keeps the entry moment, stop distance and
+        target distance of the position just opened, but picks the side by a seeded coin
+        (crc32 of pair + time, so every run is reproducible). The flipped entry pays the
+        spread on its own side, stop and target are mirrored around it."""
+        if not config.COIN_FLIP:
+            return
+        import zlib
+        st = self.active.get(pair)
+        if not st:
+            return
+        key = f"{config.COIN_FLIP_SEED}|{pair}|{t}".encode()
+        if zlib.crc32(key) & 1 == 0:
+            self.gate["coin_kept"] = self.gate.get("coin_kept", 0) + 1
+            return
+        self.gate["coin_flipped"] = self.gate.get("coin_flipped", 0) + 1
+        d = st["direction"]
+        spread = config.PAIR_SPREAD_PIPS.get(pair, config.PAIR_SPREAD_PIPS["default"])
+        leg = st["legs"][0]
+        e0 = leg["entry"]
+        e2 = e0 - 2 * d * spread * pip_size(pair)
+        mir = lambda x: (e2 - (x - e0)) if x is not None else None
+        st["direction"] = -d
+        st["mfe_price"] = e2
+        for k in ("target", "tp1_price"):
+            if st.get(k) is not None:
+                st[k] = mir(st[k])
+        leg["entry"] = e2
+        leg["stop"] = mir(leg["stop"])
+        leg["init_stop"] = mir(leg["init_stop"])
+        if leg.get("tp1") is not None:
+            leg["tp1"] = mir(leg["tp1"])
+        st["coin_flipped"] = True
+
     def _partial_bar(self, sym, tf, i, t):
         """P115 — HTF bar i truncated to the M5 bars traded so far (bar open .. the M5 bar
         at t, whose close is the engine's 'now'). Built once per (sym, tf) as running
@@ -614,6 +648,7 @@ class Backtester:
             "tfa_draw_kind": st.get("tfa_draw_kind", ""),
             "tfa_entry_tf": st.get("tfa_entry_tf", ""),
             "tfa_align": st.get("tfa_align", ""),
+            "coin_flipped": st.get("coin_flipped", False),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
@@ -751,6 +786,7 @@ class Backtester:
             "tfa_draw_kind": st.get("tfa_draw_kind", ""),
             "tfa_entry_tf": st.get("tfa_entry_tf", ""),
             "tfa_align": st.get("tfa_align", ""),
+            "coin_flipped": st.get("coin_flipped", False),
             "path_blocked": st.get("path_blocked", False),
             "path_block_tf": st.get("path_block_tf", ""),
             "d1_fvg_dist_pips": st.get("d1_fvg_dist_pips", ""),
@@ -5135,6 +5171,7 @@ class Backtester:
             "d1_draw_type": _d1_drw_type,
             "d1_draw_price": _d1_drw_price,
         }
+        self._coin_flip(pair, t)   # P118 control, no-op unless COIN_FLIP=1
         # P10: record a London-Open Judas opening so the same-day NY breakout echo
         # can be sized down. Only Judas (not breakout) reversals in London qualify.
         if not _is_breakout and _is_london:
@@ -7511,6 +7548,7 @@ class Backtester:
             "d1_draw_type": _d1_drw_type,
             "d1_draw_price": _d1_drw_price,
         }
+        self._coin_flip(pair, t)   # P118 control, no-op unless COIN_FLIP=1
         g["mm_golden_opened"] = g.get("mm_golden_opened", 0) + 1
         self._mm_golden_count[daykey] = self._mm_golden_count.get(daykey, 0) + 1
 
