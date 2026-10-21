@@ -1,0 +1,103 @@
+name: P121 Kronos direction study — Kronos forecast vs a coin on completed H1 bars
+
+# Kronos-small reads the last 400 COMPLETED H1 bars of EU/GU/NZ at 03/04/07/08/09:00 ET and calls
+# the next 4h; scored like P120 (race + 1h/4h pips, day-clustered SE). One job per year (Kronos
+# is slow on CPU), then a report job. Only 2024-07+ is clean (pretraining reportedly ends 2024-06).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/kronos-study.yml"
+      - "scripts/kronos_study.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kronos-study
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        year: [2022, 2023, 2024, 2025, 2026]
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Kronos
+        run: bash scripts/setup_kronos.sh
+      - name: Download M1 (this year + the year before for context)
+        run: |
+          Y=${{ matrix.year }}; P="EURUSD GBPUSD NZDUSD"
+          if [ "$Y" = "2026" ]; then
+            python scripts/fetch_histdata.py --years 2025 --pairs $P --dest /tmp/hd 2>&1 | tail -5
+            python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 10 --pairs $P --dest /tmp/hd 2>&1 | tail -5
+          else
+            python scripts/fetch_histdata.py --years $((Y-1)) $Y --pairs $P --dest /tmp/hd 2>&1 | tail -5
+          fi
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -5
+      - name: Forecast
+        run: python scripts/kronos_study.py --forecast --year ${{ matrix.year }} --max-minutes 280
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/kronos_fc/kronos_fc_${{ matrix.year }}.csv 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P121 Kronos forecasts ${{ matrix.year }} [$(date -u +%F)]"
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*9))
+          done
+          exit 1
+  report:
+    needs: forecast
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - run: git pull origin "${GITHUB_REF_NAME}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download M1 2022-2026
+        run: |
+          P="EURUSD GBPUSD NZDUSD"
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 --pairs $P --dest /tmp/hd 2>&1 | tail -5
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 10 --pairs $P --dest /tmp/hd 2>&1 | tail -5
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -5
+      - name: Report
+        run: python scripts/kronos_study.py --report 2>&1 | tee data/kronos_console.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/kronos_report.md data/kronos_console.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P121 Kronos direction report [$(date -u +%F)]"
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*9))
+          done
+          exit 1

@@ -1,0 +1,77 @@
+name: PD-array reaction study — FVG / IFVG / OB on H4 / H1 / M15 (HistData M1)
+
+# How does price act when it enters an intraday HTF PD array? Extends P69
+# (fvg_reaction_study.py, W/D/H4 FVGs only) to FVG, IFVG and ORDER BLOCK on
+# H4 / H1 / M15, IS 2022-23 vs OOS 2024-25, every row against a mirror control.
+# Calibrated: --null (random walk through the same run()) reads RED on all cells.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/pd-reaction-study.yml"
+      - ".github/pd-reaction.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pd-reaction-study
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Download EURUSD / GBPUSD / NZDUSD M1, 2022-2025
+        run: |
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
+                 --pairs EURUSD GBPUSD NZDUSD --dest /tmp/hd 2>&1 | tail -40
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+          ls -la data/histdata | head -30
+
+      - name: Selftest (no data)
+        run: |
+          python scripts/fvg_reaction_study.py --selftest
+          python scripts/pd_reaction_study.py --selftest
+
+      - name: PD reaction study
+        run: |
+          set -o pipefail
+          python scripts/pd_reaction_study.py --tfs 240T,60T,15T --zones fvg,ifvg,ob \
+                 --no-push --out data/pd_reaction_report.md 2>&1 | tee data/pd_reaction_console.txt
+
+      - name: Commit + push the report
+        if: always()
+        run: |
+          for f in data/pd_reaction_report.md data/pd_reaction_console.txt; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git diff --cached --quiet && { echo "nothing new"; exit 0; }
+          git commit -m "PD-array reaction study (FVG/IFVG/OB, H4/H1/M15) [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && \
+              git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            echo "push attempt $i failed, retrying"; sleep $((i * 5))
+          done
+          exit 1

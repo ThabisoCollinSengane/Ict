@@ -1,0 +1,59 @@
+name: P120 dollar-read study — does the DXY read predict the pairs on completed bars?
+
+# Each DXY reader (completed bars only) vs a coin: +10/-10 race, 1h/4h forward pips, and
+# whether the DXY x EURGBP quadrant picks the better of EURUSD/GBPUSD. --null = random walks.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/dollar-read-study.yml"
+      - "scripts/dollar_read_study.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dollar-read-study
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download M1 2022-2026
+        run: |
+          P="EURUSD GBPUSD NZDUSD EURGBP UDXUSD"
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 --pairs $P --dest /tmp/hd 2>&1 | tail -20
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 10 --pairs $P --dest /tmp/hd 2>&1 | tail -20
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+          ls -la data/histdata
+      - name: Study
+        run: |
+          python scripts/dollar_read_study.py --selftest
+          python scripts/dollar_read_study.py --null --out data/dollar_read_null.md > /dev/null
+          python scripts/dollar_read_study.py --out data/dollar_read_report.md 2>&1 | tee data/dollar_read_console.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/dollar_read_report.md data/dollar_read_null.md data/dollar_read_console.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P120 dollar-read study [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1

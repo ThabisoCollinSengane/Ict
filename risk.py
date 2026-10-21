@@ -5,7 +5,25 @@ import config
 
 
 def pip_size(symbol: str) -> float:
+    # Gold complex: XAUUSD/XAGUSD are not 4-decimal FX. Provisional units (config
+    # -overridable) chosen so the FX pip thresholds map to sane metal moves.
+    if symbol == "XAUUSD":
+        return config.GOLD_PIP
+    if symbol == "XAGUSD":
+        return config.SILVER_PIP
+    # US indices move in points, not FX pips.
+    if symbol in config.INDEX_PAIRS or symbol == config.INDEX_REF:
+        return config.INDEX_PIP
     return 0.01 if symbol.endswith("JPY") else 0.0001
+
+
+def unit_value(symbol: str) -> float:
+    """USD per 1.0 price move per unit. 1.0 for FX/gold (P&L = move x units). Indices:
+    INDEX_UNIT_VALUE lets one unit be a fraction of a contract (P109: with INDEX_LOT_UNITS=100
+    and INDEX_UNIT_VALUE=0.01, 0.01 lot = 1 unit = $0.01 per point on a $1/point contract)."""
+    if symbol in config.INDEX_PAIRS:
+        return config.INDEX_UNIT_VALUE
+    return 1.0
 
 
 def position_size(equity: float, entry: float, stop: float, symbol: str) -> float:
@@ -15,8 +33,10 @@ def position_size(equity: float, entry: float, stop: float, symbol: str) -> floa
     pairs) ≈ |entry - stop|. For JPY-quoted pairs divide by price for USD conversion,
     but for GBPUSD/EURUSD/EURGBP this simplification is fine since both legs are USD/GBP.
     """
+    if equity <= 0:
+        return 0.0                       # never size on a non-positive balance
     risk_amt = equity * (config.RISK_PER_TRADE_PCT / 100.0)
-    per_unit = abs(entry - stop)
+    per_unit = abs(entry - stop) * unit_value(symbol)
     if per_unit <= 0:
         return 0.0
     return risk_amt / per_unit

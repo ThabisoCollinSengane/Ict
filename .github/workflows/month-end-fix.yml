@@ -1,0 +1,47 @@
+name: Month-end WMR fix — hedging flow test (P80, 2010-2025)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/month-end-fix.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: month-end-fix
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -r requirements.txt yfinance
+      - name: Download EURUSD / GBPUSD / NZDUSD M1, 2010-2025
+        run: |
+          python scripts/fetch_histdata.py --years $(seq 2010 2025) \
+                 --pairs EURUSD GBPUSD NZDUSD --dest /tmp/hd 2>&1 | tail -40
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -40
+      - name: Month-end fix study
+        run: python scripts/month_end_fix_study.py --no-push 2>&1 | tee data/month_end_fix_console.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in data/month_end_fix_report.md data/month_end_fix_console.txt; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git diff --cached --quiet && exit 0
+          git commit -m "Month-end WMR fix — result [$(date -u +%F)]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

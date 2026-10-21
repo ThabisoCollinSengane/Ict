@@ -1,0 +1,77 @@
+# P79 — fundamentals scorecard (real data)
+
+_Measurement only. Every effect must hold in BOTH halves with pooled |t| ≥ 2.5 to count. 'OPPOSITE' = what fading the signal would have done._
+
+_coverage: daily EURUSD 2020-12-31→2026-10-05, GBPUSD 2020-12-31→2026-10-05, NZDUSD 2020-12-31→2026-10-05; yields 3m, 5y, 10y; COT rows 900; hourly pairs 3; news events 354_
+
+_FX daily alignment (vs hourly timestamps): EURUSD: daily label shifted -1d (median gap 2.3bp, n=664); GBPUSD: daily label shifted -1d (median gap 0.4bp, n=664); NZDUSD: daily label shifted -1d (median gap 1.7bp, n=664)_
+
+## §A COT — do speculators' positions predict next week?
+
+_2021: 156 rows · 2022: 156 rows · 2023: 156 rows · 2024: 159 rows · 2025: 156 rows · 2026: 117 rows_
+
+Signal = specs' net position (% of open interest), z-scored against the prior 52 weeks. Return = Monday after release → following Monday, bp. IS 2022-23 / OOS 2024-26.
+
+| pair | split | weeks | corr z→return (t) | extreme weeks |z|≥1.5 | FOLLOW bp/wk (hit%) | OPPOSITE bp/wk (hit%) |
+|---|---|---|---|---|---|---|
+| EURUSD | IS | 104 | +0.17 (+1.7) | 30 | +19.6 (63%) | -19.6 (37%) |
+| EURUSD | OOS | 143 | +0.04 (+0.5) | 59 | +5.1 (46%) | -5.1 (54%) |
+| GBPUSD | IS | 104 | +0.09 (+1.0) | 33 | +19.6 (48%) | -19.6 (52%) |
+| GBPUSD | OOS | 143 | -0.10 (-1.2) | 30 | -20.1 (33%) | +20.1 (67%) |
+| NZDUSD | IS | 104 | -0.07 (-0.8) | 30 | -22.4 (47%) | +22.4 (53%) |
+| NZDUSD | OOS | 143 | -0.22 (-2.7) | 27 | -36.6 (41%) | +36.6 (59%) |
+
+**Verdict (extreme weeks, FOLLOW the specs):** EURUSD nothing (pooled t +1.4) · GBPUSD nothing (pooled t -0.3) · NZDUSD nothing (pooled t -1.9). `OPPOSITE WORKS` means fading the crowd paid in both halves.
+
+## §B Interest rates — do US yields move or predict the pairs?
+
+Daily yield change in bp vs daily pair return in bp. The rate story says yields UP → dollar UP → pairs DOWN, i.e. a NEGATIVE same-day correlation. Halves: 2022-23 / 2024-26.
+
+| pair | yield | same-day corr IS / OOS | next-day corr IS / OOS (t) |
+|---|---|---|---|
+| EURUSD | 3m | -0.10 / -0.16 | +0.07 (+1.3) / -0.01 (-0.3) |
+| EURUSD | 5y | -0.31 / -0.33 | -0.07 (-1.4) / +0.01 (+0.3) |
+| EURUSD | 10y | -0.30 / -0.28 | -0.07 (-1.4) / -0.01 (-0.2) |
+| GBPUSD | 3m | -0.11 / -0.16 | +0.08 (+1.6) / -0.07 (-1.7) |
+| GBPUSD | 5y | -0.34 / -0.31 | -0.10 (-2.0) / +0.03 (+0.7) |
+| GBPUSD | 10y | -0.33 / -0.28 | -0.09 (-1.7) / +0.03 (+0.8) |
+| NZDUSD | 3m | -0.14 / -0.13 | +0.07 (+1.4) / -0.03 (-0.8) |
+| NZDUSD | 5y | -0.40 / -0.28 | -0.08 (-1.6) / +0.01 (+0.3) |
+| NZDUSD | 10y | -0.36 / -0.25 | -0.07 (-1.5) / +0.00 (+0.1) |
+
+**The brief's own rule** (5-day US yield change beyond ±5bp → lean the pairs the OTHER way), scored on the next day and the next 5 days:
+
+| pair | horizon | split | signals | FOLLOW bp (hit%) | OPPOSITE bp (hit%) |
+|---|---|---|---|---|---|
+| EURUSD | +1d | IS | 327 | -4.9 (45%) | +4.9 (55%) |
+| EURUSD | +1d | OOS | 375 | +2.1 (52%) | -2.1 (48%) |
+| EURUSD | +5d | IS | 66 | +9.5 (56%) | -9.5 (44%) |
+| EURUSD | +5d | OOS | 74 | +12.9 (57%) | -12.9 (43%) |
+| GBPUSD | +1d | IS | 327 | -0.3 (49%) | +0.3 (51%) |
+| GBPUSD | +1d | OOS | 375 | +1.5 (54%) | -1.5 (46%) |
+| GBPUSD | +5d | IS | 66 | +21.4 (52%) | -21.4 (48%) |
+| GBPUSD | +5d | OOS | 74 | +10.4 (54%) | -10.4 (46%) |
+| NZDUSD | +1d | IS | 327 | +3.4 (52%) | -3.4 (48%) |
+| NZDUSD | +1d | OOS | 375 | +4.6 (52%) | -4.6 (48%) |
+| NZDUSD | +5d | IS | 66 | +42.5 (53%) | -42.5 (47%) |
+| NZDUSD | +5d | OOS | 74 | +2.0 (49%) | -2.0 (51%) |
+
+**Verdict (brief's yield lean):** EURUSD +1d nothing · EURUSD +5d nothing · GBPUSD +1d nothing · GBPUSD +5d nothing · NZDUSD +1d nothing · NZDUSD +5d nothing. +5d uses non-overlapping 5-day blocks.
+
+## §C High / Medium news — how big is the move, and does it follow through?
+
+_hourly data 2023-12-21 → 2026-10-06; halves split at 2025-05-14. IMPACT = |move| in the 2h from the event's hour, as a multiple of the same clock hour on no-news days. FOLLOW = next 3h in the direction of that first move (bp); FADE = the opposite. CONTROL = the same measures at the same clock hours on no-news days._
+
+| class | half | events | avg 2h move bp | × normal hour | FOLLOW next 3h bp (t) | vs no-news (t) | FADE bp |
+|---|---|---|---|---|---|---|---|
+| Critical | A | 135 | 25.0 | 2.2× | -1.7 (-0.7) | -2.1 (-0.9) | +1.7 |
+| Critical | B | 132 | 17.3 | 1.8× | -0.2 (-0.1) | -0.9 (-0.7) | +0.2 |
+| High | A | 22 | 21.8 | 1.8× | -6.1 (-0.9) | -4.5 (-0.6) | +6.1 |
+| High | B | 21 | 23.5 | 2.2× | +0.6 (+0.1) | +0.5 (+0.1) | -0.6 |
+| Medium | A | 32 | 11.3 | 1.1× | +3.1 (+1.0) | +3.0 (+1.0) | -3.1 |
+| Medium | B | 30 | 9.2 | 1.0× | -2.4 (-0.7) | -1.8 (-0.5) | +2.4 |
+
+**Verdict (follow-through beyond a normal hour):** Critical nothing (pooled t -1.1) · High nothing (pooled t -0.5) · Medium nothing (pooled t +0.3). `OPPOSITE WORKS` here means fading the first news move paid.
+
+_No NZD events exist in the calendar, so NZDUSD only appears via USD news. USD events are High only (NFP/CPI/FOMC are 'Critical')._
+
