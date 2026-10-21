@@ -24,9 +24,29 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🔴 P123: Kronos's expansion read is mostly a longer volatility window — after 64h ATR + daily range + same-clock seasonal it reads +0.04/+0.05 (≈ the pure-noise placebo +0.03), OOS R² gain +0.004, its own-opinion tercile flips sign. Engine expansion filter NOT built. Kronos line CLOSED (P121 direction, P122 Q2, P123 expansion). 🟡 P122 (superseded): resid corr +0.14 after ATR16+hour only. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 direction study: coin flip (clean +0.1 / −1.5pp). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🔴 P124: ICT session position (open side, Judas/PO3, Asia sweep, PDH/PDL sweep, discount, vote) does NOT predict whether the day or hour closes above the price now — 0 of 12 cells pass (Polymarket idea closed). 🔴 P123: Kronos's expansion read is mostly a longer volatility window — after 64h ATR + daily range + same-clock seasonal it reads +0.04/+0.05 (≈ the pure-noise placebo +0.03), OOS R² gain +0.004, its own-opinion tercile flips sign. Engine expansion filter NOT built. Kronos line CLOSED (P121 direction, P122 Q2, P123 expansion). 🟡 P122 (superseded): resid corr +0.14 after ATR16+hour only. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 direction study: coin flip (clean +0.1 / −1.5pp). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
+
+## 🔴 P124 RESULT (RAN 2026-10-21) — ICT session position does not predict the close (Polymarket idea)
+Trader: predict whether price closes up or down from where it sits in the session (ICT), for Polymarket-style
+up/down contracts (no leverage, pay $1/0, break-even = hit rate > price paid + fees). `scripts/close_direction_study.py`
+(workflow `close-direction-study.yml` -> `data/close_direction_report.md`, `_null.md`). EU/GU/NZ 2022-Oct 2026,
+every 15 min 03:00-11:45 ET, completed M1 bars, 125,537 decisions / 1,226 days. Rules: open_side (vs midnight NY
+open), judas (PO3: >= 5 pips through the open then back across), asia_sweep, pd_sweep, discount (bottom/top 30% of
+today's range), vote. Targets: day (17:00 ET) / hour close vs the price NOW (gated; random walk = 50%) and vs the
+window OPEN (how contracts settle; ungated — on random walks 'already above the open' alone scores 70-76% and
+open_side/judas/sweeps 56-73%, and a live contract price already contains that). Null: 0 of 12 vs-now cells pass.
+- **Real: 0 of 12 pass.** day_vs_now hit% IS | OOS | 2026: open_side 49.4 / 49.4 / 52.0, judas 49.9 / 48.1 / 51.3,
+  asia 50.1 / 49.8 / 49.7, pd 47.9 / 49.9 / 53.6, discount 51.4 / 51.3 / 48.2, vote 50.8 / 49.1 / 50.4 — all within
+  ~1.5 SE of a coin. London vs NY: nothing.
+- hour_vs_now: everything ~48-51% except discount 50.7 / 52.9 / 51.9 (+0.7±0.6 / +2.9±0.5 / +1.9±0.8) — same sign
+  but IS fails 2 SE, and it is worth +0.2-0.3 pip (bid-quote minute bounce near the range low, not a tradeable
+  move; a 1-pip spread erases it; Polymarket lists no FX hourly contracts).
+- vs_open: real B0 70.5-72.6% (day) / 75.7-76.1% (hour) = the null's 70-73 / 75 — pure geometry. Rules that
+  DISAGREE with B0 are right only 20-43% of the time.
+**Meaning:** where price sits in the session (open, Judas, Asia/PD sweep, discount) carries no information about
+the close beyond what a random walk gives. Polymarket on this logic = coin flip minus fees. Closed.
 
 ## 🔴 P123 RESULT (RAN 2026-10-21) — Kronos's expansion read does not survive longer volatility baselines
 `scripts/kronos_expansion_check.py` (workflow `kronos-expansion-check.yml` -> `data/kronos_expansion_report.md`,
