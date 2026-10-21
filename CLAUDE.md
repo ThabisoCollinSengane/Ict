@@ -24,9 +24,27 @@ cache-bug post-mortem.)
 
 ---
 
-## 🎯 NEXT SESSION START HERE — 🟡 P122: Kronos predicts EXPANSION beyond ATR+hour (resid corr +0.14, both clean periods), NOT Judas-vs-breakout (worse than geometry). Next: longer-ATR baseline, then expansion filter in engine. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 direction study: coin flip (clean +0.1 / −1.5pp). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🔴 P123: Kronos's expansion read is mostly a longer volatility window — after 64h ATR + daily range + same-clock seasonal it reads +0.04/+0.05 (≈ the pure-noise placebo +0.03), OOS R² gain +0.004, its own-opinion tercile flips sign. Engine expansion filter NOT built. Kronos line CLOSED (P121 direction, P122 Q2, P123 expansion). 🟡 P122 (superseded): resid corr +0.14 after ATR16+hour only. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 direction study: coin flip (clean +0.1 / −1.5pp). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
+
+## 🔴 P123 RESULT (RAN 2026-10-21) — Kronos's expansion read does not survive longer volatility baselines
+`scripts/kronos_expansion_check.py` (workflow `kronos-expansion-check.yml` -> `data/kronos_expansion_report.md`,
+`_null.md`). Re-scores the same 3,823 P122 check events (no Kronos re-run) against baselines from completed M15
+bars <= the decision bar: atr16, atr256 (= Kronos's 64h window), rv256, adr20, prior-day range, seas20 (mean
+realised 4h range from the same clock time over the prior 28 days), range width, + hour and pair dummies.
+- Alone, rank corr with the realised 4h range: Kronos +0.51 / +0.50; seas20 +0.61 / +0.51 (best single
+  predictor), atr16 +0.52, atr256 +0.49 / +0.46, adr20 +0.49 / +0.41.
+- Kronos on the residual (2024-07..2025 | 2026): atr16+hour+pair +0.091 / +0.096; + atr256 +0.050 / +0.063;
+  **everything +0.037±0.027 / +0.050±0.032** — the pure-noise placebo reads +0.033 / +0.031 on the same rows.
+- Out-of-sample R² gain from adding log Kronos to the full baseline: +0.004 / +0.003 (0.33 -> 0.33).
+- Filter test (Kronos's own opinion = log k_range residualised on the baseline, terciles fixed on period 1):
+  leave-the-range rate top minus bottom third −3.3±2.8pp / +2.2±4.0pp — flips sign; realised range 27.7 vs
+  26.1 / 25.8 vs 23.4 pips.
+- Null (random walk, fake Kronos = log atr256 + noise): every column (c) cell within ~1 SE of 0 — calibrated.
+**Meaning:** ~2/3 of P122's +0.14 was the longer window it reads; what is left is noise-sized. The engine
+expansion filter (`KRONOS_EXP_MODE`) is NOT built. Same-clock-time seasonality (seas20) is the strongest
+expansion predictor here — free, no model — if a volatility/timing filter is ever tested, start from it.
 
 ## 🔴 P114 / P114b RESULT (RAN 2026-10-19) — no timeframe ladder has an entry edge; alignment adds nothing
 `data/tf_combo_report.md` (5 familiar combos, UTC candles) + `data/tf_combo2_report.md` (10 combos incl.
