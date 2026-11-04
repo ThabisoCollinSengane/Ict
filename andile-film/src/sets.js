@@ -324,7 +324,7 @@ function clubSet(scene) {
     celFight: { dir: [0.25, 0.8, 0.65], shade: [0.45, 0.32, 0.55], rim: [1.25, 0.25, 0.45], rimDir: [-0.6, 0.35, -0.7], rimAmt: 1.15 },
     update(t, cam, TL) {
       const beat = t * TL.bpm / 60, bi = Math.floor(beat), bf = beat - bi;
-      const mode = t >= 12.5 && t < 14.0 ? 'dim' : t >= 14.0 && t < 21.0 ? 'fight' : 'groove';
+      const mode = t >= TL.mark.tension && t < TL.mark.fight ? 'dim' : t >= TL.mark.fight && t < TL.mark.door ? 'fight' : 'groove';
       const P = pal[mode];
       const land = TL.cues.find((c) => c.type === 'land');
       let k = 0;

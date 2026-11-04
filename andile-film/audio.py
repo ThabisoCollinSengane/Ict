@@ -13,6 +13,8 @@ T = np.arange(N) / SR
 rng = np.random.default_rng(7)
 L = np.zeros(N); R = np.zeros(N)
 BEAT = 60.0 / TL['bpm']
+O = next(x['start'] for x in TL['shots'] if x['id'] == 'S02') - 3.0  # offset added by the daylight opening
+AMB = TL.get('ambience', {})
 
 
 def add(sig, t0, gain=1.0, pan=0.0):
@@ -216,6 +218,13 @@ for sec in TL['music']:
     if kind == 'pad':
         pz = pad([110, 164.8, 196, 246.9, 261.6], b - a + 0.8, 0.95, 0.6); i = int(a * SR)
         music[i:i + len(pz)] += pz[: N - i]
+    elif kind == 'seaPad':
+        pz = pad([146.8, 220.0, 293.7, 370.0, 440.0], b - a + 0.6, 0.8, 0.5); i = int(a * SR)
+        music[i:i + len(pz)] += pz[: N - i]
+        for k in range(int((b - a) / (BEAT / 2))):
+            f = [587.3, 740.0, 880.0, 1108.7, 880.0, 740.0][k % 6]; tp = tt(0.5)
+            pl = (np.sin(2 * np.pi * f * tp) + 0.4 * np.sin(4 * np.pi * f * tp)) * np.exp(-tp * 9) * 0.16
+            j = int((a + k * BEAT / 2) * SR); music[j:j + len(pl)] += pl[: N - j]
     elif kind == 'muffled':
         g = groove_bus(a, b)
         music += band(g, 0, 260) * 0.55
@@ -239,8 +248,8 @@ for sec in TL['music']:
             if 0 <= i < N:
                 k = min(len(sig), N - i); bus[i:i + k] += sig[:k] * g
         tdrum = a
-        while tdrum < 19.3:
-            slow = 14.45 < tdrum < 15.6 or 17.3 < tdrum < 18.9
+        while tdrum < 19.3 + O:
+            slow = 14.45 + O < tdrum < 15.6 + O or 17.3 + O < tdrum < 18.9 + O
             step16 = BEAT / (1 if slow else 4)
             k = int(round((tdrum - a) / (BEAT / 4)))
             acc = 1.0 if k % 4 == 0 else 0.55
@@ -249,24 +258,27 @@ for sec in TL['music']:
                 put(logdrum(LOGN[k % 5], 0.7), tdrum)
             tdrum += step16
         t = tt(b - a)
-        bus[int(a * SR):int(a * SR) + len(t)] += np.tanh(np.sin(2 * np.pi * 55 * t) * 3) * 0.12 * np.clip((19.35 - (a + t)) / 0.2, 0, 1)
+        bus[int(a * SR):int(a * SR) + len(t)] += np.tanh(np.sin(2 * np.pi * 55 * t) * 3) * 0.12 * np.clip((19.35 + O - (a + t)) / 0.2, 0, 1)
         music += bus
     elif kind == 'comic':
-        for ts, f0, f1, d in ((21.25, 233, 220, 0.5), (21.8, 220, 164, 0.9)):
+        for ts, f0, f1, d in ((21.25 + O, 233, 220, 0.5), (21.8 + O, 220, 164, 0.9)):
             tb = trombone(f0, f1, d); i = int(ts * SR); music[i:i + len(tb)] += tb
     elif kind == 'finale':
         p = pad([110, 164.8, 220, 261.6, 329.6, 392], b - a, 0.7, 0.9)
         music[int(a * SR):int(a * SR) + len(p)] += p
-        g = groove_bus(a, 27.0) * np.clip((27.0 - T) / 1.0, 0, 1)
+        g = groove_bus(a, 27.0 + O) * np.clip((27.0 + O - T) / 1.0, 0, 1)
         music += g * 0.7
 music = reverb(music, 1.8, 0.22)
 add(music, 0, 0.8)
 
 # ---------------- ambience ----------------
-oce = band(noise(DUR), 80, 1400) * (0.55 + 0.45 * np.sin(2 * np.pi * 0.33 * T + 1)) * gate(0, 3.05, 0.4, 0.25)
+sea0, sea1 = AMB.get('sea', [0, 3.0])
+oce = band(noise(DUR), 80, 1400) * (0.55 + 0.45 * np.sin(2 * np.pi * 0.33 * T + 1)) * gate(sea0, sea1 + 0.05, 0.4, 0.25)
+add(band(noise(DUR), 150, 1800) * (0.5 + 0.5 * np.sin(2 * np.pi * 0.21 * T)) * gate(sea0, 3.0, 0.3, 0.1), 0, 0.14, -0.3)
 add(oce, 0, 0.42)
 rain = band(noise(DUR), 1400, 9000)
-rmask = gate(3.0, 7.55, 0.05, 0.12) + gate(26.0, 30.0, 0.08, 0.8)
+rr = AMB.get('rain', [[3.0, 7.55], [26.0, 30.0]])
+rmask = gate(rr[0][0], rr[0][1], 0.05, 0.12) + gate(rr[1][0], rr[1][1], 0.08, 0.8)
 add(rain * rmask, 0, 0.11, -0.2)
 add(band(noise(DUR), 1400, 9000) * rmask, 0, 0.11, 0.2)
 drops = np.zeros(N)
@@ -278,7 +290,7 @@ for _ in range(900):
 add(drops, 0, 0.12)
 hum = band(noise(DUR), 40, 180) * rmask
 add(hum, 0, 0.15)
-crowd = band(noise(DUR), 300, 2500) * (gate(7.5, 12.5, 0.2, 0.3) + gate(14.0, 26.0, 0.3, 0.3) * 0.6)
+crowd = band(noise(DUR), 300, 2500) * (gate(7.5 + O, 12.5 + O, 0.2, 0.3) + gate(14.0 + O, 26.0 + O, 0.3, 0.3) * 0.6)
 add(crowd, 0, 0.05)
 
 # ---------------- footsteps (same period formula the rig uses) ----------------
@@ -291,8 +303,8 @@ for w in TL['walks']:
             break
         if ts >= w['t0']:
             g = 0.5 if w['char'] == 'thug' else 0.32
-            if w['t0'] >= 26:
-                g *= max(0.15, 1 - (ts - 26) / 3)
+            if w['t0'] >= 26 + O:
+                g *= max(0.15, 1 - (ts - 26 - O) / 3)
             add(step(w.get('surface', 'floor')), ts, g, 0.15 if k % 2 else -0.15)
         k += 1
 
@@ -306,6 +318,17 @@ for c in TL['cues']:
             add(whoosh(0.5, 300, 4000, 0.9 * s), t)
         else:
             add(whoosh(0.45, 500, 3000, 0.7 * s), t)
+    elif ty == 'splash':
+        d = 1.6; tp = tt(d)
+        body = band(noise(d), 120, 1500) * np.exp(-tp * 2.6) * np.minimum(1, tp / 0.02)
+        spray = band(noise(d), 2500, 10000) * np.exp(-tp * 4.5) * 0.5
+        add(reverb(np.pad(body + spray + thud(0.5 * s)[: len(tp)] if len(thud()) >= len(tp) else body + spray, (0, SR // 2)), 1.4, 0.25), t, 0.55 * s, -0.4)
+    elif ty == 'horn':
+        d = 1.9; tp = tt(d)
+        ph = 2 * np.pi * 98 * tp
+        hn = sum(np.sin(k * ph + 0.3 * k) / k for k in range(1, 12)) + 0.6 * sum(np.sin(k * 1.5 * ph) / k for k in range(1, 8))
+        hn *= np.minimum(1, tp / 0.15) * np.minimum(1, (d - tp) / 0.5)
+        add(reverb(np.pad(band(hn, 60, 1800) * 0.25, (0, SR)), 2.5, 0.5), t, 0.5 * s, 0.3)
     elif ty == 'impact':
         add(whoosh(0.12, 1500, 5000, 0.5), t - 0.1)
         add(reverb(np.pad(impact(s), (0, SR)), 1.6, 0.35), t, 0.95)

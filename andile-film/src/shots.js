@@ -18,6 +18,18 @@ const doorKeys = (keys) => (lt) => {
 
 export const SHOTS = {
   S01: {
+    camFn: (lt) => { const z = -5 * lt, u = lt / 3; return { pos: [-5.5, 9.75, 4 + z], look: [lerp(-31, -27, u), lerp(10.5, 9.2, u), -40 + z * 0.6], fov: 50, roll: 0.02 }; },
+    whales: [{ x: -27, z: -40, t0: 0.15, dur: 3.0, heading: 0.5, roll: 2.4 }, { x: -42, z: -62, t0: 0.6, dur: 3.1, heading: 0.9, roll: -2.0 },
+      { x: -17, z: -72, t0: 1.1, dur: 2.9, heading: 0.2, roll: 2.0 }, { x: -60, z: -50, t0: 1.6, dur: 3.2, heading: 1.1, roll: 1.8 }],
+    chars: {}, portrait: { hcov: 0.7 },
+  },
+  S01B: {
+    hideDeck: true,
+    camFn: (lt) => { const u = lt / 2; return { pos: [lerp(34, 20, u), lerp(30, 34, u), -110 - 70 * lt], look: [lerp(-10, 0, u), 0, -760], fov: 46, roll: lerp(0.08, 0.02, u) }; },
+    whales: [{ x: 70, z: -330, t0: 3.25, dur: 3.0, heading: -0.6, roll: 2.0 }],
+    chars: {}, portrait: { hcov: 0.72 },
+  },
+  S01X: {
     cam: [{ t: 0, pos: [0, 2.0, 84], look: [0, 6, -200], fov: 40 }, { t: 3, pos: [6, 10, -22], look: [0, 30, -220], fov: 36, ease: 'linear' }],
     chars: {}, portrait: { hcov: 0.75 },
   },

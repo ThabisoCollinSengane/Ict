@@ -1,6 +1,6 @@
 # ANDILE — Style Guide (code-rendered cold open)
 
-**Film:** ANDILE S1·E1 cold open, "Hemingway's" — 30 s, 24 fps.
+**Film:** ANDILE S1·E1 cold open, "Hemingway's" — 32 s, 24 fps.
 **Audience:** YouTube anime / action viewers, South African + global.
 **The viewer should remember:** *Andile is the quiet Durban spy who finishes the fight before the music comes back.*
 
@@ -14,13 +14,16 @@ three.js r160 (WebGL2) in headless Chromium with SwiftShader, so it runs on a CP
 - **Shading:** `MeshToonMaterial` with a 3-step ramp (shadow / mid / light). No textures on characters, only flat colour.
 - **Line:** inverted-hull outlines (#120C18, about 1.1 cm world size) on characters and hero props. No outlines on skies or distant city.
 - **Light:** one key, one hemisphere fill and at most three coloured practicals per set. Neon is pushed above 1.0 so bloom catches it.
+- **Ink:** a screen-space line pass traces every depth and normal edge in the scene (including environment, ships, whales, clouds), on top of the character hulls. Line weight fades with distance for aerial perspective.
+- **Paint:** a depth-aware Kuwahara filter turns mid and far distance into flat painted brush patches while keeping faces near camera crisp. The ocean is a dedicated shader with brushstroke foam whose strokes keep a constant screen size at any distance (the hand-painted look of the references).
 - **Post:** soft bloom → anime grade (slight saturation lift, purple shadow lift) → film grain → vignette → 2.0:1 letterbox (16:9 only).
 - **Impact language:** 1 inverted "impact frame", then a white flash decay, radial speed lines, chromatic split and a camera shake.
 
 ## Palette
 | Set | Key colours |
 |---|---|
-| Ocean at dusk | sky #1F1D5E → #6B4AA6 → #F0789A → #FFB36A, sea #1D2F6B / #2E5AA8 / #5A8FD6, foam #F2F4FF, sun path #FFD08A |
+| Sea, daylight (opening) | sky #D8F2FF → #8CCBF5 → #2A72D0; sea #0D4F9A / #1784C4 / #2FB6D2 / #7FE3DC; foam #F4FBFF; containers #C8372D; rail #F4EAD8; deck #21456C |
+| Ocean at dusk (unused in v3) | sky #1F1D5E → #6B4AA6 → #F0789A → #FFB36A, sea #1D2F6B / #2E5AA8 / #5A8FD6, foam #F2F4FF, sun path #FFD08A |
 | Street at night (rain) | asphalt #1B1E2C, facade #2C4D58, neon pink #FF4FA3, neon cyan #3FD8FF, lamp #FFB070, fog #1A1838 |
 | Club interior | walls #2A1640, floor tiles magenta / cyan / violet, bar wood #4A1C22, haze #160C26 |
 | Accent / titles | #E2563C (ANDILE orange), text #F4F1EC |

@@ -2,7 +2,7 @@
 import sys, os
 from PIL import Image
 fd, tag = sys.argv[1], sys.argv[2]
-picks = {'S01_ocean': 40, 'S07_closeup': 330, 'S09_impact': 379, 'S10_kick': 420, 'S12_sib': 545, 'S14_title': 690}
+picks = {'S01_whales': 52, 'S01B_ocean': 100, 'S07_closeup': 378, 'S09_impact': 427, 'S10_kick': 468, 'S12_sib': 593, 'S14_title': 738}
 os.makedirs('out/posters', exist_ok=True)
 for name, f in picks.items():
     src = os.path.join(fd, f'f{f:04d}.png')

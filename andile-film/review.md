@@ -27,3 +27,21 @@ Also: subtitles enlarged (S12, frames 504–563 re-rendered).
 ## Gate 5: separate 9:16 composition
 The 9:16 version is its own composition, not a crop. Each shot re-derives its lens from `portrait.hcov` (horizontal coverage), pulls the camera back where two characters share the frame (`portrait.back`), and uses a portrait type scale.
 - **Defect found on the 9:16 contact sheet:** the S14 "ANDILE" title overflowed the frame width. *Fix:* portrait title size and letter-spacing reduced; frames 648–719 re-rendered.
+
+## v3: style upgrade after feedback ("the quality is still bad")
+The user compared v2 against Opus 5.5 reference films (painted ocean, breaching whales, ink linework). The gap was the *rendering style*, not the motion.
+| Problem in v2 | v3 change |
+|---|---|
+| Flat colours, no linework on environments | Screen-space ink pass on every edge (depth + normals) |
+| Plastic 3D look | Depth-aware painterly (Kuwahara) filter |
+| Dark, muddy opening | New 5 s daylight opening: container-ship deck, four breaching humpbacks with splash crowns, aerial brushstroke ocean, ships, Durban skyline, anime cumulus |
+| Ocean read as noise | Brushstroke foam with distance-LOD so strokes stay the same size on screen |
+| Blob wakes, bubble-wrap splashes | Tapered stroked wakes; splash particles excluded from ink so they merge into white crowns |
+
+| Criterion | v2 | v3 |
+|---|---|---|
+| Hook | 7 | 8.5 |
+| Readability | 7.5 | 8 |
+| Continuity | 7 | 7.5 ("LATER THAT NIGHT" bridges day → night) |
+| Motion | 7.5 | 8 |
+| Sound sync | 8 | 8.5 (splashes, horn, deck wind on cue) |

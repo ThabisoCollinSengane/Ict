@@ -122,26 +122,39 @@ export const CEL = {
   uExpo: { value: 1.0 },
 };
 export function cel(color, o = {}) {
-  return new THREE.ShaderMaterial({
-    fog: true,
-    uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uColor: { value: new THREE.Color(color) }, uGloss: { value: o.gloss ?? 0 }, ...CEL },
+  const m = new THREE.ShaderMaterial({
+    fog: o.fog ?? true,
+    defines: o.map ? { USE_CMAP: '' } : {},
+    uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uColor: { value: new THREE.Color(color) }, uGloss: { value: o.gloss ?? 0 },
+      uMap: { value: o.map || null }, ...CEL },
     vertexShader: `#include <common>
       #include <fog_pars_vertex>
-      varying vec3 vN; varying vec3 vV;
-      void main(){ vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mvPosition.xyz;
-        gl_Position = projectionMatrix * mvPosition;
+      varying vec3 vN; varying vec3 vV; varying vec2 vUv2;
+      void main(){
+        #include <beginnormal_vertex>
+        #include <defaultnormal_vertex>
+        #include <begin_vertex>
+        #include <project_vertex>
+        vN = normalize(transformedNormal); vV = -mvPosition.xyz; vUv2 = uv;
         #include <fog_vertex>
       }`,
     fragmentShader: `#include <common>
       #include <fog_pars_fragment>
       uniform vec3 uColor, uShadeTint, uLightDir, uRim, uRimDir; uniform float uRimAmt, uGloss, uExpo;
-      varying vec3 vN; varying vec3 vV;
+      #ifdef USE_CMAP
+      uniform sampler2D uMap;
+      #endif
+      varying vec3 vN; varying vec3 vV; varying vec2 vUv2;
       void main(){
         vec3 N = normalize(vN); vec3 V = normalize(vV);
+        vec3 base = uColor;
+        #ifdef USE_CMAP
+        base *= texture2D(uMap, vUv2).rgb;
+        #endif
         vec3 L = normalize((viewMatrix * vec4(uLightDir, 0.0)).xyz);
         float d = dot(N, L);
-        vec3 c = mix(uColor * uShadeTint, uColor, smoothstep(-0.03, 0.05, d));
-        c = mix(c, uColor * 1.15 + 0.03, smoothstep(0.8, 0.84, d) * 0.45);
+        vec3 c = mix(base * uShadeTint, base, smoothstep(-0.03, 0.05, d));
+        c = mix(c, base * 1.15 + 0.03, smoothstep(0.8, 0.84, d) * 0.45);
         if (uGloss > 0.0) { vec3 H = normalize(L + V); c += vec3(1.0) * smoothstep(0.96, 0.975, dot(N, H)) * uGloss; }
         float rim = smoothstep(0.58, 0.68, 1.0 - max(dot(N, V), 0.0));
         vec3 R = normalize((viewMatrix * vec4(uRimDir, 0.0)).xyz);
@@ -150,4 +163,5 @@ export function cel(color, o = {}) {
         #include <fog_fragment>
       }`,
   });
+  return m;
 }
