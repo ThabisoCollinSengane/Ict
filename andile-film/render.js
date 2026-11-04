@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
 const A = Object.fromEntries(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=')));
-const W = +(A.w || 1280), H = +(A.h || 720), out = A.out || 'frames/16x9';
+const W = +(A.w || 1280), H = +(A.h || 720), SS = +(A.ss || 1), out = A.out || 'frames/16x9';
 const frames = A.frames ? A.frames.split(',').map(Number) : Array.from({ length: (+(A.to ?? 720)) - (+(A.from || 0)) }, (_, i) => i + (+(A.from || 0)));
 const root = __dirname;
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' };
@@ -15,10 +15,10 @@ const srv = http.createServer((req, res) => {
 });
 srv.listen(0, '127.0.0.1', async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: SS });
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) console.log('[page]', m.text().slice(0, 300)); });
   page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-  await page.goto(`http://127.0.0.1:${srv.address().port}/index.html?w=${W}&h=${H}`);
+  await page.goto(`http://127.0.0.1:${srv.address().port}/index.html?w=${W}&h=${H}&ss=${SS}`);
   await page.waitForFunction('window.READY === true', null, { timeout: 300000 });
   fs.mkdirSync(out, { recursive: true });
   const t0 = Date.now();

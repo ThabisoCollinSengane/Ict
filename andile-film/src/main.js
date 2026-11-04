@@ -6,12 +6,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildSets } from './sets.js';
 import { seaSet } from './sea.js';
+import { loadVRMCast, evalVRM } from './vrmcast.js';
 import { makeCharacter, evalChar, CAST } from './rig.js';
 import { SHOTS } from './shots.js';
 import { EASE, clamp, lerp, CEL } from './toon.js';
 
 const q = new URLSearchParams(location.search);
-const W = +(q.get('w') || 1280), H = +(q.get('h') || 720), portrait = H > W;
+const W = +(q.get('w') || 1280), H = +(q.get('h') || 720), portrait = H > W, SS = +(q.get('ss') || 1);
 document.documentElement.style.setProperty('--u', Math.min(W, H) / 100 + 'px');
 document.body.classList.toggle('portrait', portrait);
 const TL = await (await fetch('./timeline.json')).json();
@@ -21,40 +22,53 @@ TL.mark = { tension: SID('S07').start, fight: SID('S08').start, door: SID('S12')
 const canvas = document.getElementById('c');
 canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
-renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.setPixelRatio(SS); renderer.setSize(W, H, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, W / H, 0.05, 2500);
 const sets = buildSets(scene);
+// soft camera-following fill so anime faces always read
+const faceFill = new THREE.DirectionalLight('#fff1ea', 0); scene.add(faceFill); scene.add(faceFill.target);
 sets.sea = seaSet(scene);
 const cast = {};
 for (const k in CAST) cast[k] = makeCharacter(CAST[k], scene);
+if (q.get('prim') !== '1') {
+  const vc = await loadVRMCast(scene, Object.keys(CAST));
+  for (const k in vc) { scene.remove(cast[k].root); scene.remove(cast[k].blob); cast[k] = vc[k]; }
+}
 
 const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: 4 });
 const composer = new EffectComposer(renderer, rt);
-composer.setPixelRatio(1); composer.setSize(W, H);
+composer.setPixelRatio(SS); composer.setSize(W, H);
 composer.addPass(new RenderPass(scene, camera));
 // normal + log-depth pass feeding the ink/paint filter
-const nrt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType });
+const nrt = new THREE.WebGLRenderTarget(W * SS, H * SS, { type: THREE.HalfFloatType });
 const ndMat = new THREE.ShaderMaterial({
   vertexShader: `#include <common>
+    #include <morphtarget_pars_vertex>
+    #include <skinning_pars_vertex>
     varying vec3 vNn; varying float vD;
     void main(){
       #include <beginnormal_vertex>
+      #include <morphnormal_vertex>
+      #include <skinbase_vertex>
+      #include <skinnormal_vertex>
       #include <defaultnormal_vertex>
       #include <begin_vertex>
+      #include <morphtarget_vertex>
+      #include <skinning_vertex>
       #include <project_vertex>
       vNn = normalize(transformedNormal); vD = -mvPosition.z;
     }`,
   fragmentShader: `varying vec3 vNn; varying float vD; void main(){ gl_FragColor = vec4(normalize(vNn) * 0.5 + 0.5, log2(1.0 + max(vD, 0.0)) / log2(3001.0)); }`,
 });
 const inkPass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, tND: { value: nrt.texture }, uRes: { value: new THREE.Vector2(W, H) },
+  uniforms: { tDiffuse: { value: null }, tND: { value: nrt.texture }, uRes: { value: new THREE.Vector2(W * SS, H * SS) }, uPx: { value: 0.75 * SS },
     uInk: { value: 1 }, uPaint: { value: 1 }, uPaintR: { value: 4 }, uInkCol: { value: new THREE.Color(0.1, 0.08, 0.17) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: `uniform sampler2D tDiffuse, tND; uniform vec2 uRes; uniform float uInk, uPaint, uPaintR; uniform vec3 uInkCol; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse, tND; uniform vec2 uRes; uniform float uInk, uPaint, uPaintR, uPx; uniform vec3 uInkCol; varying vec2 vUv;
     vec4 ND(vec2 o){ return texture2D(tND, vUv + o / uRes); }
     void main(){
       vec4 c0 = ND(vec2(0.0)); float dep = c0.a;
@@ -78,7 +92,7 @@ const inkPass = new ShaderPass({
         col = m0; float b = a0;
         if (a1 < b) { b = a1; col = m1; } if (a2 < b) { b = a2; col = m2; } if (a3 < b) { b = a3; col = m3; }
       }
-      vec4 a = ND(vec2(1.0, 0.0)), bb = ND(vec2(-1.0, 0.0)), cc = ND(vec2(0.0, 1.0)), d = ND(vec2(0.0, -1.0));
+      vec4 a = ND(vec2(uPx, 0.0)), bb = ND(vec2(-uPx, 0.0)), cc = ND(vec2(0.0, uPx)), d = ND(vec2(0.0, -uPx));
       float dd = max(max(abs(a.a - dep), abs(bb.a - dep)), max(abs(cc.a - dep), abs(d.a - dep)));
       float de = smoothstep(0.012, 0.03, dd);
       vec3 n0 = c0.rgb * 2.0 - 1.0;
@@ -97,7 +111,7 @@ composer.addPass(new OutputPass());
 const fin = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uFrame: { value: 0 }, uFlash: { value: 0 }, uInv: { value: 0 }, uSpeed: { value: 0 },
     uSpeedC: { value: new THREE.Vector2(0.5, 0.5) }, uLetter: { value: portrait ? 0 : 0.055 }, uAspect: { value: W / H },
-    uFade: { value: 0 }, uChroma: { value: 0 }, uRes: { value: new THREE.Vector2(W, H) } },
+    uFade: { value: 0 }, uChroma: { value: 0 }, uRes: { value: new THREE.Vector2(W * SS, H * SS) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uFrame,uFlash,uInv,uSpeed,uLetter,uAspect,uFade,uChroma; uniform vec2 uSpeedC,uRes; varying vec2 vUv;
     float hs(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
@@ -186,7 +200,7 @@ window.renderAt = (frame) => {
   for (const k in sets) sets[k].group.visible = k === shot.set;
   const S = sets[shot.set];
   scene.fog = S.fog; scene.background = S.bg; bloom.strength = S.bloom;
-  inkPass.uniforms.uPaintR.value = S.paint ?? 3.5;
+  inkPass.uniforms.uPaintR.value = (S.paint ?? 0) * Math.min(SS, 1.5);
   const cc = { ...((shot.set === 'club' && t >= TL.mark.fight && t < TL.mark.door && S.celFight) || S.cel), ...(def.cel || {}) };
   CEL.uLightDir.value.set(...cc.dir).normalize(); CEL.uShadeTint.value.setRGB(...cc.shade);
   CEL.uRim.value.setRGB(...cc.rim); CEL.uRimDir.value.set(...cc.rimDir).normalize(); CEL.uRimAmt.value = cc.rimAmt;
@@ -196,7 +210,7 @@ window.renderAt = (frame) => {
   for (const k in cast) {
     const c = cast[k], tr = def.chars[k];
     c.root.visible = c.blob.visible = !!tr;
-    if (tr) evalChar(c, tr, at, ctx);
+    if (tr) { if (c.isVRM) evalVRM(c, tr, ctx, shot.start, t, (x) => (def.remap ? remap(def.remap, x) : x)); else evalChar(c, tr, at, ctx); }
   }
 
   // camera
@@ -225,6 +239,7 @@ window.renderAt = (frame) => {
   camera.lookAt(look);
   if (cs.roll) camera.rotateZ(cs.roll);
   camera.fov = fov; camera.updateProjectionMatrix();
+  faceFill.intensity = S.fill ?? 0; faceFill.position.copy(camera.position).add(new THREE.Vector3(0, 0.6, 0)); faceFill.target.position.copy(look);
 
   // props
   const club = sets.club;
@@ -232,7 +247,7 @@ window.renderAt = (frame) => {
   club.door.rotation.y = ang;
   const op = clamp(Math.abs(ang) / 1.75);
   club.doorway.material.color.setRGB(0.22 + 0.95 * op, 0.13 + 0.62 * op, 0.09 + 0.32 * op);
-  club.doorLight.intensity = 9 * op;
+  club.doorLight.intensity = 26 * op;
   if (def.glass) {
     const v = def.glass(at);
     if (v === 'hand') { cast.andile.root.updateMatrixWorld(true); cast.andile.J.handR.getWorldPosition(tmp); club.glass.position.set(tmp.x, tmp.y - 0.11, tmp.z); }

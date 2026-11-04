@@ -223,9 +223,9 @@ function streetSet(scene) {
 
   g.add(new THREE.HemisphereLight('#6a78c8', '#1a1426', 1.0));
   const moon = new THREE.DirectionalLight('#9fb4ff', 0.9); moon.position.set(-6, 12, 9); g.add(moon);
-  const pink = new THREE.PointLight('#ff4fa3', 40, 18, 2); pink.position.set(0, 4.0, -4.6); g.add(pink);
+  const pink = new THREE.PointLight('#ff4fa3', 22, 14, 2); pink.position.set(0, 4.0, -4.6); g.add(pink);
 
-  return { group: g, fog: new THREE.Fog('#1a1838', 22, 150), bg: null, bloom: 0.9,
+  return { group: g, fog: new THREE.Fog('#1a1838', 22, 150), bg: null, bloom: 0.9, fill: 0.6,
     cel: { dir: [-0.35, 0.75, 0.55], shade: [0.42, 0.4, 0.68], rim: [1.1, 0.35, 0.75], rimDir: [0.2, 0.25, -1], rimAmt: 1.0 },
     update(t, cam) {
       const H = 14, sp = 15;
@@ -238,7 +238,7 @@ function streetSet(scene) {
       rg.attributes.position.needsUpdate = true;
       rain.position.x = Math.round(cam.position.x / 34) * 34 * 0;
       const fl = hash1(Math.floor(t * 14)) < 0.06 ? 0.35 : 1;
-      sign.material.color.setScalar(1.25 * fl); pink.intensity = 40 * fl;
+      sign.material.color.setScalar(1.25 * fl); pink.intensity = 22 * fl;
     } };
 }
 
@@ -259,7 +259,7 @@ function clubSet(scene) {
   const doorPivot = new THREE.Group(); doorPivot.position.set(-0.8, 0, -9.68); g.add(doorPivot);
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 0.1), toon('#5a2230')); door.position.set(0.8, 1.3, 0); doorPivot.add(door); outline(door, 0.02);
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), toon('#d9b050')); knob.position.set(1.4, 1.25, 0.08); doorPivot.add(knob);
-  const doorLight = new THREE.PointLight('#ffc07a', 0, 9, 2); doorLight.position.set(0, 1.8, -9.0); g.add(doorLight);
+  const doorLight = new THREE.PointLight('#ffc07a', 0, 12, 2); doorLight.position.set(0, 2.4, -11.6); g.add(doorLight);
   // neon sign + tubes
   add(g, new THREE.PlaneGeometry(5.2, 1.3), glow(1.2, 1.2, 1.2, { additive: true, map: textTexture("Hemingway's") }), [0, 4.5, -9.75]);
   const nP = glow(3.2, 0.45, 1.8), nC = glow(0.35, 2.3, 3.2);
@@ -313,13 +313,13 @@ function clubSet(scene) {
   glass.position.set(5.7, 1.18, -3.4);
 
   g.add(new THREE.HemisphereLight('#7a5aa8', '#120a1a', 0.9));
-  const key = new THREE.DirectionalLight('#ffd9e8', 1.0); key.position.set(2, 8, 6); g.add(key);
+  const key = new THREE.DirectionalLight('#ffe6d8', 1.6); key.position.set(2, 8, 6); g.add(key);
   const pinkL = new THREE.PointLight('#ff3fa0', 34, 16, 2); pinkL.position.set(-3, 4, -1); g.add(pinkL);
-  const cyanL = new THREE.PointLight('#3fd8ff', 22, 10, 2); cyanL.position.set(6.4, 3.0, -0.5); g.add(cyanL);
+  const cyanL = new THREE.PointLight('#3fd8ff', 9, 10, 2); cyanL.position.set(6.4, 3.0, -0.5); g.add(cyanL);
 
   const pal = { groove: ['#ff2fa0', '#2fd8ff', '#7a3cff', '#1a1030'], fight: ['#ff2040', '#ff2fa0', '#400818', '#1a0610'], dim: ['#2a1030', '#101828', '#1a0d24', '#0a0610'] };
   const tmp = new THREE.Color();
-  return { group: g, fog: new THREE.Fog('#160c26', 10, 42), bg: C('#07040c'), bloom: 0.85, door: doorPivot, doorway, doorLight, glass,
+  return { group: g, fog: new THREE.Fog('#160c26', 10, 42), bg: C('#07040c'), bloom: 0.85, fill: 0.85, door: doorPivot, doorway, doorLight, glass,
     cel: { dir: [0.25, 0.8, 0.65], shade: [0.48, 0.38, 0.66], rim: [0.35, 0.95, 1.15], rimDir: [1, 0.25, -0.2], rimAmt: 1.0 },
     celFight: { dir: [0.25, 0.8, 0.65], shade: [0.45, 0.32, 0.55], rim: [1.25, 0.25, 0.45], rimDir: [-0.6, 0.35, -0.7], rimAmt: 1.15 },
     update(t, cam, TL) {
