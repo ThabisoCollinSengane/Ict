@@ -112,7 +112,7 @@ function overlays(t) {
     if (k === 'title') {
       const u = EASE.out(clamp((t - x.t0) / 1.4));
       el.querySelector('.t1').textContent = x.text; el.querySelector('.t2').textContent = x.sub;
-      el.querySelector('.t1').style.letterSpacing = lerp(1.1, 0.42, u) + 'em';
+      el.querySelector('.t1').style.letterSpacing = lerp(portrait ? 0.5 : 1.1, portrait ? 0.16 : 0.42, u) + 'em';
       el.querySelector('.rule').style.width = (u * 100) + '%';
       el.style.opacity = clamp((t - x.t0) / 0.5);
     }

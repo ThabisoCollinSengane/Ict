@@ -14,3 +14,16 @@
 2. **S13: the catch is shot from behind Andile**, so the button lands without his face. *Fix:* the reverse angle comes from his front-left, so the glass slides into frame and into his hand. Re-rendered frames 564–623.
 3. **S01: a weak hook** (static first second, quiet audio). *Fix:* linear skim from frame 1, ocean and pad raised about 6 dB. Re-rendered frames 0–71 and regenerated the audio.
 Also: subtitles enlarged (S12, frames 504–563 re-rendered).
+
+## After the fixes (v2)
+| Criterion | v1 | v2 |
+|---|---|---|
+| Hook | 6 | 7 |
+| Readability | 6 | 7.5 |
+| Continuity | 7 | 7 |
+| Motion | 7 | 7.5 |
+| Sound sync | 8 | 8 |
+
+## Gate 5: separate 9:16 composition
+The 9:16 version is its own composition, not a crop. Each shot re-derives its lens from `portrait.hcov` (horizontal coverage), pulls the camera back where two characters share the frame (`portrait.back`), and uses a portrait type scale.
+- **Defect found on the 9:16 contact sheet:** the S14 "ANDILE" title overflowed the frame width. *Fix:* portrait title size and letter-spacing reduced; frames 648–719 re-rendered.
