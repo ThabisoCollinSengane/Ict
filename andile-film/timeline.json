@@ -1,0 +1,69 @@
+{
+  "fps": 24,
+  "duration": 30.0,
+  "bpm": 112,
+  "shots": [
+    {"id":"S01","set":"ocean","start":0.0,"end":3.0},
+    {"id":"S02","set":"street","start":3.0,"end":6.0},
+    {"id":"S03","set":"street","start":6.0,"end":7.5},
+    {"id":"S04","set":"club","start":7.5,"end":9.5},
+    {"id":"S05","set":"club","start":9.5,"end":11.0},
+    {"id":"S06","set":"club","start":11.0,"end":12.5},
+    {"id":"S07","set":"club","start":12.5,"end":14.0},
+    {"id":"S08","set":"club","start":14.0,"end":15.5},
+    {"id":"S09","set":"club","start":15.5,"end":16.5},
+    {"id":"S10","set":"club","start":16.5,"end":19.0},
+    {"id":"S11","set":"club","start":19.0,"end":21.0},
+    {"id":"S12","set":"club","start":21.0,"end":23.5},
+    {"id":"S13","set":"club","start":23.5,"end":26.0},
+    {"id":"S14","set":"street","start":26.0,"end":30.0}
+  ],
+  "walks": [
+    {"char":"andile","t0":3.0,"t1":7.5,"period":1.0,"surface":"wet"},
+    {"char":"andile","t0":7.8,"t1":9.5,"period":0.95,"surface":"floor"},
+    {"char":"thug","t0":11.0,"t1":12.0,"period":1.15,"surface":"floor"},
+    {"char":"sib","t0":21.2,"t1":21.7,"period":0.7,"surface":"floor"},
+    {"char":"andile","t0":26.0,"t1":28.6,"period":1.0,"surface":"wet"}
+  ],
+  "cues": [
+    {"t":2.70,"type":"whoosh","s":0.7},
+    {"t":7.50,"type":"door","s":0.8},
+    {"t":14.55,"type":"whoosh","s":0.9,"slow":true},
+    {"t":15.72,"type":"impact","s":1.0,"at":[4.25,1.15,-0.5]},
+    {"t":16.72,"type":"whoosh","s":1.2,"rise":true},
+    {"t":17.20,"type":"impact","s":1.4,"at":[3.9,1.3,-0.5]},
+    {"t":19.35,"type":"land","s":1.2},
+    {"t":21.00,"type":"doorBang","s":1.0},
+    {"t":21.25,"type":"sting","s":1.0},
+    {"t":23.80,"type":"slide","s":0.8},
+    {"t":25.00,"type":"clink","s":0.9},
+    {"t":27.00,"type":"titleHit","s":1.0}
+  ],
+  "speedLines": [
+    {"t0":15.70,"t1":16.15,"at":[4.25,1.15,-0.5],"s":1.0},
+    {"t0":17.18,"t1":17.75,"at":[3.9,1.3,-0.5],"s":1.0}
+  ],
+  "music": [
+    {"t0":0.0,"t1":3.0,"kind":"pad"},
+    {"t0":3.0,"t1":7.5,"kind":"muffled"},
+    {"t0":7.5,"t1":11.0,"kind":"groove"},
+    {"t0":11.0,"t1":12.5,"kind":"grooveLow"},
+    {"t0":12.5,"t1":14.0,"kind":"tension"},
+    {"t0":14.0,"t1":21.0,"kind":"fight"},
+    {"t0":21.0,"t1":23.5,"kind":"comic"},
+    {"t0":23.5,"t1":26.0,"kind":"groove"},
+    {"t0":26.0,"t1":30.0,"kind":"finale"}
+  ],
+  "fades": [
+    {"t0":0.0,"t1":0.5,"from":1,"to":0},
+    {"t0":29.3,"t1":30.0,"from":0,"to":1}
+  ],
+  "texts": [
+    {"el":"kicker","t0":0.6,"t1":2.8,"text":"DURBAN · KWAZULU-NATAL"},
+    {"el":"name","t0":6.15,"t1":7.45,"text":"ANDILE","sub":"SPY · OFF THE BOOKS"},
+    {"el":"name","t0":9.65,"t1":10.95,"text":"FUTHI","sub":"BARTENDER · HEMINGWAY'S"},
+    {"el":"name","t0":21.35,"t1":22.9,"text":"SIB","sub":"BACKUP · ALWAYS LATE"},
+    {"el":"sub","t0":21.3,"t1":23.4,"text":"Haibo! Ngiphuthelwe futhi?","sub":"Haibo! I missed it again?"},
+    {"el":"title","t0":27.0,"t1":30.0,"text":"ANDILE","sub":"SEASON 1 · EPISODE 1 — HEMINGWAY'S"}
+  ]
+}
