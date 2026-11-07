@@ -31,8 +31,10 @@ coin 50%). Hit % IS | OOS | 2026: dxy_hour 50.0/49.0/50.3, dxy_m5_bos 49.0/48.4/
 cross_hour 50.5/50.4/50.1, gold_hour 48.6/51.3/49.8, index_hour 49.6/49.2/47.8, vote 49.6/49.8/49.2 — **0 of 7 pass** (bar 55%
 same sign beyond 2 day-clustered SE every period). Nulls calibrated (both random walks ~50%; bid-bounce trap fixed: "now" =
 next minute's open). Stage 0 (from P125 dumps): the leaky forming-H1 read calls the hour 83-85% right, the honest closed-bar
-read 48-51%; mapping ≈ +0.4 WR pts per accuracy pt, so getting back to 42% WR needs ~78-85% accuracy. Stage 2 not run.
-Audit: auditor agent cut off by a rate limit; spot-check only (outcome alignment confirmed by the leaky read scoring 84%).
+read 48-51%; straight line ≈ +0.4 WR pts per accuracy pt, so 42% needs roughly what the leak had (~80%; the line is near-circular
+since 42% IS the leaky arm). Stage 2 not run. AUDIT CLEAN (2026-11-07): alignment, 'now', lookahead (1e6 future-bar fixture),
+Stage 0 = engine read (0/230 mismatches), power (planted effects found 55-81%). Caveats: the leaky read's 84% is mostly
+geometry (nulls 84-87%); R4 sums EURGBP and AUDNZD with one sign, which can cancel a per-cross effect (not acted on).
 **Meaning:** the original 42% needed near-perfect knowledge of the dollar's next 30-60 min; no honest read gets above a coin.
 
 ## 🔍 P125 PHASE A RESULT (RAN 2026-11-07) — the DOLLAR's H1 read alone carried the 42%
