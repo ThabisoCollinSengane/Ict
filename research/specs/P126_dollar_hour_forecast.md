@@ -1,7 +1,7 @@
 # P126 — An honest forecast of the current hour's dollar move
 
-Status: DRAFT (2026-11-07) — awaiting trader approval
-Author: spec-writer · Approved by: —
+Status: APPROVED 2026-11-07 (trader) — Stage 0/1 BUILDING
+Author: spec-writer · Approved by: trader (2026-11-07; Q1 run Stage 2 once if Stage 1 passes, Q2 no USDJPY, Q3 every 5 min in the killzones)
 
 ## 1. The idea
 - **Trader's choice (2026-11-07, after P125 Phase A):** look for an HONEST way to forecast where the
