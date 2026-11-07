@@ -1,6 +1,6 @@
 # P127 — Volatility by clock time (seas20): a bracket and a fade that do not pick a side
 
-Status: APPROVED 2026-11-07 (trader) — BUILDING
+Status: APPROVED 2026-11-07 (trader) — DONE 2026-11-07: FAILED (0 of 16)
 Author: spec-writer · Approved by: <trader>
 
 **Three words used throughout:**
