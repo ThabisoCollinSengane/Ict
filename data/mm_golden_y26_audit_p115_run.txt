@@ -1,0 +1,724 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2026–2026)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD
+
+Loading and resampling to 5-minute bars (2026)...
+  GBPUSD: 276,426 M1 → 55,554 M5 bars  2026-01-01 – 2026-10-01  close 1.32581
+  EURUSD: 276,701 M1 → 55,580 M5 bars  2026-01-01 – 2026-10-01  close 1.13289
+  EURGBP: 276,784 M1 → 55,685 M5 bars  2026-01-01 – 2026-10-01  close 0.85445
+  UDXUSD: 235,958 M1 → 48,354 M5 bars  2026-01-02 – 2026-10-01  close 101.28800
+  AUDUSD: 276,456 M1 → 55,592 M5 bars  2026-01-01 – 2026-10-01  close 0.69537
+  NZDUSD: 276,755 M1 → 55,681 M5 bars  2026-01-01 – 2026-10-01  close 0.56259
+  AUDNZD: 277,230 M1 → 55,624 M5 bars  2026-01-01 – 2026-10-01  close 1.23588
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 55554 5-min bars...
+    bar 1000/55554 (2026-01-07 09:20:00+00:00) - active=0 trades=0 equity=1000
+    bar 2000/55554 (2026-01-12 20:40:00+00:00) - active=0 trades=2 equity=939
+    bar 3000/55554 (2026-01-16 08:00:00+00:00) - active=0 trades=6 equity=903
+    bar 4000/55554 (2026-01-21 19:20:00+00:00) - active=0 trades=10 equity=880
+    bar 5000/55554 (2026-01-27 06:40:00+00:00) - active=0 trades=13 equity=898
+    bar 6000/55554 (2026-01-30 18:00:00+00:00) - active=0 trades=18 equity=938
+    bar 7000/55554 (2026-02-05 05:20:00+00:00) - active=0 trades=20 equity=934
+    bar 8000/55554 (2026-02-10 16:40:00+00:00) - active=0 trades=23 equity=929
+    bar 9000/55554 (2026-02-16 04:00:00+00:00) - active=0 trades=26 equity=954
+    bar 10000/55554 (2026-02-19 15:20:00+00:00) - active=0 trades=33 equity=977
+    bar 11000/55554 (2026-02-25 02:40:00+00:00) - active=0 trades=37 equity=933
+    bar 12000/55554 (2026-03-02 14:00:00+00:00) - active=0 trades=42 equity=855
+    bar 13000/55554 (2026-03-06 01:20:00+00:00) - active=0 trades=44 equity=977
+    bar 14000/55554 (2026-03-11 11:40:00+00:00) - active=0 trades=49 equity=912
+    bar 15000/55554 (2026-03-16 23:00:00+00:00) - active=0 trades=55 equity=904
+    bar 16000/55554 (2026-03-20 10:20:00+00:00) - active=0 trades=62 equity=814
+    bar 17000/55554 (2026-03-25 21:40:00+00:00) - active=0 trades=65 equity=772
+    bar 18000/55554 (2026-03-31 11:00:00+00:00) - active=0 trades=69 equity=750
+    bar 19000/55554 (2026-04-05 22:20:00+00:00) - active=0 trades=71 equity=765
+    bar 20000/55554 (2026-04-09 09:40:00+00:00) - active=0 trades=74 equity=759
+    bar 21000/55554 (2026-04-14 21:00:00+00:00) - active=2 trades=79 equity=718
+    bar 22000/55554 (2026-04-20 08:35:00+00:00) - active=0 trades=84 equity=772
+    bar 23000/55554 (2026-04-23 19:55:00+00:00) - active=0 trades=87 equity=736
+    bar 24000/55554 (2026-04-29 07:15:00+00:00) - active=0 trades=92 equity=709
+    bar 25000/55554 (2026-05-04 18:35:00+00:00) - active=0 trades=93 equity=689
+    bar 26000/55554 (2026-05-08 05:55:00+00:00) - active=0 trades=96 equity=628
+    bar 27000/55554 (2026-05-13 17:15:00+00:00) - active=0 trades=99 equity=731
+    bar 28000/55554 (2026-05-19 15:35:00+00:00) - active=0 trades=105 equity=730
+    bar 29000/55554 (2026-05-25 02:55:00+00:00) - active=0 trades=110 equity=648
+    bar 30000/55554 (2026-05-28 14:15:00+00:00) - active=1 trades=116 equity=608
+    bar 31000/55554 (2026-06-03 01:35:00+00:00) - active=0 trades=120 equity=602
+    bar 32000/55554 (2026-06-08 12:55:00+00:00) - active=1 trades=120 equity=602
+    bar 33000/55554 (2026-06-12 00:15:00+00:00) - active=0 trades=127 equity=492
+    bar 34000/55554 (2026-06-17 11:35:00+00:00) - active=0 trades=127 equity=492
+    bar 35000/55554 (2026-06-22 23:00:00+00:00) - active=0 trades=127 equity=492
+    bar 36000/55554 (2026-06-26 10:20:00+00:00) - active=0 trades=127 equity=492
+    bar 37000/55554 (2026-07-01 21:40:00+00:00) - active=0 trades=127 equity=492
+    bar 38000/55554 (2026-07-07 09:00:00+00:00) - active=0 trades=127 equity=492
+    bar 39000/55554 (2026-07-10 20:20:00+00:00) - active=0 trades=127 equity=492
+    bar 40000/55554 (2026-07-16 07:40:00+00:00) - active=0 trades=127 equity=492
+    bar 41000/55554 (2026-07-21 19:05:00+00:00) - active=0 trades=127 equity=492
+    bar 42000/55554 (2026-07-27 06:25:00+00:00) - active=0 trades=127 equity=492
+    bar 43000/55554 (2026-07-30 17:45:00+00:00) - active=0 trades=127 equity=492
+    bar 44000/55554 (2026-08-05 05:05:00+00:00) - active=0 trades=127 equity=492
+    bar 45000/55554 (2026-08-10 16:25:00+00:00) - active=0 trades=127 equity=492
+    bar 46000/55554 (2026-08-14 03:45:00+00:00) - active=0 trades=127 equity=492
+    bar 47000/55554 (2026-08-19 15:05:00+00:00) - active=0 trades=127 equity=492
+    bar 48000/55554 (2026-08-25 02:25:00+00:00) - active=0 trades=127 equity=492
+    bar 49000/55554 (2026-08-28 13:50:00+00:00) - active=0 trades=127 equity=492
+    bar 50000/55554 (2026-09-03 01:10:00+00:00) - active=0 trades=127 equity=492
+    bar 51000/55554 (2026-09-08 12:30:00+00:00) - active=0 trades=127 equity=492
+    bar 52000/55554 (2026-09-13 23:50:00+00:00) - active=0 trades=127 equity=492
+    bar 53000/55554 (2026-09-17 11:10:00+00:00) - active=0 trades=127 equity=492
+    bar 54000/55554 (2026-09-22 22:30:00+00:00) - active=0 trades=127 equity=492
+    bar 55000/55554 (2026-09-29 06:50:00+00:00) - active=0 trades=127 equity=492
+
+=== Gate funnel (entries passing each filter) ===
+  checks                            23292  ████████████████████████████████████████
+  in_killzone                       23292  ████████████████████████████████████████
+  news_clear                        13007  ██████████████████████
+  nfp_fomc_ok                       10763  ██████████████████
+  intermarket_signal                  279  
+  pair_matches                        279  
+  mss_h1_m15_m5_ok                    168  
+  daily_bias_ok                       168  
+  h1_bias_ok                          168  
+  h4_bias_ok                          168  
+  dealing_range_ok                      4  
+  consolidation_found                 117  
+  manipulation_correct_dir            107  
+  m5_fvg_correct_dir                  119  
+  target_found                        119  
+  rr_ok                               119  
+  units_nonzero                       119  
+  limit_placed                          0  
+  entry_opened                        119  
+  pyramid_added                         0  
+  pyramid_blocked_min_target           88  
+  drawdown_halt                     10104  █████████████████
+  daily_loss_halt                      24  
+  consec_loss_pause                     0  
+  weekly_cap                            0  
+  weekly_pair_cap                       0  
+  daily_cap                            25  
+  daily_pair_cap                      626  █
+  weekly_amd_confirmed                 25  
+  session_handover_closed               0  
+  htf_draw_full_cascade                 6  
+  htf_draw_partial                     87  
+  htf_draw_counter                     33  
+  htf_fvg_5050_hit                      8  
+  ote_zone                              0  
+  choch_confirmed                       4  
+  low_conviction                        0  
+  judas_divergence                      1  
+  ny_continuation                      51  
+  mm_quad_none_eurgbp_flat           2257  ███
+  mm_quad_none_dxy_flat              2316  ███
+  mm_quad_1a                         1565  ██
+  mm_quad_selected                   2964  █████
+  mm_golden_checked                  2964  █████
+  mm_golden_amd_ok                   1727  ██
+  mm_golden_via_cascade               876  █
+  mm_golden_smt_rung_240T             153  
+  mm_golden_smt_yes                   810  █
+  mm_golden_ifvg_zone_60T             510  
+  mm_golden_pd_fvg                     36  
+  mm_golden_pd_fvg_60T                 22  
+  mm_golden_no_m1_shift               618  █
+  mm_quad_other_pair                 3043  █████
+  mm_golden_pd_ifvg                   446  
+  mm_golden_pd_ifvg_60T               193  
+  mm_golden_m1_shift                   92  
+  mm_golden_m1_smtx_s1                 37  
+  mm_golden_m1_smtx_blocked_shift      42  
+  mm_quad_1b                         1919  ███
+  sr_attempted                        133  
+  sr_prev_session_ok                  133  
+  sr_enough_bars                      133  
+  sr_consol_found                     133  
+  sr_consol_no_sweep                   55  
+  sr_fail_no_sweep                     31  
+  sr_pdliq_attempted                   55  
+  mm_golden_no_amd                     51  
+  mm_golden_wrong_sweep               900  █
+  mm_quad_2b                         1462  ██
+  mm_golden_ob_failed                 431  
+  mm_quad_2a                         1061  █
+  mm_golden_smt_rung_5T               101  
+  sr_fail_low_swept_no_close_back      20  
+  sr_breakout_found                    53  
+  mm_golden_m1_smtx_s3                 31  
+  mm_golden_m1_smtx_s2p_none            9  
+  mm_golden_no_draw                    42  
+  mm_golden_no_smt                    397  
+  mm_golden_smt_rung_1T               107  
+  mm_golden_pd_ifvg_15T               181  
+  mm_golden_ob_no_raid                246  
+  mm_golden_m1_smtx_s2                 19  
+  mm_golden_m1_smtx_s2p_smt            16  
+  mm_golden_smt_rung_60T              124  
+  pm_gate_pair_news                     0  
+  dxy_flat                           9030  ███████████████
+  dxy_directional                    1082  █
+  eurgbp_flat                         392  
+  eurgbp_flat_gbp_blocked             274  
+  breakout_confirmed                  121  
+  soj_retest                           71  
+  soj_sweep                           112  
+  dxy_fvg_room                         16  
+  golden_rule_yes                      53  
+  phase_london_judas                   44  
+  gt_pool_sweep                        85  
+  gt_disp_wick                        108  
+  structure_stop_used                 117  
+  stop_capped_10pip                   102  
+  risk_cap_ok                         119  
+  mm_golden_no_retrace                 28  
+  mm_golden_via_own_ob                331  
+  mm_golden_ifvg_zone_5T               55  
+  mm_golden_pd_ifvg_5T                 72  
+  mm_golden_ob_untested                89  
+  mm_golden_ifvg_zone_15T             175  
+  mm_golden_pd_ob2                     44  
+  mm_golden_pd_ob2_5T                  21  
+  mm_golden_smt_rung_15T              144  
+  mm_golden_pd_fvg_5T                   7  
+  mm_golden_m1_smtx_s2p_cont           15  
+  eurgbp_directional                  455  
+  smt_pair_confirmed                   27  
+  golden_rule_no                       63  
+  mstruct_align                       112  
+  phase_ny_judas                       75  
+  im_score_low                        340  
+  mm_golden_other_pair_open           258  
+  pyramid_blocked_low_im              664  █
+  mstruct_minor_sweep                   8  
+  gt_judas_reversal                    24  
+  smt_pair_opposing                    13  
+  gt_mp_discount                       15  
+  pyramid_blocked_favour              394  
+  london_judas_ny_echo                  1  
+  soj_judas                            41  
+  target_rung_far                      34  
+  mm_golden_no_ifvg                    70  
+  mm_golden_pd_ob                     184  
+  mm_golden_pd_ob_15T                 184  
+  mm_golden_m1_smtx_s2p_noref          10  
+  gt_macro_window                      12  
+  sr_fail_high_swept_no_close_back      4  
+  session_range_found                   6  
+  ny_continuation_gated                 3  
+  mm_golden_opened                      8  
+  crt_turtle_soup                      51  
+  mm_golden_pd_fvg_15T                  7  
+  mm_golden_smt_rung_D                181  
+  mm_golden_no_pd                      30  
+  mm_golden_pd_ob2_15T                  6  
+  mm_golden_pd_ob2_60T                 17  
+  mm_golden_daily_cap                  26  
+  m1_stop_used                          2  
+  mm_golden_m1_smtx_s0                  5  
+  gt_mp_extreme                         2  
+  phase_london_breakout                 1  
+  mm_golden_corr_block                  2  
+  sr_pdliq_width_ok                     1  
+  sr_pdliq_sweep                        1  
+
+=== Results ===
+  trades                    127
+  win_rate_pct              21.3
+  profit_factor             0.68
+  starting_equity_ZAR       1000
+  ending_equity_ZAR         492.09
+  pnl_ZAR                   -507.91
+  pnl_pct                   -50.79
+  max_drawdown_pct          -50.72
+  avg_win_ZAR               39.96
+  avg_loss_ZAR              -15.87
+[P92 events -> 92 rows]
+
+[trade dump → /home/runner/work/Ict/Ict/data/histdata/trades_dump.csv]
+
+=== Trade log (127 trades) ===
+                opened_at                 closed_at   pair  direction  leg_idx    entry     exit  units       pnl reason session_side        entry_type
+2026-01-12 08:05:00+00:00 2026-01-12 08:10:00+00:00 EURUSD          1        1 1.168810 1.167720   2000 -40.33000   stop     momentum        amd_fvg_h1
+2026-01-12 13:45:00+00:00 2026-01-12 14:10:00+00:00 GBPUSD          1        1 1.348230 1.347130   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-01-13 12:45:00+00:00 2026-01-13 13:30:00+00:00 EURUSD         -1        1 1.165590 1.166680   1000 -20.16500   stop     momentum         mss_ob_m5
+2026-01-14 09:10:00+00:00 2026-01-14 11:55:00+00:00 EURUSD          1        1 1.165050 1.164340   1000 -13.13500   stop     momentum        mss_ob_m15
+2026-01-14 12:55:00+00:00 2026-01-14 13:05:00+00:00 EURUSD          1        1 1.166050 1.164960   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-01-15 12:55:00+00:00 2026-01-15 16:25:00+00:00 GBPUSD         -1        1 1.340250 1.339350   1000  16.65000   stop     momentum        amd_fvg_m5
+2026-01-20 08:00:00+00:00 2026-01-20 08:20:00+00:00 GBPUSD          1        1 1.348520 1.347420   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-01-20 08:30:00+00:00 2026-01-20 10:10:00+00:00 EURUSD          1        1 1.170860 1.171770   1000  16.83500   stop     momentum        amd_fvg_m5
+2026-01-21 09:40:00+00:00 2026-01-21 11:25:00+00:00 GBPUSD         -1        1 1.341400 1.341500   1000  -1.85000   stop     momentum        amd_fvg_m5
+2026-01-21 09:30:00+00:00 2026-01-21 11:25:00+00:00 EURUSD         -1        1 1.170670 1.171620   1000 -17.57500   stop     momentum        amd_fvg_m5
+2026-01-22 13:15:00+00:00 2026-01-22 13:30:00+00:00 EURUSD          1        1 1.171790 1.170700   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-01-26 13:00:00+00:00 2026-01-26 13:25:00+00:00 EURUSD         -1        1 1.183660 1.184750   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-01-26 13:40:00+00:00 2026-01-26 15:30:00+00:00 EURUSD          1        1 1.184760 1.187960   1000  59.20000 target       golden amd_m1_shift_ifvg
+2026-01-27 08:10:00+00:00 2026-01-27 09:15:00+00:00 EURUSD         -1        1 1.185840 1.186930   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-01-27 12:05:00+00:00 2026-01-27 14:30:00+00:00 EURUSD          1        1 1.189790 1.194299   1000  83.41539 target     momentum        amd_fvg_m5
+2026-01-27 14:40:00+00:00 2026-01-27 15:30:00+00:00 GBPUSD          1        1 1.376820 1.377720   1000  16.65000   stop     momentum        amd_fvg_m5
+2026-01-28 13:20:00+00:00 2026-01-28 13:30:00+00:00 EURUSD         -1        1 1.195820 1.196910   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-01-30 12:05:00+00:00 2026-01-30 12:25:00+00:00 EURUSD          1        1 1.195120 1.194030   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-02-02 14:05:00+00:00 2026-02-02 14:35:00+00:00 GBPUSD         -1        1 1.364210 1.365310   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-02-02 13:10:00+00:00 2026-02-02 14:45:00+00:00 EURUSD         -1        1 1.183670 1.182760   1000  16.83500   stop     momentum       amd_fvg_m15
+2026-02-09 12:00:00+00:00 2026-02-09 13:15:00+00:00 GBPUSD          1        1 1.364010 1.364910   1000  16.65000   stop     momentum        amd_fvg_m5
+2026-02-09 14:05:00+00:00 2026-02-09 15:15:00+00:00 EURUSD          1        1 1.190750 1.190660   1000  -1.66500   stop     momentum       amd_fvg_m15
+2026-02-10 14:10:00+00:00 2026-02-10 14:45:00+00:00 GBPUSD          1        1 1.368550 1.367450   1000 -20.35000   stop     momentum        mss_fvg_m5
+2026-02-11 12:05:00+00:00 2026-02-11 13:30:00+00:00 EURUSD         -1        1 1.190290 1.186788   1000  64.78626 target     momentum        amd_fvg_m5
+2026-02-12 09:20:00+00:00 2026-02-12 10:15:00+00:00 EURUSD          1        1 1.188750 1.187660   1000 -20.16500   stop     momentum       amd_fvg_m15
+2026-02-13 13:30:00+00:00 2026-02-13 13:40:00+00:00 EURUSD          1        1 1.187480 1.186390   1000 -20.16500   stop     momentum    mss_breaker_m5
+2026-02-16 13:10:00+00:00 2026-02-16 14:05:00+00:00 EURUSD         -1        1 1.185110 1.185980   1000 -16.09500   stop     momentum        amd_fvg_h1
+2026-02-17 13:05:00+00:00 2026-02-17 14:35:00+00:00 GBPUSD         -1        1 1.354080 1.353180   1000  16.65000   stop     momentum        amd_fvg_m5
+2026-02-18 08:40:00+00:00 2026-02-18 09:05:00+00:00 EURUSD         -1        1 1.182790 1.183880   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-02-18 14:05:00+00:00 2026-02-18 15:00:00+00:00 GBPUSD         -1        1 1.354720 1.354820   1000  -1.85000   stop     momentum        amd_fvg_m5
+2026-02-18 13:55:00+00:00 2026-02-18 19:00:00+00:00 EURUSD         -1        1 1.182280 1.178685   1000  66.51157 target     momentum        amd_fvg_m5
+2026-02-19 12:10:00+00:00 2026-02-19 12:30:00+00:00 GBPUSD         -1        1 1.345960 1.347060   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-02-19 13:00:00+00:00 2026-02-19 15:00:00+00:00 EURUSD         -1        1 1.176020 1.176110   1000  -1.66500   stop     momentum        amd_fvg_m5
+2026-02-20 08:05:00+00:00 2026-02-20 08:20:00+00:00 EURUSD         -1        1 1.174390 1.175480   1000 -20.16500   stop     momentum         amd_ob_m5
+2026-02-20 13:25:00+00:00 2026-02-20 13:30:00+00:00 GBPUSD          1        1 1.349010 1.347910   1000 -20.35000   stop     momentum        amd_fvg_h1
+2026-02-23 09:15:00+00:00 2026-02-23 13:30:00+00:00 EURUSD         -1        1 1.180410 1.179500   1000  16.83500   stop     momentum        mss_fvg_h1
+2026-02-24 13:50:00+00:00 2026-02-24 14:35:00+00:00 EURUSD         -1        1 1.176850 1.177940   1000 -20.16500   stop     momentum       amd_fvg_m15
+2026-02-26 09:15:00+00:00 2026-02-26 09:40:00+00:00 GBPUSD         -1        1 1.352000 1.353100   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-02-27 08:05:00+00:00 2026-02-27 08:30:00+00:00 EURUSD          1        1 1.182080 1.181280   1000 -14.80000   stop     momentum        amd_fvg_m5
+2026-02-27 13:35:00+00:00 2026-02-27 14:10:00+00:00 GBPUSD         -1        1 1.344550 1.345650   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-03-02 08:20:00+00:00 2026-03-02 08:40:00+00:00 GBPUSD         -1        1 1.333330 1.333430   1000  -1.85000   stop     momentum        amd_fvg_m5
+2026-03-02 08:35:00+00:00 2026-03-02 08:40:00+00:00 NZDUSD         -1        1 0.592775 0.593900   1000 -20.81250   stop     momentum       amd_fvg_m15
+2026-03-03 08:00:00+00:00 2026-03-03 09:20:00+00:00 GBPUSD         -1        1 1.333100 1.330050   1000  56.42500 target     momentum        amd_fvg_m5
+2026-03-03 14:40:00+00:00 2026-03-03 15:15:00+00:00 EURUSD         -1        1 1.157050 1.153510   1000  65.49740 target     momentum        amd_fvg_m5
+2026-03-09 13:25:00+00:00 2026-03-09 13:40:00+00:00 GBPUSD          1        1 1.337820 1.336720   1000 -20.35000   stop     momentum        mss_fvg_m5
+2026-03-09 13:30:00+00:00 2026-03-09 13:40:00+00:00 EURUSD          1        1 1.158600 1.157510   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-03-10 07:05:00+00:00 2026-03-10 07:30:00+00:00 GBPUSD          1        1 1.346100 1.346000   1000  -1.85000   stop     momentum        amd_fvg_h1
+2026-03-10 07:35:00+00:00 2026-03-10 08:05:00+00:00 EURUSD          1        1 1.165000 1.164910   1000  -1.66500   stop     momentum        amd_fvg_m5
+2026-03-10 11:05:00+00:00 2026-03-10 11:25:00+00:00 GBPUSD          1        1 1.345450 1.344350   1000 -20.35000   stop       golden amd_m1_shift_ifvg
+2026-03-11 12:45:00+00:00 2026-03-11 14:00:00+00:00 EURUSD         -1        1 1.158490 1.159580   1000 -20.16500   stop     momentum         amd_ob_m5
+2026-03-12 11:35:00+00:00 2026-03-12 11:50:00+00:00 GBPUSD          1        1 1.340830 1.339730   1000 -20.35000   stop     momentum         amd_ob_m5
+2026-03-12 13:15:00+00:00 2026-03-12 13:25:00+00:00 EURUSD         -1        1 1.152730 1.153820   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-03-13 08:10:00+00:00 2026-03-13 08:35:00+00:00 EURUSD         -1        1 1.143870 1.144960   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-03-13 07:10:00+00:00 2026-03-13 10:45:00+00:00 GBPUSD         -1        1 1.329370 1.325330   1000  74.74000 target     momentum        amd_fvg_m5
+2026-03-16 13:35:00+00:00 2026-03-16 14:30:00+00:00 EURUSD          1        1 1.148870 1.148780   1000  -1.66500   stop     momentum        amd_fvg_h1
+2026-03-17 08:40:00+00:00 2026-03-17 09:35:00+00:00 EURUSD          1        1 1.151130 1.151040   1000  -1.66500   stop     momentum        amd_fvg_m5
+2026-03-17 13:00:00+00:00 2026-03-17 14:15:00+00:00 EURUSD          1        1 1.153530 1.152440   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-03-18 12:30:00+00:00 2026-03-18 13:25:00+00:00 GBPUSD         -1        1 1.332940 1.332040   1000  16.65000   stop     momentum        amd_fvg_m5
+2026-03-18 13:00:00+00:00 2026-03-18 13:55:00+00:00 EURUSD         -1        1 1.150340 1.151430   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-03-19 08:40:00+00:00 2026-03-19 09:00:00+00:00 EURUSD         -1        1 1.144500 1.145590   1000 -20.16500   stop     momentum        amd_fvg_h1
+2026-03-19 13:00:00+00:00 2026-03-19 13:10:00+00:00 EURUSD          1        1 1.149640 1.148340   1000 -24.05000   stop     momentum       news_fvg_m5
+2026-03-19 13:15:00+00:00 2026-03-19 13:20:00+00:00 GBPUSD          1        1 1.331850 1.330750   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-03-23 11:05:00+00:00 2026-03-23 11:10:00+00:00 GBPUSD          1        1 1.340100 1.339000   1000 -20.35000   stop     momentum         amd_ob_m5
+2026-03-25 12:05:00+00:00 2026-03-25 12:15:00+00:00 EURUSD          1        1 1.161340 1.160250   1000 -20.16500   stop       golden amd_m1_shift_ifvg
+2026-03-25 13:35:00+00:00 2026-03-25 14:15:00+00:00 EURUSD         -1        1 1.157800 1.157890   1000  -1.66500   stop     momentum        amd_fvg_m5
+2026-03-26 08:00:00+00:00 2026-03-26 08:15:00+00:00 EURUSD         -1        1 1.154900 1.155820   1000 -17.02000   stop     momentum        mss_fvg_m5
+2026-03-26 11:20:00+00:00 2026-03-26 13:00:00+00:00 EURUSD         -1        1 1.154600 1.153690   1000  16.83500   stop     momentum         mss_ob_m5
+2026-03-27 11:45:00+00:00 2026-03-27 13:20:00+00:00 GBPUSD         -1        1 1.328740 1.328840   1000  -1.85000   stop     momentum        amd_fvg_m5
+2026-03-30 13:10:00+00:00 2026-03-30 13:25:00+00:00 EURUSD         -1        1 1.147490 1.148580   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-03-31 12:40:00+00:00 2026-03-31 13:10:00+00:00 EURUSD          1        1 1.148720 1.148630   1000  -1.66500   stop     momentum        amd_fvg_m5
+2026-03-31 12:55:00+00:00 2026-03-31 15:35:00+00:00 GBPUSD          1        1 1.323560 1.324460   1000  16.65000   stop     momentum        amd_fvg_m5
+2026-04-06 08:30:00+00:00 2026-04-06 10:50:00+00:00 EURUSD          1        1 1.154120 1.155030   1000  16.83500   stop     momentum         amd_ob_m5
+2026-04-06 08:35:00+00:00 2026-04-06 11:45:00+00:00 NZDUSD          1        1 0.571395 0.571270   1000  -2.31250   stop     momentum         amd_ob_m5
+2026-04-08 12:25:00+00:00 2026-04-08 12:35:00+00:00 GBPUSD          1        1 1.346660 1.345560   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-04-09 12:25:00+00:00 2026-04-09 14:55:00+00:00 EURUSD          1        1 1.168200 1.168110   1000  -1.66500   stop     momentum         amd_ob_m5
+2026-04-10 07:15:00+00:00 2026-04-10 10:15:00+00:00 EURUSD         -1        1 1.168480 1.169550   1000 -19.79500   stop     momentum        mss_ob_m15
+2026-04-10 12:05:00+00:00 2026-04-10 12:35:00+00:00 EURUSD          1        1 1.171870 1.171010   1000 -15.91000   stop     momentum        amd_fvg_m5
+2026-04-13 11:45:00+00:00 2026-04-13 12:55:00+00:00 EURUSD          1        1 1.169280 1.168190   1000 -20.16500   stop       golden amd_m1_shift_ifvg
+2026-04-14 12:05:00+00:00 2026-04-14 14:15:00+00:00 GBPUSD          1        1 1.356630 1.357530   1000  16.65000   stop     momentum        amd_fvg_m5
+2026-04-14 07:50:00+00:00 2026-04-14 22:05:00+00:00 NZDUSD          1        1 0.588235 0.589110   1000  16.18750   stop     momentum       amd_fvg_m15
+2026-04-14 07:50:00+00:00 2026-04-15 03:20:00+00:00 EURUSD          1        1 1.177440 1.178350   1000  16.83500   stop     momentum        amd_fvg_m5
+2026-04-15 11:20:00+00:00 2026-04-15 13:30:00+00:00 EURUSD         -1        1 1.177670 1.178760   1000 -20.16500   stop     momentum         amd_ob_m5
+2026-04-16 11:00:00+00:00 2026-04-16 12:00:00+00:00 EURUSD         -1        1 1.177430 1.178430   1000 -18.50000   stop     momentum       amd_fvg_m15
+2026-04-17 13:20:00+00:00 2026-04-17 13:50:00+00:00 EURUSD          1        1 1.180240 1.183420   1000  58.83000 target     momentum        amd_fvg_h1
+2026-04-21 08:35:00+00:00 2026-04-21 14:30:00+00:00 EURUSD         -1        1 1.177060 1.177150   1000  -1.66500   stop     momentum        amd_ob_m15
+2026-04-22 12:50:00+00:00 2026-04-22 14:45:00+00:00 EURUSD         -1        1 1.173530 1.174250   1000 -13.32000   stop     momentum         amd_ob_m5
+2026-04-23 11:05:00+00:00 2026-04-23 12:50:00+00:00 EURUSD         -1        1 1.168600 1.169690   1000 -20.16500   stop     momentum         amd_ob_m5
+2026-04-24 11:40:00+00:00 2026-04-24 14:30:00+00:00 EURUSD          1        1 1.170090 1.170000   1000  -1.66500   stop     momentum       amd_fvg_m15
+2026-04-27 13:05:00+00:00 2026-04-27 13:55:00+00:00 GBPUSD          1        1 1.357090 1.355990   1000 -20.35000   stop     momentum         amd_ob_m5
+2026-04-27 08:05:00+00:00 2026-04-27 14:55:00+00:00 EURUSD          1        1 1.173670 1.173580   1000  -1.66500   stop     momentum        amd_fvg_m5
+2026-04-28 07:40:00+00:00 2026-04-28 08:20:00+00:00 EURUSD         -1        1 1.169900 1.169990   1000  -1.66500   stop     momentum        amd_fvg_h1
+2026-04-28 12:30:00+00:00 2026-04-28 13:20:00+00:00 GBPUSD         -1        1 1.347560 1.347660   1000  -1.85000   stop     momentum        amd_fvg_m5
+2026-05-04 11:05:00+00:00 2026-05-04 11:25:00+00:00 GBPUSD         -1        1 1.353190 1.354290   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-05-05 08:35:00+00:00 2026-05-05 10:00:00+00:00 GBPUSD          1        1 1.354580 1.353480   1000 -20.35000   stop     momentum        mss_fvg_m5
+2026-05-06 11:50:00+00:00 2026-05-06 12:05:00+00:00 GBPUSD          1        1 1.364120 1.363020   1000 -20.35000   stop       golden amd_m1_shift_ifvg
+2026-05-07 08:10:00+00:00 2026-05-07 17:15:00+00:00 EURUSD          1        1 1.176770 1.175680   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-05-08 13:30:00+00:00 2026-05-08 14:05:00+00:00 EURUSD          1        1 1.177840 1.176750   1000 -20.16500   stop     momentum        amd_fvg_h1
+2026-05-12 07:50:00+00:00 2026-05-12 09:05:00+00:00 GBPUSD         -1        1 1.354700 1.351330   1000  62.34500 target     momentum        amd_fvg_m5
+2026-05-13 07:00:00+00:00 2026-05-13 10:10:00+00:00 EURUSD         -1        1 1.173310 1.170040   1000  60.49500 target       golden amd_m1_shift_ifvg
+2026-05-14 12:35:00+00:00 2026-05-14 14:45:00+00:00 EURUSD         -1        1 1.169960 1.170050   1000  -1.66500   stop     momentum         amd_ob_m5
+2026-05-15 11:50:00+00:00 2026-05-15 11:55:00+00:00 GBPUSD          1        1 1.339210 1.338110   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-05-18 07:15:00+00:00 2026-05-18 13:05:00+00:00 GBPUSD          1        1 1.334080 1.338539   1000  82.49039 target     momentum       amd_fvg_m15
+2026-05-18 13:30:00+00:00 2026-05-18 14:40:00+00:00 GBPUSD          1        1 1.339340 1.338240   1000 -20.35000   stop      no_open        amd_fvg_m5
+2026-05-19 08:00:00+00:00 2026-05-19 08:45:00+00:00 GBPUSD         -1        1 1.339080 1.340180   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-05-19 11:40:00+00:00 2026-05-19 11:55:00+00:00 EURUSD         -1        1 1.161150 1.162240   1000 -20.16500   stop     momentum        amd_fvg_h1
+2026-05-21 12:50:00+00:00 2026-05-21 13:30:00+00:00 GBPUSD         -1        1 1.342330 1.342430   1000  -1.85000   stop       golden amd_m1_shift_ifvg
+2026-05-21 13:20:00+00:00 2026-05-21 13:30:00+00:00 EURUSD         -1        1 1.159370 1.160460   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-05-22 08:10:00+00:00 2026-05-22 08:25:00+00:00 GBPUSD         -1        1 1.341290 1.342390   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-05-22 07:35:00+00:00 2026-05-22 09:20:00+00:00 EURUSD         -1        1 1.160510 1.161600   1000 -20.16500   stop     momentum         mss_ob_m5
+2026-05-22 11:45:00+00:00 2026-05-22 14:00:00+00:00 EURUSD         -1        1 1.159490 1.160580   1000 -20.16500   stop     momentum       amd_fvg_m15
+2026-05-25 12:35:00+00:00 2026-05-25 14:35:00+00:00 EURUSD          1        1 1.164920 1.164150   1000 -14.24500   stop     momentum         amd_ob_m5
+2026-05-25 12:40:00+00:00 2026-05-25 14:55:00+00:00 GBPUSD          1        1 1.350500 1.349400   1000 -20.35000   stop     momentum       amd_fvg_m15
+2026-05-26 08:00:00+00:00 2026-05-26 09:10:00+00:00 GBPUSD         -1        1 1.346880 1.347980   1000 -20.35000   stop     momentum        amd_fvg_h1
+2026-05-27 13:10:00+00:00 2026-05-27 13:15:00+00:00 GBPUSD         -1        1 1.343230 1.344330   1000 -20.35000   stop       golden  amd_m1_shift_ob2
+2026-05-27 13:25:00+00:00 2026-05-27 13:55:00+00:00 EURUSD          1        1 1.165710 1.164620   1000 -20.16500   stop     momentum    amd_breaker_h1
+2026-05-27 07:40:00+00:00 2026-05-27 15:15:00+00:00 NZDUSD          1        1 0.587655 0.590660   1000  55.58917 target        judas        mss_fvg_h1
+2026-05-28 13:25:00+00:00 2026-05-28 15:15:00+00:00 EURUSD          1        1 1.162510 1.165470   1000  54.76000 target     momentum        amd_fvg_m5
+2026-05-29 08:35:00+00:00 2026-05-29 12:55:00+00:00 GBPUSD         -1        1 1.341750 1.342850   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-06-02 07:25:00+00:00 2026-06-02 08:15:00+00:00 GBPUSD          1        1 1.348030 1.346930   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-06-02 07:10:00+00:00 2026-06-02 16:25:00+00:00 EURUSD          1        1 1.164590 1.163500   1000 -20.16500   stop     momentum        amd_fvg_m5
+2026-06-08 12:10:00+00:00 2026-06-08 13:35:00+00:00 GBPUSD          1        1 1.336160 1.335060   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-06-09 07:10:00+00:00 2026-06-09 07:55:00+00:00 GBPUSD          1        1 1.337210 1.336110   1000 -20.35000   stop     momentum        amd_fvg_m5
+2026-06-09 11:25:00+00:00 2026-06-09 14:35:00+00:00 GBPUSD          1        1 1.339650 1.339550   1000  -1.85000   stop     momentum        amd_fvg_h1
+2026-06-09 12:25:00+00:00 2026-06-09 14:35:00+00:00 EURUSD          1        1 1.157310 1.156530   1000 -14.43000   stop     momentum        amd_fvg_h1
+2026-06-10 07:10:00+00:00 2026-06-10 07:50:00+00:00 EURUSD          1        1 1.155740 1.155080   1000 -12.21000   stop     momentum        amd_fvg_h1
+2026-06-10 12:00:00+00:00 2026-06-10 12:10:00+00:00 EURUSD         -1        1 1.153700 1.154790   1000 -20.16500   stop     momentum         amd_ob_m5
+2026-06-11 11:10:00+00:00 2026-06-11 12:00:00+00:00 EURUSD         -1        1 1.152510 1.153600   1000 -20.16500   stop     momentum        mss_fvg_h1
+
+=== Per-pair P&L (ZAR) ===
+  EURUSD: 75 trades  wins=14  losses=61  P&L=R-344.16
+  GBPUSD: 48 trades  wins=11  losses=37  P&L=R-212.40
+  NZDUSD: 4 trades  wins=2  losses=2  P&L=R48.65
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2026       127    27  21.3%      -507.91   -50.8%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  EURUSD   2026        75    14  18.7%
+  GBPUSD   2026        48    11  22.9%
+  NZDUSD   2026         4     2  50.0%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  amd_breaker_h1             1     0   0.0%     -20.17
+  amd_fvg_h1                14     1   7.1%      -9.46
+  amd_fvg_m15               11     3  27.3%      -0.72
+  amd_fvg_m5                64    17  26.6%      -0.90
+  amd_m1_shift_ifvg          7     2  28.6%       5.26
+  amd_m1_shift_ob2           1     0   0.0%     -20.35
+  amd_ob_m15                 1     0   0.0%      -1.67
+  amd_ob_m5                 14     1   7.1%     -12.73
+  mss_breaker_m5             1     0   0.0%     -20.17
+  mss_fvg_h1                 3     2  66.7%      17.42
+  mss_fvg_m5                 4     0   0.0%     -19.52
+  mss_ob_m15                 2     0   0.0%     -16.46
+  mss_ob_m5                  3     1  33.3%      -7.83
+  news_fvg_m5                1     0   0.0%     -24.05
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  FVG             97    23  23.7%      -247.71      -2.55   0.79
+  OB              20     2  10.0%      -236.34     -11.82   0.12
+  BREAKER          2     0   0.0%       -40.33     -20.17   0.00
+  other            8     2  25.0%        16.46       2.06   1.16
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  BREAKER H1             1     0   0.0%   0.00
+  BREAKER M5             1     0   0.0%   0.00
+  FVG H1                17     3  17.6%   0.62
+  FVG M15               11     3  27.3%   0.94
+  FVG M5                69    17  24.6%   0.81
+  OB M15                 3     0   0.0%   0.00
+  OB M5                 17     2  11.8%   0.14
+  other ?                8     2  25.0%   1.16
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  BREAKER EURUSD             2     0   0.0%   0.00
+  FVG EURUSD                53    10  18.9%   0.69
+  FVG GBPUSD                41    11  26.8%   0.82
+  FVG NZDUSD                 3     2  66.7%   3.45
+  OB EURUSD                 16     2  12.5%   0.16
+  OB GBPUSD                  3     0   0.0%   0.00
+  OB NZDUSD                  1     0   0.0%   0.00
+  other EURUSD               4     2  50.0%   2.97
+  other GBPUSD               4     0   0.0%   0.00
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  m15_range              117    24  20.5%   0.69
+  session_range            7     2  28.6%   0.52
+  (no AMD)                 3     1  33.3%   0.45
+
+  Session-range widths (n=133): median=33.7 p75=52.4 p90=52.8 pips (cap=35.0)
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  0/3               27     4  14.8%      -264.38      -9.79   0.33
+  1/3               56    15  26.8%         6.95       0.12   1.01
+  2/3               37     7  18.9%      -164.46      -4.44   0.64
+  3/3                7     1  14.3%       -86.03     -12.29   0.16
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+  1a           DXY↑ + H1 EUR>GBP → GBPUSD short         9     3  33.3%        68.63   1.81
+  1b           DXY↑ + H1 GBP>EUR → EURUSD short         4     1  25.0%         5.00   1.08
+  2a           DXY↓ + H1 EUR>GBP → EURUSD long          4     0   0.0%       -57.91   0.00
+  2b           DXY↓ + H1 GBP>EUR → GBPUSD long         10     2  20.0%       -63.66   0.61
+  3a           DXY↑ + cross flat → EURUSD short        30     4  13.3%      -296.09   0.28
+  3b           DXY↓ + cross flat → EURUSD long         29     6  20.7%       -78.83   0.76
+  1a_ip        DXY↑ + IP EUR>GBP → GBPUSD short        11     3  27.3%       -17.58   0.84
+  1b_ip        DXY↑ + IP GBP>EUR → EURUSD short         4     1  25.0%         4.29   1.07
+  2b_ip        DXY↓ + IP GBP>EUR → GBPUSD long         14     3  21.4%      -136.90   0.27
+  N-long       DXY↓ + NZD strong → NZDUSD long          3     2  66.7%        69.46  31.04
+  N-short      DXY↑ + NZD weak  → NZDUSD short          1     0   0.0%       -20.81   0.00
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  breakout          98    19  19.4%        -655.74       -6.69   0.47
+  judas             21     6  28.6%         131.37        6.26   1.52
+  mm_golden          8     2  25.0%          16.46        2.06   1.16
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  london     breakout          37     9  24.3%         -79.48   0.82
+  london     judas              8     1  12.5%         -41.91   0.57
+  london     mm_golden          1     1 100.0%          60.49    inf
+  ny         breakout          61    10  16.4%        -576.27   0.27
+  ny         judas             13     5  38.5%         173.27   2.12
+  ny         mm_golden          7     1  14.3%         -44.03   0.57
+  ----------------------------------------------------------------
+  london     TOTAL             46    11  23.9%         -60.89   0.89
+  ny         TOTAL             81    16  19.8%        -447.02   0.57
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  london_judas                44    10  22.7%        -101.22   0.80
+  london_breakout              1     0   0.0%         -20.17   0.00
+  ny_judas                    74    15  20.3%        -402.99   0.57
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  yes                    2     1  50.0%          46.35   3.30
+  no                   125    26  20.8%        -554.26   0.65
+  -- captured NY continuations by entry_model --
+     judas           2 trades  WR 50.0%  P&L R       46.35
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 FVG               3     1  33.3%          14.24   1.35
+  H4 FVG               5     2  40.0%          51.97   2.08
+  none               119    24  20.2%        -574.12   0.62
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG               1     0   0.0%         -14.80   0.00
+  D1 FVG               7     2  28.6%          20.89   1.27
+  H4 FVG               8     2  25.0%         -59.11   0.55
+  none               111    23  20.7%        -454.89   0.67
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1       18     6  33.3%          54.53   1.24       3.03
+  score=2       43     8  18.6%        -286.59   0.46      -6.66
+  score=3       33     9  27.3%         -54.78   0.86      -1.66
+  score=4       14     2  14.3%         -21.65   0.81      -1.55
+  score=5       14     2  14.3%        -105.45   0.53      -7.53
+  score=6        5     0   0.0%         -93.98   0.00     -18.80
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct agrees          42     7  16.7%        -256.33    0.56
+  HTF struct disagrees       85    20  23.5%        -251.58    0.75
+  minor-sweep (Judas)         8     3  37.5%          65.25    1.79
+  no minor-sweep            119    24  20.2%        -573.17    0.62
+  ── highest intact-structure timeframe ──
+  intact @ W                  2     0   0.0%         -40.70    0.00
+  intact @ D                 30     7  23.3%         -40.53    0.89
+  intact @ 240T              25     7  28.0%          18.85    1.07
+  intact @ 60T               22     2   9.1%        -227.83    0.13
+  intact @ 15T               16     4  25.0%         -72.80    0.61
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range            33     8  24.2%        -127.30   0.69
+  H4 range            18     5  27.8%          82.22   1.47
+  no sweep            76    14  18.4%        -462.83   0.54
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+  confirmed           27     5  18.5%        -205.35   0.39       11.8
+  opposing            12     5  41.7%         122.18   2.02       18.5
+  no divergence       84    15  17.9%        -473.39   0.57       11.0
+
+  --- SMT confirmed by pair ---
+    EURUSD        13 trades  WR  15.4%  PF   0.20  P&L      -132.65
+    GBPUSD        14 trades  WR  21.4%  PF   0.57  P&L       -72.71
+
+  --- SMT confirmed by direction ---
+    LONG          15 trades  WR  20.0%  PF   0.27  P&L      -137.27
+    SHORT         12 trades  WR  16.7%  PF   0.54  P&L       -68.08
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+  follows rule          61    14  23.0%         -69.21   0.90       13.2
+  against rule          62    11  17.7%        -487.35   0.45       10.7
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+    EURUSD LONG               36  19.4%   0.72      -117.86     GOLDEN
+    EURUSD SHORT              39  17.9%   0.58      -226.30    against
+    GBPUSD LONG               26  19.2%   0.38      -241.26    against
+    GBPUSD SHORT              22  27.3%   1.13        28.86     GOLDEN
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+    golden + confirmed              15  26.7%   0.76
+    golden + opposing                7  28.6%   0.96
+    golden + no div                 39  20.5%   0.93
+    against + confirmed             12   8.3%   0.09
+    against + opposing               5  60.0%   4.13
+    against + no div                45  15.6%   0.33
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  1              3     0   0.0%         -60.31   0.00
+  2             30     6  20.0%        -186.38   0.55
+  3             54    12  22.2%         -92.41   0.87
+  4             35     9  25.7%        -104.16   0.69
+  5              5     0   0.0%         -64.66   0.00
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile            91  25.3%   0.84        36  11.1%   0.36
+  NFP week Mon/Tue          15  26.7%   1.19       112  20.5%   0.63
+  Rate decision              3   0.0%   0.00       124  21.8%   0.71
+  PD prov (sweep)          117  21.4%   0.70        10  20.0%   0.47
+  Seasonal lean              0   0.0%   0.00       127  21.3%   0.68
+  HTF OB Context            47  21.3%   0.76        80  21.2%   0.64
+  D1 Draw                  117  18.8%   0.54        10  50.0%   3.29
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  continuation          47    10  21.3%      -123.03   0.76    -2.62
+  (none)                80    17  21.2%      -384.88   0.64    -4.81
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  breaker                5   0.0%   0.00
+  d1_fvg                37  24.3%   0.98
+  pdhl                   3  33.3%   0.51
+  w_fvg                  2   0.0%   0.00
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  d1_fvg                 2     1  50.0%        34.41   2.69
+  equal_hl             115    21  18.3%      -731.95   0.51
+  (none)                10     5  50.0%       189.63   3.29
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  equal_hl                 8     2  25.0%        34.96       4.37
+  fib_extension           67    16  23.9%      -251.50      -3.75
+  ith_liquidity            1     1 100.0%        58.83      58.83
+  itl_liquidity            1     0   0.0%       -20.17     -20.17
+  pdh_pdl                  9     0   0.0%      -126.36     -14.04
+  pwh_pwl                  4     1  25.0%        11.65       2.91
+  round_number            21     4  19.0%      -104.53      -4.98
+  swing                   16     3  18.8%      -110.82      -6.93
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  equal_hl               2       7.4%       117.10
+  fib_extension         16      59.3%       584.88
+  ith_liquidity          1       3.7%        58.83
+  pwh_pwl                1       3.7%        16.65
+  round_number           4      14.8%       192.95
+  swing                  3      11.1%       108.41
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   equal_hl               2  25.0%       117.10
+  initial (L1)   fib_extension         16  23.9%       584.88
+  initial (L1)   ith_liquidity          1 100.0%        58.83
+  initial (L1)   pwh_pwl                1  25.0%        16.65
+  initial (L1)   round_number           4  19.0%       192.95
+  initial (L1)   swing                  3  18.8%       108.41
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  London Open   equal_hl               1        62.34
+  London Open   fib_extension          6       204.77
+  London Open   round_number           2       116.92
+  London Open   swing                  2        91.57
+  New York AM   equal_hl               1        54.76
+  New York AM   fib_extension         10       380.11
+  New York AM   ith_liquidity          1        58.83
+  New York AM   pwh_pwl                1        16.65
+  New York AM   round_number           2        76.04
+  New York AM   swing                  1        16.83
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  London Open      11      40.7%       475.61
+  New York AM      16      59.3%       603.22
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  below open         1     1       0 100.0%       55.59      55.59
+  above open       117    24      93  20.5%     -559.62      -4.78
+  no session         1     0       1   0.0%      -20.35     -20.35
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)           41     8  19.5%       -266.60   0.48
+  SOJ single reference (+1)           70    16  22.9%       -174.43   0.79
+  no SOJ pattern                      16     3  18.8%        -66.88   0.72

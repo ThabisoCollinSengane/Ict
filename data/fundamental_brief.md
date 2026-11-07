@@ -1,0 +1,107 @@
+# Fundamental brief — Tue 06 Oct 2026
+
+_A reader. It changes nothing in the algo and is not validated. Fundamentals may REMOVE a trade or choose BETWEEN two valid setups — never create one._
+
+## ⚠️ Data warnings
+
+- data/cb_stance.json MISSING — no rate leans. Copy data/cb_stance.example.json, fill it in, set verified=true.
+- US 2Y absent — run: python scripts/fetch_fred.py --series DGS2 --start 2025-01-01
+
+## The dollar — the common driver
+
+- no yield data
+
+All three pairs are X/USD, so this one read leans every pair at once. A dollar bid is a headwind for EURUSD/GBPUSD/NZDUSD longs.
+
+## Per pair
+
+| pair | story | lean | vs golden rule |
+|---|---|---|---|
+| GBPUSD | NO READ | — | — |
+| EURUSD | NO READ | — | — |
+| NZDUSD | NO READ | — | — |
+
+### GBPUSD — NO READ
+
+- rates: stance missing → flat
+- dollar: flat the pair
+
+_Read against price:_
+- No draw read today. Price action alone, as normal.
+
+### EURUSD — NO READ
+
+- rates: stance missing → flat
+- dollar: flat the pair
+
+_Read against price:_
+- No draw read today. Price action alone, as normal.
+
+### NZDUSD — NO READ
+
+- rates: stance missing → flat
+- dollar: flat the pair
+- ⚠️ NZD is driven more by RISK APPETITE, China data and dairy than by rate differentials. Treat the rate lean here as the weakest of the three, and check equity futures yourself.
+
+_Read against price:_
+- No draw read today. Price action alone, as normal.
+
+## The institutional clock (ET)
+
+_⚠️ NOT YET MEASURED on your data. Run `python scripts/fx_clock_study.py`. Until it reads GREEN the fix lean below is published research on OTHER people's data, not a finding here._
+
+| ET | event | your windows |
+|---|---|---|
+| 01:00 | CLS funding window OPENS (all 18 RTGS systems overlap) | — |
+| 01:00 | CLS Asia-Pacific pay-in window opens (NZD pays in) | — |
+| 01:00 | CHAPS (sterling) opens | — |
+| 03:00 | LONDON OPEN | inside **London Open** |
+| 03:00 | CLS settlement-completion target | inside **London Open** |
+| 04:00 | CLS early-closing pay-in deadline (Asia-Pacific window closes) | inside **London Open** |
+| 06:00 | CLS funding window CLOSES | — |
+| 08:15 | ECB FIX — dollar tends to be bid INTO it, offered AFTER | inside **New York AM** |
+| 08:30 | US data release slot (peak-volume half hour follows) | inside **New York AM** |
+| 10:00 | NY OPTION CUT — expiring strikes can pin price | inside **New York AM** |
+| 11:00 | WMR LONDON FIX — dollar bid into it, offered after | — |
+| 12:00 | Euro T2 customer payments close | inside **noon block** |
+| 13:00 | CHAPS closes | — |
+| 17:00 | NY CLOSE / value-date rollover — thinnest hour | — |
+
+_How it fits the draw: the morning dollar bid into the fixes is a common reason price runs AGAINST the draw first. After the ECB and WMR fixes that pressure lifts. A tilt of ~2bp/day on average — context for WHICH side has the wind, never a trigger._
+
+## Today's calendar
+
+_No calendar events for this date._
+
+## How to use this
+
+**No pair has an agreed draw today.** Normal and common. Trade the price-action card as usual, or not at all.
+
+**The draw is not a filter on today’s move.** It is where price is likely to go AFTER the liquidity is taken. This is a REVERSAL model, so the two things that should agree are the **draw** and the **trade direction** — never the draw and whatever price is doing right now. Price running the other way is the manipulation leg: that is the setup forming, not a warning.
+
+| what you see | how to read it |
+|---|---|
+| price running **against** the draw | the liquidity raid. A reversal entry back toward the draw is the cleanest case here. |
+| price running **with** the draw already | distribution may be underway — a reversal entry now fades the draw, and a continuation is late. |
+| **no** draw read | price action alone. Normal. |
+
+1. The draw says which pair and which way to **look**.
+2. Price action says **when** — full card, every box, as always.
+3. A draw with no setup is **not a trade**. Ever.
+4. The thing to question is a setup whose **trade direction** opposes an AGREED draw. A setup entered against the recent **move** is normal and expected — that is what this model does.
+5. **Two things lining up is not a signal.** Nine measured-null combinations in this project say so. Nothing here outranks the card.
+
+### ⚠️ The honest limit of this framing
+
+“Price went against the fundamentals, so it was going for liquidity first” can explain **every** outcome after the fact — including the ones where the fundamentals were simply wrong and price just kept going. A story that cannot be wrong predicts nothing.
+
+So record the state instead of feeling it. Per trade, log four fields:
+
+```
+draw_dir      LONG / SHORT / none      (from this brief, before the session)
+price_vs_draw against / with / flat    (what price was doing at entry)
+trade_dir     LONG / SHORT             (the side actually taken)
+outcome       R                        (not rands)
+```
+
+_After 50 trades that table answers it directly: did `against` + reversal-toward-the-draw actually beat `with`? Same test as everything else here — controls, and both halves._

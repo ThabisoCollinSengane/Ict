@@ -1,0 +1,849 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2022–2025)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, XAUUSD, XAGUSD
+
+Loading and resampling to 5-minute bars (2022 + 2023 + 2024 + 2025)...
+  GBPUSD: 1,437,919 M1 → 289,020 M5 bars  2022-01-02 – 2025-12-31  close 1.34740
+  EURUSD: 1,439,786 M1 → 289,268 M5 bars  2022-01-02 – 2025-12-31  close 1.17455
+  EURGBP: 1,436,073 M1 → 289,103 M5 bars  2022-01-02 – 2025-12-31  close 0.87158
+  UDXUSD: 1,235,373 M1 → 251,395 M5 bars  2022-01-03 – 2025-12-31  close 97.96900
+  AUDUSD: 1,435,435 M1 → 289,003 M5 bars  2022-01-02 – 2025-12-31  close 0.66733
+  NZDUSD: 1,432,732 M1 → 288,780 M5 bars  2022-01-02 – 2025-12-31  close 0.57549
+  AUDNZD: 1,436,487 M1 → 288,624 M5 bars  2022-01-02 – 2025-12-31  close 1.15922
+  XAUUSD: 1,372,863 M1 → 274,665 M5 bars  2022-01-02 – 2025-12-31  close 4318.37900
+  XAGUSD: 1,362,757 M1 → 274,334 M5 bars  2022-01-02 – 2025-12-31  close 71.54200
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 289020 5-min bars...
+    bar 2000/289020 (2022-01-11 20:50:00+00:00) - active=0 trades=0 equity=10000
+    bar 3000/289020 (2022-01-17 08:10:00+00:00) - active=0 trades=1 equity=9843
+    bar 4000/289020 (2022-01-20 19:35:00+00:00) - active=1 trades=2 equity=9719
+    bar 5000/289020 (2022-01-26 06:55:00+00:00) - active=0 trades=4 equity=9849
+    bar 6000/289020 (2022-01-31 18:15:00+00:00) - active=0 trades=7 equity=9453
+    bar 7000/289020 (2022-02-04 05:40:00+00:00) - active=0 trades=9 equity=9287
+    bar 8000/289020 (2022-02-09 17:00:00+00:00) - active=1 trades=10 equity=9278
+    bar 9000/289020 (2022-02-15 04:20:00+00:00) - active=0 trades=12 equity=6000
+    bar 10000/289020 (2022-02-18 15:40:00+00:00) - active=1 trades=14 equity=6348
+    bar 11000/289020 (2022-02-24 03:00:00+00:00) - active=0 trades=17 equity=6435
+    bar 12000/289020 (2022-03-01 14:20:00+00:00) - active=0 trades=20 equity=6039
+    bar 13000/289020 (2022-03-07 01:50:00+00:00) - active=0 trades=21 equity=5881
+    bar 14000/289020 (2022-03-10 13:10:00+00:00) - active=0 trades=24 equity=5513
+    bar 15000/289020 (2022-03-15 23:30:00+00:00) - active=0 trades=24 equity=5513
+    bar 16000/289020 (2022-03-21 11:00:00+00:00) - active=0 trades=24 equity=5513
+    bar 17000/289020 (2022-03-24 22:20:00+00:00) - active=0 trades=27 equity=5615
+    bar 18000/289020 (2022-03-30 11:40:00+00:00) - active=0 trades=29 equity=5279
+    bar 19000/289020 (2022-04-04 23:00:00+00:00) - active=0 trades=30 equity=5122
+    bar 20000/289020 (2022-04-08 10:20:00+00:00) - active=0 trades=31 equity=4948
+    bar 21000/289020 (2022-04-13 21:45:00+00:00) - active=0 trades=34 equity=5539
+    bar 22000/289020 (2022-04-19 09:05:00+00:00) - active=1 trades=36 equity=5316
+    bar 23000/289020 (2022-04-22 20:25:00+00:00) - active=0 trades=38 equity=4922
+    bar 24000/289020 (2022-04-28 07:45:00+00:00) - active=0 trades=38 equity=4922
+    bar 25000/289020 (2022-05-03 19:05:00+00:00) - active=0 trades=38 equity=4922
+    bar 26000/289020 (2022-05-09 06:25:00+00:00) - active=0 trades=40 equity=4608
+    bar 27000/289020 (2022-05-12 17:50:00+00:00) - active=0 trades=42 equity=4885
+    bar 28000/289020 (2022-05-18 05:10:00+00:00) - active=0 trades=45 equity=5422
+    bar 29000/289020 (2022-05-23 16:30:00+00:00) - active=0 trades=46 equity=5265
+    bar 30000/289020 (2022-05-27 03:50:00+00:00) - active=1 trades=48 equity=5394
+    bar 31000/289020 (2022-06-01 15:15:00+00:00) - active=0 trades=50 equity=5524
+    bar 32000/289020 (2022-06-07 02:35:00+00:00) - active=0 trades=51 equity=5367
+    bar 33000/289020 (2022-06-10 13:55:00+00:00) - active=0 trades=52 equity=5209
+    bar 34000/289020 (2022-06-16 01:15:00+00:00) - active=0 trades=55 equity=6130
+    bar 35000/289020 (2022-06-21 12:40:00+00:00) - active=0 trades=57 equity=5720
+    bar 36000/289020 (2022-06-27 00:05:00+00:00) - active=0 trades=59 equity=5402
+    bar 37000/289020 (2022-06-30 11:25:00+00:00) - active=0 trades=61 equity=5236
+    bar 38000/289020 (2022-07-05 22:45:00+00:00) - active=0 trades=61 equity=5236
+    bar 39000/289020 (2022-07-11 10:10:00+00:00) - active=1 trades=61 equity=5236
+    bar 40000/289020 (2022-07-14 21:30:00+00:00) - active=0 trades=64 equity=5313
+    bar 41000/289020 (2022-07-20 08:50:00+00:00) - active=1 trades=65 equity=5156
+    bar 42000/289020 (2022-07-25 20:15:00+00:00) - active=0 trades=66 equity=5442
+    bar 43000/289020 (2022-07-29 07:35:00+00:00) - active=1 trades=67 equity=5285
+    bar 44000/289020 (2022-08-03 19:05:00+00:00) - active=0 trades=69 equity=5586
+    bar 45000/289020 (2022-08-09 06:25:00+00:00) - active=1 trades=70 equity=5429
+    bar 46000/289020 (2022-08-12 17:45:00+00:00) - active=0 trades=72 equity=5595
+    bar 47000/289020 (2022-08-18 05:30:00+00:00) - active=1 trades=72 equity=5595
+    bar 48000/289020 (2022-08-23 17:00:00+00:00) - active=0 trades=74 equity=6726
+    bar 49000/289020 (2022-08-29 04:20:00+00:00) - active=0 trades=76 equity=6377
+    bar 50000/289020 (2022-09-01 15:40:00+00:00) - active=0 trades=78 equity=6211
+    bar 51000/289020 (2022-09-07 03:00:00+00:00) - active=0 trades=81 equity=6183
+    bar 52000/289020 (2022-09-12 14:20:00+00:00) - active=0 trades=83 equity=5868
+    bar 53000/289020 (2022-09-16 01:40:00+00:00) - active=0 trades=83 equity=5868
+    bar 54000/289020 (2022-09-21 13:10:00+00:00) - active=1 trades=84 equity=5758
+    bar 55000/289020 (2022-09-27 00:30:00+00:00) - active=0 trades=86 equity=6332
+    bar 56000/289020 (2022-09-30 11:55:00+00:00) - active=0 trades=89 equity=5824
+    bar 57000/289020 (2022-10-05 23:15:00+00:00) - active=0 trades=93 equity=6137
+    bar 58000/289020 (2022-10-11 10:45:00+00:00) - active=0 trades=95 equity=5822
+    bar 59000/289020 (2022-10-16 22:05:00+00:00) - active=0 trades=100 equity=5229
+    bar 60000/289020 (2022-10-20 09:35:00+00:00) - active=0 trades=100 equity=5229
+    bar 61000/289020 (2022-10-25 20:55:00+00:00) - active=0 trades=101 equity=5071
+    bar 62000/289020 (2022-10-31 07:20:00+00:00) - active=0 trades=103 equity=4896
+    bar 63000/289020 (2022-11-03 18:40:00+00:00) - active=0 trades=105 equity=4327
+    bar 64000/289020 (2022-11-09 07:00:00+00:00) - active=0 trades=105 equity=4327
+    bar 65000/289020 (2022-11-14 18:20:00+00:00) - active=0 trades=106 equity=4614
+    bar 66000/289020 (2022-11-18 05:40:00+00:00) - active=0 trades=106 equity=4614
+    bar 67000/289020 (2022-11-23 17:05:00+00:00) - active=1 trades=109 equity=4192
+    bar 68000/289020 (2022-11-29 04:25:00+00:00) - active=0 trades=111 equity=4026
+    bar 69000/289020 (2022-12-02 15:45:00+00:00) - active=1 trades=111 equity=4026
+    bar 70000/289020 (2022-12-08 03:10:00+00:00) - active=0 trades=113 equity=4220
+    bar 71000/289020 (2022-12-13 16:35:00+00:00) - active=0 trades=115 equity=4350
+    bar 72000/289020 (2022-12-19 03:55:00+00:00) - active=0 trades=118 equity=3818
+    bar 73000/289020 (2022-12-22 15:15:00+00:00) - active=0 trades=118 equity=3818
+    bar 74000/289020 (2022-12-28 03:00:00+00:00) - active=0 trades=118 equity=3818
+    bar 75000/289020 (2023-01-02 15:25:00+00:00) - active=1 trades=118 equity=3818
+    bar 76000/289020 (2023-01-06 02:45:00+00:00) - active=0 trades=121 equity=3938
+    bar 77000/289020 (2023-01-11 14:05:00+00:00) - active=1 trades=121 equity=3938
+    bar 78000/289020 (2023-01-17 01:30:00+00:00) - active=1 trades=125 equity=4133
+    bar 79000/289020 (2023-01-20 12:50:00+00:00) - active=0 trades=126 equity=3976
+    bar 80000/289020 (2023-01-26 00:10:00+00:00) - active=0 trades=128 equity=4106
+    bar 81000/289020 (2023-01-31 11:30:00+00:00) - active=1 trades=130 equity=3920
+    bar 82000/289020 (2023-02-05 22:50:00+00:00) - active=0 trades=132 equity=4198
+    bar 83000/289020 (2023-02-09 11:10:00+00:00) - active=1 trades=133 equity=3997
+    bar 84000/289020 (2023-02-14 22:35:00+00:00) - active=0 trades=138 equity=3769
+    bar 85000/289020 (2023-02-20 11:55:00+00:00) - active=1 trades=140 equity=3602
+    bar 86000/289020 (2023-02-27 09:15:00+00:00) - active=0 trades=142 equity=3411
+    bar 87000/289020 (2023-03-06 07:35:00+00:00) - active=0 trades=142 equity=3411
+    bar 88000/289020 (2023-03-13 06:00:00+00:00) - active=0 trades=144 equity=3430
+    bar 89000/289020 (2023-03-20 04:20:00+00:00) - active=0 trades=145 equity=3273
+    bar 90000/289020 (2023-03-27 05:40:00+00:00) - active=0 trades=148 equity=3134
+    bar 91000/289020 (2023-04-03 03:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 92000/289020 (2023-04-11 00:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 93000/289020 (2023-04-17 19:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 94000/289020 (2023-04-24 18:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 95000/289020 (2023-05-01 12:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 96000/289020 (2023-05-08 09:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 97000/289020 (2023-05-15 09:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 98000/289020 (2023-05-22 07:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 99000/289020 (2023-05-29 06:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 100000/289020 (2023-06-05 06:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 101000/289020 (2023-06-12 04:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 102000/289020 (2023-06-19 02:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 103000/289020 (2023-06-26 02:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 104000/289020 (2023-07-03 01:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 105000/289020 (2023-07-07 19:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 106000/289020 (2023-07-17 00:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 107000/289020 (2023-07-21 19:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 108000/289020 (2023-07-28 15:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 109000/289020 (2023-08-03 06:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 110000/289020 (2023-08-08 17:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 111000/289020 (2023-08-14 04:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 112000/289020 (2023-08-17 16:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 113000/289020 (2023-08-23 03:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 114000/289020 (2023-08-28 14:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 115000/289020 (2023-09-01 02:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 116000/289020 (2023-09-06 13:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 117000/289020 (2023-09-12 00:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 118000/289020 (2023-09-15 12:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 119000/289020 (2023-09-20 23:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 120000/289020 (2023-09-26 11:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 121000/289020 (2023-10-01 23:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 122000/289020 (2023-10-05 10:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 123000/289020 (2023-10-10 21:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 124000/289020 (2023-10-16 09:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 125000/289020 (2023-10-19 20:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 126000/289020 (2023-10-25 07:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 127000/289020 (2023-10-30 18:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 128000/289020 (2023-11-03 05:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 129000/289020 (2023-11-08 17:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 130000/289020 (2023-11-14 05:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 131000/289020 (2023-11-17 16:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 132000/289020 (2023-11-23 03:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 133000/289020 (2023-11-28 15:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 134000/289020 (2023-12-04 02:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 135000/289020 (2023-12-07 13:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 136000/289020 (2023-12-13 01:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 137000/289020 (2023-12-18 12:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 138000/289020 (2023-12-21 23:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 139000/289020 (2023-12-28 04:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 140000/289020 (2024-01-03 16:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 141000/289020 (2024-01-09 03:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 142000/289020 (2024-01-12 14:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 143000/289020 (2024-01-18 02:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 144000/289020 (2024-01-23 14:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 145000/289020 (2024-01-29 01:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 146000/289020 (2024-02-01 13:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 147000/289020 (2024-02-07 00:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 148000/289020 (2024-02-12 11:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 149000/289020 (2024-02-15 23:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 150000/289020 (2024-02-21 10:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 151000/289020 (2024-02-26 21:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 152000/289020 (2024-03-01 09:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 153000/289020 (2024-03-06 20:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 154000/289020 (2024-03-12 06:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 155000/289020 (2024-03-15 18:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 156000/289020 (2024-03-21 05:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 157000/289020 (2024-03-26 16:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 158000/289020 (2024-04-01 06:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 159000/289020 (2024-04-04 17:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 160000/289020 (2024-04-10 04:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 161000/289020 (2024-04-15 16:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 162000/289020 (2024-04-19 03:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 163000/289020 (2024-04-24 14:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 164000/289020 (2024-04-30 02:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 165000/289020 (2024-05-03 13:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 166000/289020 (2024-05-09 01:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 167000/289020 (2024-05-14 12:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 168000/289020 (2024-05-19 23:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 169000/289020 (2024-05-23 11:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 170000/289020 (2024-05-28 22:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 171000/289020 (2024-06-03 09:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 172000/289020 (2024-06-06 21:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 173000/289020 (2024-06-12 08:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 174000/289020 (2024-06-17 19:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 175000/289020 (2024-06-21 07:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 176000/289020 (2024-06-26 18:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 177000/289020 (2024-07-02 05:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 178000/289020 (2024-07-05 17:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 179000/289020 (2024-07-11 04:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 180000/289020 (2024-07-16 15:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 181000/289020 (2024-07-22 03:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 182000/289020 (2024-07-25 14:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 183000/289020 (2024-07-31 01:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 184000/289020 (2024-08-05 13:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 185000/289020 (2024-08-09 00:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 186000/289020 (2024-08-14 11:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 187000/289020 (2024-08-19 23:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 188000/289020 (2024-08-23 10:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 189000/289020 (2024-08-28 22:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 190000/289020 (2024-09-03 09:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 191000/289020 (2024-09-06 20:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 192000/289020 (2024-09-12 08:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 193000/289020 (2024-09-17 19:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 194000/289020 (2024-09-23 06:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 195000/289020 (2024-09-26 18:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 196000/289020 (2024-10-02 05:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 197000/289020 (2024-10-07 16:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 198000/289020 (2024-10-11 04:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 199000/289020 (2024-10-16 15:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 200000/289020 (2024-10-22 02:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 201000/289020 (2024-10-25 14:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 202000/289020 (2024-10-31 00:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 203000/289020 (2024-11-05 13:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 204000/289020 (2024-11-11 05:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 205000/289020 (2024-11-14 16:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 206000/289020 (2024-11-20 03:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 207000/289020 (2024-11-25 15:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 208000/289020 (2024-11-29 02:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 209000/289020 (2024-12-04 13:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 210000/289020 (2024-12-10 01:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 211000/289020 (2024-12-13 12:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 212000/289020 (2024-12-18 23:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 213000/289020 (2024-12-24 11:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 214000/289020 (2024-12-30 15:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 215000/289020 (2025-01-06 02:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 216000/289020 (2025-01-09 13:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 217000/289020 (2025-01-15 01:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 218000/289020 (2025-01-20 12:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 219000/289020 (2025-01-23 23:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 220000/289020 (2025-01-29 11:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 221000/289020 (2025-02-03 22:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 222000/289020 (2025-02-07 09:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 223000/289020 (2025-02-12 21:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 224000/289020 (2025-02-18 08:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 225000/289020 (2025-02-21 19:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 226000/289020 (2025-02-27 07:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 227000/289020 (2025-03-04 18:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 228000/289020 (2025-03-10 05:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 229000/289020 (2025-03-13 16:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 230000/289020 (2025-03-19 03:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 231000/289020 (2025-03-24 15:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 232000/289020 (2025-03-28 02:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 233000/289020 (2025-04-02 15:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 234000/289020 (2025-04-08 03:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 235000/289020 (2025-04-11 14:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 236000/289020 (2025-04-17 02:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 237000/289020 (2025-04-22 13:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 238000/289020 (2025-04-28 00:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 239000/289020 (2025-05-01 12:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 240000/289020 (2025-05-06 23:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 241000/289020 (2025-05-12 11:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 242000/289020 (2025-05-15 22:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 243000/289020 (2025-05-21 09:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 244000/289020 (2025-05-26 21:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 245000/289020 (2025-05-30 08:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 246000/289020 (2025-06-04 19:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 247000/289020 (2025-06-10 07:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 248000/289020 (2025-06-13 18:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 249000/289020 (2025-06-19 05:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 250000/289020 (2025-06-24 17:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 251000/289020 (2025-06-30 04:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 252000/289020 (2025-07-03 15:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 253000/289020 (2025-07-09 03:15:00+00:00) - active=0 trades=149 equity=2977
+    bar 254000/289020 (2025-07-14 14:35:00+00:00) - active=0 trades=149 equity=2977
+    bar 255000/289020 (2025-07-18 01:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 256000/289020 (2025-07-23 13:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 257000/289020 (2025-07-29 00:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 258000/289020 (2025-08-01 12:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 259000/289020 (2025-08-06 23:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 260000/289020 (2025-08-12 10:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 261000/289020 (2025-08-17 22:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 262000/289020 (2025-08-21 09:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 263000/289020 (2025-08-26 20:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 264000/289020 (2025-09-01 08:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 265000/289020 (2025-09-04 19:20:00+00:00) - active=0 trades=149 equity=2977
+    bar 266000/289020 (2025-09-10 06:40:00+00:00) - active=0 trades=149 equity=2977
+    bar 267000/289020 (2025-09-15 18:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 268000/289020 (2025-09-19 05:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 269000/289020 (2025-09-24 16:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 270000/289020 (2025-09-30 04:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 271000/289020 (2025-10-03 15:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 272000/289020 (2025-10-09 02:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 273000/289020 (2025-10-14 14:05:00+00:00) - active=0 trades=149 equity=2977
+    bar 274000/289020 (2025-10-20 01:25:00+00:00) - active=0 trades=149 equity=2977
+    bar 275000/289020 (2025-10-23 12:45:00+00:00) - active=0 trades=149 equity=2977
+    bar 276000/289020 (2025-10-28 23:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 277000/289020 (2025-11-03 11:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 278000/289020 (2025-11-06 22:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 279000/289020 (2025-11-12 10:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 280000/289020 (2025-11-17 21:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 281000/289020 (2025-11-21 08:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 282000/289020 (2025-11-26 20:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 283000/289020 (2025-12-02 07:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 284000/289020 (2025-12-05 18:50:00+00:00) - active=0 trades=149 equity=2977
+    bar 285000/289020 (2025-12-11 06:10:00+00:00) - active=0 trades=149 equity=2977
+    bar 286000/289020 (2025-12-16 17:30:00+00:00) - active=0 trades=149 equity=2977
+    bar 287000/289020 (2025-12-22 04:55:00+00:00) - active=0 trades=149 equity=2977
+    bar 288000/289020 (2025-12-26 09:00:00+00:00) - active=0 trades=149 equity=2977
+    bar 289000/289020 (2025-12-31 20:20:00+00:00) - active=0 trades=149 equity=2977
+
+=== Gate funnel (entries passing each filter) ===
+  checks                            48617  ████████████████████████████████████████
+  in_killzone                       48617  ████████████████████████████████████████
+  news_clear                         8301  ██████
+  nfp_fomc_ok                        6818  █████
+  intermarket_signal                  171  
+  pair_matches                        171  
+  mss_h1_m15_m5_ok                     74  
+  daily_bias_ok                        74  
+  h1_bias_ok                           74  
+  h4_bias_ok                           74  
+  dealing_range_ok                      7  
+  consolidation_found                  19  
+  manipulation_correct_dir             19  
+  m5_fvg_correct_dir                   34  
+  target_found                         34  
+  rr_ok                                34  
+  units_nonzero                        34  
+  limit_placed                          0  
+  entry_opened                         19  
+  pyramid_added                         0  
+  pyramid_blocked_min_target           35  
+  drawdown_halt                     40217  █████████████████████████████████
+  daily_loss_halt                       0  
+  consec_loss_pause                     0  
+  weekly_cap                            0  
+  weekly_pair_cap                       0  
+  daily_cap                             0  
+  daily_pair_cap                        0  
+  weekly_amd_confirmed                 23  
+  session_handover_closed               9  
+  htf_draw_full_cascade                 1  
+  htf_draw_partial                     33  
+  htf_draw_counter                     40  
+  htf_fvg_5050_hit                      9  
+  ote_zone                              0  
+  choch_confirmed                       7  
+  low_conviction                        0  
+  judas_divergence                      0  
+  ny_continuation                       5  
+  pm_gate_pair_news                     0  
+  dxy_flat                           5125  ████
+  gold_pb_checked                    8160  ██████
+  gold_pb_no_trend_bars               209  
+  dxy_directional                    1693  █
+  gold_pb_no_pullback                5018  ████
+  gold_pb_no_trigger                 1906  █
+  gold_pb_opened                      130  
+  sr_attempted                         34  
+  sr_prev_session_ok                   34  
+  sr_enough_bars                       34  
+  sr_pdliq_attempted                   34  
+  soj_retest                           21  
+  soj_sweep                            34  
+  dxy_fvg_room                          6  
+  mstruct_align                        34  
+  phase_london_judas                   25  
+  structure_stop_used                  34  
+  target_rung_far                      23  
+  gold_own_sized                       34  
+  risk_cap_ok                          19  
+  pyramid_blocked_favour              269  
+  pyramid_blocked_low_im              707  
+  gold_pb_trend_flat                  831  
+  gold_pb_no_swing                     49  
+  soj_judas                            13  
+  crt_turtle_soup                       6  
+  phase_ny_judas                        9  
+  gt_disp_wick                         22  
+  gt_mp_discount                        3  
+  gt_mp_extreme                         1  
+  gold_pb_dxy_opposes                  16  
+  target_score_sized                   12  
+  sr_pdliq_width_ok                    22  
+  gt_macro_window                       8  
+  sr_pdliq_sweep                       19  
+  session_range_found                  19  
+  pdliq_sweep_sized                    19  
+  gt_judas_reversal                     4  
+  risk_cap_skip                        15  
+  mstruct_minor_sweep                   2  
+  crt_sweep_sized                       2  
+  gold_pb_risk_cap                      1  
+
+=== Results ===
+  trades                    149
+  win_rate_pct              23.5
+  profit_factor             0.83
+  starting_equity_ZAR       10000
+  ending_equity_ZAR         7379.36
+  pnl_ZAR                   -2620.64
+  pnl_pct                   -26.21
+  max_drawdown_pct          -34.87
+  avg_win_ZAR               357.02
+  avg_loss_ZAR              -132.6
+  withdrawn_total_ZAR       4402.8
+  withdrawal_count          2
+  working_balance_ZAR       2976.56
+  working_max_drawdown_pct  57.03
+
+=== Withdrawals (income) per year — amount, frequency, avg ===
+  2022: R       4,403  (  2 withdrawals, ~1 / 182d, avg R2,201)
+  TOTAL income: R4,403 across 2 withdrawals (avg R2,201 each)
+  final working balance: R2,977  (keep-level R6,000)
+
+[trade dump → /home/runner/work/Ict/Ict/data/histdata/trades_dump.csv]
+
+=== Trade log (149 trades) ===
+                opened_at                 closed_at   pair  direction  leg_idx    entry       exit  units        pnl           reason session_side     entry_type
+2022-01-14 09:35:00+00:00 2022-01-14 17:10:00+00:00 XAUUSD          1        1 1824.698 1816.19800      1 -157.25000             stop      no_open        gold_pb
+2022-01-17 08:30:00+00:00 2022-01-17 15:05:00+00:00 XAUUSD          1        1 1823.789 1817.11800      1 -123.41350             stop     momentum      mss_ob_m5
+2022-01-20 12:45:00+00:00 2022-01-21 08:15:00+00:00 XAUUSD          1        1 1840.388 1831.88800      1 -157.25000             stop      no_open        gold_pb
+2022-01-21 09:35:00+00:00 2022-01-25 14:45:00+00:00 XAUUSD          1        1 1833.824 1849.32400      1  286.75000           target      no_open        gold_pb
+2022-01-26 08:20:00+00:00 2022-01-26 12:00:00+00:00 XAUUSD          1        1 1847.238 1842.85800      1  -81.03000 session_handover      no_open        gold_pb
+2022-01-26 12:15:00+00:00 2022-01-26 14:20:00+00:00 XAUUSD          1        1 1846.178 1837.67800      1 -157.25000             stop      no_open        gold_pb
+2022-01-31 09:20:00+00:00 2022-01-31 13:55:00+00:00 XAUUSD         -1        1 1788.618 1797.11800      1 -157.25000             stop      no_open        gold_pb
+2022-02-01 12:45:00+00:00 2022-02-02 13:15:00+00:00 XAUUSD         -1        1 1805.598 1806.09800      1   -9.25000             stop      no_open        gold_pb
+2022-02-02 13:45:00+00:00 2022-02-02 15:25:00+00:00 XAUUSD         -1        1 1802.318 1810.81800      1 -157.25000             stop      no_open        gold_pb
+2022-02-04 08:55:00+00:00 2022-02-04 14:45:00+00:00 XAUUSD         -1        1 1806.985 1807.48500      1   -9.25000             stop      no_open        gold_pb
+2022-02-08 08:05:00+00:00 2022-02-10 13:40:00+00:00 XAUUSD          1        1 1820.172 1835.67200      1  286.75000           target      no_open        gold_pb
+2022-02-10 14:40:00+00:00 2022-02-11 18:45:00+00:00 XAUUSD          1        1 1833.024 1857.50400      1  452.88000           target      no_open        gold_pb
+2022-02-15 14:10:00+00:00 2022-02-17 08:25:00+00:00 XAUUSD          1        1 1857.298 1884.59800      1  505.05000           target      no_open        gold_pb
+2022-02-18 08:55:00+00:00 2022-02-18 10:30:00+00:00 XAUUSD          1        1 1896.558 1888.05800      1 -157.25000             stop      no_open        gold_pb
+2022-02-18 12:35:00+00:00 2022-02-21 01:30:00+00:00 XAUUSD          1        1 1893.683 1893.18300      1   -9.25000             stop      no_open        gold_pb
+2022-02-21 08:15:00+00:00 2022-02-21 23:00:00+00:00 XAUUSD          1        1 1894.633 1910.49300      1  293.41000           target      no_open        gold_pb
+2022-02-22 12:40:00+00:00 2022-02-23 09:30:00+00:00 XAUUSD          1        1 1900.408 1889.76800      1 -196.84000             stop      no_open        gold_pb
+2022-02-25 12:10:00+00:00 2022-02-25 13:10:00+00:00 XAUUSD          1        1 1903.338 1891.19800      1 -224.59000             stop      no_open        gold_pb
+2022-02-25 14:15:00+00:00 2022-02-25 15:05:00+00:00 XAUUSD          1        1 1892.298 1883.50000      1 -162.76300             stop      no_open        gold_pb
+2022-02-28 08:30:00+00:00 2022-02-28 16:15:00+00:00 XAUUSD          1        1 1902.278 1901.77800      1   -9.25000             stop      no_open        gold_pb
+2022-03-02 13:05:00+00:00 2022-03-02 16:00:00+00:00 XAUUSD          1        1 1929.878 1921.37800      1 -157.25000             stop      no_open        gold_pb
+2022-03-07 13:05:00+00:00 2022-03-07 13:15:00+00:00 XAUUSD          1        1 1985.498 1976.99800      1 -157.25000             stop      no_open        gold_pb
+2022-03-07 14:30:00+00:00 2022-03-07 16:05:00+00:00 XAUUSD          1        1 1978.818 1978.31800      1   -9.25000             stop      no_open        gold_pb
+2022-03-09 08:00:00+00:00 2022-03-09 09:00:00+00:00 XAUUSD          1        1 2047.550 2036.62800      1 -202.05700             stop      no_open        gold_pb
+2022-03-22 07:00:00+00:00 2022-03-22 14:00:00+00:00 XAUUSD         -1        1 1933.963 1918.46300      1  286.75000           target      no_open        gold_pb
+2022-03-23 11:25:00+00:00 2022-03-23 14:00:00+00:00 XAUUSD         -1        1 1926.948 1936.40300      1 -174.91750             stop      no_open        gold_pb
+2022-03-24 07:05:00+00:00 2022-03-24 12:30:00+00:00 XAUUSD          1        1 1943.078 1942.57800      1   -9.25000             stop      no_open        gold_pb
+2022-03-25 08:15:00+00:00 2022-03-25 10:40:00+00:00 XAUUSD          1        1 1961.243 1951.55200      1 -179.28350             stop      no_open        gold_pb
+2022-03-25 11:50:00+00:00 2022-03-25 13:20:00+00:00 XAUUSD          1        1 1954.863 1946.36300      1 -157.25000             stop      no_open        gold_pb
+2022-04-04 12:45:00+00:00 2022-04-04 14:40:00+00:00 XAUUSD         -1        1 1928.068 1936.56800      1 -157.25000             stop      no_open        gold_pb
+2022-04-06 11:30:00+00:00 2022-04-07 15:00:00+00:00 XAUUSD         -1        1 1925.458 1934.84800      1 -173.71500             stop      no_open        gold_pb
+2022-04-11 07:00:00+00:00 2022-04-11 13:05:00+00:00 XAUUSD          1        1 1946.652 1962.15200      1  286.75000           target      no_open        gold_pb
+2022-04-12 11:00:00+00:00 2022-04-12 11:05:00+00:00 XAUUSD          1        1 1956.118 1954.65800      1  -27.01000 session_handover      no_open        gold_pb
+2022-04-12 11:25:00+00:00 2022-04-12 15:50:00+00:00 XAUUSD          1        1 1957.722 1975.63000      1  331.29800           target      no_open        gold_pb
+2022-04-14 08:05:00+00:00 2022-04-14 11:00:00+00:00 XAUUSD          1        1 1972.948 1969.40800      1  -65.49000 session_handover      no_open        gold_pb
+2022-04-14 11:35:00+00:00 2022-04-14 14:55:00+00:00 XAUUSD          1        1 1971.068 1962.56800      1 -157.25000             stop      no_open        gold_pb
+2022-04-19 07:20:00+00:00 2022-04-19 13:45:00+00:00 XAUUSD          1        1 1976.558 1968.05800      1 -157.25000             stop      no_open        gold_pb
+2022-04-20 11:00:00+00:00 2022-04-21 12:40:00+00:00 XAUUSD          1        1 1951.338 1938.54200      1 -236.72600             stop     momentum      mss_ob_m5
+2022-05-04 11:35:00+00:00 2022-05-04 19:30:00+00:00 XAUUSD         -1        1 1867.928 1876.42800      1 -157.25000             stop      no_open        gold_pb
+2022-05-06 13:05:00+00:00 2022-05-06 16:20:00+00:00 XAUUSD         -1        1 1882.008 1890.50800      1 -157.25000             stop      no_open        gold_pb
+2022-05-10 07:30:00+00:00 2022-05-10 16:30:00+00:00 XAUUSD         -1        1 1860.278 1844.77800      1  286.75000           target      no_open        gold_pb
+2022-05-11 11:20:00+00:00 2022-05-11 14:20:00+00:00 XAUUSD         -1        1 1850.072 1850.57200      1   -9.25000             stop      no_open        gold_pb
+2022-05-13 07:15:00+00:00 2022-05-13 14:00:00+00:00 XAUUSD         -1        1 1822.768 1807.26800      1  286.75000           target      no_open        gold_pb
+2022-05-17 07:00:00+00:00 2022-05-17 11:00:00+00:00 XAUUSD          1        1 1828.916 1827.48500      2  -52.94700 session_handover     momentum      mss_ob_m5
+2022-05-17 13:20:00+00:00 2022-05-18 02:30:00+00:00 XAUUSD         -1        1 1828.553 1812.16300      1  303.21500           target      no_open        gold_pb
+2022-05-18 11:45:00+00:00 2022-05-18 16:40:00+00:00 XAUUSD         -1        1 1815.403 1823.90300      1 -157.25000             stop      no_open        gold_pb
+2022-05-24 07:55:00+00:00 2022-05-24 16:20:00+00:00 XAUUSD          1        1 1852.848 1868.34800      1  286.75000           target      no_open        gold_pb
+2022-05-25 12:45:00+00:00 2022-05-25 14:00:00+00:00 XAUUSD          1        1 1857.298 1848.79800      1 -157.25000             stop      no_open        gold_pb
+2022-05-26 07:35:00+00:00 2022-05-30 07:15:00+00:00 XAUUSD          1        1 1847.868 1863.36800      1  286.75000           target      no_open        gold_pb
+2022-05-30 12:25:00+00:00 2022-05-31 01:25:00+00:00 XAUUSD          1        1 1856.935 1848.43500      1 -157.25000             stop      no_open        gold_pb
+2022-06-03 12:05:00+00:00 2022-06-03 13:30:00+00:00 XAUUSD          1        1 1868.436 1859.93600      1 -157.25000             stop      no_open        gold_pb
+2022-06-07 11:05:00+00:00 2022-06-07 14:50:00+00:00 XAUUSD         -1        1 1844.950 1853.45000      1 -157.25000             stop      no_open        gold_pb
+2022-06-13 08:15:00+00:00 2022-06-13 15:00:00+00:00 XAUUSD         -1        1 1861.023 1829.23302      2 1176.22926           target     momentum     mss_ob_m15
+2022-06-14 08:15:00+00:00 2022-06-14 16:35:00+00:00 XAUUSD         -1        1 1827.802 1812.30200      1  286.75000           target      no_open        gold_pb
+2022-06-15 12:05:00+00:00 2022-06-15 12:20:00+00:00 XAUUSD         -1        1 1823.978 1832.47800      1 -157.25000             stop      no_open        gold_pb
+2022-06-16 07:30:00+00:00 2022-06-16 10:05:00+00:00 XAUUSD         -1        1 1830.238 1834.73800      1  -83.25000             stop        judas mss_breaker_m5
+2022-06-16 11:10:00+00:00 2022-06-16 16:10:00+00:00 XAUUSD         -1        1 1819.758 1837.39800      1 -326.34000             stop      no_open        gold_pb
+2022-06-22 13:00:00+00:00 2022-06-22 13:45:00+00:00 XAUUSD         -1        1 1835.756 1844.42800      1 -160.43200             stop      no_open        gold_pb
+2022-06-24 11:20:00+00:00 2022-06-26 23:00:00+00:00 XAUUSD         -1        1 1825.258 1833.75800      1 -157.25000             stop      no_open        gold_pb
+2022-06-28 08:30:00+00:00 2022-06-29 11:40:00+00:00 XAUUSD         -1        1 1825.348 1825.84800      1   -9.25000             stop      no_open        gold_pb
+2022-06-29 12:55:00+00:00 2022-06-29 13:30:00+00:00 XAUUSD         -1        1 1823.363 1831.86300      1 -157.25000             stop      no_open        gold_pb
+2022-07-11 08:30:00+00:00 2022-07-11 14:50:00+00:00 XAUUSD         -1        1 1737.050 1742.46400      2 -200.31800             stop     momentum mss_breaker_m5
+2022-07-12 08:40:00+00:00 2022-07-13 13:30:00+00:00 XAUUSD         -1        1 1733.288 1717.78800      1  286.75000           target      no_open        gold_pb
+2022-07-14 11:20:00+00:00 2022-07-14 16:40:00+00:00 XAUUSD         -1        1 1711.977 1712.47700      1   -9.25000             stop     momentum     mss_fvg_h1
+2022-07-18 07:00:00+00:00 2022-07-18 10:20:00+00:00 XAUUSD         -1        1 1713.458 1721.95800      1 -157.25000             stop      no_open        gold_pb
+2022-07-18 11:00:00+00:00 2022-07-20 17:40:00+00:00 XAUUSD         -1        1 1719.814 1704.31400      1  286.75000           target      no_open        gold_pb
+2022-07-27 11:40:00+00:00 2022-07-27 19:35:00+00:00 XAUUSD         -1        1 1721.238 1729.73800      1 -157.25000             stop      no_open        gold_pb
+2022-07-28 13:35:00+00:00 2022-08-01 10:55:00+00:00 XAUUSD          1        1 1747.625 1772.37900      1  457.94900           target      no_open        gold_pb
+2022-08-03 12:00:00+00:00 2022-08-03 15:10:00+00:00 XAUUSD          1        1 1766.167 1757.66700      1 -157.25000             stop      no_open        gold_pb
+2022-08-05 12:30:00+00:00 2022-08-05 13:30:00+00:00 XAUUSD          1        1 1788.618 1780.11800      1 -157.25000             stop      no_open        gold_pb
+2022-08-08 08:00:00+00:00 2022-08-11 03:05:00+00:00 XAUUSD          1        1 1775.464 1784.96400      1  175.75000             stop     momentum      mss_ob_m5
+2022-08-11 07:25:00+00:00 2022-08-11 16:10:00+00:00 XAUUSD          1        1 1787.894 1787.39400      1   -9.25000             stop      no_open        gold_pb
+2022-08-15 08:00:00+00:00 2022-08-19 02:30:00+00:00 XAUUSD         -1        1 1790.698 1754.69800      2 1332.00000           target     momentum      mss_ob_m5
+2022-08-23 11:10:00+00:00 2022-08-23 14:45:00+00:00 XAUUSD         -1        1 1734.398 1745.26400      1 -201.02100             stop      no_open        gold_pb
+2022-08-24 08:20:00+00:00 2022-08-24 10:00:00+00:00 XAUUSD         -1        1 1744.525 1753.02500      1 -157.25000             stop      no_open        gold_pb
+2022-08-24 11:25:00+00:00 2022-08-24 16:15:00+00:00 XAUUSD         -1        1 1744.718 1755.08500      1 -191.78950             stop      no_open        gold_pb
+2022-08-29 12:30:00+00:00 2022-08-29 13:45:00+00:00 XAUUSD         -1        1 1725.654 1734.15400      1 -157.25000             stop      no_open        gold_pb
+2022-08-31 07:15:00+00:00 2022-08-31 15:25:00+00:00 XAUUSD         -1        1 1721.174 1721.67400      1   -9.25000             stop      no_open        gold_pb
+2022-09-02 07:25:00+00:00 2022-09-02 13:30:00+00:00 XAUUSD         -1        1 1699.378 1707.87800      1 -157.25000             stop      no_open        gold_pb
+2022-09-05 13:15:00+00:00 2022-09-06 01:30:00+00:00 XAUUSD         -1        1 1710.570 1719.07000      1 -157.25000             stop      no_open        gold_pb
+2022-09-06 08:10:00+00:00 2022-09-07 01:20:00+00:00 XAUUSD         -1        1 1714.148 1698.64800      1  286.75000           target      no_open        gold_pb
+2022-09-07 08:25:00+00:00 2022-09-07 09:00:00+00:00 XAUUSD         -1        1 1696.014 1704.51400      1 -157.25000             stop      no_open        gold_pb
+2022-09-07 11:10:00+00:00 2022-09-07 15:30:00+00:00 XAUUSD         -1        1 1703.448 1711.94800      1 -157.25000             stop      no_open        gold_pb
+2022-09-19 07:00:00+00:00 2022-09-19 15:40:00+00:00 XAUUSD         -1        1 1665.135 1671.08800      1 -110.13050             stop     momentum      mss_ob_m5
+2022-09-21 08:35:00+00:00 2022-09-21 19:05:00+00:00 XAUUSD         -1        1 1669.938 1654.43800      1  286.75000           target      no_open        gold_pb
+2022-09-23 07:50:00+00:00 2022-09-23 11:45:00+00:00 XAUUSD         -1        1 1668.305 1652.80500      1  286.75000           target      no_open        gold_pb
+2022-09-28 07:45:00+00:00 2022-09-28 11:15:00+00:00 XAUUSD         -1        1 1621.908 1626.92800      2 -185.74000             stop     momentum      amd_ob_m5
+2022-09-28 12:10:00+00:00 2022-09-28 13:20:00+00:00 XAUUSD         -1        1 1625.688 1634.18800      1 -157.25000             stop      no_open        gold_pb
+2022-09-29 13:35:00+00:00 2022-09-29 14:35:00+00:00 XAUUSD         -1        1 1648.665 1657.54000      1 -164.18750             stop      no_open        gold_pb
+2022-09-30 13:20:00+00:00 2022-10-03 10:30:00+00:00 XAUUSD          1        1 1667.668 1659.16800      1 -157.25000             stop      no_open        gold_pb
+2022-10-03 11:10:00+00:00 2022-10-03 15:20:00+00:00 XAUUSD          1        1 1664.696 1680.19600      1  286.75000           target      no_open        gold_pb
+2022-10-04 07:00:00+00:00 2022-10-05 09:05:00+00:00 XAUUSD          1        1 1703.494 1712.99400      2  351.50000             stop     momentum      mss_ob_m5
+2022-10-05 11:35:00+00:00 2022-10-05 15:00:00+00:00 XAUUSD          1        1 1710.695 1701.56800      1 -168.84950             stop      no_open        gold_pb
+2022-10-06 12:05:00+00:00 2022-10-06 15:25:00+00:00 XAUUSD          1        1 1717.175 1708.67500      1 -157.25000             stop      no_open        gold_pb
+2022-10-07 12:35:00+00:00 2022-10-07 13:30:00+00:00 XAUUSD          1        1 1709.304 1700.80400      1 -157.25000             stop      no_open        gold_pb
+2022-10-11 11:05:00+00:00 2022-10-11 13:00:00+00:00 XAUUSD         -1        1 1660.398 1671.24500      1 -200.66950             stop      no_open        gold_pb
+2022-10-11 13:40:00+00:00 2022-10-11 16:30:00+00:00 XAUUSD         -1        1 1668.065 1676.56500      1 -157.25000             stop      no_open        gold_pb
+2022-10-12 08:15:00+00:00 2022-10-12 11:00:00+00:00 XAUUSD         -1        1 1667.648 1670.31500      1  -49.33950 session_handover      no_open        gold_pb
+2022-10-13 11:00:00+00:00 2022-10-13 11:05:00+00:00 XAUUSD         -1        1 1673.795 1675.36500      1  -29.04500 session_handover      no_open        gold_pb
+2022-10-13 11:35:00+00:00 2022-10-13 12:40:00+00:00 XAUUSD         -1        1 1673.133 1681.63300      1 -157.25000             stop      no_open        gold_pb
+2022-10-24 11:20:00+00:00 2022-10-25 10:15:00+00:00 XAUUSD          1        1 1650.528 1642.02800      1 -157.25000             stop      no_open        gold_pb
+2022-10-26 07:00:00+00:00 2022-10-27 08:00:00+00:00 XAUUSD          1        1 1659.908 1659.40800      2  -18.50000             stop     momentum      amd_ob_m5
+2022-10-28 07:45:00+00:00 2022-10-28 09:05:00+00:00 XAUUSD          1        1 1658.778 1650.27800      1 -157.25000             stop      no_open        gold_pb
+2022-10-31 08:00:00+00:00 2022-11-01 06:55:00+00:00 XAUUSD         -1        1 1639.117 1645.93800      3 -378.56550             stop     momentum      mss_ob_m5
+2022-11-01 07:45:00+00:00 2022-11-01 10:00:00+00:00 XAUUSD         -1        1 1640.988 1651.24700      1 -189.79150             stop      no_open        gold_pb
+2022-11-14 12:00:00+00:00 2022-11-14 15:10:00+00:00 XAUUSD          1        1 1758.068 1773.56800      1  286.75000           target      no_open        gold_pb
+2022-11-18 12:15:00+00:00 2022-11-18 14:25:00+00:00 XAUUSD          1        1 1763.618 1755.11800      1 -157.25000             stop      no_open        gold_pb
+2022-11-21 09:00:00+00:00 2022-11-21 13:20:00+00:00 XAUUSD         -1        1 1740.578 1745.51800      1  -91.39000             stop     momentum      mss_ob_m5
+2022-11-21 14:40:00+00:00 2022-11-22 09:40:00+00:00 XAUUSD         -1        1 1738.998 1748.34800      1 -172.97500             stop      no_open        gold_pb
+2022-11-23 08:20:00+00:00 2022-11-23 19:00:00+00:00 XAUUSD         -1        1 1739.908 1748.40800      1 -157.25000             stop      no_open        gold_pb
+2022-11-25 14:30:00+00:00 2022-11-28 14:05:00+00:00 XAUUSD          1        1 1750.125 1749.62500      1   -9.25000             stop      no_open        gold_pb
+2022-12-02 14:25:00+00:00 2022-12-05 01:35:00+00:00 XAUUSD          1        1 1787.178 1806.19800      1  351.87000           target      no_open        gold_pb
+2022-12-05 09:20:00+00:00 2022-12-05 13:50:00+00:00 XAUUSD          1        1 1799.248 1790.74800      1 -157.25000             stop      no_open        gold_pb
+2022-12-08 09:10:00+00:00 2022-12-09 13:20:00+00:00 XAUUSD          1        1 1786.367 1801.86700      1  286.75000           target      no_open        gold_pb
+2022-12-12 14:35:00+00:00 2022-12-12 19:05:00+00:00 XAUUSD          1        1 1787.008 1778.50800      1 -157.25000             stop      no_open        gold_pb
+2022-12-14 08:20:00+00:00 2022-12-14 19:00:00+00:00 XAUUSD          1        1 1810.605 1802.10500      1 -157.25000             stop      no_open        gold_pb
+2022-12-16 08:20:00+00:00 2022-12-16 13:20:00+00:00 XAUUSD         -1        1 1774.605 1786.37500      1 -217.74500             stop      no_open        gold_pb
+2022-12-16 14:10:00+00:00 2022-12-16 14:50:00+00:00 XAUUSD         -1        1 1781.385 1789.88500      1 -157.25000             stop      no_open        gold_pb
+2022-12-29 08:30:00+00:00 2023-01-02 23:00:00+00:00 XAUUSD          1        1 1811.305 1826.80500      1  286.75000           target      no_open        gold_pb
+2023-01-03 12:25:00+00:00 2023-01-03 15:20:00+00:00 XAUUSD          1        1 1836.785 1836.28500      1   -9.25000             stop      no_open        gold_pb
+2023-01-05 09:15:00+00:00 2023-01-05 13:15:00+00:00 XAUUSD          1        1 1849.895 1841.39500      1 -157.25000             stop      no_open        gold_pb
+2023-01-09 12:00:00+00:00 2023-01-11 14:35:00+00:00 XAUUSD          1        1 1874.498 1873.99800      1   -9.25000             stop      no_open        gold_pb
+2023-01-12 08:00:00+00:00 2023-01-12 13:30:00+00:00 XAUUSD          1        1 1883.605 1883.10500      1   -9.25000             stop      no_open        gold_pb
+2023-01-13 08:10:00+00:00 2023-01-13 12:00:00+00:00 XAUUSD          1        1 1904.325 1899.62500      1  -86.95000 session_handover      no_open        gold_pb
+2023-01-13 13:40:00+00:00 2023-01-13 18:05:00+00:00 XAUUSD          1        1 1900.998 1917.26400      1  300.92100           target      no_open        gold_pb
+2023-01-16 09:05:00+00:00 2023-01-17 09:40:00+00:00 XAUUSD          1        1 1914.595 1906.09500      1 -157.25000             stop      no_open        gold_pb
+2023-01-23 08:30:00+00:00 2023-01-23 14:05:00+00:00 XAUUSD          1        1 1923.648 1915.14800      1 -157.25000             stop      no_open        gold_pb
+2023-01-25 12:40:00+00:00 2023-01-25 20:00:00+00:00 XAUUSD          1        1 1927.685 1943.18500      1  286.75000           target      no_open        gold_pb
+2023-01-26 08:00:00+00:00 2023-01-26 11:30:00+00:00 XAUUSD          1        1 1941.665 1933.16500      1 -157.25000             stop      no_open        gold_pb
+2023-01-26 12:00:00+00:00 2023-01-26 12:05:00+00:00 XAUUSD          1        1 1937.305 1935.77500      1  -28.30500 session_handover      no_open        gold_pb
+2023-01-31 08:00:00+00:00 2023-01-31 12:45:00+00:00 XAUUSD         -1        1 1912.225 1912.72500      1   -9.25000             stop     momentum      amd_ob_m5
+2023-02-01 08:40:00+00:00 2023-02-01 19:50:00+00:00 XAUUSD          1        1 1927.685 1943.18500      1  286.75000           target      no_open        gold_pb
+2023-02-06 09:10:00+00:00 2023-02-07 17:45:00+00:00 XAUUSD         -1        1 1871.865 1882.69800      1 -200.41050             stop      no_open        gold_pb
+2023-02-09 08:00:00+00:00 2023-02-09 12:00:00+00:00 XAUUSD          1        1 1883.915 1881.75500      1  -39.96000 session_handover     momentum     mss_ob_m15
+2023-02-09 12:40:00+00:00 2023-02-09 13:50:00+00:00 XAUUSD         -1        1 1879.668 1888.16800      1 -157.25000             stop      no_open        gold_pb
+2023-02-09 14:35:00+00:00 2023-02-09 20:05:00+00:00 XAUUSD         -1        1 1880.655 1860.26900      1  377.14100           target      no_open        gold_pb
+2023-02-10 08:00:00+00:00 2023-02-10 16:50:00+00:00 XAUUSD          1        1 1869.555 1855.96700      1 -251.37800             stop     momentum     amd_fvg_h1
+2023-02-13 08:25:00+00:00 2023-02-14 13:30:00+00:00 XAUUSD         -1        1 1860.455 1868.95500      1 -157.25000             stop      no_open        gold_pb
+2023-02-16 08:30:00+00:00 2023-02-16 16:30:00+00:00 XAUUSD         -1        1 1838.428 1838.92800      1   -9.25000             stop      no_open        gold_pb
+2023-02-17 14:30:00+00:00 2023-02-17 15:10:00+00:00 XAUUSD         -1        1 1826.185 1834.68500      1 -157.25000             stop      no_open        gold_pb
+2023-02-20 08:20:00+00:00 2023-02-21 14:35:00+00:00 XAUUSD         -1        1 1843.685 1844.18500      1   -9.25000             stop      no_open        gold_pb
+2023-02-22 08:35:00+00:00 2023-02-22 12:25:00+00:00 XAUUSD         -1        1 1832.755 1842.56500      1 -181.48500             stop      no_open        gold_pb
+2023-03-06 13:25:00+00:00 2023-03-06 19:15:00+00:00 XAUUSD          1        1 1853.425 1844.92500      1 -157.25000             stop      no_open        gold_pb
+2023-03-07 12:00:00+00:00 2023-03-09 16:35:00+00:00 XAUUSD         -1        1 1840.025 1830.52500      1  175.75000             stop     momentum     amd_fvg_h1
+2023-03-14 11:05:00+00:00 2023-03-14 13:45:00+00:00 XAUUSD          1        1 1905.185 1896.68500      1 -157.25000             stop      no_open        gold_pb
+2023-03-21 11:00:00+00:00 2023-03-21 14:00:00+00:00 XAUUSD          1        1 1970.125 1961.62500      1 -157.25000             stop      no_open        gold_pb
+2023-03-22 07:50:00+00:00 2023-03-22 18:00:00+00:00 XAUUSD          1        1 1941.425 1950.92500      1  175.75000             stop      no_open        gold_pb
+2023-03-24 07:50:00+00:00 2023-03-24 08:40:00+00:00 XAUUSD          1        1 1990.395 1981.89500      1 -157.25000             stop      no_open        gold_pb
+2023-03-27 07:40:00+00:00 2023-03-27 10:20:00+00:00 XAUUSD          1        1 1970.698 1962.19800      1 -157.25000             stop      no_open        gold_pb
+
+=== Per-pair P&L (ZAR) ===
+  XAUUSD: 149 trades  wins=35  losses=114  P&L=R-2620.64
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2022       119    29  24.4%     -1492.71   -27.4%
+  2023        30     6  20.0%     -1127.93   -34.9%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  XAUUSD   2022       119    29  24.4%
+  XAUUSD   2023        30     6  20.0%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  amd_fvg_h1                 2     1  50.0%     -37.81
+  amd_ob_m5                  3     0   0.0%     -71.16
+  gold_pb                  130    30  23.1%     -31.08
+  mss_breaker_m5             2     0   0.0%    -141.78
+  mss_fvg_h1                 1     0   0.0%      -9.25
+  mss_ob_m15                 2     1  50.0%     568.13
+  mss_ob_m5                  9     3  33.3%      96.23
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  FVG              3     1  33.3%       -84.88     -28.29   0.67
+  OB              14     4  28.6%      1788.86     127.78   2.43
+  BREAKER          2     0   0.0%      -283.57    -141.78   0.00
+  other          130    30  23.1%     -4041.05     -31.08   0.70
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  BREAKER M5             2     0   0.0%   0.00
+  FVG H1                 3     1  33.3%   0.67
+  OB M15                 2     1  50.0%  29.44
+  OB M5                 12     3  25.0%   1.54
+  other ?              130    30  23.1%   0.70
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  BREAKER XAUUSD             2     0   0.0%   0.00
+  FVG XAUUSD                 3     1  33.3%   0.67
+  OB XAUUSD                 14     4  28.6%   2.43
+  other XAUUSD             130    30  23.1%   0.70
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  session_range            5     1  20.0%   0.38
+  (no AMD)               144    34  23.6%   0.84
+
+  Session-range widths (n=34): median=11.4 p75=28.1 p90=28.1 pips (cap=35.0)
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  0/3              130    30  23.1%     -4041.05     -31.08   0.70
+  1/3               11     2  18.2%      -603.25     -54.84   0.37
+  2/3                7     3  42.9%      2402.22     343.17   6.25
+  3/3                1     0   0.0%      -378.57    -378.57   0.00
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  gold_pb          130    30  23.1%       -4041.05      -31.08   0.70
+  judas             19     5  26.3%        1420.41       74.76   1.79
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  london     gold_pb           56    18  32.1%         532.58   1.12
+  london     judas             16     4  25.0%        1490.64   1.96
+  ny         gold_pb           74    12  16.2%       -4573.63   0.48
+  ny         judas              3     1  33.3%         -70.23   0.71
+  ----------------------------------------------------------------
+  london     TOTAL             72    22  30.6%        2023.21   1.33
+  ny         TOTAL             77    13  16.9%       -4643.85   0.49
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  london_judas                16     4  25.0%        1490.64   1.96
+  ny_judas                     3     1  33.3%         -70.23   0.71
+  unknown                    130    30  23.1%       -4041.05   0.70
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  no                   149    35  23.5%       -2620.64   0.83
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 FVG               2     1  50.0%        1080.62   5.30
+  H4 FVG               7     2  28.6%        -486.31   0.42
+  none               140    32  22.9%       -3214.95   0.77
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 FVG               2     0   0.0%        -374.79   0.00
+  none               147    35  23.8%       -2245.85   0.85
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1      136    31  22.8%       -4863.47   0.66     -35.76
+  score=2        4     1  25.0%          72.37   1.26      18.09
+  score=3        6     1  16.7%        -254.52   0.41     -42.42
+  score=4        2     1  50.0%        1248.75  16.00     624.38
+  score=5        1     1 100.0%        1176.23    inf    1176.23
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct agrees          11     2  18.2%        -933.73    0.27
+  HTF struct disagrees      138    33  23.9%       -1686.90    0.88
+  no minor-sweep            149    35  23.5%       -2620.64    0.83
+  ── highest intact-structure timeframe ──
+  intact @ W                  2     0   0.0%        -291.34    0.00
+  intact @ D                  5     0   0.0%        -505.20    0.00
+  intact @ 240T               4     1  25.0%          -4.61    0.99
+  intact @ 60T                3     1  33.3%        -326.23    0.35
+  intact @ 15T                1     1 100.0%        1176.23     inf
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range             4     0   0.0%        -559.55   0.00
+  no sweep           145    35  24.1%       -2061.09   0.86
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  0            130    30  23.1%       -4041.05   0.70
+  3              4     0   0.0%        -486.33   0.00
+  4             14     5  35.7%        2285.30   3.47
+  5              1     0   0.0%        -378.57   0.00
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile            14  35.7%   2.63       135  22.2%   0.67
+  NFP week Mon/Tue           3  33.3%   0.91       146  23.3%   0.82
+  Rate decision              1   0.0%   0.00       148  23.6%   0.83
+  PD prov (sweep)           19  26.3%   1.79       130  23.1%   0.70
+  Seasonal lean              0   0.0%   0.00       149  23.5%   0.83
+  HTF OB Context            17  23.5%   1.61       132  23.5%   0.72
+  D1 Draw                   19  26.3%   1.79       130  23.1%   0.70
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  continuation          17     4  23.5%      1078.16   1.61    63.42
+  (none)               132    31  23.5%     -3698.80   0.72   -28.02
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  breaker                1   0.0%   0.00
+  d1_fvg                14  21.4%   1.99
+  pdhl                   2  50.0%   3.32
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  equal_hl              19     5  26.3%      1420.41   1.79
+  (none)               130    30  23.1%     -4041.05   0.70
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  fib_extension            1     1 100.0%      1176.23    1176.23
+  gold_pb_rr             130    30  23.1%     -4041.05     -31.08
+  ith_liquidity            1     1 100.0%       351.50     351.50
+  pdh_pdl                  1     0   0.0%      -236.73    -236.73
+  pwh_pwl                  4     1  25.0%      1009.17     252.29
+  round_number             8     0   0.0%     -1099.92    -137.49
+  swing                    4     2  50.0%       220.15      55.04
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  fib_extension          1       2.9%      1176.23
+  gold_pb_rr            30      85.7%      9284.48
+  ith_liquidity          1       2.9%       351.50
+  pwh_pwl                1       2.9%      1332.00
+  swing                  2       5.7%       351.50
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   fib_extension          1 100.0%      1176.23
+  initial (L1)   gold_pb_rr            30  23.1%      9284.48
+  initial (L1)   ith_liquidity          1 100.0%       351.50
+  initial (L1)   pwh_pwl                1  25.0%      1332.00
+  initial (L1)   swing                  2  50.0%       351.50
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  London Open   fib_extension          1      1176.23
+  London Open   gold_pb_rr            18      5057.16
+  London Open   ith_liquidity          1       351.50
+  London Open   pwh_pwl                1      1332.00
+  London Open   swing                  1       175.75
+  New York AM   gold_pb_rr            12      4227.32
+  New York AM   swing                  1       175.75
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  London Open      22      62.9%      8092.64
+  New York AM      13      37.1%      4403.07
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  below open         1     0       1   0.0%      -83.25     -83.25
+  above open        18     5      13  27.8%     1503.66      83.54
+  no session       130    30     100  23.1%    -4041.05     -31.08
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)            7     3  42.9%       -216.62   0.76
+  SOJ single reference (+1)           12     2  16.7%       1637.03   2.88
+  no SOJ pattern                     130    30  23.1%      -4041.05   0.70

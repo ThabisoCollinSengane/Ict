@@ -1,0 +1,52 @@
+name: Fix clock — 16-year test (HistData M1 2010-2025)
+
+# The 4-year run showed the ECB fix pointing the published way in BOTH halves but
+# at ~0.5bp/day — too small for ~1,000 days to separate from noise. The original
+# research used 21 years. This doubles-plus the sample: IS 2010-17 vs OOS 2018-25.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/fix-clock-long.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-clock-long
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Download EURUSD / GBPUSD / NZDUSD M1, 2010-2025
+        run: |
+          python scripts/fetch_histdata.py --years $(seq 2010 2025) \
+                 --pairs EURUSD GBPUSD NZDUSD --dest /tmp/hd 2>&1 | tail -60
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -60
+      - name: Fix-clock study, 16 years
+        run: |
+          python scripts/fx_clock_study.py --no-push \
+                 --is-years $(seq 2010 2017) --oos-years $(seq 2018 2025) \
+                 --out data/fx_clock_long_report.md 2>&1 | tee data/fx_clock_long_console.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/fx_clock_long_report.md data/fx_clock_long_console.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix clock — 16-year result [$(date -u +%F)]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

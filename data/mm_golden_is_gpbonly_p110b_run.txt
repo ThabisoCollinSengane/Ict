@@ -1,0 +1,525 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2022–2023)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, XAUUSD, XAGUSD
+
+Loading and resampling to 5-minute bars (2022 + 2023)...
+  GBPUSD: 694,841 M1 → 139,494 M5 bars  2022-01-02 – 2023-12-29  close 1.27305
+  EURUSD: 695,383 M1 → 139,717 M5 bars  2022-01-02 – 2023-12-29  close 1.10361
+  EURGBP: 694,588 M1 → 139,602 M5 bars  2022-01-02 – 2023-12-29  close 0.86671
+  UDXUSD: 601,836 M1 → 121,828 M5 bars  2022-01-03 – 2023-12-29  close 101.04500
+  AUDUSD: 693,584 M1 → 139,626 M5 bars  2022-01-02 – 2023-12-29  close 0.68082
+  NZDUSD: 691,331 M1 → 139,417 M5 bars  2022-01-02 – 2023-12-29  close 0.63174
+  AUDNZD: 693,115 M1 → 139,235 M5 bars  2022-01-02 – 2023-12-29  close 1.07787
+  XAUUSD: 663,320 M1 → 132,722 M5 bars  2022-01-02 – 2023-12-29  close 2062.72800
+  XAGUSD: 655,797 M1 → 132,562 M5 bars  2022-01-02 – 2023-12-29  close 23.78100
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 139494 5-min bars...
+    bar 2000/139494 (2022-01-11 20:50:00+00:00) - active=0 trades=0 equity=10000
+    bar 3000/139494 (2022-01-17 08:10:00+00:00) - active=0 trades=1 equity=9843
+    bar 4000/139494 (2022-01-20 19:35:00+00:00) - active=1 trades=1 equity=9843
+    bar 5000/139494 (2022-01-26 06:55:00+00:00) - active=0 trades=3 equity=9972
+    bar 6000/139494 (2022-01-31 18:15:00+00:00) - active=0 trades=5 equity=9658
+    bar 7000/139494 (2022-02-04 05:40:00+00:00) - active=0 trades=7 equity=9491
+    bar 8000/139494 (2022-02-09 17:00:00+00:00) - active=0 trades=7 equity=6000
+    bar 9000/139494 (2022-02-15 04:20:00+00:00) - active=0 trades=8 equity=6453
+    bar 10000/139494 (2022-02-18 15:40:00+00:00) - active=1 trades=9 equity=6958
+    bar 11000/139494 (2022-02-24 03:00:00+00:00) - active=0 trades=11 equity=6752
+    bar 12000/139494 (2022-03-01 14:20:00+00:00) - active=0 trades=13 equity=6364
+    bar 13000/139494 (2022-03-07 01:50:00+00:00) - active=0 trades=14 equity=6207
+    bar 14000/139494 (2022-03-10 13:10:00+00:00) - active=0 trades=17 equity=5749
+    bar 15000/139494 (2022-03-15 23:30:00+00:00) - active=0 trades=17 equity=5749
+    bar 16000/139494 (2022-03-21 11:00:00+00:00) - active=0 trades=17 equity=5749
+    bar 17000/139494 (2022-03-24 22:20:00+00:00) - active=0 trades=18 equity=5574
+    bar 18000/139494 (2022-03-30 11:40:00+00:00) - active=0 trades=19 equity=5417
+    bar 19000/139494 (2022-04-04 23:00:00+00:00) - active=0 trades=20 equity=5260
+    bar 20000/139494 (2022-04-08 10:20:00+00:00) - active=0 trades=21 equity=5086
+    bar 21000/139494 (2022-04-13 21:45:00+00:00) - active=0 trades=23 equity=5390
+    bar 22000/139494 (2022-04-19 09:05:00+00:00) - active=0 trades=24 equity=5233
+    bar 23000/139494 (2022-04-22 20:25:00+00:00) - active=0 trades=25 equity=4996
+    bar 24000/139494 (2022-04-28 07:45:00+00:00) - active=0 trades=26 equity=5283
+    bar 25000/139494 (2022-05-03 19:05:00+00:00) - active=0 trades=28 equity=5116
+    bar 26000/139494 (2022-05-09 06:25:00+00:00) - active=0 trades=30 equity=4802
+    bar 27000/139494 (2022-05-12 17:50:00+00:00) - active=0 trades=30 equity=4802
+    bar 28000/139494 (2022-05-18 05:10:00+00:00) - active=0 trades=30 equity=4802
+    bar 29000/139494 (2022-05-23 16:30:00+00:00) - active=0 trades=30 equity=4802
+    bar 30000/139494 (2022-05-27 03:50:00+00:00) - active=0 trades=32 equity=4487
+    bar 31000/139494 (2022-06-01 15:15:00+00:00) - active=0 trades=33 equity=4330
+    bar 32000/139494 (2022-06-07 02:35:00+00:00) - active=0 trades=34 equity=4173
+    bar 33000/139494 (2022-06-10 13:55:00+00:00) - active=0 trades=35 equity=4016
+    bar 34000/139494 (2022-06-16 01:15:00+00:00) - active=0 trades=35 equity=4016
+    bar 35000/139494 (2022-06-21 12:40:00+00:00) - active=0 trades=35 equity=4016
+    bar 36000/139494 (2022-06-27 00:05:00+00:00) - active=0 trades=37 equity=3698
+    bar 37000/139494 (2022-06-30 11:25:00+00:00) - active=0 trades=38 equity=3535
+    bar 38000/139494 (2022-07-05 22:45:00+00:00) - active=0 trades=38 equity=3535
+    bar 39000/139494 (2022-07-11 10:10:00+00:00) - active=0 trades=39 equity=3377
+    bar 40000/139494 (2022-07-14 21:30:00+00:00) - active=0 trades=39 equity=3377
+    bar 41000/139494 (2022-07-20 08:50:00+00:00) - active=0 trades=39 equity=3377
+    bar 42000/139494 (2022-07-25 20:15:00+00:00) - active=0 trades=39 equity=3377
+    bar 43000/139494 (2022-07-29 07:35:00+00:00) - active=1 trades=40 equity=3220
+    bar 44000/139494 (2022-08-03 19:05:00+00:00) - active=0 trades=42 equity=3521
+    bar 45000/139494 (2022-08-09 06:25:00+00:00) - active=0 trades=43 equity=3364
+    bar 46000/139494 (2022-08-12 17:45:00+00:00) - active=0 trades=43 equity=3364
+    bar 47000/139494 (2022-08-18 05:30:00+00:00) - active=0 trades=44 equity=3206
+    bar 48000/139494 (2022-08-23 17:00:00+00:00) - active=0 trades=46 equity=3292
+    bar 49000/139494 (2022-08-29 04:20:00+00:00) - active=0 trades=47 equity=3100
+    bar 50000/139494 (2022-09-01 15:40:00+00:00) - active=0 trades=47 equity=3100
+    bar 51000/139494 (2022-09-07 03:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 52000/139494 (2022-09-12 14:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 53000/139494 (2022-09-16 01:40:00+00:00) - active=0 trades=48 equity=2943
+    bar 54000/139494 (2022-09-21 13:10:00+00:00) - active=0 trades=48 equity=2943
+    bar 55000/139494 (2022-09-27 00:30:00+00:00) - active=0 trades=48 equity=2943
+    bar 56000/139494 (2022-09-30 11:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 57000/139494 (2022-10-05 23:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 58000/139494 (2022-10-11 10:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 59000/139494 (2022-10-16 22:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 60000/139494 (2022-10-20 09:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 61000/139494 (2022-10-25 20:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 62000/139494 (2022-10-31 07:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 63000/139494 (2022-11-03 18:40:00+00:00) - active=0 trades=48 equity=2943
+    bar 64000/139494 (2022-11-09 07:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 65000/139494 (2022-11-14 18:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 66000/139494 (2022-11-18 05:40:00+00:00) - active=0 trades=48 equity=2943
+    bar 67000/139494 (2022-11-23 17:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 68000/139494 (2022-11-29 04:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 69000/139494 (2022-12-02 15:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 70000/139494 (2022-12-08 03:10:00+00:00) - active=0 trades=48 equity=2943
+    bar 71000/139494 (2022-12-13 16:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 72000/139494 (2022-12-19 03:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 73000/139494 (2022-12-22 15:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 74000/139494 (2022-12-28 03:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 75000/139494 (2023-01-02 15:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 76000/139494 (2023-01-06 02:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 77000/139494 (2023-01-11 14:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 78000/139494 (2023-01-17 01:30:00+00:00) - active=0 trades=48 equity=2943
+    bar 79000/139494 (2023-01-20 12:50:00+00:00) - active=0 trades=48 equity=2943
+    bar 80000/139494 (2023-01-26 00:10:00+00:00) - active=0 trades=48 equity=2943
+    bar 81000/139494 (2023-01-31 11:30:00+00:00) - active=0 trades=48 equity=2943
+    bar 82000/139494 (2023-02-05 22:50:00+00:00) - active=0 trades=48 equity=2943
+    bar 83000/139494 (2023-02-09 11:10:00+00:00) - active=0 trades=48 equity=2943
+    bar 84000/139494 (2023-02-14 22:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 85000/139494 (2023-02-20 11:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 86000/139494 (2023-02-27 09:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 87000/139494 (2023-03-06 07:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 88000/139494 (2023-03-13 06:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 89000/139494 (2023-03-20 04:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 90000/139494 (2023-03-27 05:40:00+00:00) - active=0 trades=48 equity=2943
+    bar 91000/139494 (2023-04-03 03:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 92000/139494 (2023-04-11 00:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 93000/139494 (2023-04-17 19:40:00+00:00) - active=0 trades=48 equity=2943
+    bar 94000/139494 (2023-04-24 18:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 95000/139494 (2023-05-01 12:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 96000/139494 (2023-05-08 09:40:00+00:00) - active=0 trades=48 equity=2943
+    bar 97000/139494 (2023-05-15 09:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 98000/139494 (2023-05-22 07:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 99000/139494 (2023-05-29 06:40:00+00:00) - active=0 trades=48 equity=2943
+    bar 100000/139494 (2023-06-05 06:00:00+00:00) - active=0 trades=48 equity=2943
+    bar 101000/139494 (2023-06-12 04:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 102000/139494 (2023-06-19 02:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 103000/139494 (2023-06-26 02:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 104000/139494 (2023-07-03 01:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 105000/139494 (2023-07-07 19:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 106000/139494 (2023-07-17 00:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 107000/139494 (2023-07-21 19:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 108000/139494 (2023-07-28 15:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 109000/139494 (2023-08-03 06:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 110000/139494 (2023-08-08 17:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 111000/139494 (2023-08-14 04:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 112000/139494 (2023-08-17 16:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 113000/139494 (2023-08-23 03:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 114000/139494 (2023-08-28 14:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 115000/139494 (2023-09-01 02:05:00+00:00) - active=0 trades=48 equity=2943
+    bar 116000/139494 (2023-09-06 13:25:00+00:00) - active=0 trades=48 equity=2943
+    bar 117000/139494 (2023-09-12 00:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 118000/139494 (2023-09-15 12:20:00+00:00) - active=0 trades=48 equity=2943
+    bar 119000/139494 (2023-09-20 23:45:00+00:00) - active=0 trades=48 equity=2943
+    bar 120000/139494 (2023-09-26 11:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 121000/139494 (2023-10-01 23:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 122000/139494 (2023-10-05 10:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 123000/139494 (2023-10-10 21:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 124000/139494 (2023-10-16 09:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 125000/139494 (2023-10-19 20:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 126000/139494 (2023-10-25 07:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 127000/139494 (2023-10-30 18:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 128000/139494 (2023-11-03 05:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 129000/139494 (2023-11-08 17:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 130000/139494 (2023-11-14 05:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 131000/139494 (2023-11-17 16:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 132000/139494 (2023-11-23 03:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 133000/139494 (2023-11-28 15:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 134000/139494 (2023-12-04 02:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 135000/139494 (2023-12-07 13:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 136000/139494 (2023-12-13 01:15:00+00:00) - active=0 trades=48 equity=2943
+    bar 137000/139494 (2023-12-18 12:35:00+00:00) - active=0 trades=48 equity=2943
+    bar 138000/139494 (2023-12-21 23:55:00+00:00) - active=0 trades=48 equity=2943
+    bar 139000/139494 (2023-12-28 04:50:00+00:00) - active=0 trades=48 equity=2943
+
+=== Gate funnel (entries passing each filter) ===
+  checks                            13949  ████████████████████████████████████████
+  in_killzone                       13949  ████████████████████████████████████████
+  news_clear                         3188  █████████
+  nfp_fomc_ok                        2681  ███████
+  intermarket_signal                   49  
+  pair_matches                         49  
+  mss_h1_m15_m5_ok                     19  
+  daily_bias_ok                        19  
+  h1_bias_ok                           19  
+  h4_bias_ok                           19  
+  dealing_range_ok                      4  
+  consolidation_found                   0  
+  manipulation_correct_dir              0  
+  m5_fvg_correct_dir                    1  
+  target_found                          1  
+  rr_ok                                 1  
+  units_nonzero                         1  
+  limit_placed                          0  
+  entry_opened                          1  
+  pyramid_added                         0  
+  pyramid_blocked_min_target            0  
+  drawdown_halt                     10709  ██████████████████████████████
+  daily_loss_halt                       0  
+  consec_loss_pause                     0  
+  weekly_cap                            0  
+  weekly_pair_cap                       0  
+  daily_cap                             0  
+  daily_pair_cap                        0  
+  weekly_amd_confirmed                  0  
+  session_handover_closed               1  
+  htf_draw_full_cascade                 0  
+  htf_draw_partial                      1  
+  htf_draw_counter                     18  
+  htf_fvg_5050_hit                      0  
+  ote_zone                              0  
+  choch_confirmed                       0  
+  low_conviction                        0  
+  judas_divergence                      0  
+  ny_continuation                       1  
+  pm_gate_pair_news                     0  
+  dxy_flat                           2084  █████
+  gold_pb_checked                    3155  █████████
+  gold_pb_no_trend_bars               125  
+  dxy_directional                     597  █
+  gold_pb_opened                       47  
+  gold_pb_no_pullback                2093  ██████
+  gold_pb_trend_flat                  307  
+  gold_pb_no_trigger                  562  █
+  gold_pb_no_swing                     13  
+  sr_attempted                          1  
+  sr_prev_session_ok                    1  
+  sr_enough_bars                        1  
+  sr_pdliq_attempted                    1  
+  soj_judas                             1  
+  soj_sweep                             1  
+  crt_turtle_soup                       1  
+  mstruct_align                         1  
+  phase_ny_judas                        1  
+  gt_disp_wick                          1  
+  gt_mp_discount                        1  
+  gt_mp_extreme                         1  
+  structure_stop_used                   1  
+  gold_own_sized                        1  
+  risk_cap_ok                           1  
+  pyramid_blocked_favour               11  
+  pyramid_blocked_low_im               41  
+  gold_pb_dxy_opposes                   8  
+
+=== Results ===
+  trades                    48
+  win_rate_pct              14.6
+  profit_factor             0.42
+  starting_equity_ZAR       10000
+  ending_equity_ZAR         6434.2
+  pnl_ZAR                   -3565.8
+  pnl_pct                   -35.66
+  max_drawdown_pct          -38.42
+  avg_win_ZAR               372.49
+  avg_loss_ZAR              -150.57
+  withdrawn_total_ZAR       3491.25
+  withdrawal_count          1
+  working_balance_ZAR       2942.95
+  working_max_drawdown_pct  57.7
+
+=== Withdrawals (income) per year — amount, frequency, avg ===
+  2022: R       3,491  (  1 withdrawals, ~1 / 365d, avg R3,491)
+  TOTAL income: R3,491 across 1 withdrawals (avg R3,491 each)
+  final working balance: R2,943  (keep-level R6,000)
+
+[trade dump → /home/runner/work/Ict/Ict/data/histdata/trades_dump.csv]
+
+=== Trade log (48 trades) ===
+                opened_at                 closed_at   pair  direction  leg_idx    entry     exit  units       pnl           reason session_side entry_type
+2022-01-14 12:00:00+00:00 2022-01-14 17:15:00+00:00 XAUUSD          1        1 1824.248 1815.748      1 -157.2500             stop      no_open    gold_pb
+2022-01-20 12:45:00+00:00 2022-01-21 08:15:00+00:00 XAUUSD          1        1 1840.388 1831.888      1 -157.2500             stop      no_open    gold_pb
+2022-01-21 12:15:00+00:00 2022-01-25 14:45:00+00:00 XAUUSD          1        1 1835.418 1850.918      1  286.7500           target      no_open    gold_pb
+2022-01-26 12:15:00+00:00 2022-01-26 14:20:00+00:00 XAUUSD          1        1 1846.178 1837.678      1 -157.2500             stop      no_open    gold_pb
+2022-01-31 12:15:00+00:00 2022-01-31 13:55:00+00:00 XAUUSD         -1        1 1789.618 1798.118      1 -157.2500             stop      no_open    gold_pb
+2022-02-01 12:45:00+00:00 2022-02-02 13:15:00+00:00 XAUUSD         -1        1 1805.598 1806.098      1   -9.2500             stop      no_open    gold_pb
+2022-02-02 13:45:00+00:00 2022-02-02 15:25:00+00:00 XAUUSD         -1        1 1802.318 1810.818      1 -157.2500             stop      no_open    gold_pb
+2022-02-10 14:40:00+00:00 2022-02-11 18:45:00+00:00 XAUUSD          1        1 1833.024 1857.504      1  452.8800           target      no_open    gold_pb
+2022-02-15 14:10:00+00:00 2022-02-17 08:25:00+00:00 XAUUSD          1        1 1857.298 1884.598      1  505.0500           target      no_open    gold_pb
+2022-02-18 12:35:00+00:00 2022-02-21 01:30:00+00:00 XAUUSD          1        1 1893.683 1893.183      1   -9.2500             stop      no_open    gold_pb
+2022-02-22 12:40:00+00:00 2022-02-23 09:30:00+00:00 XAUUSD          1        1 1900.408 1889.768      1 -196.8400             stop      no_open    gold_pb
+2022-02-25 12:10:00+00:00 2022-02-25 13:10:00+00:00 XAUUSD          1        1 1903.338 1891.198      1 -224.5900             stop      no_open    gold_pb
+2022-02-25 14:15:00+00:00 2022-02-25 15:05:00+00:00 XAUUSD          1        1 1892.298 1883.500      1 -162.7630             stop      no_open    gold_pb
+2022-03-02 13:05:00+00:00 2022-03-02 16:00:00+00:00 XAUUSD          1        1 1929.878 1921.378      1 -157.2500             stop      no_open    gold_pb
+2022-03-07 13:05:00+00:00 2022-03-07 13:15:00+00:00 XAUUSD          1        1 1985.498 1976.998      1 -157.2500             stop      no_open    gold_pb
+2022-03-07 14:30:00+00:00 2022-03-07 16:05:00+00:00 XAUUSD          1        1 1978.818 1978.318      1   -9.2500             stop      no_open    gold_pb
+2022-03-09 12:35:00+00:00 2022-03-09 13:00:00+00:00 XAUUSD          1        1 2022.108 2006.338      1 -291.7450             stop      no_open    gold_pb
+2022-03-23 11:25:00+00:00 2022-03-23 14:00:00+00:00 XAUUSD         -1        1 1926.948 1936.403      1 -174.9175             stop      no_open    gold_pb
+2022-03-25 11:50:00+00:00 2022-03-25 13:20:00+00:00 XAUUSD          1        1 1954.863 1946.363      1 -157.2500             stop      no_open    gold_pb
+2022-04-04 12:45:00+00:00 2022-04-04 14:40:00+00:00 XAUUSD         -1        1 1928.068 1936.568      1 -157.2500             stop      no_open    gold_pb
+2022-04-06 11:30:00+00:00 2022-04-07 15:00:00+00:00 XAUUSD         -1        1 1925.458 1934.848      1 -173.7150             stop      no_open    gold_pb
+2022-04-12 11:00:00+00:00 2022-04-12 11:05:00+00:00 XAUUSD          1        1 1956.118 1954.658      1  -27.0100 session_handover      no_open    gold_pb
+2022-04-12 11:25:00+00:00 2022-04-12 15:50:00+00:00 XAUUSD          1        1 1957.722 1975.630      1  331.2980           target      no_open    gold_pb
+2022-04-14 11:35:00+00:00 2022-04-14 14:55:00+00:00 XAUUSD          1        1 1971.068 1962.568      1 -157.2500             stop      no_open    gold_pb
+2022-04-20 11:00:00+00:00 2022-04-21 12:40:00+00:00 XAUUSD          1        1 1951.338 1938.542      1 -236.7260             stop     momentum  mss_ob_m5
+2022-04-26 12:25:00+00:00 2022-04-27 09:10:00+00:00 XAUUSD         -1        1 1904.923 1889.423      1  286.7500           target      no_open    gold_pb
+2022-04-28 11:05:00+00:00 2022-04-28 13:30:00+00:00 XAUUSD         -1        1 1886.678 1895.178      1 -157.2500             stop      no_open    gold_pb
+2022-04-29 11:40:00+00:00 2022-04-29 15:55:00+00:00 XAUUSD         -1        1 1913.988 1914.488      1   -9.2500             stop      no_open    gold_pb
+2022-05-04 11:35:00+00:00 2022-05-04 19:30:00+00:00 XAUUSD         -1        1 1867.928 1876.428      1 -157.2500             stop      no_open    gold_pb
+2022-05-06 13:05:00+00:00 2022-05-06 16:20:00+00:00 XAUUSD         -1        1 1882.008 1890.508      1 -157.2500             stop      no_open    gold_pb
+2022-05-25 12:45:00+00:00 2022-05-25 14:00:00+00:00 XAUUSD          1        1 1857.298 1848.798      1 -157.2500             stop      no_open    gold_pb
+2022-05-26 11:05:00+00:00 2022-05-26 12:20:00+00:00 XAUUSD          1        1 1849.018 1840.518      1 -157.2500             stop      no_open    gold_pb
+2022-05-30 12:25:00+00:00 2022-05-31 01:25:00+00:00 XAUUSD          1        1 1856.935 1848.435      1 -157.2500             stop      no_open    gold_pb
+2022-06-03 12:05:00+00:00 2022-06-03 13:30:00+00:00 XAUUSD          1        1 1868.436 1859.936      1 -157.2500             stop      no_open    gold_pb
+2022-06-07 11:05:00+00:00 2022-06-07 14:50:00+00:00 XAUUSD         -1        1 1844.950 1853.450      1 -157.2500             stop      no_open    gold_pb
+2022-06-22 13:00:00+00:00 2022-06-22 13:45:00+00:00 XAUUSD         -1        1 1835.756 1844.428      1 -160.4320             stop      no_open    gold_pb
+2022-06-24 11:20:00+00:00 2022-06-26 23:00:00+00:00 XAUUSD         -1        1 1825.258 1833.758      1 -157.2500             stop      no_open    gold_pb
+2022-06-28 11:40:00+00:00 2022-06-29 13:30:00+00:00 XAUUSD         -1        1 1822.078 1830.912      1 -163.4290             stop      no_open    gold_pb
+2022-07-08 13:25:00+00:00 2022-07-08 15:35:00+00:00 XAUUSD         -1        1 1739.310 1747.810      1 -157.2500             stop      no_open    gold_pb
+2022-07-27 11:40:00+00:00 2022-07-27 19:35:00+00:00 XAUUSD         -1        1 1721.238 1729.738      1 -157.2500             stop      no_open    gold_pb
+2022-07-28 13:35:00+00:00 2022-08-01 10:55:00+00:00 XAUUSD          1        1 1747.625 1772.379      1  457.9490           target      no_open    gold_pb
+2022-08-03 12:00:00+00:00 2022-08-03 15:10:00+00:00 XAUUSD          1        1 1766.167 1757.667      1 -157.2500             stop      no_open    gold_pb
+2022-08-05 12:30:00+00:00 2022-08-05 13:30:00+00:00 XAUUSD          1        1 1788.618 1780.118      1 -157.2500             stop      no_open    gold_pb
+2022-08-15 11:50:00+00:00 2022-08-16 13:30:00+00:00 XAUUSD          1        1 1779.478 1770.978      1 -157.2500             stop      no_open    gold_pb
+2022-08-18 11:45:00+00:00 2022-08-19 11:00:00+00:00 XAUUSD         -1        1 1767.118 1751.618      1  286.7500           target      no_open    gold_pb
+2022-08-23 11:10:00+00:00 2022-08-23 14:45:00+00:00 XAUUSD         -1        1 1734.398 1745.264      1 -201.0210             stop      no_open    gold_pb
+2022-08-24 11:25:00+00:00 2022-08-24 16:15:00+00:00 XAUUSD         -1        1 1744.718 1755.085      1 -191.7895             stop      no_open    gold_pb
+2022-09-05 13:15:00+00:00 2022-09-06 01:30:00+00:00 XAUUSD         -1        1 1710.570 1719.070      1 -157.2500             stop      no_open    gold_pb
+
+=== Per-pair P&L (ZAR) ===
+  XAUUSD: 48 trades  wins=7  losses=41  P&L=R-3565.80
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2022        48     7  14.6%     -3565.80   -38.4%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  XAUUSD   2022        48     7  14.6%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  gold_pb                   47     7  14.9%     -70.83
+  mss_ob_m5                  1     0   0.0%    -236.73
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  OB               1     0   0.0%      -236.73    -236.73   0.00
+  other           47     7  14.9%     -3329.08     -70.83   0.44
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  OB M5                  1     0   0.0%   0.00
+  other ?               47     7  14.9%   0.44
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  OB XAUUSD                  1     0   0.0%   0.00
+  other XAUUSD              47     7  14.9%   0.44
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  (no AMD)                48     7  14.6%   0.42
+
+  Session-range widths (n=1): median=13.7 p75=13.7 p90=13.7 pips (cap=35.0)
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  0/3               47     7  14.9%     -3329.08     -70.83   0.44
+  1/3                1     0   0.0%      -236.73    -236.73   0.00
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  gold_pb           47     7  14.9%       -3329.08      -70.83   0.44
+  judas              1     0   0.0%        -236.73     -236.73   0.00
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  ny         gold_pb           47     7  14.9%       -3329.08   0.44
+  ny         judas              1     0   0.0%        -236.73   0.00
+  ----------------------------------------------------------------
+  ny         TOTAL             48     7  14.6%       -3565.80   0.42
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  ny_judas                     1     0   0.0%        -236.73   0.00
+  unknown                     47     7  14.9%       -3329.08   0.44
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  no                    48     7  14.6%       -3565.80   0.42
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  none                48     7  14.6%       -3565.80   0.42
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  none                48     7  14.6%       -3565.80   0.42
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1       47     7  14.9%       -3329.08   0.44     -70.83
+  score=3        1     0   0.0%        -236.73   0.00    -236.73
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct disagrees       48     7  14.6%       -3565.80    0.42
+  no minor-sweep             48     7  14.6%       -3565.80    0.42
+  ── highest intact-structure timeframe ──
+  intact @ 240T               1     0   0.0%        -236.73    0.00
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range             1     0   0.0%        -236.73   0.00
+  no sweep            47     7  14.9%       -3329.08   0.44
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  0             47     7  14.9%       -3329.08   0.44
+  4              1     0   0.0%        -236.73   0.00
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile             1   0.0%   0.00        47  14.9%   0.44
+  NFP week Mon/Tue           0   0.0%   0.00        48  14.6%   0.42
+  Rate decision              0   0.0%   0.00        48  14.6%   0.42
+  PD prov (sweep)            1   0.0%   0.00        47  14.9%   0.44
+  Seasonal lean              0   0.0%   0.00        48  14.6%   0.42
+  HTF OB Context             1   0.0%   0.00        47  14.9%   0.44
+  D1 Draw                    1   0.0%   0.00        47  14.9%   0.44
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  continuation           1     0   0.0%      -236.73   0.00  -236.73
+  (none)                47     7  14.9%     -3329.08   0.44   -70.83
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  d1_fvg                 1   0.0%   0.00
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  equal_hl               1     0   0.0%      -236.73   0.00
+  (none)                47     7  14.9%     -3329.08   0.44
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  gold_pb_rr              47     7  14.9%     -3329.08     -70.83
+  pdh_pdl                  1     0   0.0%      -236.73    -236.73
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  gold_pb_rr             7     100.0%      2607.43
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   gold_pb_rr             7  14.9%      2607.43
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  New York AM   gold_pb_rr             7      2607.43
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  New York AM       7     100.0%      2607.43
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  above open         1     0       1   0.0%     -236.73    -236.73
+  no session        47     7      40  14.9%    -3329.08     -70.83
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)            1     0   0.0%       -236.73   0.00
+  no SOJ pattern                      47     7  14.9%      -3329.08   0.44

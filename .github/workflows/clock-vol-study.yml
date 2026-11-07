@@ -1,0 +1,72 @@
+name: P127 clock-volatility study — bracket in busy seas20 slots, fade in quiet slots
+
+# research/specs/P127_clock_volatility.md (approved 2026-11-07: 16 cells, hourly 00:00-12:00 ET,
+# FX only). Pure price on HistData M1. Order: selftest -> both random-walk nulls (real clock
+# volatility profile) -> power check (planted follow-through / reversion) -> real run, which puts
+# the null numbers in the same tables and applies the pre-registered pass rule.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/clock-vol-study.yml"
+      - "scripts/clock_vol_study.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clock-vol-study
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download M1 2022-2026
+        run: |
+          P="EURUSD GBPUSD NZDUSD"
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 --pairs $P --dest /tmp/hd 2>&1 | tail -40
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 10 --pairs $P --dest /tmp/hd 2>&1 | tail -40
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -30
+          ls -la data/histdata
+      - name: Study
+        run: |
+          set -o pipefail
+          {
+            echo "## selftest"
+            python scripts/clock_vol_study.py --selftest
+            rm -f data/clock_vol_null.json
+            echo "## nulls"
+            python scripts/clock_vol_study.py --null > /dev/null
+            echo "nulls written"
+            echo "## power"
+            python scripts/clock_vol_study.py --power
+            echo "## real"
+            python scripts/clock_vol_study.py
+          } 2>&1 | tee data/clock_vol_console.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/clock_vol_report.md data/clock_vol_null.md data/clock_vol_null.json \
+                     data/clock_vol_power.md data/clock_vol_console.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P127 clock-volatility study [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1

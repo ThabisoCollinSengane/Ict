@@ -1,0 +1,999 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2026–2026)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, XAUUSD, XAGUSD, SPXUSD, NSXUSD
+
+Loading and resampling to 5-minute bars (2026)...
+  GBPUSD: 276,426 M1 → 55,554 M5 bars  2026-01-01 – 2026-10-01  close 1.32581
+  EURUSD: 276,701 M1 → 55,580 M5 bars  2026-01-01 – 2026-10-01  close 1.13289
+  EURGBP: 276,784 M1 → 55,685 M5 bars  2026-01-01 – 2026-10-01  close 0.85445
+  UDXUSD: 235,958 M1 → 48,354 M5 bars  2026-01-02 – 2026-10-01  close 101.28800
+  AUDUSD: 276,456 M1 → 55,592 M5 bars  2026-01-01 – 2026-10-01  close 0.69537
+  NZDUSD: 276,755 M1 → 55,681 M5 bars  2026-01-01 – 2026-10-01  close 0.56259
+  AUDNZD: 277,230 M1 → 55,624 M5 bars  2026-01-01 – 2026-10-01  close 1.23588
+  XAUUSD: 264,191 M1 → 52,847 M5 bars  2026-01-01 – 2026-10-01  close 4175.57500
+  XAGUSD: 263,362 M1 → 52,708 M5 bars  2026-01-01 – 2026-10-01  close 61.13700
+  SPXUSD: 255,007 M1 → 51,080 M5 bars  2026-01-01 – 2026-10-01  close 7689.86900
+  NSXUSD: 255,194 M1 → 51,069 M5 bars  2026-01-01 – 2026-10-01  close 30661.11900
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 55554 5-min bars...
+    bar 1000/55554 (2026-01-07 09:20:00+00:00) - active=0 trades=0 equity=1000
+    bar 2000/55554 (2026-01-12 20:40:00+00:00) - active=0 trades=3 equity=984
+    bar 3000/55554 (2026-01-16 08:00:00+00:00) - active=1 trades=12 equity=1015
+    bar 4000/55554 (2026-01-21 19:20:00+00:00) - active=0 trades=19 equity=1034
+    bar 5000/55554 (2026-01-27 06:40:00+00:00) - active=0 trades=26 equity=1036
+    bar 6000/55554 (2026-01-30 18:00:00+00:00) - active=0 trades=33 equity=980
+    bar 7000/55554 (2026-02-05 05:20:00+00:00) - active=0 trades=37 equity=1016
+    bar 8000/55554 (2026-02-10 16:40:00+00:00) - active=0 trades=45 equity=1101
+    bar 9000/55554 (2026-02-16 04:00:00+00:00) - active=0 trades=52 equity=1141
+    bar 10000/55554 (2026-02-19 15:20:00+00:00) - active=0 trades=60 equity=1099
+    bar 11000/55554 (2026-02-25 02:40:00+00:00) - active=0 trades=61 equity=1135
+    bar 12000/55554 (2026-03-02 14:00:00+00:00) - active=1 trades=69 equity=1187
+    bar 13000/55554 (2026-03-06 01:20:00+00:00) - active=0 trades=78 equity=1461
+    bar 14000/55554 (2026-03-11 11:40:00+00:00) - active=0 trades=85 equity=1359
+    bar 15000/55554 (2026-03-16 23:00:00+00:00) - active=0 trades=96 equity=1407
+    bar 16000/55554 (2026-03-20 10:20:00+00:00) - active=0 trades=106 equity=1495
+    bar 17000/55554 (2026-03-25 21:40:00+00:00) - active=0 trades=111 equity=2143
+    bar 18000/55554 (2026-03-31 11:00:00+00:00) - active=0 trades=115 equity=2157
+    bar 19000/55554 (2026-04-05 22:20:00+00:00) - active=0 trades=116 equity=2144
+    bar 20000/55554 (2026-04-09 09:40:00+00:00) - active=1 trades=119 equity=2120
+    bar 21000/55554 (2026-04-14 21:00:00+00:00) - active=1 trades=129 equity=2192
+    bar 22000/55554 (2026-04-20 08:35:00+00:00) - active=0 trades=137 equity=2378
+    bar 23000/55554 (2026-04-23 19:55:00+00:00) - active=0 trades=143 equity=2303
+    bar 24000/55554 (2026-04-29 07:15:00+00:00) - active=0 trades=152 equity=2596
+    bar 25000/55554 (2026-05-04 18:35:00+00:00) - active=0 trades=156 equity=2743
+    bar 26000/55554 (2026-05-08 05:55:00+00:00) - active=0 trades=162 equity=2557
+    bar 27000/55554 (2026-05-13 17:15:00+00:00) - active=0 trades=167 equity=2698
+    bar 28000/55554 (2026-05-19 15:35:00+00:00) - active=0 trades=174 equity=2862
+    bar 29000/55554 (2026-05-25 02:55:00+00:00) - active=0 trades=179 equity=2815
+    bar 30000/55554 (2026-05-28 14:15:00+00:00) - active=1 trades=183 equity=2739
+    bar 31000/55554 (2026-06-03 01:35:00+00:00) - active=0 trades=186 equity=2595
+    bar 32000/55554 (2026-06-08 12:55:00+00:00) - active=1 trades=190 equity=2564
+    bar 33000/55554 (2026-06-12 00:15:00+00:00) - active=0 trades=197 equity=2505
+    bar 34000/55554 (2026-06-17 11:35:00+00:00) - active=0 trades=202 equity=2525
+    bar 35000/55554 (2026-06-22 23:00:00+00:00) - active=0 trades=205 equity=2457
+    bar 36000/55554 (2026-06-26 10:20:00+00:00) - active=0 trades=218 equity=3249
+    bar 37000/55554 (2026-07-01 21:40:00+00:00) - active=0 trades=221 equity=3180
+    bar 38000/55554 (2026-07-07 09:00:00+00:00) - active=0 trades=226 equity=3021
+    bar 39000/55554 (2026-07-10 20:20:00+00:00) - active=0 trades=236 equity=2655
+    bar 40000/55554 (2026-07-16 07:40:00+00:00) - active=0 trades=238 equity=2617
+    bar 41000/55554 (2026-07-21 19:05:00+00:00) - active=0 trades=247 equity=2719
+    bar 42000/55554 (2026-07-27 06:25:00+00:00) - active=0 trades=257 equity=4646
+    bar 43000/55554 (2026-07-30 17:45:00+00:00) - active=1 trades=264 equity=4555
+    bar 44000/55554 (2026-08-05 05:05:00+00:00) - active=0 trades=269 equity=3942
+    bar 45000/55554 (2026-08-10 16:25:00+00:00) - active=0 trades=269 equity=3942
+    bar 46000/55554 (2026-08-14 03:45:00+00:00) - active=0 trades=269 equity=3942
+    bar 47000/55554 (2026-08-19 15:05:00+00:00) - active=0 trades=284 equity=5003
+    bar 48000/55554 (2026-08-25 02:25:00+00:00) - active=1 trades=291 equity=4660
+    bar 49000/55554 (2026-08-28 13:50:00+00:00) - active=0 trades=298 equity=4489
+    bar 50000/55554 (2026-09-03 01:10:00+00:00) - active=0 trades=299 equity=4454
+    bar 51000/55554 (2026-09-08 12:30:00+00:00) - active=2 trades=300 equity=4461
+    bar 52000/55554 (2026-09-13 23:50:00+00:00) - active=0 trades=304 equity=4099
+    bar 53000/55554 (2026-09-17 11:10:00+00:00) - active=0 trades=304 equity=4099
+    bar 54000/55554 (2026-09-22 22:30:00+00:00) - active=0 trades=307 equity=4085
+    bar 55000/55554 (2026-09-29 06:50:00+00:00) - active=0 trades=311 equity=3732
+
+=== Gate funnel (entries passing each filter) ===
+  checks                            51983  ████████████████████████████████████████
+  in_killzone                       51983  ████████████████████████████████████████
+  news_clear                        46276  ███████████████████████████████████
+  nfp_fomc_ok                       40533  ███████████████████████████████
+  intermarket_signal                 1644  █
+  pair_matches                       1644  █
+  mss_h1_m15_m5_ok                    586  
+  daily_bias_ok                       586  
+  h1_bias_ok                          586  
+  h4_bias_ok                          586  
+  dealing_range_ok                     28  
+  consolidation_found                 110  
+  manipulation_correct_dir            100  
+  m5_fvg_correct_dir                  274  
+  target_found                        274  
+  rr_ok                               274  
+  units_nonzero                       274  
+  limit_placed                          0  
+  entry_opened                        171  
+  pyramid_added                        15  
+  pyramid_blocked_min_target          176  
+  drawdown_halt                      4656  ███
+  daily_loss_halt                     306  
+  consec_loss_pause                   224  
+  weekly_cap                            0  
+  weekly_pair_cap                       0  
+  daily_cap                           115  
+  daily_pair_cap                     1019  
+  weekly_amd_confirmed                 96  
+  session_handover_closed               8  
+  htf_draw_full_cascade                22  
+  htf_draw_partial                    236  
+  htf_draw_counter                    221  
+  htf_fvg_5050_hit                      5  
+  ote_zone                              1  
+  choch_confirmed                       4  
+  low_conviction                        0  
+  judas_divergence                      1  
+  ny_continuation                     129  
+  ds_outside_window                  8359  ██████
+  mm_quad_none_eurgbp_flat           2638  ██
+  mm_quad_none_dxy_flat              2838  ██
+  mm_quad_1a                         2825  ██
+  mm_quad_selected                   5350  ████
+  mm_golden_checked                  5350  ████
+  mm_golden_wrong_sweep              1768  █
+  mm_quad_other_pair                 5711  ████
+  mm_golden_amd_ok                   2635  ██
+  mm_golden_via_cascade              1302  █
+  mm_golden_smt_rung_240T             247  
+  mm_golden_smt_yes                  1220  
+  mm_golden_ifvg_zone_60T             745  
+  mm_golden_pd_ifvg                   657  
+  mm_golden_pd_ifvg_60T               246  
+  mm_golden_no_m1_shift               922  
+  ds_sfp                              182  
+  ds_sfp_asia                          30  
+  ds_risk_cap                          41  
+  ds_no_sfp                          1154  
+  mm_quad_2a                         2159  █
+  mm_golden_smt_rung_15T              209  
+  mm_golden_m1_shift                  146  
+  mm_golden_m1_smtx_s2                 40  
+  mm_golden_m1_smtx_s2p_smt            30  
+  mm_golden_no_draw                    73  
+  mm_golden_m1_smtx_s3                 52  
+  ds_sfp_pd                            15  
+  sr_attempted                        342  
+  sr_prev_session_ok                  342  
+  sr_enough_bars                      342  
+  sr_consol_found                     175  
+  sr_breakout_found                    85  
+  mm_golden_smt_rung_5T               170  
+  mm_golden_m1_smtx_s2p_none           17  
+  mm_golden_no_smt                    594  
+  sr_consol_no_sweep                   57  
+  sr_fail_low_swept_no_close_back      34  
+  sr_pdliq_attempted                  224  
+  mm_golden_no_amd                     55  
+  ds_sfp_london                       102  
+  ds_no_target                         27  
+  mm_golden_smt_rung_1T               142  
+  ds_opened                           112  
+  mm_golden_ob_no_raid                193  
+  mm_golden_pd_ifvg_15T               267  
+  mm_quad_1b                         3760  ██
+  mm_golden_smt_rung_60T              170  
+  ds_sfp_pdsw                          35  
+  pm_gate_pair_news                     0  
+  dxy_directional                    8091  ██████
+  eurgbp_flat                         885  
+  eurgbp_flat_gbp_blocked             633  
+  soj_retest                          176  
+  soj_sweep                           262  
+  golden_rule_yes                      51  
+  phase_london_judas                   95  
+  gt_pool_sweep                        83  
+  gt_disp_wick                        197  
+  structure_stop_used                 270  
+  stop_capped_10pip                    66  
+  risk_cap_ok                         171  
+  mm_golden_ob_untested               103  
+  dxy_flat                          31308  ████████████████████████
+  mm_quad_2b                         2317  █
+  mm_golden_no_retrace                 53  
+  mm_golden_via_own_ob                512  
+  mm_golden_ifvg_zone_5T               86  
+  mm_golden_pd_ifvg_5T                144  
+  mm_golden_ifvg_zone_15T             279  
+  mm_golden_no_pd                      42  
+  mm_golden_pd_ob2                     85  
+  mm_golden_pd_ob2_5T                  29  
+  mm_golden_pd_fvg                     54  
+  mm_golden_pd_fvg_5T                   9  
+  mm_golden_no_ifvg                   110  
+  ds_no_bias                          884  
+  mm_golden_m1_smtx_s1                 49  
+  mm_golden_m1_smtx_blocked_shift      54  
+  mm_golden_m1_smtx_s2p_cont           27  
+  breakout_confirmed                  141  
+  crt_turtle_soup                     144  
+  golden_rule_no                       57  
+  mstruct_align                       259  
+  mstruct_minor_sweep                  24  
+  phase_ny_judas                      174  
+  gt_judas_reversal                    53  
+  gt_mp_discount                       52  
+  pyramid_blocked_low_im              877  
+  mm_golden_ob_failed                 718  
+  eurgbp_directional                 1661  █
+  smt_pair_confirmed                   30  
+  im_score_low                       1073  
+  pyramid_blocked_favour             1063  
+  mm_golden_corr_block                396  
+  soj_judas                            86  
+  target_rung_far                      75  
+  mm_golden_other_pair_open           405  
+  mm_golden_pd_ob                     272  
+  mm_golden_pd_ob_15T                 272  
+  mm_golden_m1_smtx_s2p_noref          18  
+  mm_golden_pd_fvg_15T                 22  
+  session_range_found                  10  
+  gt_macro_window                      22  
+  index_own_sized                      59  
+  mm_golden_pd_fvg_60T                 23  
+  mm_golden_opened                     16  
+  sr_fail_no_sweep                     23  
+  m1_stop_used                          4  
+  smt_pair_opposing                    12  
+  dxy_fvg_room                         36  
+  gold_own_sized                      105  
+  risk_cap_skip                       103  
+  mm_golden_pd_ob2_60T                 20  
+  mm_golden_daily_cap                  91  
+  ny_continuation_gated                29  
+  gt_mp_extreme                        14  
+  mm_golden_smt_rung_D                282  
+  smt_dollar                            7  
+  phase_ny_extend                       8  
+  smt_index                             1  
+  ds_news                               2  
+  mm_golden_m1_smtx_s0                  5  
+  mm_golden_pd_ob2_15T                 36  
+  phase_london_breakout                 2  
+  london_judas_ny_echo                  1  
+  target_score_sized                   12  
+  golden_rule_sized                     7  
+  mm_golden_risk_cap                    3  
+  crt_sweep_sized                       5  
+  pdliq_sweep_sized                     7  
+  htf_fvg_breakout_sized                2  
+
+=== Results ===
+  trades                    314
+  win_rate_pct              33.1
+  profit_factor             1.33
+  starting_equity_ZAR       1000
+  ending_equity_ZAR         3364.59
+  pnl_ZAR                   2364.59
+  pnl_pct                   236.46
+  max_drawdown_pct          -32.74
+  avg_win_ZAR               91.68
+  avg_loss_ZAR              -34.14
+[P92 events -> 146 rows]
+
+[trade dump → /home/runner/work/Ict/Ict/data/histdata/trades_dump.csv]
+
+=== Trade log (314 trades) ===
+                opened_at                 closed_at   pair  direction  leg_idx        entry         exit  units         pnl           reason session_side             entry_type
+2026-01-09 15:00:00+00:00 2026-01-09 15:25:00+00:00 NSXUSD         -1        1 25560.253000 25653.458000      1  -17.242925             stop      no_open            daily_sweep
+2026-01-08 15:00:00+00:00 2026-01-09 16:50:00+00:00 SPXUSD          1        1  6910.036000  6964.348000      4   40.190880           target      no_open            daily_sweep
+2026-01-12 08:05:00+00:00 2026-01-12 08:10:00+00:00 EURUSD          1        1     1.168810     1.167770   2000  -38.480000             stop     momentum             amd_fvg_h1
+2026-01-13 12:30:00+00:00 2026-01-13 13:30:00+00:00 EURUSD         -1        1     1.166260     1.166300   1000   -0.740000             stop     momentum         mss_breaker_m5
+2026-01-13 16:00:00+00:00 2026-01-13 16:55:00+00:00 NSXUSD          1        1 25732.979000 25850.796000      1   21.796145           target      no_open            daily_sweep
+2026-01-13 16:00:00+00:00 2026-01-13 20:30:00+00:00 SPXUSD          1        1  6963.639000  6943.639000      2   -7.400000             stop      no_open            daily_sweep
+2026-01-14 09:00:00+00:00 2026-01-14 12:00:00+00:00 GBPUSD          1        1     1.345070     1.344830   1000   -4.440000 session_handover     momentum             amd_ob_m15
+2026-01-14 12:45:00+00:00 2026-01-14 13:15:00+00:00 EURUSD          1        1     1.164890     1.164850   1053   -0.779220             stop     momentum             amd_ob_m15
+2026-01-14 13:00:00+00:00 2026-01-14 14:30:00+00:00 SPXUSD          1        1  6938.836000  6923.633000      3   -8.437665             stop      no_open            daily_sweep
+2026-01-14 13:00:00+00:00 2026-01-14 14:30:00+00:00 NSXUSD          1        1 25617.175000 25536.555000      1  -14.914700             stop      no_open            daily_sweep
+2026-01-15 13:00:00+00:00 2026-01-15 13:10:00+00:00 SPXUSD         -1        1  6952.799000  6957.099000     13  -10.341500             stop      no_open            daily_sweep
+2026-01-15 12:45:00+00:00 2026-01-15 13:35:00+00:00 GBPUSD         -1        1     1.340630     1.337625   1000   55.586950           target     momentum             amd_fvg_h1
+2026-01-16 13:00:00+00:00 2026-01-16 14:55:00+00:00 SPXUSD          1        1  6957.151000  6949.899000      8  -10.732960             stop      no_open            daily_sweep
+2026-01-15 15:00:00+00:00 2026-01-18 23:00:00+00:00 NSXUSD         -1        1 25701.664000 25262.751000      1   81.198905           target      no_open            daily_sweep
+2026-01-19 14:30:00+00:00 2026-01-20 00:05:00+00:00 EURUSD          1        1     1.163740     1.163700   2000   -1.480000             stop     momentum              amd_ob_m5
+2026-01-20 08:00:00+00:00 2026-01-20 13:30:00+00:00 NZDUSD          1        1     0.584115     0.583040   2000  -39.775000             stop     momentum             amd_fvg_m5
+2026-01-20 13:00:00+00:00 2026-01-20 14:40:00+00:00 SPXUSD         -1        1  6845.148000  6854.054000      6   -9.885660             stop      no_open            daily_sweep
+2026-01-21 09:05:00+00:00 2026-01-21 09:40:00+00:00 NSXUSD         -1        1 25052.138000 25042.638000      1    1.757500             stop     momentum            mss_fvg_m15
+2026-01-21 09:30:00+00:00 2026-01-21 12:35:00+00:00 GBPUSD         -1        1     1.342210     1.342260   2000   -1.850000             stop     momentum              amd_ob_m5
+2026-01-22 13:15:00+00:00 2026-01-22 13:30:00+00:00 EURUSD          1        1     1.171790     1.170750   2000  -38.480000             stop     momentum             amd_fvg_m5
+2026-01-22 13:00:00+00:00 2026-01-22 13:45:00+00:00 NSXUSD          1        1 25564.320000 25563.820000      1   -0.092500             stop     momentum             mss_ob_m15
+2026-01-22 13:00:00+00:00 2026-01-22 14:45:00+00:00 SPXUSD          1        1  6917.942000  6906.748000      5  -10.354450             stop     momentum             mss_ob_m15
+2026-01-23 15:00:00+00:00 2026-01-25 23:00:00+00:00 SPXUSD          1        1  6912.339000  6891.336000      2   -7.771110             stop      no_open            daily_sweep
+2026-01-26 14:05:00+00:00 2026-01-26 14:25:00+00:00 NSXUSD          1        1 25600.011000 25599.511000      1   -0.092500             stop     momentum             mss_fvg_m5
+2026-01-26 14:05:00+00:00 2026-01-26 14:30:00+00:00 SPXUSD          1        1  6923.933000  6923.433000      2   -0.185000             stop     momentum             mss_fvg_m5
+2026-01-26 13:40:00+00:00 2026-01-26 15:30:00+00:00 EURUSD          1        1     1.184760     1.187960   1000   59.200000           target       golden      amd_m1_shift_ifvg
+2026-01-27 09:00:00+00:00 2026-01-27 10:05:00+00:00 GBPUSD          1        1     1.367480     1.368430   2000   35.150000             stop       golden        amd_m1_shift_ob
+2026-01-27 14:00:00+00:00 2026-01-27 14:15:00+00:00 SPXUSD          1        1  6966.448000  6962.436000     16  -11.875520             stop      no_open            daily_sweep
+2026-01-28 13:00:00+00:00 2026-01-28 13:10:00+00:00 SPXUSD          1        1  6994.845000  6991.042000     17  -11.960435             stop      no_open            daily_sweep
+2026-01-28 13:45:00+00:00 2026-01-28 14:20:00+00:00 EURUSD         -1        1     1.195580     1.196620   2000  -38.480000             stop     momentum             amd_fvg_m5
+2026-01-28 15:00:00+00:00 2026-01-28 15:15:00+00:00 NSXUSD          1        1 26124.829000 26082.653000      1   -7.802560             stop      no_open            daily_sweep
+2026-01-30 13:00:00+00:00 2026-01-30 14:30:00+00:00 SPXUSD         -1        1  6933.548000  6950.654000      3   -9.493830             stop      no_open            daily_sweep
+2026-01-30 13:00:00+00:00 2026-01-30 14:30:00+00:00 NSXUSD         -1        1 25725.914000 25788.077000      1  -11.500155             stop      no_open            daily_sweep
+2026-02-02 13:00:00+00:00 2026-02-02 13:55:00+00:00 NSXUSD         -1        1 25373.279000 25415.029000      1   -7.723750             stop      no_open            daily_sweep
+2026-02-02 13:00:00+00:00 2026-02-02 14:05:00+00:00 GBPUSD         -1        1     1.367320     1.364350   1000   54.945000           target     momentum             amd_fvg_m5
+2026-02-03 09:30:00+00:00 2026-02-03 13:05:00+00:00 EURUSD         -1        1     1.180240     1.180280   2000   -1.480000             stop     momentum             amd_ob_m15
+2026-02-04 14:00:00+00:00 2026-02-04 14:05:00+00:00 NSXUSD          1        1 25255.397000 25237.864000      3   -9.730815             stop      no_open            daily_sweep
+2026-02-06 15:00:00+00:00 2026-02-06 16:05:00+00:00 NSXUSD         -1        1 24757.558000 24893.529000      1  -25.154635             stop      no_open            daily_sweep
+2026-02-06 17:00:00+00:00 2026-02-06 17:05:00+00:00 SPXUSD         -1        1  6894.445000  6903.199000      6   -9.716940             stop      no_open            daily_sweep
+2026-02-09 12:00:00+00:00 2026-02-09 13:15:00+00:00 GBPUSD          1        1     1.364010     1.364960   1000   17.575000             stop     momentum             amd_fvg_m5
+2026-02-09 13:20:00+00:00 2026-02-09 15:15:00+00:00 EURUSD          1        2     1.189990     1.190950   1000   17.760000             stop      no_open  pyramid_im0.8_fvg_m15
+2026-02-09 15:00:00+00:00 2026-02-09 15:50:00+00:00 NSXUSD          1        1 25030.149000 25207.305000      1   32.773860           target      no_open            daily_sweep
+2026-02-09 13:00:00+00:00 2026-02-10 12:45:00+00:00 EURUSD          1        1     1.188280     1.189240   1000   17.760000             stop     momentum            amd_fvg_m15
+2026-02-10 13:30:00+00:00 2026-02-10 14:35:00+00:00 GBPUSD          1        1     1.368060     1.368010   2000   -1.850000             stop     momentum             mss_fvg_m5
+2026-02-10 14:00:00+00:00 2026-02-10 14:45:00+00:00 EURUSD          1        1     1.190460     1.191420   2000   35.520000             stop        judas             amd_fvg_m5
+2026-02-11 12:05:00+00:00 2026-02-11 13:30:00+00:00 EURUSD         -1        1     1.190290     1.186830   2000  128.020000             stop     momentum             amd_fvg_m5
+2026-02-12 09:00:00+00:00 2026-02-12 10:45:00+00:00 EURUSD          1        1     1.188540     1.187500   2000  -38.480000             stop     momentum            amd_fvg_m15
+2026-02-11 16:00:00+00:00 2026-02-12 15:50:00+00:00 NSXUSD          1        1 25164.245000 24975.109000      1  -34.990160             stop      no_open            daily_sweep
+2026-02-11 16:00:00+00:00 2026-02-12 15:55:00+00:00 SPXUSD          1        1  6945.845000  6911.336000      1   -6.384165             stop      no_open            daily_sweep
+2026-02-13 13:00:00+00:00 2026-02-13 13:20:00+00:00 EURUSD          1        1     1.186570     1.185700   2000  -32.190000             stop     momentum        amd_breaker_m15
+2026-02-13 14:00:00+00:00 2026-02-13 14:30:00+00:00 NSXUSD         -1        1 24706.838000 24643.070000      1   11.797080           target      no_open            daily_sweep
+2026-02-13 14:00:00+00:00 2026-02-13 14:35:00+00:00 SPXUSD         -1        1  6836.833000  6823.551000      5   12.285850           target      no_open            daily_sweep
+2026-02-17 13:15:00+00:00 2026-02-17 13:30:00+00:00 GBPUSD         -1        1     1.353390     1.354440   2000  -38.850000             stop     momentum             amd_fvg_m5
+2026-02-17 14:00:00+00:00 2026-02-17 14:55:00+00:00 SPXUSD          1        1  6811.948000  6788.942000      2   -8.512220             stop      no_open            daily_sweep
+2026-02-18 14:00:00+00:00 2026-02-18 15:00:00+00:00 GBPUSD         -1        1     1.355480     1.354530   2000   35.150000             stop     momentum             amd_fvg_m5
+2026-02-18 13:25:00+00:00 2026-02-18 15:00:00+00:00 EURUSD         -1        1     1.183620     1.182660   2000   35.520000             stop        judas             mss_fvg_m5
+2026-02-18 13:00:00+00:00 2026-02-18 15:00:00+00:00 NSXUSD         -1        1 24823.698000 24898.019000      1  -13.749385             stop      no_open            daily_sweep
+2026-02-19 12:00:00+00:00 2026-02-19 12:30:00+00:00 GBPUSD         -1        1     1.346480     1.347320   2000  -31.080000             stop        judas             amd_fvg_m5
+2026-02-19 13:00:00+00:00 2026-02-19 13:25:00+00:00 NSXUSD          1        1 24803.577000 24746.881000      1  -10.488760             stop      no_open            daily_sweep
+2026-02-19 14:00:00+00:00 2026-02-19 14:35:00+00:00 SPXUSD          1        1  6857.039000  6846.448000      5   -9.796675             stop      no_open            daily_sweep
+2026-02-23 09:15:00+00:00 2026-02-23 13:30:00+00:00 EURUSD         -1        1     1.180410     1.179450   2000   35.520000             stop     momentum             mss_fvg_h1
+2026-02-26 08:00:00+00:00 2026-02-26 10:35:00+00:00 GBPUSD         -1        1     1.353460     1.353510   2000   -1.850000             stop     momentum             amd_fvg_m5
+2026-02-26 09:15:00+00:00 2026-02-26 12:00:00+00:00 EURUSD         -1        1     1.179790     1.180160   2000  -13.690000 session_handover     momentum             mss_fvg_m5
+2026-02-26 16:00:00+00:00 2026-02-27 12:00:00+00:00 NSXUSD          1        1 24957.931000 24896.177000      1  -11.424490 session_handover      no_open            daily_sweep
+2026-02-26 16:00:00+00:00 2026-02-27 13:25:00+00:00 SPXUSD          1        1  6894.439000  6857.445000      1   -6.843890             stop      no_open            daily_sweep
+2026-02-27 13:25:00+00:00 2026-02-27 13:30:00+00:00 SPXUSD         -1        1  6857.251000  6857.751000      2   -0.185000             stop     momentum             mss_fvg_m5
+2026-02-27 13:15:00+00:00 2026-02-27 13:30:00+00:00 NSXUSD         -1        1 24857.155000 24802.655000      1   10.082500             stop     momentum             mss_fvg_m5
+2026-02-27 13:30:00+00:00 2026-02-27 14:15:00+00:00 GBPUSD         -1        1     1.345040     1.346090   2000  -38.850000             stop     momentum             amd_fvg_m5
+2026-03-02 12:00:00+00:00 2026-03-02 13:05:00+00:00 EURUSD         -1        1     1.173160     1.170040   2000  115.440000           target       golden      amd_m1_shift_ifvg
+2026-03-02 14:00:00+00:00 2026-03-02 14:30:00+00:00 SPXUSD         -1        1  6795.654000  6824.242000      2  -10.577560             stop      no_open            daily_sweep
+2026-03-03 08:00:00+00:00 2026-03-03 08:10:00+00:00 GBPUSD         -1        1     1.333100     1.333150   2000   -1.850000             stop     momentum             amd_fvg_m5
+2026-03-03 08:00:00+00:00 2026-03-03 08:10:00+00:00 NSXUSD         -1        1 24640.599000 24631.099000      1    1.757500             stop     momentum             mss_fvg_m5
+2026-03-03 08:00:00+00:00 2026-03-03 08:55:00+00:00 SPXUSD         -1        1  6802.299000  6768.132088      3   18.962636           target     momentum             mss_fvg_m5
+2026-03-03 09:15:00+00:00 2026-03-03 11:10:00+00:00 EURUSD         -1        1     1.162290     1.158613   2000  136.038640           target     momentum             amd_fvg_m5
+2026-03-03 14:00:00+00:00 2026-03-03 14:20:00+00:00 EURUSD         -1        1     1.159460     1.158500   2000   35.520000             stop     momentum              amd_ob_m5
+2026-03-03 15:00:00+00:00 2026-03-03 15:05:00+00:00 SPXUSD          1        1  6739.233000  6731.639000     10  -14.048900             stop      no_open            daily_sweep
+2026-03-03 16:00:00+00:00 2026-03-04 15:25:00+00:00 NSXUSD          1        1 24412.562000 25058.622000      1  119.521100           target      no_open            daily_sweep
+2026-03-05 16:00:00+00:00 2026-03-05 16:10:00+00:00 SPXUSD          1        1  6836.733000  6805.248000      2  -11.649450             stop      no_open            daily_sweep
+2026-03-06 13:00:00+00:00 2026-03-06 13:30:00+00:00 SPXUSD          1        1  6784.554000  6775.842000      9  -14.505480             stop      no_open            daily_sweep
+2026-03-09 14:00:00+00:00 2026-03-09 14:40:00+00:00 NSXUSD         -1        1 24343.022000 24495.022000      1  -28.120000             stop      no_open            daily_sweep
+2026-03-10 07:00:00+00:00 2026-03-10 07:05:00+00:00 NSXUSD          1        1 24960.494000 24959.994000      1   -0.092500             stop     momentum             mss_fvg_m5
+2026-03-10 07:05:00+00:00 2026-03-10 07:10:00+00:00 EURUSD          1        1     1.164060     1.163020   2000  -38.480000             stop     momentum            mss_fvg_m15
+2026-03-10 07:00:00+00:00 2026-03-10 10:15:00+00:00 SPXUSD          1        1  6791.645000  6801.145000      2    3.515000             stop     momentum             mss_fvg_m5
+2026-03-10 11:05:00+00:00 2026-03-10 11:25:00+00:00 GBPUSD          1        1     1.345450     1.344400   2000  -38.850000             stop       golden      amd_m1_shift_ifvg
+2026-03-10 13:00:00+00:00 2026-03-10 13:30:00+00:00 NSXUSD          1        1 24943.266000 25021.929000      1   14.552655           target      no_open            daily_sweep
+2026-03-11 12:30:00+00:00 2026-03-11 14:00:00+00:00 EURUSD         -1        1     1.158760     1.159800   2000  -38.480000             stop     momentum              mss_ob_m5
+2026-03-11 13:00:00+00:00 2026-03-11 15:25:00+00:00 SPXUSD          1        1  6767.748000  6757.233000      7  -13.616925             stop      no_open            daily_sweep
+2026-03-11 16:00:00+00:00 2026-03-11 17:35:00+00:00 NSXUSD          1        1 24911.300000 24865.075000      1   -8.551625             stop      no_open            daily_sweep
+2026-03-12 13:15:00+00:00 2026-03-12 13:25:00+00:00 EURUSD         -1        1     1.152730     1.153770   2000  -38.480000             stop     momentum             amd_fvg_m5
+2026-03-12 12:00:00+00:00 2026-03-12 13:45:00+00:00 NSXUSD         -1        1 24835.250000 24713.555000      1   22.513575           target      no_open            daily_sweep
+2026-03-12 13:15:00+00:00 2026-03-12 14:00:00+00:00 SPXUSD         -1        1  6720.739000  6711.239000      4    7.030000             stop     momentum             mss_fvg_m5
+2026-03-13 07:00:00+00:00 2026-03-13 07:05:00+00:00 NSXUSD         -1        1 24439.903000 24430.403000      1    1.757500             stop     momentum             mss_fvg_m5
+2026-03-13 07:00:00+00:00 2026-03-13 08:30:00+00:00 GBPUSD         -1        1     1.329960     1.326510   2000  127.650000             stop     momentum            amd_fvg_m15
+2026-03-13 07:00:00+00:00 2026-03-13 08:45:00+00:00 SPXUSD         -1        1  6658.842000  6659.342000      2   -0.185000             stop     momentum            mss_fvg_m15
+2026-03-13 13:00:00+00:00 2026-03-13 13:40:00+00:00 NSXUSD         -1        1 24663.533000 24718.761000      1  -10.217180             stop      no_open            daily_sweep
+2026-03-16 13:30:00+00:00 2026-03-16 14:35:00+00:00 EURUSD          1        1     1.148420     1.148380   2000   -1.480000             stop     momentum             amd_fvg_h1
+2026-03-17 08:30:00+00:00 2026-03-17 10:15:00+00:00 EURUSD          1        1     1.149580     1.150540   2000   35.520000             stop     momentum             amd_fvg_m5
+2026-03-17 12:00:00+00:00 2026-03-17 12:05:00+00:00 NSXUSD          1        1 24619.525000 24629.025000      1    1.757500             stop     momentum             mss_fvg_m5
+2026-03-17 12:00:00+00:00 2026-03-17 13:15:00+00:00 SPXUSD          1        1  6696.739000  6729.342000      4   24.126220           target     momentum              mss_ob_m5
+2026-03-17 13:00:00+00:00 2026-03-17 14:15:00+00:00 EURUSD          1        1     1.153530     1.152490   2000  -38.480000             stop     momentum             amd_fvg_m5
+2026-03-18 12:00:00+00:00 2026-03-18 12:05:00+00:00 NSXUSD         -1        1 24846.208000 24846.708000      1   -0.092500             stop     momentum             mss_fvg_m5
+2026-03-18 12:00:00+00:00 2026-03-18 12:30:00+00:00 SPXUSD         -1        1  6729.339000  6719.839000      2    3.515000             stop     momentum             mss_fvg_m5
+2026-03-18 12:15:00+00:00 2026-03-18 12:40:00+00:00 SPXUSD         -1        2  6712.642000  6703.142000      2    3.515000             stop      no_open pyramid_wamd1.0_fvg_m5
+2026-03-18 12:15:00+00:00 2026-03-18 13:10:00+00:00 GBPUSD         -1        1     1.333890     1.330717   2000  117.409880           target     momentum             amd_fvg_m5
+2026-03-18 15:00:00+00:00 2026-03-18 17:10:00+00:00 SPXUSD          1        1  6681.942000  6664.148000      4  -13.167560             stop      no_open            daily_sweep
+2026-03-19 13:00:00+00:00 2026-03-19 13:10:00+00:00 GBPUSD          1        1     1.330570     1.329320   2000  -46.250000             stop     momentum            news_fvg_m5
+2026-03-23 11:00:00+00:00 2026-03-23 11:05:00+00:00 GBPUSD          1        1     1.326860     1.338310   2000  423.650000             stop     momentum         amd_breaker_m5
+2026-03-23 11:00:00+00:00 2026-03-23 11:05:00+00:00 SPXUSD          1        1  6461.948000  6656.448000      2   71.965000             stop     momentum         mss_breaker_m5
+2026-03-23 11:00:00+00:00 2026-03-23 11:15:00+00:00 NSXUSD          1        1 23682.779000 24417.279000      1  135.882500             stop     momentum             mss_ob_m15
+2026-03-24 12:00:00+00:00 2026-03-24 12:35:00+00:00 SPXUSD          1        1  6576.933000  6551.154000      4  -19.076460             stop      no_open            daily_sweep
+2026-03-25 13:15:00+00:00 2026-03-25 14:15:00+00:00 EURUSD         -1        1     1.158920     1.157960   2000   35.520000             stop     momentum             amd_fvg_m5
+2026-03-26 11:25:00+00:00 2026-03-26 11:40:00+00:00 NSXUSD         -1        1 23935.338000 23935.838000      1   -0.092500             stop     momentum             mss_fvg_m5
+2026-03-26 11:15:00+00:00 2026-03-26 13:05:00+00:00 EURUSD         -1        1     1.154950     1.153990   2000   35.520000             stop     momentum              amd_ob_m5
+2026-03-26 11:25:00+00:00 2026-03-26 13:40:00+00:00 SPXUSD         -1        1  6539.151000  6554.499000      7  -19.875660             stop     momentum              mss_ob_m5
+2026-03-27 11:45:00+00:00 2026-03-27 13:20:00+00:00 GBPUSD         -1        1     1.328740     1.328790   2000   -1.850000             stop     momentum             amd_fvg_m5
+2026-03-31 14:00:00+00:00 2026-03-31 14:30:00+00:00 NSXUSD         -1        1 23185.761000 23254.947000      1  -12.799410             stop      no_open            daily_sweep
+2026-04-06 08:30:00+00:00 2026-04-06 10:50:00+00:00 EURUSD          1        1     1.154120     1.155080   2000   35.520000             stop     momentum              amd_ob_m5
+2026-04-07 14:00:00+00:00 2026-04-07 14:55:00+00:00 SPXUSD          1        1  6585.354000  6563.354000      5  -20.350000             stop      no_open            daily_sweep
+2026-04-08 13:00:00+00:00 2026-04-08 13:20:00+00:00 GBPUSD          1        1     1.346590     1.345540   2000  -38.850000             stop     momentum             amd_fvg_m5
+2026-04-09 12:15:00+00:00 2026-04-09 14:55:00+00:00 EURUSD          1        1     1.168100     1.168060   2000   -1.480000             stop     momentum             amd_ob_m15
+2026-04-08 16:00:00+00:00 2026-04-09 16:30:00+00:00 SPXUSD          1        1  6754.442000  6797.445000      7   55.688885           target      no_open            daily_sweep
+2026-04-10 07:15:00+00:00 2026-04-10 10:15:00+00:00 EURUSD         -1        1     1.168480     1.169500   2000  -37.740000             stop     momentum             amd_ob_m15
+2026-04-10 12:00:00+00:00 2026-04-10 12:35:00+00:00 EURUSD          1        1     1.171670     1.171060   2026  -22.863410             stop     momentum             amd_fvg_m5
+2026-04-10 13:15:00+00:00 2026-04-10 13:25:00+00:00 NSXUSD          1        1 25124.848000 25134.348000      3    5.272500             stop     momentum             mss_fvg_m5
+2026-04-10 13:15:00+00:00 2026-04-10 16:40:00+00:00 SPXUSD          1        1  6826.651000  6826.151000      7   -0.647500             stop     momentum              mss_ob_m5
+2026-04-14 08:00:00+00:00 2026-04-14 08:05:00+00:00 NSXUSD          1        1 25446.469000 25455.969000      2    3.515000             stop     momentum             mss_ob_m15
+2026-04-14 08:00:00+00:00 2026-04-14 08:15:00+00:00 EURUSD          1        1     1.178950     1.177910   2000  -38.480000             stop     momentum             amd_fvg_m5
+2026-04-14 08:00:00+00:00 2026-04-14 11:35:00+00:00 SPXUSD          1        1  6892.736000  6892.236000     10   -0.925000             stop     momentum              mss_ob_m5
+2026-04-14 11:00:00+00:00 2026-04-14 12:45:00+00:00 GBPUSD          1        1     1.354490     1.357440   2000  109.150000           target     momentum              amd_ob_m5
+2026-04-15 11:15:00+00:00 2026-04-15 13:30:00+00:00 EURUSD         -1        1     1.177900     1.178820   2000  -34.040000             stop     momentum              amd_ob_m5
+2026-04-15 12:00:00+00:00 2026-04-15 14:30:00+00:00 SPXUSD          1        1  6965.042000  6977.945000      9   21.483495           target      no_open            daily_sweep
+2026-04-14 07:30:00+00:00 2026-04-16 03:40:00+00:00 NZDUSD          1        1     0.587935     0.591988   2000  149.947680           target     momentum             amd_fvg_h1
+2026-04-16 12:00:00+00:00 2026-04-16 14:50:00+00:00 SPXUSD          1        1  7028.542000  7020.036000     15  -23.604150             stop      no_open            daily_sweep
+2026-04-17 08:00:00+00:00 2026-04-17 09:50:00+00:00 NSXUSD          1        1 26323.750000 26365.644744      3   23.251583           target     momentum             mss_ob_m15
+2026-04-17 13:00:00+00:00 2026-04-17 13:25:00+00:00 NSXUSD          1        1 26432.761000 26442.261000      1    1.757500             stop     momentum             mss_fvg_m5
+2026-04-17 13:15:00+00:00 2026-04-17 13:45:00+00:00 EURUSD          1        1     1.180140     1.181100   2000   35.520000             stop     momentum             amd_fvg_h1
+2026-04-17 13:00:00+00:00 2026-04-17 13:45:00+00:00 SPXUSD          1        1  7068.939000  7078.439000      7   12.302500             stop     momentum             mss_fvg_h1
+2026-04-21 08:00:00+00:00 2026-04-21 14:30:00+00:00 EURUSD         -1        1     1.177090     1.177130   2000   -1.480000             stop     momentum             amd_ob_m15
+2026-04-22 13:30:00+00:00 2026-04-22 14:35:00+00:00 XAUUSD         -1        1  4752.085000  4752.585000      1   -9.250000             stop     momentum         mss_breaker_m5
+2026-04-22 13:15:00+00:00 2026-04-22 14:40:00+00:00 EURUSD         -1        1     1.173240     1.173900   2072  -25.299120             stop     momentum             amd_fvg_h1
+2026-04-22 14:00:00+00:00 2026-04-22 15:00:00+00:00 SPXUSD         -1        1  7101.742000  7122.299000      6  -22.818270             stop      no_open            daily_sweep
+2026-04-22 14:00:00+00:00 2026-04-22 15:05:00+00:00 NSXUSD         -1        1 26669.357000 26750.683000      1  -15.045310             stop      no_open            daily_sweep
+2026-04-23 11:00:00+00:00 2026-04-23 12:50:00+00:00 EURUSD         -1        1     1.169150     1.169190   2008   -1.485920             stop     momentum              amd_ob_m5
+2026-04-24 12:00:00+00:00 2026-04-24 12:05:00+00:00 NSXUSD          1        1 27050.500000 27105.000000      1   10.082500             stop     momentum             mss_fvg_m5
+2026-04-24 11:20:00+00:00 2026-04-24 12:20:00+00:00 SPXUSD          1        1  7117.372000  7147.002000      8   43.852400           target     momentum              mss_ob_m5
+2026-04-24 11:25:00+00:00 2026-04-24 13:35:00+00:00 EURUSD          1        2     1.169690     1.170650   2000   35.520000             stop      no_open    pyramid_im0.8_ob_m5
+2026-04-24 13:00:00+00:00 2026-04-24 16:45:00+00:00 SPXUSD         -1        1  7137.131000  7158.616000      6  -23.848350             stop      no_open            daily_sweep
+2026-04-24 08:30:00+00:00 2026-04-26 22:00:00+00:00 EURUSD          1        1     1.168090     1.171550   2109  134.997090             stop     momentum              amd_ob_m5
+2026-04-27 07:35:00+00:00 2026-04-27 13:05:00+00:00 GBPUSD          1        1     1.353330     1.356690   2000  124.320000           target       golden      amd_m1_shift_ifvg
+2026-04-28 07:30:00+00:00 2026-04-28 09:05:00+00:00 EURUSD         -1        1     1.170150     1.170190   2000   -1.480000             stop     momentum             amd_fvg_h1
+2026-04-28 12:00:00+00:00 2026-04-28 12:05:00+00:00 SPXUSD          1        1  7159.499000  7153.436000     25  -28.041375             stop      no_open            daily_sweep
+2026-04-28 12:30:00+00:00 2026-04-28 13:20:00+00:00 GBPUSD         -1        1     1.347560     1.347610   2000   -1.850000             stop     momentum             amd_fvg_m5
+2026-05-01 11:15:00+00:00 2026-05-01 13:20:00+00:00 GBPUSD          1        1     1.360730     1.364083   2000  124.077280           target       golden      amd_m1_shift_ifvg
+2026-05-04 11:00:00+00:00 2026-05-04 11:05:00+00:00 GBPUSD         -1        1     1.354780     1.354830   2000   -1.850000             stop     momentum             amd_fvg_h1
+2026-05-04 11:00:00+00:00 2026-05-04 11:05:00+00:00 SPXUSD         -1        1  7213.148000  7213.648000      5   -0.462500             stop     momentum              mss_ob_m5
+2026-05-04 11:00:00+00:00 2026-05-04 11:05:00+00:00 NSXUSD         -1        1 27727.008000 27592.508000      1   24.882500             stop     momentum             mss_fvg_m5
+2026-05-05 12:00:00+00:00 2026-05-05 13:05:00+00:00 NSXUSD         -1        1 27816.816000 27842.925000      5  -24.150825             stop      no_open            daily_sweep
+2026-05-05 15:00:00+00:00 2026-05-05 15:25:00+00:00 XAUUSD         -1        1  4577.265000  4586.335000      1 -167.795000             stop      no_open            daily_sweep
+2026-05-06 11:45:00+00:00 2026-05-06 11:50:00+00:00 GBPUSD          1        1     1.362790     1.362740   2000   -1.850000             stop       golden      amd_m1_shift_ifvg
+2026-05-07 08:00:00+00:00 2026-05-07 09:15:00+00:00 SPXUSD          1        1  7372.742000  7372.242000     14   -1.295000             stop     momentum              mss_ob_m5
+2026-05-07 08:00:00+00:00 2026-05-07 11:45:00+00:00 EURUSD          1        1     1.175580     1.176540   2000   35.520000             stop     momentum         amd_breaker_m5
+2026-05-07 12:00:00+00:00 2026-05-07 14:45:00+00:00 SPXUSD          1        1  7370.733000  7362.239000     17  -26.713630             stop      no_open            daily_sweep
+2026-05-12 07:15:00+00:00 2026-05-12 07:20:00+00:00 NSXUSD         -1        1 29163.903000 29164.403000      2   -0.185000             stop     momentum             mss_fvg_m5
+2026-05-12 07:20:00+00:00 2026-05-12 08:40:00+00:00 GBPUSD         -1        1     1.355840     1.352488   2000  124.033620           target     momentum             amd_fvg_m5
+2026-05-12 13:00:00+00:00 2026-05-12 13:30:00+00:00 SPXUSD          1        1  7385.636000  7376.833000     17  -27.685435             stop      no_open            daily_sweep
+2026-05-12 16:00:00+00:00 2026-05-12 16:05:00+00:00 XAUUSD          1        1  4674.235000  4667.845000      1 -118.215000             stop      no_open            daily_sweep
+2026-05-13 07:00:00+00:00 2026-05-13 09:45:00+00:00 EURUSD         -1        1     1.173310     1.170275   2915  163.650549           target     momentum              amd_ob_m5
+2026-05-14 08:15:00+00:00 2026-05-14 12:55:00+00:00 GBPUSD         -1        1     1.351210     1.351260   2000   -1.850000             stop     momentum             amd_fvg_m5
+2026-05-14 12:30:00+00:00 2026-05-14 20:40:00+00:00 EURUSD         -1        1     1.170270     1.167110   2243  131.127440           target     momentum             amd_ob_m15
+2026-05-15 14:00:00+00:00 2026-05-15 14:40:00+00:00 SPXUSD          1        1  7417.242000  7406.236000     14  -28.505540             stop      no_open            daily_sweep
+2026-05-18 07:15:00+00:00 2026-05-18 13:00:00+00:00 GBPUSD          1        1     1.334080     1.337530   2000  127.650000             stop     momentum            amd_fvg_m15
+2026-05-18 13:30:00+00:00 2026-05-18 13:35:00+00:00 NSXUSD          1        1 29148.914000 29158.414000      1    1.757500             stop     momentum             mss_fvg_m5
+2026-05-18 13:30:00+00:00 2026-05-18 14:40:00+00:00 GBPUSD          1        1     1.339340     1.338290   2000  -38.850000             stop      no_open             amd_fvg_m5
+2026-05-19 12:00:00+00:00 2026-05-19 14:20:00+00:00 SPXUSD          1        1  7380.799000  7362.145000      8  -27.607920             stop      no_open            daily_sweep
+2026-05-20 12:00:00+00:00 2026-05-20 13:25:00+00:00 NSXUSD         -1        1 29013.385000 29064.493000      3  -28.364940             stop      no_open            daily_sweep
+2026-05-21 12:40:00+00:00 2026-05-21 13:45:00+00:00 EURUSD         -1        1     1.160650     1.160690   2000   -1.480000             stop       golden      amd_m1_shift_ifvg
+2026-05-21 12:00:00+00:00 2026-05-21 13:55:00+00:00 NSXUSD          1        1 29156.220000 29100.749000      2  -20.524270             stop      no_open            daily_sweep
+2026-05-21 15:00:00+00:00 2026-05-21 16:10:00+00:00 SPXUSD          1        1  7417.154000  7389.733000      5  -25.364425             stop      no_open            daily_sweep
+2026-05-22 12:00:00+00:00 2026-05-22 12:45:00+00:00 SPXUSD          1        1  7458.148000  7466.399000     19   29.002265           target      no_open            daily_sweep
+2026-05-26 15:00:00+00:00 2026-05-26 16:45:00+00:00 SPXUSD          1        1  7526.048000  7507.336000      8  -27.693760             stop      no_open            daily_sweep
+2026-05-27 15:00:00+00:00 2026-05-27 15:25:00+00:00 NSXUSD          1        1 29991.577000 29865.761000      1  -23.275960             stop      no_open            daily_sweep
+2026-05-28 12:00:00+00:00 2026-05-28 12:05:00+00:00 NSXUSD          1        1 29816.794000 29805.577000     13  -26.976885             stop      no_open            daily_sweep
+2026-05-28 13:30:00+00:00 2026-05-28 13:35:00+00:00 NSXUSD          1        1 29916.436000 29925.936000      1    1.757500             stop     momentum             mss_fvg_m5
+2026-05-28 13:30:00+00:00 2026-05-28 14:30:00+00:00 SPXUSD          1        1  7514.699000  7514.199000     10   -0.925000             stop        judas              mss_ob_m5
+2026-05-29 12:00:00+00:00 2026-05-29 15:00:00+00:00 XAUUSD         -1        1  4536.935000  4544.525000      1 -140.415000             stop      no_open            daily_sweep
+2026-06-02 07:00:00+00:00 2026-06-02 11:20:00+00:00 EURUSD          1        1     1.163910     1.163870   3510   -2.597400             stop     momentum              amd_ob_m5
+2026-06-03 12:00:00+00:00 2026-06-03 13:30:00+00:00 SPXUSD          1        1  7604.748000  7597.648000     21  -27.583500             stop      no_open            daily_sweep
+2026-06-03 15:00:00+00:00 2026-06-03 23:00:00+00:00 NSXUSD          1        1 30513.786000 30447.808000      2  -24.411860             stop      no_open            daily_sweep
+2026-06-08 12:00:00+00:00 2026-06-08 12:05:00+00:00 NSXUSD          1        1 29197.120000 29206.620000      2    3.515000             stop        judas             mss_fvg_m5
+2026-06-08 12:00:00+00:00 2026-06-08 12:10:00+00:00 SPXUSD          1        1  7416.839000  7426.339000     10   17.575000             stop        judas              mss_ob_m5
+2026-06-08 12:00:00+00:00 2026-06-08 13:35:00+00:00 GBPUSD          1        1     1.334250     1.335200   2000   35.150000             stop     momentum             amd_fvg_m5
+2026-06-09 11:50:00+00:00 2026-06-09 12:05:00+00:00 NSXUSD          1        1 29641.242000 29640.742000      2   -0.185000             stop        judas             mss_ob_m15
+2026-06-09 11:15:00+00:00 2026-06-09 15:15:00+00:00 GBPUSD          1        1     1.339330     1.339280   2000   -1.850000             stop     momentum             amd_fvg_h1
+2026-06-09 16:00:00+00:00 2026-06-09 16:20:00+00:00 SPXUSD          1        1  7391.833000  7357.636000      4  -25.305780             stop      no_open            daily_sweep
+2026-06-09 16:00:00+00:00 2026-06-09 16:20:00+00:00 NSXUSD          1        1 29200.976000 29046.983000      1  -28.488705             stop      no_open            daily_sweep
+2026-06-10 12:00:00+00:00 2026-06-10 12:10:00+00:00 EURUSD         -1        1     1.153700     1.154740   2000  -38.480000             stop     momentum              amd_ob_m5
+2026-06-10 12:00:00+00:00 2026-06-10 12:35:00+00:00 SPXUSD         -1        1  7309.133000  7309.633000      2   -0.185000             stop     momentum             mss_fvg_h1
+2026-06-12 15:00:00+00:00 2026-06-12 15:05:00+00:00 SPXUSD          1        1  7380.099000  7411.799000      6   35.187000           target      no_open            daily_sweep
+2026-06-12 15:00:00+00:00 2026-06-12 15:05:00+00:00 NSXUSD          1        1 29333.054000 29556.731000      1   41.380245           target      no_open            daily_sweep
+2026-06-16 11:10:00+00:00 2026-06-16 11:35:00+00:00 NSXUSD          1        1 30573.542000 30583.042000      1    1.757500             stop     momentum             mss_fvg_m5
+2026-06-16 11:15:00+00:00 2026-06-16 12:40:00+00:00 EURUSD          1        1     1.161000     1.159960   2000  -38.480000             stop     momentum            amd_fvg_m15
+2026-06-16 15:00:00+00:00 2026-06-16 15:15:00+00:00 NSXUSD          1        1 30482.709000 30427.989000      2  -20.246400             stop      no_open            daily_sweep
+2026-06-17 12:00:00+00:00 2026-06-17 13:50:00+00:00 EURUSD         -1        1     1.159610     1.160210   2436  -27.039600             stop     momentum             amd_fvg_h1
+2026-06-18 11:00:00+00:00 2026-06-18 12:00:00+00:00 GBPUSD         -1        1     1.323080     1.323130   2000   -1.850000             stop     momentum             amd_fvg_m5
+2026-06-22 08:30:00+00:00 2026-06-22 10:00:00+00:00 EURUSD         -1        1     1.144780     1.145820   2000  -38.480000             stop     momentum             amd_fvg_m5
+2026-06-23 08:40:00+00:00 2026-06-23 08:50:00+00:00 NSXUSD         -1        1 29640.708000 29641.208000      1   -0.092500             stop     momentum             mss_fvg_m5
+2026-06-23 08:30:00+00:00 2026-06-23 09:40:00+00:00 XAUUSD         -1        1  4118.005000  4108.505000      1  175.750000             stop        judas              mss_ob_m5
+2026-06-23 08:40:00+00:00 2026-06-23 10:20:00+00:00 SPXUSD         -1        1  7372.339000  7372.839000      1   -0.092500             stop     momentum             mss_fvg_h1
+2026-06-23 08:30:00+00:00 2026-06-23 12:30:00+00:00 EURUSD         -1        1     1.142560     1.139270   2000  121.730000           target        judas         amd_breaker_m5
+2026-06-23 16:00:00+00:00 2026-06-24 00:05:00+00:00 SPXUSD         -1        1  7397.039000  7354.866000      5   39.010025           target      no_open            daily_sweep
+2026-06-23 12:30:00+00:00 2026-06-24 08:40:00+00:00 EURUSD         -1        1     1.139270     1.135810   2000  128.020000             stop     momentum             amd_fvg_m5
+2026-06-24 12:00:00+00:00 2026-06-24 12:45:00+00:00 SPXUSD         -1        1  7378.913000  7391.833000     12  -28.682400             stop      no_open            daily_sweep
+2026-06-24 13:30:00+00:00 2026-06-24 14:20:00+00:00 GBPUSD         -1        1     1.315470     1.315520   2000   -1.850000             stop     momentum              amd_ob_m5
+2026-06-24 14:00:00+00:00 2026-06-24 14:45:00+00:00 NSXUSD         -1        1 29453.181000 29274.403000      1   33.073930           target      no_open            daily_sweep
+2026-06-25 12:15:00+00:00 2026-06-25 13:30:00+00:00 EURUSD         -1        1     1.133940     1.134720   2135  -30.808050             stop     momentum             amd_fvg_m5
+2026-06-25 14:00:00+00:00 2026-06-25 14:05:00+00:00 XAUUSD         -1        1  4010.715000  4020.825000      1 -187.035000             stop      no_open            daily_sweep
+2026-06-25 14:00:00+00:00 2026-06-25 14:50:00+00:00 SPXUSD         -1        1  7418.954000  7337.749000     13  195.298025           target      no_open            daily_sweep
+2026-06-25 14:00:00+00:00 2026-06-26 03:55:00+00:00 NSXUSD         -1        1 29900.921000 28961.146000      2  347.716750           target      no_open            daily_sweep
+2026-06-29 07:15:00+00:00 2026-06-29 09:20:00+00:00 EURUSD          1        1     1.139760     1.139720   7812   -5.780880             stop     momentum            amd_fvg_m15
+2026-07-01 13:00:00+00:00 2026-07-01 14:20:00+00:00 EURUSD         -1        1     1.138580     1.137620   5000   88.800000             stop     momentum            amd_fvg_m15
+2026-07-01 13:00:00+00:00 2026-07-01 14:20:00+00:00 XAUUSD         -1        1  4028.505000  4036.715000      1 -151.885000             stop      no_open            daily_sweep
+2026-07-02 07:45:00+00:00 2026-07-02 08:00:00+00:00 GBPUSD          1        1     1.331440     1.330390   5000  -97.125000             stop     momentum              amd_ob_m5
+2026-07-02 13:00:00+00:00 2026-07-02 13:05:00+00:00 NSXUSD          1        1 29818.821000 29828.321000      2    3.515000             stop     momentum             mss_fvg_m5
+2026-07-03 07:00:00+00:00 2026-07-03 07:05:00+00:00 NSXUSD          1        1 29626.187000 29635.687000      4    7.030000             stop     momentum             mss_fvg_m5
+2026-07-03 07:00:00+00:00 2026-07-03 09:45:00+00:00 SPXUSD          1        1  7509.399000  7498.322000     30  -61.477350             stop     momentum              mss_ob_m5
+2026-07-06 07:20:00+00:00 2026-07-06 16:45:00+00:00 EURUSD         -1        1     1.142390     1.142430  15000  -11.100000             stop     momentum              mss_ob_m5
+2026-07-07 15:00:00+00:00 2026-07-07 15:05:00+00:00 SPXUSD          1        1  7516.082000  7507.453000     20  -31.927300             stop      no_open            daily_sweep
+2026-07-08 08:15:00+00:00 2026-07-08 09:15:00+00:00 EURUSD          1        1     1.142270     1.141570   2448  -31.701600             stop     momentum              amd_ob_m5
+2026-07-08 08:30:00+00:00 2026-07-08 09:15:00+00:00 NZDUSD          1        1     0.571665     0.570590   2000  -39.775000             stop     momentum             amd_fvg_h1
+2026-07-09 07:00:00+00:00 2026-07-09 09:55:00+00:00 GBPUSD          1        1     1.341060     1.341010   2000   -1.850000             stop     momentum             amd_fvg_h1
+2026-07-09 07:00:00+00:00 2026-07-09 10:40:00+00:00 SPXUSD          1        1  7503.563000  7487.313000     10  -30.062500             stop     momentum             mss_fvg_m5
+2026-07-09 11:45:00+00:00 2026-07-09 13:00:00+00:00 EURUSD         -1        1     1.142710     1.143300   2836  -30.954940             stop     momentum              amd_ob_m5
+2026-07-09 15:00:00+00:00 2026-07-09 15:05:00+00:00 XAUUSD         -1        1  4119.945000  4130.755000      1 -199.985000             stop      no_open            daily_sweep
+2026-07-09 15:00:00+00:00 2026-07-09 16:05:00+00:00 SPXUSD         -1        1  7511.445000  7521.628000     15  -28.257825             stop      no_open            daily_sweep
+2026-07-10 08:00:00+00:00 2026-07-10 13:10:00+00:00 EURUSD         -1        1     1.143810     1.143850   2000   -1.480000             stop       golden      amd_m1_shift_ifvg
+2026-07-10 16:00:00+00:00 2026-07-10 16:25:00+00:00 NSXUSD          1        1 29608.410000 29772.216000      1   30.304110           target      no_open            daily_sweep
+2026-07-14 13:00:00+00:00 2026-07-14 13:25:00+00:00 NSXUSD         -1        1 29426.750000 29466.750000      3  -22.200000             stop      no_open            daily_sweep
+2026-07-14 14:00:00+00:00 2026-07-15 11:00:00+00:00 SPXUSD         -1        1  7532.299000  7561.419000      3  -16.161600 session_handover      no_open            daily_sweep
+2026-07-16 13:30:00+00:00 2026-07-16 14:40:00+00:00 GBPUSD         -1        1     1.350090     1.351140   2000  -38.850000             stop     momentum             amd_fvg_h1
+2026-07-16 13:00:00+00:00 2026-07-16 14:40:00+00:00 SPXUSD          1        1  7554.629000  7535.249000      7  -25.097100             stop      no_open            daily_sweep
+2026-07-17 11:15:00+00:00 2026-07-17 12:15:00+00:00 GBPUSD         -1        1     1.343800     1.343850   2000   -1.850000             stop     momentum             amd_fvg_h1
+2026-07-17 12:00:00+00:00 2026-07-17 12:40:00+00:00 NSXUSD         -1        1 28594.209000 28538.942000      3   30.673185           target      no_open            daily_sweep
+2026-07-20 08:20:00+00:00 2026-07-20 09:25:00+00:00 GBPUSD          1        1     1.346730     1.346680   2000   -1.850000             stop     momentum             amd_ob_m15
+2026-07-20 13:00:00+00:00 2026-07-20 19:15:00+00:00 EURUSD         -1        1     1.142750     1.141790   2000   35.520000             stop     momentum             amd_fvg_m5
+2026-07-21 07:30:00+00:00 2026-07-21 11:00:00+00:00 SPXUSD          1        1  7485.679000  7484.134000      9   -2.572425 session_handover     momentum             mss_fvg_h1
+2026-07-21 12:00:00+00:00 2026-07-21 14:25:00+00:00 NSXUSD         -1        1 28994.909000 29034.232000      3  -21.824265             stop      no_open            daily_sweep
+2026-07-21 13:00:00+00:00 2026-07-21 14:35:00+00:00 GBPUSD         -1        1     1.340100     1.336650   2000  127.650000             stop     momentum             amd_fvg_m5
+2026-07-22 11:00:00+00:00 2026-07-22 11:05:00+00:00 EURUSD         -1        1     1.140060     1.140180   2000   -4.440000 session_handover       golden       amd_m1_shift_ob2
+2026-07-22 13:00:00+00:00 2026-07-22 13:55:00+00:00 SPXUSD          1        1  7481.986000  7473.363000     18  -28.714590             stop      no_open            daily_sweep
+2026-07-22 14:00:00+00:00 2026-07-22 14:30:00+00:00 XAUUSD          1        1  4114.285000  4134.565000      1  375.180000           target      no_open            daily_sweep
+2026-07-23 12:00:00+00:00 2026-07-23 12:20:00+00:00 XAUUSD          1        1  4094.525000  4083.755000      1 -199.245000             stop      no_open            daily_sweep
+2026-07-23 07:35:00+00:00 2026-07-23 12:40:00+00:00 GBPUSD         -1        1     1.337880     1.334220  12500  846.375000           target       golden      amd_m1_shift_ifvg
+2026-07-23 13:00:00+00:00 2026-07-23 13:15:00+00:00 SPXUSD          1        1  7463.754000  7450.866000     16  -38.148480             stop      no_open            daily_sweep
+2026-07-23 11:15:00+00:00 2026-07-23 13:45:00+00:00 EURUSD         -1        1     1.140660     1.137640  12500  698.375000           target     momentum            amd_fvg_m15
+2026-07-24 08:00:00+00:00 2026-07-24 14:05:00+00:00 XAUUSD          1        1  4039.235000  4048.735000      1  175.750000             stop     momentum              mss_ob_m5
+2026-07-24 12:00:00+00:00 2026-07-24 14:50:00+00:00 NSXUSD         -1        1 28483.031000 28273.564000      3  116.254185           target      no_open            daily_sweep
+2026-07-24 11:50:00+00:00 2026-07-24 16:05:00+00:00 EURUSD         -1        1     1.138140     1.138180  18750  -13.875000             stop       golden       amd_m1_shift_ob2
+2026-07-27 11:55:00+00:00 2026-07-27 14:30:00+00:00 GBPUSD         -1        1     1.331750     1.331800   6250   -5.781250             stop     momentum             amd_fvg_m5
+2026-07-27 13:00:00+00:00 2026-07-28 03:50:00+00:00 EURUSD         -1        1     1.138840     1.137880   5000   88.800000             stop     momentum              amd_ob_m5
+2026-07-28 12:10:00+00:00 2026-07-28 13:00:00+00:00 GBPUSD         -1        1     1.327450     1.328400  18750 -329.531250             stop       golden      amd_m1_shift_ifvg
+2026-07-29 11:00:00+00:00 2026-07-29 11:05:00+00:00 EURUSD         -1        1     1.139140     1.139210  19531  -25.292645 session_handover        judas         amd_breaker_m5
+2026-07-30 07:00:00+00:00 2026-07-30 09:15:00+00:00 EURUSD         -1        1     1.144760     1.144800   9765   -7.226100             stop     momentum              amd_ob_m5
+2026-07-30 08:15:00+00:00 2026-07-30 11:00:00+00:00 SPXUSD         -1        1  7335.242000  7343.929000     20  -32.141900 session_handover     momentum              mss_ob_m5
+2026-07-30 11:00:00+00:00 2026-07-30 12:05:00+00:00 GBPUSD          1        1     1.337830     1.338780  12500  219.687500             stop        judas             amd_fvg_m5
+2026-07-30 16:00:00+00:00 2026-07-30 20:05:00+00:00 NSXUSD         -1        1 27932.331000 28108.919000      1  -32.668780             stop      no_open            daily_sweep
+2026-07-31 07:05:00+00:00 2026-07-31 09:30:00+00:00 EURUSD          1        1     1.151580     1.150540  12500 -240.500000             stop       golden      amd_m1_shift_ifvg
+2026-07-31 12:00:00+00:00 2026-07-31 12:20:00+00:00 XAUUSD         -1        1  4054.375000  4059.705000      1  -98.605000             stop        judas             mss_fvg_h1
+2026-07-31 12:00:00+00:00 2026-07-31 14:20:00+00:00 EURUSD         -1        1     1.149930     1.149970   7812   -5.780880             stop     momentum              amd_ob_m5
+2026-08-03 12:50:00+00:00 2026-08-03 15:05:00+00:00 EURUSD          1        1     1.152930     1.151910  12500 -235.875000             stop       golden      amd_m1_shift_ifvg
+2026-08-14 12:00:00+00:00 2026-08-14 12:30:00+00:00 XAUUSD         -1        1  4347.655000  4360.015000      1 -228.660000             stop      no_open            daily_sweep
+2026-08-14 12:00:00+00:00 2026-08-14 13:10:00+00:00 SPXUSD          1        1  7807.473000  7802.973000     53  -44.122500             stop     momentum              mss_ob_m5
+2026-08-14 07:00:00+00:00 2026-08-14 13:30:00+00:00 EURUSD          1        1     1.154390     1.157628  19531 1170.095569           target     momentum              mss_ob_m5
+2026-08-14 15:00:00+00:00 2026-08-14 15:20:00+00:00 SPXUSD          1        1  7805.994000  7796.729000     29  -49.706725             stop      no_open            daily_sweep
+2026-08-17 07:30:00+00:00 2026-08-17 07:35:00+00:00 NSXUSD          1        2 30212.710000 30212.210000      5   -0.462500             stop      no_open   pyramid_im0.8_fvg_m5
+2026-08-17 07:35:00+00:00 2026-08-17 07:40:00+00:00 NSXUSD          1        2 30227.819000 30217.319000      5   -9.712500             stop      no_open   pyramid_im0.8_fvg_m5
+2026-08-17 07:40:00+00:00 2026-08-17 07:45:00+00:00 NSXUSD          1        2 30219.321000 30218.821000      5   -0.462500             stop      no_open   pyramid_im0.8_fvg_m5
+2026-08-17 07:45:00+00:00 2026-08-17 07:55:00+00:00 NSXUSD          1        2 30230.653000 30220.153000      5   -9.712500             stop      no_open   pyramid_im0.8_fvg_m5
+2026-08-17 07:55:00+00:00 2026-08-17 08:00:00+00:00 NSXUSD          1        2 30230.220000 30219.720000      5   -9.712500             stop      no_open   pyramid_im0.8_fvg_m5
+2026-08-17 08:00:00+00:00 2026-08-17 08:05:00+00:00 NSXUSD          1        2 30217.319000 30206.819000      5   -9.712500             stop      no_open   pyramid_im0.8_fvg_m5
+2026-08-17 07:00:00+00:00 2026-08-17 08:10:00+00:00 NSXUSD          1        1 30196.119000 30195.619000      6   -0.555000             stop     momentum             mss_fvg_m5
+2026-08-17 07:00:00+00:00 2026-08-17 13:00:00+00:00 SPXUSD          1        1  7798.903000  7789.171000     56 -100.823520             stop     momentum             mss_fvg_h1
+2026-08-19 07:20:00+00:00 2026-08-19 13:30:00+00:00 EURUSD          1        1     1.159830     1.160790  15625  277.500000             stop     momentum             amd_fvg_h1
+2026-08-19 13:15:00+00:00 2026-08-19 13:30:00+00:00 NSXUSD          1        1 29483.708000 29518.208000      3   19.147500             stop     momentum            mss_fvg_m15
+2026-08-19 13:15:00+00:00 2026-08-19 14:45:00+00:00 SPXUSD          1        1  7699.192000  7708.692000     33   57.997500             stop     momentum             mss_ob_m15
+2026-08-20 11:00:00+00:00 2026-08-20 11:45:00+00:00 EURUSD          1        2     1.170730     1.169920   5000  -74.925000             stop      no_open pyramid_wamd1.0_fvg_m5
+2026-08-20 11:45:00+00:00 2026-08-20 11:50:00+00:00 EURUSD          1        2     1.170150     1.169710   5000  -40.700000             stop      no_open  pyramid_wamd1.0_ob_m5
+2026-08-20 11:50:00+00:00 2026-08-20 12:10:00+00:00 EURUSD          1        2     1.169610     1.169170   5000  -40.700000             stop      no_open  pyramid_wamd1.0_ob_m5
+2026-08-20 12:30:00+00:00 2026-08-20 12:40:00+00:00 EURUSD          1        2     1.169610     1.168720   5000  -82.325000             stop      no_open  pyramid_wamd1.0_ob_m5
+2026-08-20 07:10:00+00:00 2026-08-20 13:05:00+00:00 EURUSD          1        1     1.168020     1.167980  12500   -9.250000             stop     momentum             amd_ob_m15
+2026-08-21 12:00:00+00:00 2026-08-21 12:20:00+00:00 SPXUSD         -1        1  7668.416000  7675.184000     41  -51.335280             stop      no_open            daily_sweep
+2026-08-21 12:00:00+00:00 2026-08-21 12:20:00+00:00 NSXUSD         -1        1 29395.087000 29433.953000      6  -43.141260             stop      no_open            daily_sweep
+2026-08-25 07:00:00+00:00 2026-08-25 07:10:00+00:00 EURUSD         -1        2     1.165280     1.165780   5000  -46.250000             stop      no_open    pyramid_im1.0_ob_m5
+2026-08-25 07:10:00+00:00 2026-08-25 08:15:00+00:00 EURUSD         -1        2     1.165630     1.166070   5000  -40.700000             stop      no_open    pyramid_im1.0_ob_m5
+2026-08-24 08:00:00+00:00 2026-08-25 09:45:00+00:00 EURUSD         -1        1     1.167640     1.166680   6250  111.000000             stop     momentum              mss_ob_m5
+2026-08-26 12:00:00+00:00 2026-08-26 13:30:00+00:00 XAUUSD          1        1  4621.525000  4611.695000      1 -181.855000             stop      no_open            daily_sweep
+2026-08-26 13:30:00+00:00 2026-08-26 14:45:00+00:00 SPXUSD         -1        1  7668.795000  7684.192000     16  -45.575120             stop     momentum         mss_breaker_m5
+2026-08-25 15:00:00+00:00 2026-08-26 23:00:00+00:00 NSXUSD         -1        1 29239.665000 29344.289000      2  -38.710880             stop      no_open            daily_sweep
+2026-08-27 15:00:00+00:00 2026-08-27 16:15:00+00:00 SPXUSD          1        1  7702.878000  7726.929000     16   71.190960           target      no_open            daily_sweep
+2026-09-02 16:00:00+00:00 2026-09-03 00:45:00+00:00 NSXUSD         -1        1 29072.610000 29167.198000      2  -34.997560             stop      no_open            daily_sweep
+2026-09-08 08:30:00+00:00 2026-09-08 08:35:00+00:00 NSXUSD         -1        1 29554.654000 29545.154000      4    7.030000             stop     momentum             mss_fvg_m5
+2026-09-08 12:00:00+00:00 2026-09-08 13:55:00+00:00 NSXUSD         -1        1 29533.576000 29613.410000      3  -44.307870             stop      no_open            daily_sweep
+2026-09-08 08:00:00+00:00 2026-09-08 14:00:00+00:00 NZDUSD         -1        1     0.585485     0.585560  15625  -21.679688             stop     momentum              amd_ob_m5
+2026-09-09 07:00:00+00:00 2026-09-09 09:05:00+00:00 GBPUSD          1        1     1.355690     1.354660   5000  -95.275000             stop     momentum              amd_ob_m5
+2026-09-09 13:00:00+00:00 2026-09-09 14:15:00+00:00 XAUUSD         -1        1  4405.595000  4416.475000      1 -201.280000             stop      no_open            daily_sweep
+2026-09-21 12:15:00+00:00 2026-09-21 14:05:00+00:00 EURUSD          1        1     1.148330     1.148290   7812   -5.780880             stop     momentum              amd_ob_m5
+2026-09-22 08:30:00+00:00 2026-09-22 09:00:00+00:00 NSXUSD         -1        1 30458.776000 30449.276000      2    3.515000             stop     momentum             mss_fvg_m5
+2026-09-22 08:30:00+00:00 2026-09-22 09:50:00+00:00 EURUSD         -1        1     1.145630     1.145670  15625  -11.562500             stop     momentum            amd_fvg_m15
+2026-09-23 13:00:00+00:00 2026-09-23 14:35:00+00:00 SPXUSD          1        1  7761.936000  7751.563000     22  -42.218110             stop      no_open            daily_sweep
+2026-09-23 16:00:00+00:00 2026-09-24 06:55:00+00:00 NSXUSD          1        1 30528.386000 30346.820000      1  -33.589710             stop      no_open            daily_sweep
+2026-09-24 16:00:00+00:00 2026-09-24 17:15:00+00:00 NSXUSD         -1        1 30249.697000 30349.510000      2  -36.930810             stop      no_open            daily_sweep
+2026-09-28 07:00:00+00:00 2026-09-28 09:00:00+00:00 EURUSD         -1        1     1.137650     1.138690  12500 -240.500000             stop       golden        amd_m1_shift_ob
+2026-09-29 08:30:00+00:00 2026-09-29 12:50:00+00:00 EURUSD         -1        1     1.134250     1.135290  10000 -192.400000             stop     momentum              amd_ob_m5
+2026-09-29 13:00:00+00:00 2026-09-29 13:10:00+00:00 NSXUSD         -1        1 30401.164000 30429.287000      6  -31.216530             stop      no_open            daily_sweep
+2026-09-29 16:00:00+00:00 2026-09-29 20:55:00+00:00 XAUUSD         -1        1  4168.785000  4176.545000      1 -143.560000             stop      no_open            daily_sweep
+
+=== Per-pair P&L (ZAR) ===
+  EURUSD: 83 trades  wins=29  losses=54  P&L=R1914.06
+  GBPUSD: 45 trades  wins=17  losses=28  P&L=R1834.88
+  NSXUSD: 83 trades  wins=34  losses=49  P&L=R357.60
+  NZDUSD: 4 trades  wins=1  losses=3  P&L=R48.72
+  SPXUSD: 83 trades  wins=20  losses=63  P&L=R-489.57
+  XAUUSD: 16 trades  wins=3  losses=13  P&L=R-1301.10
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2026       314   104  33.1%      2364.59   -34.2%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  EURUSD   2026        83    29  34.9%
+  GBPUSD   2026        45    17  37.8%
+  NSXUSD   2026        83    34  41.0%
+  NZDUSD   2026         4     1  25.0%
+  SPXUSD   2026        83    20  24.1%
+  XAUUSD   2026        16     3  18.8%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  amd_breaker_m15            1     0   0.0%     -32.19
+  amd_breaker_m5             4     3  75.0%     138.90
+  amd_fvg_h1                15     4  26.7%      22.58
+  amd_fvg_m15                9     5  55.6%     107.33
+  amd_fvg_m5                36    15  41.7%      20.50
+  amd_m1_shift_ifvg         12     5  41.7%      34.99
+  amd_m1_shift_ob            2     1  50.0%    -102.67
+  amd_m1_shift_ob2           2     0   0.0%      -9.16
+  amd_ob_m15                 9     1  11.1%       8.07
+  amd_ob_m5                 23     7  30.4%       1.45
+  daily_sweep              112    23  20.5%     -16.24
+  mss_breaker_m5             4     1  25.0%       4.10
+  mss_fvg_h1                 7     2  28.6%     -22.07
+  mss_fvg_m15                4     2  50.0%      -4.44
+  mss_fvg_m5                33    21  63.6%       3.29
+  mss_ob_m15                 7     4  57.1%      30.00
+  mss_ob_m5                 18     7  38.9%      83.71
+  news_fvg_m5                1     0   0.0%     -46.25
+  pyramid_im0.8_fvg_m15       1     1 100.0%      17.76
+  pyramid_im0.8_fvg_m5       6     0   0.0%      -6.63
+  pyramid_im0.8_ob_m5        1     1 100.0%      35.52
+  pyramid_im1.0_ob_m5        2     0   0.0%     -43.47
+  pyramid_wamd1.0_fvg_m5       2     1  50.0%     -35.70
+  pyramid_wamd1.0_ob_m5       3     0   0.0%     -54.57
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  FVG            114    51  44.7%      1839.46      16.14   2.47
+  OB              65    21  32.3%      1402.28      21.57   2.05
+  BREAKER          9     4  44.4%       539.82      59.98   5.78
+  other          126    28  22.2%     -1416.98     -11.25   0.68
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  BREAKER M15            1     0   0.0%   0.00
+  BREAKER M5             8     4  50.0%   8.07
+  FVG H1                22     6  27.3%   1.48
+  FVG M15               14     8  57.1%   8.26
+  FVG M5                78    37  47.4%   1.94
+  OB ?                   2     1  50.0%   0.15
+  OB M15                16     5  31.2%   5.09
+  OB M5                 47    15  31.9%   2.28
+  other ?              126    28  22.2%   0.68
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  BREAKER EURUSD             5     2  40.0%   2.70
+  BREAKER GBPUSD             1     1 100.0%    inf
+  BREAKER SPXUSD             2     1  50.0%   1.58
+  BREAKER XAUUSD             1     0   0.0%   0.00
+  FVG EURUSD                35    15  42.9%   2.90
+  FVG GBPUSD                30    11  36.7%   3.50
+  FVG NSXUSD                31    18  58.1%   2.64
+  FVG NZDUSD                 3     1  33.3%   1.88
+  FVG SPXUSD                14     6  42.9%   0.36
+  FVG XAUUSD                 1     0   0.0%   0.00
+  OB EURUSD                 35    10  28.6%   2.05
+  OB GBPUSD                  8     2  25.0%   0.71
+  OB NSXUSD                  5     3  60.0% 586.12
+  OB NZDUSD                  1     0   0.0%   0.00
+  OB SPXUSD                 14     4  28.6%   0.83
+  OB XAUUSD                  2     2 100.0%    inf
+  other EURUSD               8     2  25.0%   0.35
+  other GBPUSD               6     3  50.0%   2.96
+  other NSXUSD              47    13  27.7%   1.17
+  other SPXUSD              53     9  17.0%   0.55
+  other XAUUSD              12     1   8.3%   0.20
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  m15_range              118    41  34.7%   2.59
+  session_range           11     5  45.5%   0.99
+  (no AMD)               185    58  31.4%   0.66
+
+  Session-range widths (n=342): median=38.4 p75=52.8 p90=72.9 pips (cap=35.0)
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  0/3              133    28  21.1%     -1941.38     -14.60   0.51
+  1/3               95    38  40.0%       663.71       6.99   1.65
+  2/3               64    33  51.6%      3789.04      59.20   3.28
+  3/3               22     5  22.7%      -146.78      -6.67   0.71
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+  1a           DXY↑ + H1 EUR>GBP → GBPUSD short         9     2  22.2%       160.80   2.77
+  1b           DXY↑ + H1 GBP>EUR → EURUSD short         9     5  55.6%        52.54   1.19
+  2a           DXY↓ + H1 EUR>GBP → EURUSD long          1     0   0.0%       -38.48   0.00
+  2b           DXY↓ + H1 GBP>EUR → GBPUSD long          9     4  44.4%       458.06   2.93
+  3a           DXY↑ + cross flat → EURUSD short        26    10  38.5%      1198.70   4.34
+  3b           DXY↓ + cross flat → EURUSD long         32    11  34.4%      1246.32   3.13
+  1a_h4        DXY↑ + H4 EUR>GBP → GBPUSD short         4     0   0.0%        -7.40   0.00
+  1b_h4        DXY↑ + H4 GBP>EUR → EURUSD short         4     0   0.0%      -108.04   0.00
+  2b_h4        DXY↓ + H4 GBP>EUR → GBPUSD long          1     0   0.0%       -46.25   0.00
+  1a_ip        DXY↑ + IP EUR>GBP → GBPUSD short         9     5  55.6%       317.11   5.31
+  1b_ip        DXY↑ + IP GBP>EUR → EURUSD short         2     1  50.0%       126.53  86.16
+  2b_ip        DXY↓ + IP GBP>EUR → GBPUSD long          6     2  33.3%       192.86   5.34
+  N-long       DXY↓ + NZD strong → NZDUSD long          3     1  33.3%        70.40   1.88
+  N-short      DXY↑ + NZD weak  → NZDUSD short          1     0   0.0%       -21.68   0.00
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  breakout          74    26  35.1%        1251.95       16.92   1.98
+  daily_sweep      112    23  20.5%       -1818.51      -16.24   0.49
+  judas            112    49  43.8%        2734.96       24.42   3.31
+  mm_golden         16     6  37.5%         196.18       12.26   1.18
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  london     breakout          28     8  28.6%         110.70   1.14
+  london     judas             55    20  36.4%        1709.85   3.63
+  london     mm_golden          6     3  50.0%         523.36   2.08
+  ny         breakout          46    18  39.1%        1141.25   3.25
+  ny         daily_sweep       56     8  14.3%       -1733.90   0.13
+  ny         judas             57    29  50.9%        1025.11   2.92
+  ny         mm_golden         10     3  30.0%        -327.18   0.48
+  other      daily_sweep       56    15  26.8%         -84.60   0.95
+  ----------------------------------------------------------------
+  london     TOTAL             89    31  34.8%        2343.92   2.23
+  ny         TOTAL            169    58  34.3%         105.27   1.03
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  london_judas                79    26  32.9%        1620.75   2.21
+  london_breakout              4     2  50.0%         199.80   3.30
+  ny_judas                    98    45  45.9%        2244.98   3.39
+  ny_extend                    5     2  40.0%         -78.62   0.21
+  unknown                    112    23  20.5%       -1818.51   0.49
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  yes                   11    10  90.9%         132.17   4.00
+  no                   303    94  31.0%        2232.41   1.31
+  -- captured NY continuations by entry_model --
+     judas          11 trades  WR 90.9%  P&L R      132.17
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG               5     1  20.0%         -20.58   0.84
+  H4 FVG               2     0   0.0%         -65.52   0.00
+  none               307   103  33.6%        2450.69   1.35
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG               4     1  25.0%         -21.53   0.84
+  D1 FVG              13     6  46.2%          19.85   1.09
+  H4 FVG               8     2  25.0%         -21.18   0.81
+  none               289    95  32.9%        2387.44   1.36
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1      152    42  27.6%       -2431.19   0.49     -15.99
+  score=2       61    23  37.7%         817.00   1.76      13.39
+  score=3       54    26  48.1%        1985.64   3.58      36.77
+  score=4       30     8  26.7%         886.46   3.36      29.55
+  score=5       14     4  28.6%        1148.12   9.39      82.01
+  score=6        3     1  33.3%         -41.44   0.46     -13.81
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct agrees          96    37  38.5%        1071.92    1.77
+  HTF struct disagrees      218    67  30.7%        1292.67    1.22
+  minor-sweep (Judas)        29     9  31.0%         690.79    2.21
+  no minor-sweep            285    95  33.3%        1673.80    1.25
+  ── highest intact-structure timeframe ──
+  intact @ W                 22     3  13.6%        -288.94    0.41
+  intact @ D                 50    22  44.0%        1273.21    2.75
+  intact @ 240T              35    19  54.3%        1340.78    5.90
+  intact @ 60T               30    11  36.7%         -56.75    0.88
+  intact @ 15T               12     2  16.7%          17.11    1.12
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range            62    27  43.5%        2979.84   4.79
+  H4 range            29    18  62.1%         982.55   5.85
+  no sweep           223    59  26.5%       -1597.81   0.74
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+  confirmed           31    11  35.5%        1001.23   3.61       15.8
+  opposing            17     7  41.2%         168.05   1.47       19.9
+  no divergence       80    28  35.0%        2579.66   2.16       19.9
+
+  --- SMT confirmed by pair ---
+    EURUSD        18 trades  WR  38.9%  PF   4.00  P&L       836.09
+    GBPUSD        13 trades  WR  30.8%  PF   2.58  P&L       165.14
+
+  --- SMT confirmed by direction ---
+    LONG          11 trades  WR   9.1%  PF   0.17  P&L      -173.43
+    SHORT         20 trades  WR  50.0%  PF   7.73  P&L      1174.66
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+  follows rule          71    24  33.8%        1874.53   1.98       17.5
+  against rule          57    22  38.6%        1874.40   2.76       20.7
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+    EURUSD LONG               36  33.3%   1.72       790.66     GOLDEN
+    EURUSD SHORT              47  36.2%   2.12      1123.40    against
+    GBPUSD LONG               21  42.9%   3.30       847.52    against
+    GBPUSD SHORT              24  33.3%   2.97       987.36     GOLDEN
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+    golden + confirmed              14  35.7%   2.40
+    golden + opposing               11  36.4%   0.84
+    golden + no div                 46  32.6%   2.17
+    against + confirmed             17  35.3%   4.21
+    against + opposing               6  50.0%   4.04
+    against + no div                34  38.2%   2.13
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  0            112    23  20.5%       -1818.51   0.49
+  1              7     4  57.1%          44.90   3.58
+  2             39    15  38.5%         846.43   2.70
+  3            102    40  39.2%        3299.85   3.34
+  4             50    21  42.0%         415.94   1.36
+  5              4     1  25.0%        -424.03   0.11
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile           143  43.4%   2.00       171  24.6%   0.93
+  NFP week Mon/Tue          15  46.7%   0.72       299  32.4%   1.39
+  Rate decision              9  22.2%   0.80       305  33.4%   1.36
+  PD prov (sweep)          192  40.6%   1.90       122  21.3%   0.81
+  Seasonal lean              0   0.0%   0.00       314  33.1%   1.33
+  HTF OB Context            84  40.5%   1.95       230  30.4%   1.09
+  D1 Draw                  168  35.7%   2.23       146  30.1%   0.65
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  inside                 5     3  60.0%       157.03   5.81    31.41
+  continuation          79    31  39.2%      1745.21   1.89    22.09
+  (none)               230    70  30.4%       462.34   1.09     2.01
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  breaker                4   0.0%   0.00
+  d1_fvg                66  43.9%   1.84
+  ob                     2  50.0%   5.54
+  pdhl                   9  33.3%   0.78
+  w_fvg                  3  33.3%  36.44
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  d1_fvg                 1     1 100.0%       175.75    inf
+  equal_hl             167    59  35.3%      3627.19   2.18
+  (none)               146    44  30.1%     -1438.36   0.65
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  ds_asia                  5     3  60.0%        68.08      13.62
+  ds_london               13     2  15.4%       -23.16      -1.78
+  ds_pd                   94    18  19.1%     -1863.42     -19.82
+  equal_hl                15     3  20.0%       496.45      33.10
+  fib_extension           93    45  48.4%      3331.54      35.82
+  ith_liquidity           10     1  10.0%        66.88       6.69
+  itl_liquidity            3     0   0.0%      -324.93    -108.31
+  pdh_pdl                 24    12  50.0%       178.89       7.45
+  pwh_pwl                  7     4  57.1%       173.75      24.82
+  round_number            25     8  32.0%      -324.36     -12.97
+  swing                   25     8  32.0%       584.87      23.39
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  ds_asia                3       2.9%       107.85
+  ds_london              2       1.9%       414.19
+  ds_pd                 18      17.3%      1256.04
+  equal_hl               3       2.9%       828.80
+  fib_extension         45      43.3%      4656.55
+  ith_liquidity          1       1.0%       109.15
+  pdh_pdl               12      11.5%       454.55
+  pwh_pwl                4       3.8%       175.79
+  round_number           8       7.7%       197.49
+  swing                  8       7.7%      1334.02
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   ds_asia                3  60.0%       107.85
+  initial (L1)   ds_london              2  15.4%       414.19
+  initial (L1)   ds_pd                 18  19.1%      1256.04
+  initial (L1)   equal_hl               3  27.3%       828.80
+  initial (L1)   fib_extension         44  47.8%      4638.79
+  initial (L1)   ith_liquidity          1  25.0%       109.15
+  initial (L1)   pdh_pdl               11  47.8%       451.04
+  initial (L1)   pwh_pwl                3  50.0%       140.27
+  initial (L1)   round_number           8  32.0%       197.49
+  initial (L1)   swing                  8  34.8%      1334.02
+  pyramid (L2+)  fib_extension          1 100.0%        17.76
+  pyramid (L2+)  pdh_pdl                1 100.0%         3.52
+  pyramid (L2+)  pwh_pwl                1 100.0%        35.52
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  London Open   equal_hl               1       277.50
+  London Open   fib_extension         18      2400.64
+  London Open   pdh_pdl                3       186.29
+  London Open   pwh_pwl                2       138.51
+  London Open   round_number           2         3.52
+  London Open   swing                  4      1209.34
+  New York AM   ds_asia                2        52.16
+  New York AM   ds_pd                  6       206.41
+  New York AM   equal_hl               2       551.30
+  New York AM   fib_extension         27      2255.91
+  New York AM   ith_liquidity          1       109.15
+  New York AM   pdh_pdl                9       268.26
+  New York AM   pwh_pwl                2        37.28
+  New York AM   round_number           6       193.97
+  New York AM   swing                  4       124.67
+  Other         ds_asia                1        55.69
+  Other         ds_london              2       414.19
+  Other         ds_pd                 12      1049.63
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  London Open      30      28.8%      4215.81
+  New York AM      59      56.7%      3799.10
+  Other            15      14.4%      1519.51
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  below open        12     7       5  58.3%      453.21      37.77
+  above open       158    65      93  41.1%     3881.13      24.56
+  no session       128    26     102  20.3%    -2165.94     -16.92
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)           58    21  36.2%        648.14   2.05
+  SOJ single reference (+1)          113    49  43.4%       3334.28   3.21
+  no SOJ pattern                     143    34  23.8%      -1617.83   0.68

@@ -1,0 +1,81 @@
+name: Single-month backtest (R3,000 start) — FX alone vs FX + gold + indices
+
+# P111: trade ONE month (TRADE_FROM), with the months before it loaded as warm-up
+# history only, so weekly/daily structure is already formed on day one.
+# win: oct = October 2026 (the current month, if HistData has published it),
+#      sep = September 2026 (the latest completed month, the fallback).
+# mode: fx = default engine (MM_PRESET p93), FX pairs only;
+#       all3 = FX + gold (1 oz floor) + US indices (0.01 lot), as P109 all3.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/month-backtest.yml"
+      - ".github/month-backtest.trigger"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        win: [oct, sep]
+        mode: [fx, all3]
+    env:
+      NO_PUSH: "1"
+      STARTING_CASH: "3000"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download HistData M1 2026 Jun-Oct
+        run: |
+          python scripts/fetch_histdata.py --years 2026 --months 6 7 8 9 10 \
+                 --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD XAUUSD XAGUSD SPXUSD NSXUSD --dest /tmp/hd 2>&1 | tail -40
+          ls -la /tmp/hd | tail -60
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+      - name: Backtest (${{ matrix.win }} / ${{ matrix.mode }})
+        continue-on-error: true
+        run: |
+          case "${{ matrix.win }}" in
+            oct) export TRADE_FROM=2026-10-01 ;;
+            sep) export TRADE_FROM=2026-09-01 ;;
+          esac
+          case "${{ matrix.mode }}" in all3)
+            export INDICES_ENABLED=1 INDEX_PAIRS="SPXUSD NSXUSD" INDEX_AMD_MAX_RANGE_PCT=0.8 INDEX_MAX_TRADES_PER_DAY=3 INDEX_LOT_UNITS=100 INDEX_UNIT_VALUE=0.01 INDEX_MIN_LOT=0.01
+            export GOLD_ENABLED=1 GOLD_MIN_LOT=0.01 GOLD_MIN_IMSCORE=1.0 ;;
+          esac
+          python -c "import config as c;print('PRESET',c.MM_PRESET,'CASH',c.STARTING_CASH,'FROM',c.TRADE_FROM,'GOLD',c.GOLD_ENABLED,'IDX',c.INDICES_ENABLED,'PAIRS',c.PAIRS)"
+          python run_backtest_histdata.py --years 2026 > /tmp/run.txt 2>&1 || true
+          tail -150 /tmp/run.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          A=${{ matrix.win }}26_${{ matrix.mode }}_p111
+          [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/month_${A}_report.md
+          [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/month_${A}_console.txt
+          cp /tmp/run.txt data/month_${A}_run.txt 2>/dev/null || true
+          for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
+            [ -f "$d" ] && { cp "$d" data/month_${A}_trades.csv; break; }
+          done
+          git checkout -- data/backtest_report.md data/backtest_console.txt 2>/dev/null || true
+          git add -f data/month_${A}_*
+          git diff --cached --quiet && exit 0
+          git commit -m "Month backtest ${A} [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1

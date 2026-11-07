@@ -1,0 +1,34 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2022–2025)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, XAUUSD, XAGUSD
+
+Loading and resampling to 5-minute bars (2022 + 2023 + 2024 + 2025)...
+  GBPUSD: 1,437,919 M1 → 289,020 M5 bars  2022-01-02 – 2025-12-31  close 1.34740
+  EURUSD: 1,439,786 M1 → 289,268 M5 bars  2022-01-02 – 2025-12-31  close 1.17455
+  EURGBP: 1,436,073 M1 → 289,103 M5 bars  2022-01-02 – 2025-12-31  close 0.87158
+  UDXUSD: 1,235,373 M1 → 251,395 M5 bars  2022-01-03 – 2025-12-31  close 97.96900
+  AUDUSD: 1,435,435 M1 → 289,003 M5 bars  2022-01-02 – 2025-12-31  close 0.66733
+  NZDUSD: 1,432,732 M1 → 288,780 M5 bars  2022-01-02 – 2025-12-31  close 0.57549
+  AUDNZD: 1,436,487 M1 → 288,624 M5 bars  2022-01-02 – 2025-12-31  close 1.15922
+  XAUUSD: 1,372,863 M1 → 274,665 M5 bars  2022-01-02 – 2025-12-31  close 4318.37900
+  XAGUSD: 1,362,757 M1 → 274,334 M5 bars  2022-01-02 – 2025-12-31  close 71.54200
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 289020 5-min bars...
+    bar 2000/289020 (2022-01-11 20:50:00+00:00) - active=0 trades=4 equity=983
+Traceback (most recent call last):
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 1749, in <module>
+    main()
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 160, in main
+    _main(_real_stdout)
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 283, in _main
+    backtester.run()
+  File "/home/runner/work/Ict/Ict/backtest.py", line 306, in run
+    self._gold_pullback_entry(pair, t)   # P110 gold's own model
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/Ict/Ict/backtest.py", line 5460, in _gold_pullback_entry
+    if config.GOLD_PB_DXY and self._dxy_bias(t) == d:
+                              ^^^^^^^^^^^^^^^^^
+TypeError: HistdataBacktester._dxy_bias() missing 1 required positional argument: 't'

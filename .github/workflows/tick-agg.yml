@@ -1,0 +1,62 @@
+name: P117 tick data -> M1 order-flow bins (HistData free tick product)
+
+# Downloads HistData TICK zips one month at a time, turns each into per-minute bins
+# (tick count, up-ticks = buy, down-ticks = sell, unchanged = neutral; Lee-Ready on the bid),
+# deletes the zip, and commits data/tick_agg/<PAIR>_<YYYYMM>_m1.csv.gz. No exchange volume
+# exists for spot FX — this is tick activity and tick direction, the free order-flow proxy.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/tick-agg.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        pair: [EURUSD, GBPUSD, NZDUSD]
+        year: [2022, 2023, 2024, 2025, 2026]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download + aggregate month by month
+        run: |
+          mkdir -p data/tick_agg /tmp/tk
+          last=12; [ "${{ matrix.year }}" = "2026" ] && last=10
+          for m in $(seq 1 $last); do
+            out=data/tick_agg/${{ matrix.pair }}_${{ matrix.year }}$(printf %02d $m)_m1.csv.gz
+            [ -f "$out" ] && { echo "have $out"; continue; }
+            python scripts/fetch_histdata.py --tick --years ${{ matrix.year }} --months $m \
+                   --pairs ${{ matrix.pair }} --dest /tmp/tk 2>&1 | tail -3 || true
+            z=$(ls /tmp/tk/*.zip 2>/dev/null | head -1)
+            [ -z "$z" ] && { echo "no zip for $m"; continue; }
+            python -c "import sys; sys.path.insert(0,'scripts'); import p39_volume_analysis as p; print(p.aggregate_month('$z', '$out', bin_secs=60))"
+            rm -f /tmp/tk/*
+          done
+          ls -la data/tick_agg | tail -20
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/tick_agg/*.csv.gz 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P117 tick bins ${{ matrix.pair }} ${{ matrix.year }} [$(date -u +%F)]"
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*9))
+          done
+          exit 1
