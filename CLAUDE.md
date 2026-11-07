@@ -24,6 +24,15 @@ cache-bug post-mortem.)
 
 ---
 
+## 🔍 P125 PHASE A RESULT (RAN 2026-11-07) — the DOLLAR's H1 read alone carried the 42%
+`data/p125_phaseA_report.md`. Leaky engine in measurement mode, one symbol group's H1 on completed candles at a time
+(`DROP_SYMS`). n / WR / PF / first-leg avg R, 2022-23 | 2024-25: reference 472/42.2%/1.97/+0.66 | 478/44.1%/4.83/+0.90;
+pairs honest 455/41.1%/2.12 | 466/41.2%/3.53; EURGBP/AUDNZD honest 465/39.1%/1.84 | 463/42.5%/4.05; **DXY honest
+298/28.5%/1.17/+0.15 | 308/29.9%/1.46/+0.25**; all H1 honest 296/26.4%/1.18 | 304/28.9%/1.34. Leaky R1k regression
+exact (424 / 42.2% / 3.13). The edge = knowing where the CURRENT hour's DXY candle closes; the pair and cross H1
+reads and the rest of the stack add almost nothing. MM trades 27-38% WR in every arm. P120 already showed no honest
+DXY read predicts the next 1-4h, so recovering 42% needs a new honest forecast of the hour's dollar move.
+
 ## 🤖 AI RESEARCH TEAM (set up 2026-11-07) — how every new idea is now handled
 Four subagents in `.claude/agents/`: **spec-writer** (idea -> falsifiable spec, pass rule fixed first,
 `research/specs/P<n>_*.md`, from `research/SPEC_TEMPLATE.md`) -> **trader approves** -> **builder**
@@ -38,7 +47,7 @@ RUNNING: `DROP_SYMS` (default "" = byte-identical) makes H1 completed-bars per s
 md60 / mdxyH1 / mcrossH1 / mpairH1 × is/oos (measurement mode, all other TFs leaky) + leaky IS regression
 -> `data/mm_golden_*_p125_*`.
 
-## 🎯 NEXT SESSION START HERE — 🟡 P125 Phase A RUNNING (which H1 read — DXY / cross / pair — carried the 42%); read `data/mm_golden_*_p125_*`, leaky IS regression first. 🔴 P124: ICT session position (open side, Judas/PO3, Asia sweep, PDH/PDL sweep, discount, vote) does NOT predict whether the day or hour closes above the price now — 0 of 12 cells pass (Polymarket idea closed). 🔴 P123: Kronos's expansion read is mostly a longer volatility window — after 64h ATR + daily range + same-clock seasonal it reads +0.04/+0.05 (≈ the pure-noise placebo +0.03), OOS R² gain +0.004, its own-opinion tercile flips sign. Engine expansion filter NOT built. Kronos line CLOSED (P121 direction, P122 Q2, P123 expansion). 🟡 P122 (superseded): resid corr +0.14 after ATR16+hour only. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 direction study: coin flip (clean +0.1 / −1.5pp). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
+## 🎯 NEXT SESSION START HERE — 🔴 P125 Phase A: the DXY H1 read alone carried the 42% (honest DXY -> 28-30% WR); Phase B choice pending with trader. 🔴 P124: ICT session position (open side, Judas/PO3, Asia sweep, PDH/PDL sweep, discount, vote) does NOT predict whether the day or hour closes above the price now — 0 of 12 cells pass (Polymarket idea closed). 🔴 P123: Kronos's expansion read is mostly a longer volatility window — after 64h ATR + daily range + same-clock seasonal it reads +0.04/+0.05 (≈ the pure-noise placebo +0.03), OOS R² gain +0.004, its own-opinion tercile flips sign. Engine expansion filter NOT built. Kronos line CLOSED (P121 direction, P122 Q2, P123 expansion). 🟡 P122 (superseded): resid corr +0.14 after ATR16+hour only. 🔴 P121 engine: Kronos filter/side LOWERS the honest WR (agree trades worse); P121 direction study: coin flip (clean +0.1 / −1.5pp). 🔴 P120: no DXY read (10 tried, completed bars) beats a coin on the pairs; the gate's edge was the lookahead. 🔒 P119: HONEST ENGINE IS NOW THE DEFAULT (old 876/R176k numbers = lookahead). 🚨 P118: on the leak-free engine a COIN FLIP does as well as the strategy's direction (no bug — no edge). P115c: clean PF 0.2-0.73. Next: redesign on completed bars, every idea vs the coin-flip control. Do NOT trade live. with honest (partial) HTF bars the strategy LOSES (PF 0.45-0.81). Verify `_partial_bar`, locate which HTF reads carry the leak, rebuild on completed bars. Do NOT fund live. P116 Nill CLOSED (no edge).
 Trader decisions still open: stop20h default? FX+indices NY vs all three? Live account: R3,000
 start considered. `DS_ENABLED=0` stays (P112/P112b/P112c below).
 
