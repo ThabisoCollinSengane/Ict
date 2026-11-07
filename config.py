@@ -1233,6 +1233,7 @@ STRICT_BAR_CLOSE = bool(int(_os.environ.get("STRICT_BAR_CLOSE", "0")))
 HONEST_HTF     = bool(int(_os.environ.get("HONEST_HTF", "1")))
 HONEST_TFS     = tuple(x for x in _os.environ.get("HONEST_TFS", "15T,240T,D").split(",") if x)   # "" = every HTF; else only these
 DROP_TFS       = tuple(x for x in _os.environ.get("DROP_TFS", "60T").split(",") if x)     # completed bars only on these TFs (P115c)
+DROP_SYMS      = tuple(x for x in _os.environ.get("DROP_SYMS", "").split(",") if x)       # P125: "" = DROP_TFS on every symbol; else only these
 SAMEBAR_EXIT   = bool(int(_os.environ.get("SAMEBAR_EXIT", "1")))
 STOP_SLIP_PIPS = float(_os.environ.get("STOP_SLIP_PIPS", "0.5"))
 # P118 random-direction control: same entries/stops/targets, side picked by a seeded coin.

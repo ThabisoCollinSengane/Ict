@@ -1,7 +1,7 @@
 # P125 — Honest rebuild of the original strategy (base + MM, ~42% win rate)
 
-Status: DRAFT — awaiting trader approval
-Author: spec-writer · Approved by: —
+Status: APPROVED 2026-11-07 (goal: >=42% WR AND PF >=1.3, FX base + MM only, 2026 used once at the end) — Phase A RUNNING
+Author: spec-writer · Approved by: trader
 
 ## 1. The idea
 - **Trader's words (2026-11-07):** "Revisit the original algo with the previous 42% win rate and the MM
@@ -41,6 +41,10 @@ know which one carried it. Make ONE group honest at a time, everything else as i
 - A2 `crossH1`: only EURGBP / AUDNZD H1 (the pair-selection cross).
 - A3 `pairH1`: only the traded pairs' own H1 (H1 FVG entries, MM 60-minute IFVG rung, the EU/GU H1
   structure check).
+- Auditor note: the level-3 synthetic cross (`_eurgbp_synthetic`, EURUSD vs GBPUSD H1 momentum) reads
+  the PAIRS' H1, so it is covered by A3, not A2. A2 = the real EURGBP / AUDNZD H1 reads only. All other
+  timeframes (M15/M30/H4/D) stay leaky in every A arm, by design. Regression arm `leaky` × IS must
+  reproduce 424 / 42.2% / PF 3.13 before any arm is read.
 
 The arm whose honest version collapses the result is the one that was reading the future. This tells
 us WHICH information made the 43%: next-hour dollar direction, the cross, or the pair itself.

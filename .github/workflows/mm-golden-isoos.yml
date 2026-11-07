@@ -23,8 +23,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arm: [is, oos, y25, y26]
-        mode: [mhdef, leaky, mk1, mk2, mk3, k2, k3]
+        arm: [is, oos]
+        mode: [mleaky, md60, mdxyH1, mcrossH1, mpairH1]
+        include:
+          - {arm: is, mode: leaky}    # regression: must reproduce P115 p93 IS 424 / 42.2% / PF 3.13
     env:
       NO_PUSH: "1"
       MODE: ${{ matrix.mode }}
@@ -171,6 +173,14 @@ jobs:
           # P112b: *1r = the same arms with a fixed 1R target (DS_TARGET=rr DS_RR=1).
           case "${{ matrix.mode }}" in *1r) export DS_TARGET=rr DS_RR=1.0;; esac
           case "${{ matrix.mode }}" in ixdsonly|ixdsonly1r) export TRADE_PAIRS="SPXUSD NSXUSD" STARTING_CASH=3000;; gdsonly|gdsonly1r) export TRADE_PAIRS=XAUUSD STARTING_CASH=3000;; esac
+          # P125 Phase A: which H1 read carried the leak? Leaky original (no sbx/slip) in measurement
+          #   mode, with H1 on COMPLETED bars for ONE symbol group only. mleaky = none (reference),
+          #   md60 = all symbols, mdxyH1 = UDXUSD, mcrossH1 = EURGBP/AUDNZD, mpairH1 = traded pairs.
+          case "${{ matrix.mode }}" in mleaky|md60|mdxyH1|mcrossH1|mpairH1)
+            export HONEST_HTF=0 SAMEBAR_EXIT=0 STOP_SLIP_PIPS=0 DROP_TFS=60T
+            export MAX_DRAWDOWN_HALT_PCT=1000 MAX_DAILY_LOSS_PCT=1000 MAX_CONSECUTIVE_LOSSES=99999 GROWTH_PHASE_FLOOR_ZAR=-1000000000 WITHDRAW_SCHEDULE=0 STARTING_CASH=100000;; esac
+          case "${{ matrix.mode }}" in mleaky) export DROP_TFS=;; mdxyH1) export DROP_SYMS=UDXUSD;; mcrossH1) export DROP_SYMS=EURGBP,AUDNZD;; mpairH1) export DROP_SYMS=EURUSD,GBPUSD,NZDUSD;; esac
+          python -c "import config as c;print('P125 HONEST',c.HONEST_HTF,'DROP_TFS',c.DROP_TFS,'DROP_SYMS',c.DROP_SYMS,'SAMEBAR',c.SAMEBAR_EXIT,'SLIP',c.STOP_SLIP_PIPS)"
           python -c "import config as c;print('PRESET',c.MM_PRESET,'MM',c.MM_GOLDEN_ENABLED,'M1',c.MM_GOLDEN_M1_MSS,'FRESH',c.MM_GOLDEN_M1_MSS_FRESH,'DXY',c.MM_GOLDEN_M1_DXY,'SMT3',c.MM_GOLDEN_M1_SMT3,'LB',c.MM_GOLDEN_M1_SMT3_LOOKBACK,'SMTZ',c.MM_GOLDEN_M1_SMTZ,'SMTX',c.MM_GOLDEN_M1_SMTX,'JT',c.MM_GOLDEN_JUDAS_TARGET,'FX',c.MM_GOLDEN_FIXED_EXIT,'RR',c.MM_GOLDEN_FIXED_RR,'DISP',c.MM_GOLDEN_M1_MSS_DISP,'JTF',c.MM_GOLDEN_JT_TFS,'BEF',c.MM_GOLDEN_BE_FRAC,'HSMT',c.MM_GOLDEN_HSMT,'OBSMT',c.MM_GOLDEN_OB_SMT_REQUIRED,'SESS',c.MM_GOLDEN_SESSION_EXIT,'NEWS',c.MM_GOLDEN_NEWS_EXIT,'WRB',c.WRB_FILTER,'CMP',c.COMPRESS_MULT,c.COMPRESS_TF,'VOLX',c.VOLX_MULT,c.VOLX_RATIO,'GOLD',c.GOLD_ENABLED,c.GOLD_MIN_IMSCORE,c.GOLD_SIZE_MULT,'IDX',c.INDICES_ENABLED,c.INDEX_SIZE_MULT,'DS',c.DS_ENABLED,c.DS_ENTRY,c.DS_TARGET,'PAIRS',c.PAIRS)"
           python run_backtest_histdata.py $Y > /tmp/run.txt 2>&1 || true
           tail -150 /tmp/run.txt
@@ -185,7 +195,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          A=${{ matrix.arm }}_${{ matrix.mode }}_p121
+          A=${{ matrix.arm }}_${{ matrix.mode }}_p125
           [ -f data/backtest_report.md ]   && cp data/backtest_report.md   data/mm_golden_${A}_report.md
           [ -f data/backtest_console.txt ] && cp data/backtest_console.txt data/mm_golden_${A}_console.txt
           cp /tmp/run.txt data/mm_golden_${A}_run.txt 2>/dev/null || true

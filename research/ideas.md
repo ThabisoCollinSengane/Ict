@@ -6,4 +6,4 @@ approved / running / passed / failed / closed.
 
 | # | Date | Idea (trader's words) | Spec | Status | Verdict |
 |---|---|---|---|---|---|
-| 1 | 2026-11-07 | Revisit the original algo (~42% WR, base + MM model) that collapsed once the backtest was made honest; correct it and get back to the same or higher win rate | [P125](specs/P125_honest_rebuild.md) | spec — awaiting approval | — |
+| 1 | 2026-11-07 | Revisit the original algo (~42% WR, base + MM model) that collapsed once the backtest was made honest; correct it and get back to the same or higher win rate | [P125](specs/P125_honest_rebuild.md) | approved — Phase A running | — |
