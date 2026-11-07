@@ -31,7 +31,7 @@ Reported only (not a pass cell; trap 1 — the pairs ARE most of DXY):
 | pairs_hour | 28600/520d 50.5% (+0.5±0.6) | 28765/523d 50.0% (-0.0±0.6) | 11110/202d 49.2% (-0.8±0.9) |
 ## Bounce-trap check (diagnostic, not a pass cell)
 
-Rule = fade the last completed M1 candle. Scored against the hour close measured from the LAST CLOSED M1 close (the broken 'now') vs from the OPEN of the next minute (the study's 'now'). With bid-quote noise the broken version reads below 50% on noise alone; the fixed one must read ~50%.
+Rule = fade the last completed M1 candle. Scored against the hour close measured from the LAST CLOSED M1 close (the broken 'now') vs from the OPEN of the next minute (the study's 'now'). With bid-quote noise the broken version reads above 50% on noise alone; the fixed one must read ~50%.
 
 | 'now' = | IS | OOS | 2026 | ALL |
 |---|---|---|---|---|
@@ -135,7 +135,7 @@ Reported only (not a pass cell; trap 1 — the pairs ARE most of DXY):
 | pairs_hour | 28600/520d 50.8% (+0.8±0.6) | 28765/523d 49.7% (-0.3±0.6) | 11110/202d 51.0% (+1.0±0.9) |
 ## Bounce-trap check (diagnostic, not a pass cell)
 
-Rule = fade the last completed M1 candle. Scored against the hour close measured from the LAST CLOSED M1 close (the broken 'now') vs from the OPEN of the next minute (the study's 'now'). With bid-quote noise the broken version reads below 50% on noise alone; the fixed one must read ~50%.
+Rule = fade the last completed M1 candle. Scored against the hour close measured from the LAST CLOSED M1 close (the broken 'now') vs from the OPEN of the next minute (the study's 'now'). With bid-quote noise the broken version reads above 50% on noise alone; the fixed one must read ~50%.
 
 | 'now' = | IS | OOS | 2026 | ALL |
 |---|---|---|---|---|
