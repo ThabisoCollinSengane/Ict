@@ -1,0 +1,86 @@
+# P78 — the institutional FX clock (real data, IS 2010-2017 / OOS 2018-2025)
+
+_coverage: EURUSD 2010-01-03→2025-12-31 (1,184,265 bars), GBPUSD 2010-01-03→2025-12-31 (1,183,738 bars), NZDUSD 2010-01-03→2025-12-31 (1,182,352 bars); trading days IS 2067 / OOS 2047; window ±2h around each anchor_
+
+## §2 The fix reversal — the verdict
+
+R = dollar move into the anchor minus dollar move after it, USD basket, bp/day. Positive = dollar bid into the fix, offered after. `pctl` = share of placebo clock times this fix beats (needs ≥95 in BOTH halves).
+
+| fix | R IS | t IS | pctl IS | R OOS | t OOS | pctl OOS | pooled t | verdict |
+|---|---|---|---|---|---|---|---|---|
+| ECB | -0.14 | -0.3 | 67 | +0.32 | +0.6 | 69 | +0.2 | **RED** |
+| WMR | +1.21 | +1.9 | 100 | -0.28 | -0.4 | 27 | +1.1 | **RED** |
+| TOKYO | +0.54 | +1.4 | 90 | -1.45 | -4.5 | 4 | -1.8 | **RED** |
+
+> ⚠️ **ECB and WMR windows overlap** (±2h each, fixes 2.75h apart). A real ECB effect leaks into WMR with the OPPOSITE sign — the planted-effect drive showed WMR at t −3.5 with nothing planted there. Narrowing the window (`--window 1.375`) cut that to t −2.5 but did NOT remove it: the effect itself lasts hours, longer than the gap. **ECB and WMR are not independent tests.** If ECB is GREEN, a negative WMR is the expected echo, not a second finding.
+
+**VERDICT: RED** (ECB RED · WMR RED · Tokyo RED — Tokyo is reported but not counted; it is outside every killzone).
+
+_placebo: 52 clock times, every 15 min ET, excluding ±90 min around the real fixes._
+
+### §2a The two legs separately — did the dollar rise INTO the fix, fall AFTER?
+
+USD basket bp per day, `+` = dollar up. The research says BEFORE > 0 and AFTER < 0. R above is simply BEFORE − AFTER.
+
+| fix | before IS (t) | after IS (t) | before OOS (t) | after OOS (t) |
+|---|---|---|---|---|
+| ECB | +0.63 (+2.0) | +0.78 (+1.7) | +0.36 (+1.2) | +0.04 (+0.1) |
+| WMR | +0.21 (+0.5) | -0.99 (-2.4) | -0.04 (-0.1) | +0.23 (+0.6) |
+| TOKYO | +0.37 (+1.6) | -0.17 (-0.6) | -1.70 (-8.4) | -0.24 (-0.9) |
+
+### §2b Direction-free: does price REVERSE at the fix, whichever way it was going?
+
+giveback = bp the after-window gives back against the before-window's move (> 0 = reversal). A dollar that ran UP into the fix one day and DOWN the next cancels out in R but counts here both times. Same 52-placebo control.
+
+| fix | giveback IS (t) | pctl IS | giveback OOS (t) | pctl OOS | pooled t | verdict |
+|---|---|---|---|---|---|---|
+| ECB | -0.34 (-0.7) | 10 | -0.16 (-0.3) | 6 | -0.8 | **RED** |
+| WMR | -0.30 (-0.7) | 10 | +0.38 (+0.9) | 79 | +0.1 | **RED** |
+| TOKYO | +0.32 (+1.1) | 65 | -0.58 (-2.1) | 0 | -0.6 | **RED** |
+
+_Real FX mean-reverts a little at ANY time of day; the placebo percentile is what separates 'the fix' from 'any two-hour window'._
+
+## §1 Average dollar move by ET hour (USD basket)
+
+Mean bp per hour; positive = dollar up. t = mean / SE.
+
+| ET hour | IS bp | t | OOS bp | t | clock |
+|---|---|---|---|---|---|
+| 00:00 | -0.16 | -1.0 | -0.20 | -1.5 |  |
+| 01:00 | -0.24 | -1.6 | +0.10 | +0.7 | CLS window opens |
+| 02:00 | -0.10 | -0.5 | -0.35 | -1.8 |  |
+| 03:00 | -0.10 | -0.4 | +0.26 | +1.1 | London open / CLS settle target · **London KZ** |
+| 04:00 | +0.20 | +0.7 | +0.21 | +0.8 | London KZ |
+| 05:00 | +0.14 | +0.5 | +0.20 | +0.9 |  |
+| 06:00 | +0.11 | +0.5 | +0.05 | +0.3 | CLS window closes |
+| 07:00 | +0.11 | +0.5 | +0.35 | +1.8 | **NY AM KZ** |
+| 08:00 | +0.63 | +2.3 | +0.06 | +0.2 | ECB fix 08:15 · US data 08:30 · NY AM |
+| 09:00 | +0.10 | +0.3 | +0.18 | +0.5 | NY AM |
+| 10:00 | +0.30 | +1.0 | -0.07 | -0.2 | NY option cut 10:00 |
+| 11:00 | -0.47 | -1.5 | -0.13 | -0.4 | WMR fix 11:00 |
+| 12:00 | -0.41 | -1.6 | +0.09 | +0.4 | noon block |
+| 13:00 | -0.29 | -1.4 | +0.42 | +2.1 |  |
+| 14:00 | -0.20 | -0.9 | -0.51 | -2.4 |  |
+| 15:00 | -0.12 | -0.4 | +0.11 | +0.6 |  |
+| 16:00 | -0.12 | -0.6 | +0.02 | +0.1 |  |
+| 17:00 | +0.34 | +2.5 | +0.76 | +6.6 | NY close / rollover |
+| 18:00 | +0.43 | +2.6 | +0.24 | +2.1 |  |
+| 19:00 | +0.19 | +0.9 | -0.69 | -4.2 |  |
+| 20:00 | -0.08 | -0.4 | -0.45 | -2.6 | Tokyo fix 20:55 |
+| 21:00 | +0.55 | +2.6 | +0.35 | +1.6 |  |
+| 22:00 | -0.31 | -1.4 | -0.05 | -0.3 |  |
+| 23:00 | -0.26 | -1.0 | +0.12 | +0.7 |  |
+
+_Home-hours claim (Ranaldo): dollar up during European hours (~03-09 ET), down during US hours (~11-15 ET). Read sign AND both halves._
+
+## §3 Daylight-saving natural experiment
+
+273 mismatch days (Europe 5h ahead of New York, not 6). On those days the European fixes sit one hour LATER in ET. If the effect follows the European clock, `at Euro clock` carries it and `at usual ET` does not.
+
+| fix | at Euro clock R (n) | MDE | at usual ET R | MDE | normal days R |
+|---|---|---|---|---|---|
+| ECB | -0.61 (273) | 3.32 | -1.21 | 3.32 | +0.14 (3840) |
+| WMR | +0.50 (272) | 3.67 | -1.04 | 3.48 | +0.47 (3810) |
+
+_MDE = minimum detectable effect (2 SE). Where |R| < MDE the comparison is UNDERPOWERED — that is a statement about sample size, not about the clock._
+

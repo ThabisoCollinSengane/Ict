@@ -1,0 +1,440 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2026–2026)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD
+
+Loading and resampling to 5-minute bars (2026)...
+  GBPUSD: 134,472 M1 → 27,021 M5 bars  2026-06-01 – 2026-10-09  close 1.32309
+  EURUSD: 134,418 M1 → 27,023 M5 bars  2026-06-01 – 2026-10-09  close 1.12011
+  EURGBP: 134,246 M1 → 27,021 M5 bars  2026-06-01 – 2026-10-09  close 0.84632
+  UDXUSD: 113,877 M1 → 23,525 M5 bars  2026-06-01 – 2026-10-09  close 102.00900
+  AUDUSD: 134,215 M1 → 27,023 M5 bars  2026-06-01 – 2026-10-09  close 0.69840
+  NZDUSD: 134,222 M1 → 27,017 M5 bars  2026-06-01 – 2026-10-09  close 0.56117
+  AUDNZD: 134,508 M1 → 26,988 M5 bars  2026-06-01 – 2026-10-09  close 1.24384
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  TRADE_FROM 2026-10-01: last bar in data 2026-10-09 21:55:00+00:00
+  Iterating 27021 5-min bars...
+    bar 26000/27021 (2026-10-06 08:55:00+00:00) - active=0 trades=3 equity=3527
+    bar 27000/27021 (2026-10-09 20:15:00+00:00) - active=0 trades=9 equity=4234
+
+=== Gate funnel (entries passing each filter) ===
+  checks                              789  ████████████████████████████████████████
+  in_killzone                         789  ████████████████████████████████████████
+  news_clear                          702  ███████████████████████████████████
+  nfp_fomc_ok                         472  ███████████████████████
+  intermarket_signal                   18  
+  pair_matches                         18  
+  mss_h1_m15_m5_ok                      7  
+  daily_bias_ok                         7  
+  h1_bias_ok                            7  
+  h4_bias_ok                            7  
+  dealing_range_ok                      0  
+  consolidation_found                   7  
+  manipulation_correct_dir              7  
+  m5_fvg_correct_dir                    7  
+  target_found                          7  
+  rr_ok                                 7  
+  units_nonzero                         7  
+  limit_placed                          0  
+  entry_opened                          6  
+  pyramid_added                         1  
+  pyramid_blocked_min_target           11  
+  drawdown_halt                         0  
+  daily_loss_halt                      75  ███
+  consec_loss_pause                     0  
+  weekly_cap                            0  
+  weekly_pair_cap                       0  
+  daily_cap                             0  
+  daily_pair_cap                        6  
+  weekly_amd_confirmed                  6  
+  session_handover_closed               0  
+  htf_draw_full_cascade                 0  
+  htf_draw_partial                      7  
+  htf_draw_counter                      0  
+  htf_fvg_5050_hit                      0  
+  ote_zone                              0  
+  choch_confirmed                       0  
+  low_conviction                        0  
+  judas_divergence                      0  
+  ny_continuation                       5  
+  mm_quad_1b                          224  ███████████
+  mm_quad_other_pair                  213  ██████████
+  mm_quad_selected                    179  █████████
+  mm_golden_checked                   179  █████████
+  mm_golden_wrong_sweep                21  █
+  mm_golden_amd_ok                    114  █████
+  mm_golden_via_cascade                95  ████
+  mm_golden_smt_rung_240T              44  ██
+  mm_golden_smt_yes                    67  ███
+  mm_golden_ifvg_zone_60T              46  ██
+  mm_golden_pd_ifvg                    51  ██
+  mm_golden_pd_ifvg_5T                 13  
+  mm_golden_no_m1_shift                56  ██
+  mm_golden_m1_shift                    8  
+  mm_golden_m1_smtx_s2                  2  
+  mm_golden_m1_smtx_s2p_cont            2  
+  mm_golden_opened                      2  
+  pyramid_blocked_low_im               24  █
+  pyramid_blocked_favour               75  ███
+  mm_quad_none_eurgbp_flat             85  ████
+  mm_golden_daily_cap                  21  █
+  mm_quad_2b                           96  ████
+  mm_golden_no_smt                     44  ██
+  mm_golden_smt_rung_1T                 8  
+  mm_golden_ifvg_zone_5T                7  
+  mm_quad_2a                           12  
+  mm_golden_via_own_ob                 16  
+  mm_golden_pd_ob                       8  
+  mm_golden_pd_ob_15T                   8  
+  mm_quad_none_dxy_flat                75  ███
+  pm_gate_pair_news                     0  
+  dxy_flat                            343  █████████████████
+  mm_golden_no_retrace                  1  
+  mm_golden_m1_smtx_s2p_none            1  
+  dxy_directional                     123  ██████
+  eurgbp_directional                   44  ██
+  im_score_low                         39  █
+  soj_judas                             2  
+  soj_sweep                             7  
+  crt_turtle_soup                       5  
+  smt_pair_confirmed                    2  
+  golden_rule_no                        5  
+  mstruct_align                         7  
+  phase_london_judas                    2  
+  gt_pool_sweep                         7  
+  gt_disp_wick                          5  
+  structure_stop_used                   7  
+  risk_cap_ok                           6  
+  mm_golden_other_pair_open            23  █
+  mm_golden_pd_ifvg_15T                35  █
+  mm_golden_m1_smtx_s1                  2  
+  mm_golden_m1_smtx_blocked_shift       2  
+  mm_golden_pd_ob2                      5  
+  mm_golden_pd_ob2_5T                   5  
+  eurgbp_flat                          49  ██
+  eurgbp_flat_gbp_blocked              36  █
+  mm_golden_no_pd                       3  
+  breakout_confirmed                    3  
+  golden_rule_yes                       2  
+  mstruct_minor_sweep                   1  
+  phase_ny_judas                        5  
+  target_score_sized                    3  
+  golden_rule_sized                     2  
+  london_judas_ny_echo                  2  
+  mm_golden_m1_smtx_s3                  4  
+  mm_golden_no_draw                     4  
+  soj_retest                            5  
+  pdliq_sweep_sized                     5  
+  mm_quad_1a                           60  ███
+  mm_golden_ifvg_zone_15T              14  
+  dxy_fvg_room                          2  
+  target_rung_far                       2  
+  stop_capped_10pip                     2  
+  mm_golden_smt_rung_60T                9  
+  mm_golden_pd_ifvg_60T                 3  
+  mm_golden_m1_smtx_s2p_smt             3  
+  mm_golden_smt_rung_5T                 6  
+  mm_golden_ob_failed                   3  
+  gt_mp_discount                        2  
+  crt_sweep_sized                       2  
+  risk_cap_skip                         1  
+
+=== Results ===
+  trades                    9
+  win_rate_pct              44.4
+  profit_factor             2.99
+  starting_equity_ZAR       3000
+  ending_equity_ZAR         4234.01
+  pnl_ZAR                   1234.01
+  pnl_pct                   41.13
+  max_drawdown_pct          -9.41
+  avg_win_ZAR               463.22
+  avg_loss_ZAR              -123.77
+[P92 events -> 8 rows]
+
+[trade dump → /home/runner/work/Ict/Ict/data/histdata/trades_dump.csv]
+
+=== Trade log (9 trades) ===
+                opened_at                 closed_at   pair  direction  leg_idx   entry     exit  units        pnl reason session_side             entry_type
+2026-10-01 07:20:00+00:00 2026-10-01 10:55:00+00:00 EURUSD         -1        1 1.13196 1.128097  12500  893.20775 target       golden      amd_m1_shift_ifvg
+2026-10-05 07:45:00+00:00 2026-10-05 08:30:00+00:00 EURUSD         -1        1 1.11848 1.119520  12500 -240.50000   stop       golden      amd_m1_shift_ifvg
+2026-10-06 07:00:00+00:00 2026-10-06 08:15:00+00:00 EURUSD         -1        1 1.12094 1.121620  10000 -125.80000   stop     momentum              amd_ob_m5
+2026-10-06 12:00:00+00:00 2026-10-06 14:25:00+00:00 EURUSD          1        1 1.12430 1.125260   7812  138.74112   stop     momentum             amd_fvg_h1
+2026-10-07 08:10:00+00:00 2026-10-07 09:15:00+00:00 EURUSD         -1        1 1.12220 1.118100   6250  474.06250 target     momentum            amd_fvg_m15
+2026-10-07 13:20:00+00:00 2026-10-07 14:00:00+00:00 EURUSD         -1        2 1.11654 1.117580   5000  -96.20000   stop      no_open pyramid_wamd1.0_fvg_m5
+2026-10-07 12:30:00+00:00 2026-10-07 14:50:00+00:00 EURUSD         -1        1 1.11840 1.118440   6250   -4.62500   stop     momentum             amd_fvg_h1
+2026-10-07 13:00:00+00:00 2026-10-07 15:55:00+00:00 GBPUSD         -1        1 1.32054 1.321590   7812 -151.74810   stop     momentum             amd_fvg_m5
+2026-10-09 11:20:00+00:00 2026-10-09 19:45:00+00:00 EURUSD         -1        1 1.12132 1.120360  19531  346.87056   stop     momentum              amd_ob_m5
+
+=== Per-pair P&L (ZAR) ===
+  EURUSD: 8 trades  wins=4  losses=4  P&L=R1385.76
+  GBPUSD: 1 trades  wins=0  losses=1  P&L=R-151.75
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2026         9     4  44.4%      1234.01    -9.4%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  EURUSD   2026         8     4  50.0%
+  GBPUSD   2026         1     0   0.0%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  amd_fvg_h1                 2     1  50.0%      67.06
+  amd_fvg_m15                1     1 100.0%     474.06
+  amd_fvg_m5                 1     0   0.0%    -151.75
+  amd_m1_shift_ifvg          2     1  50.0%     326.35
+  amd_ob_m5                  2     1  50.0%     110.54
+  pyramid_wamd1.0_fvg_m5       1     0   0.0%     -96.20
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  FVG              5     2  40.0%       360.23      72.05   2.43
+  OB               2     1  50.0%       221.07     110.54   2.76
+  other            2     1  50.0%       652.71     326.35   3.71
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  FVG H1                 2     1  50.0%  30.00
+  FVG M15                1     1 100.0%    inf
+  FVG M5                 2     0   0.0%   0.00
+  OB M5                  2     1  50.0%   2.76
+  other ?                2     1  50.0%   3.71
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  FVG EURUSD                 4     2  50.0%   6.08
+  FVG GBPUSD                 1     0   0.0%   0.00
+  OB EURUSD                  2     1  50.0%   2.76
+  other EURUSD               2     1  50.0%   3.71
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  m15_range                9     4  44.4%   2.99
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  1/3                5     2  40.0%       360.23      72.05   2.43
+  2/3                4     2  50.0%       873.78     218.44   3.39
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+  1b           DXY↑ + H1 GBP>EUR → EURUSD short         2     1  50.0%       348.26   3.77
+  3a           DXY↑ + cross flat → EURUSD short         3     1  33.3%       246.05   3.44
+  3b           DXY↓ + cross flat → EURUSD long          1     1 100.0%       138.74    inf
+  1a_ip        DXY↑ + IP EUR>GBP → GBPUSD short         1     0   0.0%      -151.75   0.00
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  breakout           4     1  25.0%        -113.83      -28.46   0.55
+  judas              3     2  66.7%         695.13      231.71   6.53
+  mm_golden          2     1  50.0%         652.71      326.35   3.71
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  london     judas              2     1  50.0%         348.26   3.77
+  london     mm_golden          2     1  50.0%         652.71   3.71
+  ny         breakout           4     1  25.0%        -113.83   0.55
+  ny         judas              1     1 100.0%         346.87    inf
+  ----------------------------------------------------------------
+  london     TOTAL              4     2  50.0%        1000.97   3.73
+  ny         TOTAL              5     2  40.0%         233.04   1.92
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  london_judas                 2     1  50.0%         348.26   3.77
+  ny_judas                     5     2  40.0%         233.04   1.92
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  no                     9     4  44.4%        1234.01   2.99
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  none                 9     4  44.4%        1234.01   2.99
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  H4 FVG               3     0   0.0%        -252.57   0.00
+  none                 6     4  66.7%        1486.58   5.06
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1        3     0   0.0%        -341.32   0.00    -113.77
+  score=2        4     2  50.0%        1089.72   4.93     272.43
+  score=4        2     2 100.0%         485.61    inf     242.81
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct agrees           2     1  50.0%         195.12    2.29
+  HTF struct disagrees        7     3  42.9%        1038.89    3.22
+  minor-sweep (Judas)         1     1 100.0%         138.74     inf
+  no minor-sweep              8     3  37.5%        1095.27    2.77
+  ── highest intact-structure timeframe ──
+  intact @ D                  2     1  50.0%         195.12    2.29
+  intact @ 240T               4     1  25.0%         247.44    2.09
+  intact @ 60T                1     1 100.0%         138.74     inf
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range             4     1  25.0%         247.44   2.09
+  H4 range             1     1 100.0%         346.87    inf
+  no sweep             4     2  50.0%         639.70   2.63
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+  confirmed            2     1  50.0%         348.26   3.77       24.7
+  no divergence        7     3  42.9%         885.75   2.80       20.5
+
+  --- SMT confirmed by pair ---
+    EURUSD         2 trades  WR  50.0%  PF   3.77  P&L       348.26
+
+  --- SMT confirmed by direction ---
+    SHORT          2 trades  WR  50.0%  PF   3.77  P&L       348.26
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+  follows rule           4     2  50.0%         639.70   2.63       24.5
+  against rule           5     2  40.0%         594.31   3.62       19.0
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+    EURUSD LONG                1 100.0%    inf       138.74     GOLDEN
+    EURUSD SHORT               7  42.9%   3.67      1247.02     GOLDEN
+    GBPUSD SHORT               1   0.0%   0.00      -151.75     GOLDEN
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+    golden + no div                  4  50.0%   2.63
+    against + confirmed              2  50.0%   3.77
+    against + no div                 3  33.3%   3.44
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  1              1     1 100.0%         893.21    inf
+  2              2     0   0.0%        -366.30   0.00
+  3              5     3  60.0%         858.85   9.52
+  4              1     0   0.0%        -151.75   0.00
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile             8  37.5%   1.55         1 100.0%    inf
+  NFP week Mon/Tue           0   0.0%   0.00         9  44.4%   2.99
+  Rate decision              0   0.0%   0.00         9  44.4%   2.99
+  PD prov (sweep)            9  44.4%   2.99         0   0.0%   0.00
+  Seasonal lean              0   0.0%   0.00         9  44.4%   2.99
+  HTF OB Context             1   0.0%   0.00         8  50.0%   3.97
+  D1 Draw                    6  50.0%   3.80         3  33.3%   2.44
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  continuation           1     0   0.0%      -151.75   0.00  -151.75
+  (none)                 8     4  50.0%      1385.76   3.97   173.22
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  d1_fvg                 1   0.0%   0.00
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  equal_hl               6     3  50.0%       707.10   3.80
+  (none)                 3     1  33.3%       526.91   2.44
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  fib_extension            8     4  50.0%      1474.51     184.31
+  round_number             1     0   0.0%      -240.50    -240.50
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  fib_extension          4     100.0%      1852.88
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   fib_extension          4  57.1%      1852.88
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  London Open   fib_extension          2      1367.27
+  New York AM   fib_extension          2       485.61
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  London Open       2      50.0%      1367.27
+  New York AM       2      50.0%       485.61
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  above open         6     3       3  50.0%      677.50     112.92
+  no session         1     0       1   0.0%      -96.20     -96.20
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)            2     1  50.0%         12.94   1.10
+  SOJ single reference (+1)            5     2  40.0%        568.36   3.25
+  no SOJ pattern                       2     1  50.0%        652.71   3.71

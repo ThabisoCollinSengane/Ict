@@ -1,0 +1,60 @@
+name: P116 Patrick Nill P/b impulse-range at the weekly value area (pure price)
+
+# Impulse -> range setups split by whether the range sits on last week's TPO value area.
+# Null (random walk): AT-VA minus ELSE gaps +0.00..+0.12R (noise floor ~+0.05R).
+# NOTE: script uses scripts/tf_combo_study.py as a helper (loader), kept in the paths filter.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/nill-study.yml"
+      - "scripts/nill_study.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nill-study
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download M1 2022-2026
+        run: |
+          P="EURUSD GBPUSD NZDUSD XAUUSD SPXUSD NSXUSD"
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 --pairs $P --dest /tmp/hd 2>&1 | tail -20
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 10 --pairs $P --dest /tmp/hd 2>&1 | tail -20
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+          ls -la data/histdata
+      - name: Study
+        run: |
+          python scripts/nill_study.py --selftest
+          python scripts/nill_study.py --null --out data/nill_null.md > /dev/null
+          python scripts/nill_study.py --out data/nill_report.md 2>&1 | tee data/nill_console.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/nill_report.md data/nill_null.md data/nill_console.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P116 Nill study [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1

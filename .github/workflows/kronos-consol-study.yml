@@ -1,0 +1,98 @@
+name: P122 Kronos consolidation study — expansion timing + Judas-vs-breakout (clean 2024-07+)
+
+# Kronos-mini reads 256 COMPLETED M15 bars at each consolidation check / range break and samples
+# 12 futures; scored against ATR + hour (Q1) and the engine rule + pure geometry (Q2).
+# 12 event jobs (pair x half-year), then one report job.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/kronos-consol-study.yml"
+      - "scripts/kronos_consol_study.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kronos-consol-study
+  cancel-in-progress: false
+
+env:
+  KRONOS_MODEL: NeoQuasar/Kronos-mini
+  KRONOS_TOKENIZER: NeoQuasar/Kronos-Tokenizer-2k
+
+jobs:
+  events:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        pair: [EURUSD, GBPUSD, NZDUSD]
+        win: ["2024-07-01 2025-01-01", "2025-01-01 2025-07-01", "2025-07-01 2026-01-01", "2026-01-01 2026-11-01"]
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Kronos
+        run: bash scripts/setup_kronos.sh
+      - name: Download M1 2024-2026
+        run: |
+          python scripts/fetch_histdata.py --years 2024 2025 --pairs ${{ matrix.pair }} --dest /tmp/hd 2>&1 | tail -3
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 10 --pairs ${{ matrix.pair }} --dest /tmp/hd 2>&1 | tail -3
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -3
+      - name: Events + Kronos
+        run: |
+          set -- ${{ matrix.win }}
+          python scripts/kronos_consol_study.py --selftest
+          python scripts/kronos_consol_study.py --events --pair ${{ matrix.pair }} --start $1 --end $2 --max-minutes 270
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/kronos_consol/*.csv 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P122 Kronos consolidation events ${{ matrix.pair }} ${{ matrix.win }} [$(date -u +%F)]"
+          for i in 1 2 3 4 5 6 7; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*9))
+          done
+          exit 1
+  report:
+    needs: events
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - run: git pull origin "${GITHUB_REF_NAME}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Report
+        run: python scripts/kronos_consol_study.py --report 2>&1 | tee data/kronos_consol_console.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/kronos_consol_report.md data/kronos_consol_console.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P122 Kronos consolidation report [$(date -u +%F)]"
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*9))
+          done
+          exit 1

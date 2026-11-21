@@ -1,0 +1,1202 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2022–2025)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, SPXUSD, NSXUSD
+
+Loading and resampling to 5-minute bars (2022 + 2023 + 2024 + 2025)...
+  GBPUSD: 1,437,919 M1 → 289,020 M5 bars  2022-01-02 – 2025-12-31  close 1.34740
+  EURUSD: 1,439,786 M1 → 289,268 M5 bars  2022-01-02 – 2025-12-31  close 1.17455
+  EURGBP: 1,436,073 M1 → 289,103 M5 bars  2022-01-02 – 2025-12-31  close 0.87158
+  UDXUSD: 1,235,373 M1 → 251,395 M5 bars  2022-01-03 – 2025-12-31  close 97.96900
+  AUDUSD: 1,435,435 M1 → 289,003 M5 bars  2022-01-02 – 2025-12-31  close 0.66733
+  NZDUSD: 1,432,732 M1 → 288,780 M5 bars  2022-01-02 – 2025-12-31  close 0.57549
+  AUDNZD: 1,436,487 M1 → 288,624 M5 bars  2022-01-02 – 2025-12-31  close 1.15922
+  SPXUSD: 1,306,405 M1 → 265,218 M5 bars  2022-01-02 – 2025-12-31  close 6849.53300
+  NSXUSD: 1,323,419 M1 → 264,864 M5 bars  2022-01-02 – 2025-12-31  close 25248.53100
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 289020 5-min bars...
+    bar 2000/289020 (2022-01-11 20:50:00+00:00) - active=0 trades=0 equity=1000
+    bar 3000/289020 (2022-01-17 08:10:00+00:00) - active=0 trades=2 equity=1020
+    bar 4000/289020 (2022-01-20 19:35:00+00:00) - active=0 trades=2 equity=1020
+    bar 5000/289020 (2022-01-26 06:55:00+00:00) - active=0 trades=2 equity=1020
+    bar 6000/289020 (2022-01-31 18:15:00+00:00) - active=0 trades=4 equity=1027
+    bar 7000/289020 (2022-02-04 05:40:00+00:00) - active=0 trades=4 equity=1027
+    bar 8000/289020 (2022-02-09 17:00:00+00:00) - active=0 trades=4 equity=1027
+    bar 9000/289020 (2022-02-15 04:20:00+00:00) - active=0 trades=6 equity=1028
+    bar 10000/289020 (2022-02-18 15:40:00+00:00) - active=0 trades=10 equity=1051
+    bar 11000/289020 (2022-02-24 03:00:00+00:00) - active=0 trades=13 equity=1054
+    bar 12000/289020 (2022-03-01 14:20:00+00:00) - active=0 trades=16 equity=1056
+    bar 13000/289020 (2022-03-07 01:50:00+00:00) - active=0 trades=16 equity=1056
+    bar 14000/289020 (2022-03-10 13:10:00+00:00) - active=0 trades=17 equity=1056
+    bar 15000/289020 (2022-03-15 23:30:00+00:00) - active=0 trades=17 equity=1056
+    bar 16000/289020 (2022-03-21 11:00:00+00:00) - active=0 trades=20 equity=1054
+    bar 17000/289020 (2022-03-24 22:20:00+00:00) - active=0 trades=22 equity=1054
+    bar 18000/289020 (2022-03-30 11:40:00+00:00) - active=0 trades=24 equity=1099
+    bar 19000/289020 (2022-04-04 23:00:00+00:00) - active=0 trades=24 equity=1099
+    bar 20000/289020 (2022-04-08 10:20:00+00:00) - active=0 trades=24 equity=1099
+    bar 21000/289020 (2022-04-13 21:45:00+00:00) - active=0 trades=27 equity=1116
+    bar 22000/289020 (2022-04-19 09:05:00+00:00) - active=0 trades=31 equity=1112
+    bar 23000/289020 (2022-04-22 20:25:00+00:00) - active=0 trades=34 equity=1122
+    bar 24000/289020 (2022-04-28 07:45:00+00:00) - active=0 trades=38 equity=1125
+    bar 25000/289020 (2022-05-03 19:05:00+00:00) - active=0 trades=38 equity=1125
+    bar 26000/289020 (2022-05-09 06:25:00+00:00) - active=0 trades=38 equity=1125
+    bar 27000/289020 (2022-05-12 17:50:00+00:00) - active=0 trades=40 equity=1125
+    bar 28000/289020 (2022-05-18 05:10:00+00:00) - active=0 trades=41 equity=1159
+    bar 29000/289020 (2022-05-23 16:30:00+00:00) - active=0 trades=41 equity=1159
+    bar 30000/289020 (2022-05-27 03:50:00+00:00) - active=0 trades=41 equity=1159
+    bar 31000/289020 (2022-06-01 15:15:00+00:00) - active=0 trades=42 equity=1159
+    bar 32000/289020 (2022-06-07 02:35:00+00:00) - active=0 trades=44 equity=1183
+    bar 33000/289020 (2022-06-10 13:55:00+00:00) - active=0 trades=44 equity=1183
+    bar 34000/289020 (2022-06-16 01:15:00+00:00) - active=0 trades=46 equity=1188
+    bar 35000/289020 (2022-06-21 12:40:00+00:00) - active=0 trades=49 equity=1211
+    bar 36000/289020 (2022-06-27 00:05:00+00:00) - active=0 trades=49 equity=1211
+    bar 37000/289020 (2022-06-30 11:25:00+00:00) - active=0 trades=51 equity=1217
+    bar 38000/289020 (2022-07-05 22:45:00+00:00) - active=0 trades=54 equity=1257
+    bar 39000/289020 (2022-07-11 10:10:00+00:00) - active=0 trades=56 equity=1261
+    bar 40000/289020 (2022-07-14 21:30:00+00:00) - active=0 trades=58 equity=1305
+    bar 41000/289020 (2022-07-20 08:50:00+00:00) - active=0 trades=63 equity=1333
+    bar 42000/289020 (2022-07-25 20:15:00+00:00) - active=0 trades=66 equity=1322
+    bar 43000/289020 (2022-07-29 07:35:00+00:00) - active=1 trades=66 equity=1322
+    bar 44000/289020 (2022-08-03 19:05:00+00:00) - active=0 trades=68 equity=1308
+    bar 45000/289020 (2022-08-09 06:25:00+00:00) - active=0 trades=70 equity=1310
+    bar 46000/289020 (2022-08-12 17:45:00+00:00) - active=0 trades=75 equity=1356
+    bar 47000/289020 (2022-08-18 05:30:00+00:00) - active=0 trades=77 equity=1392
+    bar 48000/289020 (2022-08-23 17:00:00+00:00) - active=0 trades=82 equity=1411
+    bar 49000/289020 (2022-08-29 04:20:00+00:00) - active=0 trades=86 equity=1475
+    bar 50000/289020 (2022-09-01 15:40:00+00:00) - active=0 trades=88 equity=1492
+    bar 51000/289020 (2022-09-07 03:00:00+00:00) - active=0 trades=88 equity=1492
+    bar 52000/289020 (2022-09-12 14:20:00+00:00) - active=0 trades=91 equity=1520
+    bar 53000/289020 (2022-09-16 01:40:00+00:00) - active=0 trades=93 equity=1537
+    bar 54000/289020 (2022-09-21 13:10:00+00:00) - active=0 trades=98 equity=1530
+    bar 55000/289020 (2022-09-27 00:30:00+00:00) - active=0 trades=98 equity=1530
+    bar 56000/289020 (2022-09-30 11:55:00+00:00) - active=0 trades=103 equity=1546
+    bar 57000/289020 (2022-10-05 23:15:00+00:00) - active=0 trades=104 equity=1607
+    bar 58000/289020 (2022-10-11 10:45:00+00:00) - active=0 trades=104 equity=1607
+    bar 59000/289020 (2022-10-16 22:05:00+00:00) - active=0 trades=106 equity=1610
+    bar 60000/289020 (2022-10-20 09:35:00+00:00) - active=0 trades=110 equity=1641
+    bar 61000/289020 (2022-10-25 20:55:00+00:00) - active=0 trades=111 equity=1659
+    bar 62000/289020 (2022-10-31 07:20:00+00:00) - active=0 trades=114 equity=1642
+    bar 63000/289020 (2022-11-03 18:40:00+00:00) - active=0 trades=117 equity=1641
+    bar 64000/289020 (2022-11-09 07:00:00+00:00) - active=0 trades=119 equity=1648
+    bar 65000/289020 (2022-11-14 18:20:00+00:00) - active=0 trades=127 equity=1841
+    bar 66000/289020 (2022-11-18 05:40:00+00:00) - active=0 trades=131 equity=1864
+    bar 67000/289020 (2022-11-23 17:05:00+00:00) - active=0 trades=134 equity=1850
+    bar 68000/289020 (2022-11-29 04:25:00+00:00) - active=0 trades=137 equity=1894
+    bar 69000/289020 (2022-12-02 15:45:00+00:00) - active=0 trades=138 equity=1907
+    bar 70000/289020 (2022-12-08 03:10:00+00:00) - active=0 trades=138 equity=1907
+    bar 71000/289020 (2022-12-13 16:35:00+00:00) - active=0 trades=139 equity=1906
+    bar 72000/289020 (2022-12-19 03:55:00+00:00) - active=0 trades=143 equity=1923
+    bar 73000/289020 (2022-12-22 15:15:00+00:00) - active=0 trades=146 equity=1973
+    bar 74000/289020 (2022-12-28 03:00:00+00:00) - active=0 trades=148 equity=2102
+    bar 75000/289020 (2023-01-02 15:25:00+00:00) - active=0 trades=148 equity=2102
+    bar 76000/289020 (2023-01-06 02:45:00+00:00) - active=0 trades=148 equity=2102
+    bar 77000/289020 (2023-01-11 14:05:00+00:00) - active=0 trades=149 equity=2081
+    bar 78000/289020 (2023-01-17 01:30:00+00:00) - active=0 trades=152 equity=2043
+    bar 79000/289020 (2023-01-20 12:50:00+00:00) - active=0 trades=156 equity=2044
+    bar 80000/289020 (2023-01-26 00:10:00+00:00) - active=0 trades=156 equity=2044
+    bar 81000/289020 (2023-01-31 11:30:00+00:00) - active=0 trades=157 equity=2057
+    bar 82000/289020 (2023-02-05 22:50:00+00:00) - active=0 trades=157 equity=2057
+    bar 83000/289020 (2023-02-09 11:10:00+00:00) - active=1 trades=162 equity=2072
+    bar 84000/289020 (2023-02-14 22:35:00+00:00) - active=0 trades=169 equity=2156
+    bar 85000/289020 (2023-02-20 11:55:00+00:00) - active=0 trades=172 equity=2209
+    bar 86000/289020 (2023-02-27 09:15:00+00:00) - active=0 trades=177 equity=2337
+    bar 87000/289020 (2023-03-06 07:35:00+00:00) - active=0 trades=177 equity=2337
+    bar 88000/289020 (2023-03-13 06:00:00+00:00) - active=0 trades=179 equity=2302
+    bar 89000/289020 (2023-03-20 04:20:00+00:00) - active=0 trades=179 equity=2302
+    bar 90000/289020 (2023-03-27 05:40:00+00:00) - active=0 trades=181 equity=2305
+    bar 91000/289020 (2023-04-03 03:00:00+00:00) - active=0 trades=182 equity=2347
+    bar 92000/289020 (2023-04-11 00:20:00+00:00) - active=0 trades=183 equity=2326
+    bar 93000/289020 (2023-04-17 19:40:00+00:00) - active=0 trades=183 equity=2326
+    bar 94000/289020 (2023-04-24 18:00:00+00:00) - active=0 trades=186 equity=2324
+    bar 95000/289020 (2023-05-01 12:20:00+00:00) - active=0 trades=188 equity=2412
+    bar 96000/289020 (2023-05-08 09:40:00+00:00) - active=0 trades=188 equity=2412
+    bar 97000/289020 (2023-05-15 09:00:00+00:00) - active=1 trades=189 equity=2411
+    bar 98000/289020 (2023-05-22 07:20:00+00:00) - active=0 trades=193 equity=2365
+    bar 99000/289020 (2023-05-29 06:40:00+00:00) - active=0 trades=195 equity=2486
+    bar 100000/289020 (2023-06-05 06:00:00+00:00) - active=0 trades=195 equity=2486
+    bar 101000/289020 (2023-06-12 04:25:00+00:00) - active=0 trades=196 equity=2461
+    bar 102000/289020 (2023-06-19 02:45:00+00:00) - active=0 trades=198 equity=2454
+    bar 103000/289020 (2023-06-26 02:05:00+00:00) - active=0 trades=198 equity=2454
+    bar 104000/289020 (2023-07-03 01:25:00+00:00) - active=0 trades=198 equity=2454
+    bar 105000/289020 (2023-07-07 19:45:00+00:00) - active=0 trades=198 equity=2454
+    bar 106000/289020 (2023-07-17 00:05:00+00:00) - active=0 trades=200 equity=2429
+    bar 107000/289020 (2023-07-21 19:25:00+00:00) - active=0 trades=201 equity=2402
+    bar 108000/289020 (2023-07-28 15:45:00+00:00) - active=0 trades=203 equity=2399
+    bar 109000/289020 (2023-08-03 06:05:00+00:00) - active=0 trades=207 equity=2721
+    bar 110000/289020 (2023-08-08 17:25:00+00:00) - active=0 trades=210 equity=2758
+    bar 111000/289020 (2023-08-14 04:45:00+00:00) - active=0 trades=214 equity=2742
+    bar 112000/289020 (2023-08-17 16:05:00+00:00) - active=0 trades=221 equity=2754
+    bar 113000/289020 (2023-08-23 03:25:00+00:00) - active=0 trades=224 equity=2756
+    bar 114000/289020 (2023-08-28 14:45:00+00:00) - active=0 trades=224 equity=2756
+    bar 115000/289020 (2023-09-01 02:05:00+00:00) - active=0 trades=224 equity=2756
+    bar 116000/289020 (2023-09-06 13:25:00+00:00) - active=0 trades=226 equity=2753
+    bar 117000/289020 (2023-09-12 00:45:00+00:00) - active=0 trades=229 equity=2767
+    bar 118000/289020 (2023-09-15 12:20:00+00:00) - active=0 trades=231 equity=2785
+    bar 119000/289020 (2023-09-20 23:45:00+00:00) - active=0 trades=233 equity=2880
+    bar 120000/289020 (2023-09-26 11:55:00+00:00) - active=0 trades=235 equity=2916
+    bar 121000/289020 (2023-10-01 23:15:00+00:00) - active=0 trades=240 equity=2966
+    bar 122000/289020 (2023-10-05 10:35:00+00:00) - active=0 trades=242 equity=2965
+    bar 123000/289020 (2023-10-10 21:55:00+00:00) - active=0 trades=242 equity=2965
+    bar 124000/289020 (2023-10-16 09:15:00+00:00) - active=0 trades=244 equity=2906
+    bar 125000/289020 (2023-10-19 20:35:00+00:00) - active=0 trades=246 equity=2879
+    bar 126000/289020 (2023-10-25 07:55:00+00:00) - active=0 trades=248 equity=2854
+    bar 127000/289020 (2023-10-30 18:15:00+00:00) - active=0 trades=252 equity=2892
+    bar 128000/289020 (2023-11-03 05:35:00+00:00) - active=0 trades=255 equity=2914
+    bar 129000/289020 (2023-11-08 17:55:00+00:00) - active=0 trades=257 equity=2901
+    bar 130000/289020 (2023-11-14 05:15:00+00:00) - active=0 trades=258 equity=2870
+    bar 131000/289020 (2023-11-17 16:35:00+00:00) - active=0 trades=263 equity=2852
+    bar 132000/289020 (2023-11-23 03:55:00+00:00) - active=0 trades=266 equity=3068
+    bar 133000/289020 (2023-11-28 15:15:00+00:00) - active=0 trades=266 equity=3068
+    bar 134000/289020 (2023-12-04 02:35:00+00:00) - active=0 trades=266 equity=3068
+    bar 135000/289020 (2023-12-07 13:55:00+00:00) - active=1 trades=271 equity=3097
+    bar 136000/289020 (2023-12-13 01:15:00+00:00) - active=0 trades=274 equity=3460
+    bar 137000/289020 (2023-12-18 12:35:00+00:00) - active=0 trades=277 equity=3475
+    bar 138000/289020 (2023-12-21 23:55:00+00:00) - active=0 trades=281 equity=3540
+    bar 139000/289020 (2023-12-28 04:50:00+00:00) - active=0 trades=283 equity=3480
+    bar 140000/289020 (2024-01-03 16:10:00+00:00) - active=0 trades=287 equity=3478
+    bar 141000/289020 (2024-01-09 03:35:00+00:00) - active=0 trades=289 equity=3938
+    bar 142000/289020 (2024-01-12 14:55:00+00:00) - active=0 trades=291 equity=3794
+    bar 143000/289020 (2024-01-18 02:15:00+00:00) - active=0 trades=294 equity=3769
+    bar 144000/289020 (2024-01-23 14:35:00+00:00) - active=0 trades=294 equity=3769
+    bar 145000/289020 (2024-01-29 01:55:00+00:00) - active=0 trades=297 equity=3673
+    bar 146000/289020 (2024-02-01 13:15:00+00:00) - active=0 trades=297 equity=3673
+    bar 147000/289020 (2024-02-07 00:35:00+00:00) - active=0 trades=297 equity=3673
+    bar 148000/289020 (2024-02-12 11:55:00+00:00) - active=0 trades=297 equity=3673
+    bar 149000/289020 (2024-02-15 23:15:00+00:00) - active=0 trades=299 equity=3676
+    bar 150000/289020 (2024-02-21 10:35:00+00:00) - active=0 trades=301 equity=3674
+    bar 151000/289020 (2024-02-26 21:55:00+00:00) - active=0 trades=303 equity=3794
+    bar 152000/289020 (2024-03-01 09:15:00+00:00) - active=0 trades=303 equity=3794
+    bar 153000/289020 (2024-03-06 20:35:00+00:00) - active=0 trades=306 equity=3793
+    bar 154000/289020 (2024-03-12 06:55:00+00:00) - active=0 trades=308 equity=3812
+    bar 155000/289020 (2024-03-15 18:15:00+00:00) - active=0 trades=310 equity=3871
+    bar 156000/289020 (2024-03-21 05:35:00+00:00) - active=0 trades=310 equity=3871
+    bar 157000/289020 (2024-03-26 16:55:00+00:00) - active=0 trades=310 equity=3871
+    bar 158000/289020 (2024-04-01 06:15:00+00:00) - active=0 trades=310 equity=3871
+    bar 159000/289020 (2024-04-04 17:35:00+00:00) - active=0 trades=311 equity=4129
+    bar 160000/289020 (2024-04-10 04:55:00+00:00) - active=0 trades=312 equity=4128
+    bar 161000/289020 (2024-04-15 16:15:00+00:00) - active=0 trades=315 equity=4227
+    bar 162000/289020 (2024-04-19 03:35:00+00:00) - active=0 trades=315 equity=4227
+    bar 163000/289020 (2024-04-24 14:55:00+00:00) - active=0 trades=316 equity=4225
+    bar 164000/289020 (2024-04-30 02:20:00+00:00) - active=0 trades=318 equity=4263
+    bar 165000/289020 (2024-05-03 13:40:00+00:00) - active=0 trades=320 equity=4323
+    bar 166000/289020 (2024-05-09 01:00:00+00:00) - active=0 trades=321 equity=4351
+    bar 167000/289020 (2024-05-14 12:20:00+00:00) - active=0 trades=326 equity=4384
+    bar 168000/289020 (2024-05-19 23:40:00+00:00) - active=0 trades=327 equity=4339
+    bar 169000/289020 (2024-05-23 11:05:00+00:00) - active=0 trades=329 equity=4257
+    bar 170000/289020 (2024-05-28 22:30:00+00:00) - active=0 trades=330 equity=4257
+    bar 171000/289020 (2024-06-03 09:50:00+00:00) - active=0 trades=331 equity=4269
+    bar 172000/289020 (2024-06-06 21:10:00+00:00) - active=0 trades=331 equity=4269
+    bar 173000/289020 (2024-06-12 08:30:00+00:00) - active=0 trades=331 equity=4269
+    bar 174000/289020 (2024-06-17 19:50:00+00:00) - active=0 trades=333 equity=4533
+    bar 175000/289020 (2024-06-21 07:10:00+00:00) - active=0 trades=335 equity=4315
+    bar 176000/289020 (2024-06-26 18:30:00+00:00) - active=0 trades=340 equity=4344
+    bar 177000/289020 (2024-07-02 05:50:00+00:00) - active=0 trades=343 equity=4254
+    bar 178000/289020 (2024-07-05 17:10:00+00:00) - active=0 trades=344 equity=4263
+    bar 179000/289020 (2024-07-11 04:30:00+00:00) - active=0 trades=345 equity=4223
+    bar 180000/289020 (2024-07-16 15:50:00+00:00) - active=0 trades=345 equity=4223
+    bar 181000/289020 (2024-07-22 03:10:00+00:00) - active=0 trades=345 equity=4223
+    bar 182000/289020 (2024-07-25 14:30:00+00:00) - active=0 trades=345 equity=4223
+    bar 183000/289020 (2024-07-31 01:50:00+00:00) - active=0 trades=346 equity=4222
+    bar 184000/289020 (2024-08-05 13:10:00+00:00) - active=0 trades=346 equity=4222
+    bar 185000/289020 (2024-08-09 00:30:00+00:00) - active=0 trades=346 equity=4222
+    bar 186000/289020 (2024-08-14 11:50:00+00:00) - active=0 trades=346 equity=4222
+    bar 187000/289020 (2024-08-19 23:10:00+00:00) - active=0 trades=346 equity=4222
+    bar 188000/289020 (2024-08-23 10:40:00+00:00) - active=0 trades=346 equity=4222
+    bar 189000/289020 (2024-08-28 22:00:00+00:00) - active=0 trades=350 equity=4230
+    bar 190000/289020 (2024-09-03 09:20:00+00:00) - active=0 trades=350 equity=4230
+    bar 191000/289020 (2024-09-06 20:40:00+00:00) - active=0 trades=350 equity=4230
+    bar 192000/289020 (2024-09-12 08:05:00+00:00) - active=0 trades=350 equity=4230
+    bar 193000/289020 (2024-09-17 19:30:00+00:00) - active=0 trades=353 equity=4284
+    bar 194000/289020 (2024-09-23 06:50:00+00:00) - active=0 trades=355 equity=4202
+    bar 195000/289020 (2024-09-26 18:10:00+00:00) - active=0 trades=356 equity=4201
+    bar 196000/289020 (2024-10-02 05:30:00+00:00) - active=0 trades=358 equity=4091
+    bar 197000/289020 (2024-10-07 16:50:00+00:00) - active=0 trades=358 equity=4091
+    bar 198000/289020 (2024-10-11 04:10:00+00:00) - active=0 trades=358 equity=4091
+    bar 199000/289020 (2024-10-16 15:30:00+00:00) - active=0 trades=358 equity=4091
+    bar 200000/289020 (2024-10-22 02:50:00+00:00) - active=0 trades=360 equity=4084
+    bar 201000/289020 (2024-10-25 14:10:00+00:00) - active=1 trades=364 equity=4067
+    bar 202000/289020 (2024-10-31 00:30:00+00:00) - active=0 trades=367 equity=4166
+    bar 203000/289020 (2024-11-05 13:50:00+00:00) - active=0 trades=367 equity=4166
+    bar 204000/289020 (2024-11-11 05:10:00+00:00) - active=0 trades=370 equity=4261
+    bar 205000/289020 (2024-11-14 16:30:00+00:00) - active=0 trades=370 equity=4261
+    bar 206000/289020 (2024-11-20 03:50:00+00:00) - active=0 trades=372 equity=4284
+    bar 207000/289020 (2024-11-25 15:10:00+00:00) - active=0 trades=377 equity=4362
+    bar 208000/289020 (2024-11-29 02:30:00+00:00) - active=0 trades=382 equity=4361
+    bar 209000/289020 (2024-12-04 13:50:00+00:00) - active=0 trades=382 equity=4361
+    bar 210000/289020 (2024-12-10 01:10:00+00:00) - active=0 trades=382 equity=4361
+    bar 211000/289020 (2024-12-13 12:30:00+00:00) - active=2 trades=383 equity=4305
+    bar 212000/289020 (2024-12-18 23:50:00+00:00) - active=0 trades=391 equity=4218
+    bar 213000/289020 (2024-12-24 11:10:00+00:00) - active=0 trades=391 equity=4218
+    bar 214000/289020 (2024-12-30 15:10:00+00:00) - active=1 trades=393 equity=4215
+    bar 215000/289020 (2025-01-06 02:30:00+00:00) - active=0 trades=394 equity=4311
+    bar 216000/289020 (2025-01-09 13:50:00+00:00) - active=0 trades=396 equity=4425
+    bar 217000/289020 (2025-01-15 01:10:00+00:00) - active=0 trades=401 equity=4361
+    bar 218000/289020 (2025-01-20 12:30:00+00:00) - active=0 trades=401 equity=4361
+    bar 219000/289020 (2025-01-23 23:50:00+00:00) - active=0 trades=404 equity=4387
+    bar 220000/289020 (2025-01-29 11:10:00+00:00) - active=0 trades=404 equity=4387
+    bar 221000/289020 (2025-02-03 22:30:00+00:00) - active=0 trades=405 equity=4401
+    bar 222000/289020 (2025-02-07 09:50:00+00:00) - active=0 trades=407 equity=4524
+    bar 223000/289020 (2025-02-12 21:10:00+00:00) - active=0 trades=407 equity=4524
+    bar 224000/289020 (2025-02-18 08:30:00+00:00) - active=0 trades=407 equity=4524
+    bar 225000/289020 (2025-02-21 19:50:00+00:00) - active=0 trades=407 equity=4524
+    bar 226000/289020 (2025-02-27 07:10:00+00:00) - active=0 trades=407 equity=4524
+    bar 227000/289020 (2025-03-04 18:35:00+00:00) - active=0 trades=409 equity=4642
+    bar 228000/289020 (2025-03-10 05:00:00+00:00) - active=0 trades=409 equity=4642
+    bar 229000/289020 (2025-03-13 16:20:00+00:00) - active=0 trades=409 equity=4642
+    bar 230000/289020 (2025-03-19 03:40:00+00:00) - active=0 trades=409 equity=4642
+    bar 231000/289020 (2025-03-24 15:00:00+00:00) - active=0 trades=411 equity=4637
+    bar 232000/289020 (2025-03-28 02:20:00+00:00) - active=0 trades=413 equity=4576
+    bar 233000/289020 (2025-04-02 15:40:00+00:00) - active=0 trades=413 equity=4576
+    bar 234000/289020 (2025-04-08 03:05:00+00:00) - active=0 trades=413 equity=4576
+    bar 235000/289020 (2025-04-11 14:50:00+00:00) - active=0 trades=413 equity=4576
+    bar 236000/289020 (2025-04-17 02:10:00+00:00) - active=0 trades=414 equity=4583
+    bar 237000/289020 (2025-04-22 13:30:00+00:00) - active=0 trades=414 equity=4583
+    bar 238000/289020 (2025-04-28 00:50:00+00:00) - active=0 trades=414 equity=4583
+    bar 239000/289020 (2025-05-01 12:10:00+00:00) - active=0 trades=416 equity=4615
+    bar 240000/289020 (2025-05-06 23:40:00+00:00) - active=0 trades=416 equity=4615
+    bar 241000/289020 (2025-05-12 11:00:00+00:00) - active=0 trades=416 equity=4615
+    bar 242000/289020 (2025-05-15 22:20:00+00:00) - active=0 trades=417 equity=4615
+    bar 243000/289020 (2025-05-21 09:40:00+00:00) - active=0 trades=417 equity=4615
+    bar 244000/289020 (2025-05-26 21:00:00+00:00) - active=0 trades=417 equity=4615
+    bar 245000/289020 (2025-05-30 08:25:00+00:00) - active=0 trades=417 equity=4615
+    bar 246000/289020 (2025-06-04 19:50:00+00:00) - active=0 trades=417 equity=4615
+    bar 247000/289020 (2025-06-10 07:10:00+00:00) - active=0 trades=417 equity=4615
+    bar 248000/289020 (2025-06-13 18:30:00+00:00) - active=0 trades=419 equity=4766
+    bar 249000/289020 (2025-06-19 05:50:00+00:00) - active=0 trades=422 equity=4807
+    bar 250000/289020 (2025-06-24 17:10:00+00:00) - active=0 trades=422 equity=4807
+    bar 251000/289020 (2025-06-30 04:35:00+00:00) - active=0 trades=422 equity=4807
+    bar 252000/289020 (2025-07-03 15:55:00+00:00) - active=0 trades=422 equity=4807
+    bar 253000/289020 (2025-07-09 03:15:00+00:00) - active=0 trades=422 equity=4807
+    bar 254000/289020 (2025-07-14 14:35:00+00:00) - active=0 trades=422 equity=4807
+    bar 255000/289020 (2025-07-18 01:55:00+00:00) - active=0 trades=422 equity=4807
+    bar 256000/289020 (2025-07-23 13:20:00+00:00) - active=0 trades=423 equity=4806
+    bar 257000/289020 (2025-07-29 00:40:00+00:00) - active=0 trades=423 equity=4806
+    bar 258000/289020 (2025-08-01 12:00:00+00:00) - active=0 trades=423 equity=4806
+    bar 259000/289020 (2025-08-06 23:20:00+00:00) - active=0 trades=423 equity=4806
+    bar 260000/289020 (2025-08-12 10:40:00+00:00) - active=0 trades=423 equity=4806
+    bar 261000/289020 (2025-08-17 22:00:00+00:00) - active=0 trades=426 equity=4752
+    bar 262000/289020 (2025-08-21 09:20:00+00:00) - active=0 trades=426 equity=4752
+    bar 263000/289020 (2025-08-26 20:40:00+00:00) - active=0 trades=427 equity=4751
+    bar 264000/289020 (2025-09-01 08:00:00+00:00) - active=0 trades=427 equity=4751
+    bar 265000/289020 (2025-09-04 19:20:00+00:00) - active=0 trades=430 equity=5116
+    bar 266000/289020 (2025-09-10 06:40:00+00:00) - active=0 trades=430 equity=5116
+    bar 267000/289020 (2025-09-15 18:05:00+00:00) - active=1 trades=431 equity=5114
+    bar 268000/289020 (2025-09-19 05:25:00+00:00) - active=0 trades=433 equity=5107
+    bar 269000/289020 (2025-09-24 16:45:00+00:00) - active=0 trades=435 equity=5002
+    bar 270000/289020 (2025-09-30 04:05:00+00:00) - active=0 trades=437 equity=5049
+    bar 271000/289020 (2025-10-03 15:25:00+00:00) - active=0 trades=437 equity=5049
+    bar 272000/289020 (2025-10-09 02:45:00+00:00) - active=0 trades=437 equity=5049
+    bar 273000/289020 (2025-10-14 14:05:00+00:00) - active=0 trades=440 equity=5089
+    bar 274000/289020 (2025-10-20 01:25:00+00:00) - active=0 trades=440 equity=5089
+    bar 275000/289020 (2025-10-23 12:45:00+00:00) - active=0 trades=440 equity=5089
+    bar 276000/289020 (2025-10-28 23:10:00+00:00) - active=0 trades=442 equity=5088
+    bar 277000/289020 (2025-11-03 11:30:00+00:00) - active=0 trades=447 equity=5474
+    bar 278000/289020 (2025-11-06 22:50:00+00:00) - active=0 trades=447 equity=5474
+    bar 279000/289020 (2025-11-12 10:10:00+00:00) - active=0 trades=447 equity=5474
+    bar 280000/289020 (2025-11-17 21:30:00+00:00) - active=0 trades=449 equity=5512
+    bar 281000/289020 (2025-11-21 08:50:00+00:00) - active=0 trades=449 equity=5512
+    bar 282000/289020 (2025-11-26 20:10:00+00:00) - active=0 trades=449 equity=5512
+    bar 283000/289020 (2025-12-02 07:30:00+00:00) - active=0 trades=449 equity=5512
+    bar 284000/289020 (2025-12-05 18:50:00+00:00) - active=0 trades=449 equity=5512
+    bar 285000/289020 (2025-12-11 06:10:00+00:00) - active=0 trades=451 equity=5979
+    bar 286000/289020 (2025-12-16 17:30:00+00:00) - active=0 trades=454 equity=6026
+    bar 287000/289020 (2025-12-22 04:55:00+00:00) - active=0 trades=454 equity=6026
+    bar 288000/289020 (2025-12-26 09:00:00+00:00) - active=0 trades=456 equity=6122
+    bar 289000/289020 (2025-12-31 20:20:00+00:00) - active=0 trades=460 equity=5942
+
+=== Gate funnel (entries passing each filter) ===
+  checks                           103027  ████████████████████████████████████████
+  in_killzone                      103027  ████████████████████████████████████████
+  news_clear                       101669  ███████████████████████████████████████
+  nfp_fomc_ok                       87356  █████████████████████████████████
+  intermarket_signal                 3008  █
+  pair_matches                       3008  █
+  mss_h1_m15_m5_ok                   1084  
+  daily_bias_ok                      1084  
+  h1_bias_ok                         1084  
+  h4_bias_ok                         1084  
+  dealing_range_ok                     72  
+  consolidation_found                  16  
+  manipulation_correct_dir             15  
+  m5_fvg_correct_dir                  410  
+  target_found                        410  
+  rr_ok                               410  
+  units_nonzero                       410  
+  limit_placed                          0  
+  entry_opened                        410  
+  pyramid_added                        50  
+  pyramid_blocked_min_target          260  
+  drawdown_halt                         0  
+  daily_loss_halt                       0  
+  consec_loss_pause                    11  
+  weekly_cap                            0  
+  weekly_pair_cap                       0  
+  daily_cap                           122  
+  daily_pair_cap                     2093  
+  weekly_amd_confirmed                209  
+  session_handover_closed               1  
+  htf_draw_full_cascade                28  
+  htf_draw_partial                    394  
+  htf_draw_counter                    662  
+  htf_fvg_5050_hit                     30  
+  ote_zone                              3  
+  choch_confirmed                      17  
+  low_conviction                        0  
+  judas_divergence                      0  
+  ny_continuation                     156  
+  pm_gate_pair_news                     0  
+  dxy_flat                          65089  █████████████████████████
+  dxy_directional                   20052  ███████
+  sr_attempted                        422  
+  sr_prev_session_ok                  422  
+  sr_enough_bars                      422  
+  sr_pdliq_attempted                  422  
+  soj_judas                           169  
+  soj_sweep                           367  
+  mstruct_align                       411  
+  phase_ny_judas                      202  
+  gt_disp_wick                        321  
+  structure_stop_used                 393  
+  target_rung_far                     116  
+  index_own_sized                     410  
+  risk_cap_ok                         410  
+  crt_turtle_soup                     178  
+  pyramid_blocked_favour             2257  
+  soj_retest                          198  
+  mstruct_minor_sweep                  89  
+  smt_dollar                           75  
+  phase_london_judas                  167  
+  m1_stop_used                         17  
+  gt_macro_window                      70  
+  pyramid_blocked_low_im             2025  
+  gt_pool_sweep                        24  
+  phase_london_watch                    8  
+  dxy_fvg_room                         59  
+  gt_mp_discount                      100  
+  gt_mp_extreme                        32  
+  smt_index                            25  
+  phase_ny_extend                      30  
+  gt_judas_reversal                    76  
+  phase_london_breakout                15  
+  ny_continuation_gated                23  
+  sr_pdliq_width_ok                    28  
+  sr_pdliq_sweep                       16  
+  session_range_found                  16  
+  target_score_sized                   20  
+  crt_sweep_sized                      27  
+  pdliq_sweep_sized                     8  
+  pyramid_blocked_no_pattern            5  
+
+=== Results ===
+  trades                    460
+  win_rate_pct              43.5
+  profit_factor             2.64
+  starting_equity_ZAR       1000
+  ending_equity_ZAR         5941.64
+  pnl_ZAR                   4941.64
+  pnl_pct                   494.16
+  max_drawdown_pct          -10.28
+  avg_win_ZAR               39.76
+  avg_loss_ZAR              -11.58
+
+[trade dump → /home/runner/work/Ict/Ict/data/histdata/trades_dump.csv]
+
+=== Trade log (460 trades) ===
+                opened_at                 closed_at   pair  direction  leg_idx     entry         exit  units         pnl           reason session_side                 entry_type
+2022-01-14 12:00:00+00:00 2022-01-14 12:05:00+00:00 NSXUSD         -1        1 15468.249 15458.749000      1    1.757500             stop     momentum                mss_fvg_m15
+2022-01-14 12:00:00+00:00 2022-01-14 13:45:00+00:00 SPXUSD         -1        1  4654.254  4620.500000      3   18.733470           target     momentum                 mss_ob_m15
+2022-01-28 12:15:00+00:00 2022-01-28 12:20:00+00:00 SPXUSD         -1        1  4304.548  4305.048000      1   -0.092500             stop     momentum                  mss_ob_m5
+2022-01-28 12:15:00+00:00 2022-01-28 12:20:00+00:00 NSXUSD         -1        1 13983.889 13949.389000      1    6.382500             stop     momentum                 mss_fvg_m5
+2022-02-14 08:15:00+00:00 2022-02-14 08:20:00+00:00 SPXUSD         -1        1  4406.845  4407.345000      1   -0.092500             stop     momentum                mss_fvg_m15
+2022-02-14 08:15:00+00:00 2022-02-14 08:20:00+00:00 NSXUSD         -1        1 14203.269 14193.769000      1    1.757500             stop     momentum                mss_fvg_m15
+2022-02-15 08:00:00+00:00 2022-02-15 08:05:00+00:00 SPXUSD          1        1  4405.051  4404.551000      3   -0.277500             stop     momentum             mss_breaker_m5
+2022-02-15 08:05:00+00:00 2022-02-15 08:15:00+00:00 NSXUSD          1        1 14351.689 14361.189000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-02-16 08:00:00+00:00 2022-02-16 08:10:00+00:00 NSXUSD          1        1 14569.159 14578.659000      3    5.272500             stop        judas                 mss_ob_m15
+2022-02-16 08:00:00+00:00 2022-02-16 09:10:00+00:00 SPXUSD          1        1  4461.099  4470.599000      9   15.817500             stop        judas                 mss_ob_m15
+2022-02-21 12:15:00+00:00 2022-02-21 12:40:00+00:00 NSXUSD         -1        1 13878.599 13869.099000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-02-21 12:15:00+00:00 2022-02-21 13:55:00+00:00 SPXUSD         -1        1  4324.645  4325.145000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-02-23 08:00:00+00:00 2022-02-23 08:10:00+00:00 NSXUSD          1        1 13978.959 13988.459000      1    1.757500             stop     momentum                 mss_ob_m15
+2022-02-25 08:00:00+00:00 2022-02-25 08:05:00+00:00 NSXUSD         -1        1 13842.429 13832.929000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-02-25 08:00:00+00:00 2022-02-25 09:50:00+00:00 SPXUSD         -1        1  4253.642  4254.142000      3   -0.277500             stop     momentum                  mss_ob_m5
+2022-02-25 13:15:00+00:00 2022-02-25 13:30:00+00:00 SPXUSD          1        1  4304.833  4304.333000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-03-10 08:00:00+00:00 2022-03-10 08:10:00+00:00 NSXUSD         -1        1 13682.339 13682.839000      1   -0.092500             stop     momentum                 mss_ob_m15
+2022-03-16 08:00:00+00:00 2022-03-16 08:15:00+00:00 NSXUSD          1        1 13634.799 13634.299000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-03-16 08:00:00+00:00 2022-03-16 12:35:00+00:00 SPXUSD          1        1  4298.939  4308.439000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-03-16 11:30:00+00:00 2022-03-16 12:35:00+00:00 SPXUSD          1        2  4315.254  4306.639000      2   -3.187550             stop      no_open    pyramid_wamd1.0_fvg_m15
+2022-03-22 13:00:00+00:00 2022-03-22 13:30:00+00:00 NSXUSD          1        1 14407.319 14406.819000      1   -0.092500             stop        judas                 mss_fvg_m5
+2022-03-22 13:00:00+00:00 2022-03-22 13:35:00+00:00 SPXUSD          1        1  4478.339  4477.839000      1   -0.092500             stop     momentum                 mss_ob_m15
+2022-03-29 12:45:00+00:00 2022-03-29 12:50:00+00:00 NSXUSD          1        1 15069.419 15068.919000      1   -0.092500             stop     momentum                  mss_ob_m5
+2022-03-29 07:45:00+00:00 2022-03-29 14:30:00+00:00 SPXUSD          1        1  4582.745  4617.245000      7   44.677500             stop     momentum                  mss_ob_m5
+2022-04-08 13:00:00+00:00 2022-04-08 15:50:00+00:00 SPXUSD         -1        1  4512.942  4503.442000      4    7.030000             stop        judas                  mss_ob_m5
+2022-04-12 13:00:00+00:00 2022-04-12 13:05:00+00:00 NSXUSD          1        1 14029.739 14039.239000      1    1.757500             stop     momentum                mss_fvg_m15
+2022-04-12 13:00:00+00:00 2022-04-12 13:30:00+00:00 SPXUSD          1        1  4420.639  4430.139000      5    8.787500             stop     momentum                 mss_fvg_h1
+2022-04-14 12:45:00+00:00 2022-04-14 12:50:00+00:00 NSXUSD         -1        1 14222.489 14214.989000      2    2.775000             stop     momentum                 news_ob_m5
+2022-04-14 12:45:00+00:00 2022-04-14 14:30:00+00:00 SPXUSD         -1        1  4442.799  4453.799000      7  -14.245000             stop     momentum                news_ob_m15
+2022-04-18 12:00:00+00:00 2022-04-18 12:05:00+00:00 NSXUSD          1        1 13831.399 13830.899000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-04-18 12:00:00+00:00 2022-04-18 14:30:00+00:00 SPXUSD          1        1  4378.145  4387.645000      4    7.030000             stop     momentum                 mss_ob_m15
+2022-04-20 11:15:00+00:00 2022-04-20 11:30:00+00:00 NSXUSD          1        1 14200.189 14199.689000      1   -0.092500             stop        judas                 mss_fvg_m5
+2022-04-21 08:25:00+00:00 2022-04-21 08:55:00+00:00 NSXUSD          1        1 14106.569 14116.069000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-04-21 08:25:00+00:00 2022-04-21 15:15:00+00:00 SPXUSD          1        1  4485.254  4494.754000      5    8.787500             stop     momentum             mss_breaker_m5
+2022-04-25 07:00:00+00:00 2022-04-25 07:10:00+00:00 NSXUSD         -1        1 13249.199 13239.699000      1    1.757500             stop     momentum                mss_fvg_m15
+2022-04-25 07:00:00+00:00 2022-04-25 08:05:00+00:00 SPXUSD         -1        1  4236.439  4236.939000      3   -0.277500             stop     momentum                  mss_ob_m5
+2022-04-26 08:00:00+00:00 2022-04-26 08:05:00+00:00 NSXUSD         -1        1 13502.179 13492.679000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-04-26 08:00:00+00:00 2022-04-26 10:05:00+00:00 SPXUSD         -1        1  4291.451  4291.951000      3   -0.277500             stop     momentum                mss_fvg_m15
+2022-05-12 12:35:00+00:00 2022-05-12 12:40:00+00:00 NSXUSD         -1        1 11841.989 11842.489000      1   -0.092500             stop        judas                 mss_fvg_m5
+2022-05-12 12:35:00+00:00 2022-05-12 13:40:00+00:00 SPXUSD         -1        1  3910.248  3910.748000      1   -0.092500             stop        judas                  mss_ob_m5
+2022-05-17 07:45:00+00:00 2022-05-17 09:25:00+00:00 SPXUSD          1        1  4030.342  4061.133000      6   34.178010           target     momentum                 mss_fvg_m5
+2022-05-31 13:00:00+00:00 2022-05-31 14:30:00+00:00 SPXUSD         -1        1  4130.242  4130.742000      2   -0.185000             stop        judas                  mss_ob_m5
+2022-06-06 08:00:00+00:00 2022-06-06 08:50:00+00:00 NSXUSD          1        1 12664.919 12674.419000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-06-06 08:00:00+00:00 2022-06-06 15:05:00+00:00 SPXUSD          1        1  4137.551  4167.548000      4   22.197780           target     momentum                  mss_ob_m5
+2022-06-13 07:00:00+00:00 2022-06-13 08:35:00+00:00 NSXUSD         -1        1 11564.419 11564.919000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-06-13 07:00:00+00:00 2022-06-13 11:35:00+00:00 SPXUSD         -1        1  3828.536  3819.036000      3    5.272500             stop     momentum                  mss_ob_m5
+2022-06-16 07:15:00+00:00 2022-06-16 07:25:00+00:00 NSXUSD         -1        1 11529.329 11529.829000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-06-16 07:15:00+00:00 2022-06-16 08:30:00+00:00 SPXUSD         -1        1  3770.942  3736.442000      1    6.382500             stop     momentum                 mss_fvg_m5
+2022-06-16 07:35:00+00:00 2022-06-16 09:55:00+00:00 SPXUSD         -1        2  3753.936  3707.533000      2   17.169110           target      no_open       pyramid_im0.8_fvg_m5
+2022-06-27 08:00:00+00:00 2022-06-27 08:20:00+00:00 NSXUSD          1        1 12126.139 12135.639000      1    1.757500             stop        judas                 mss_ob_m15
+2022-06-27 08:00:00+00:00 2022-06-27 10:05:00+00:00 SPXUSD          1        1  3916.999  3926.499000      2    3.515000             stop        judas                 mss_ob_m15
+2022-07-05 08:00:00+00:00 2022-07-05 08:05:00+00:00 NSXUSD         -1        1 11631.839 11632.339000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-07-05 08:00:00+00:00 2022-07-05 09:40:00+00:00 SPXUSD         -1        1  3837.139  3807.479000      5   27.435500           target     momentum                  mss_ob_m5
+2022-07-05 13:00:00+00:00 2022-07-05 15:00:00+00:00 SPXUSD         -1        1  3786.854  3752.354000      2   12.765000             stop     momentum                mss_fvg_m15
+2022-07-11 07:00:00+00:00 2022-07-11 07:05:00+00:00 NSXUSD         -1        1 12007.589 11998.089000      3    5.272500             stop        judas                 mss_fvg_h1
+2022-07-11 07:00:00+00:00 2022-07-11 08:20:00+00:00 SPXUSD         -1        1  3871.239  3871.739000     10   -0.925000             stop     momentum                  mss_ob_m5
+2022-07-12 12:15:00+00:00 2022-07-12 14:35:00+00:00 SPXUSD          1        1  3830.539  3864.051000      7   43.398040           target     momentum                  mss_ob_m5
+2022-07-14 11:45:00+00:00 2022-07-14 13:00:00+00:00 NSXUSD         -1        1 11610.069 11610.569000      1   -0.092500             stop     momentum                 mss_ob_m15
+2022-07-15 13:35:00+00:00 2022-07-15 13:45:00+00:00 SPXUSD          1        1  3808.936  3808.436000      2   -0.185000             stop     momentum             mss_breaker_m5
+2022-07-15 13:35:00+00:00 2022-07-15 13:45:00+00:00 NSXUSD          1        1 11803.889 11838.389000      1    6.382500             stop     momentum             mss_breaker_m5
+2022-07-18 08:15:00+00:00 2022-07-18 08:30:00+00:00 NSXUSD          1        1 12100.379 12109.879000      1    1.757500             stop     momentum                mss_fvg_m15
+2022-07-18 08:15:00+00:00 2022-07-18 13:20:00+00:00 SPXUSD          1        1  3890.454  3889.954000      4   -0.370000             stop     momentum                  mss_ob_m5
+2022-07-19 11:00:00+00:00 2022-07-19 15:45:00+00:00 SPXUSD          1        1  3858.599  3895.751000      3   20.619360           target     momentum                 mss_fvg_m5
+2022-07-20 11:30:00+00:00 2022-07-20 11:45:00+00:00 NSXUSD         -1        1 12241.199 12231.699000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-07-20 11:30:00+00:00 2022-07-20 15:25:00+00:00 SPXUSD         -1        1  3928.654  3945.643000      4  -12.571860             stop     momentum                  mss_ob_m5
+2022-07-21 13:05:00+00:00 2022-07-21 14:15:00+00:00 SPXUSD          1        1  3956.039  3955.539000      4   -0.370000             stop        judas                  mss_ob_m5
+2022-07-29 07:15:00+00:00 2022-07-29 13:30:00+00:00 SPXUSD          1        1  4098.051  4089.542000      8  -12.593320             stop     momentum                  mss_ob_m5
+2022-08-02 08:00:00+00:00 2022-08-02 12:30:00+00:00 SPXUSD         -1        1  4096.199  4096.699000      8   -0.740000             stop     momentum                  mss_ob_m5
+2022-08-08 08:00:00+00:00 2022-08-08 11:40:00+00:00 NSXUSD          1        1 13273.579 13283.079000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-08-08 08:00:00+00:00 2022-08-08 14:00:00+00:00 SPXUSD          1        1  4161.239  4160.739000      2   -0.185000             stop     momentum                 mss_fvg_h1
+2022-08-10 13:00:00+00:00 2022-08-10 13:15:00+00:00 NSXUSD          1        1 13063.449 13062.949000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-08-10 13:00:00+00:00 2022-08-10 13:30:00+00:00 SPXUSD          1        1  4137.154  4171.654000      7   44.677500             stop     momentum                  mss_ob_m5
+2022-08-11 07:15:00+00:00 2022-08-11 07:35:00+00:00 NSXUSD          1        1 13418.779 13428.279000      3    5.272500             stop     momentum                 mss_ob_m15
+2022-08-11 07:15:00+00:00 2022-08-11 09:30:00+00:00 SPXUSD          1        1  4220.433  4212.148000      9  -13.794525             stop     momentum                 mss_ob_m15
+2022-08-11 13:00:00+00:00 2022-08-11 16:00:00+00:00 SPXUSD          1        1  4229.145  4238.645000      6   10.545000             stop     momentum                 mss_fvg_h1
+2022-08-15 08:00:00+00:00 2022-08-15 08:10:00+00:00 NSXUSD         -1        1 13520.979 13511.479000      4    7.030000             stop     momentum                 mss_ob_m15
+2022-08-15 08:00:00+00:00 2022-08-15 14:30:00+00:00 SPXUSD         -1        1  4266.733  4257.233000     16   28.120000             stop     momentum                 mss_ob_m15
+2022-08-18 07:30:00+00:00 2022-08-18 08:05:00+00:00 NSXUSD         -1        1 13409.799 13410.299000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-08-18 07:30:00+00:00 2022-08-18 10:05:00+00:00 SPXUSD         -1        1  4258.042  4272.048000      5  -12.955550             stop     momentum                  mss_ob_m5
+2022-08-22 08:15:00+00:00 2022-08-22 14:35:00+00:00 SPXUSD         -1        1  4199.733  4167.941556      5   29.407086           target     momentum                  mss_ob_m5
+2022-08-23 07:00:00+00:00 2022-08-23 07:05:00+00:00 NSXUSD         -1        1 12884.227 12874.727000      2    3.515000             stop     momentum                 mss_fvg_h1
+2022-08-23 07:00:00+00:00 2022-08-23 08:10:00+00:00 SPXUSD         -1        1  4134.436  4134.936000      4   -0.370000             stop     momentum                 mss_fvg_h1
+2022-08-25 07:10:00+00:00 2022-08-25 07:15:00+00:00 SPXUSD          1        1  4160.445  4169.945000      7   12.302500             stop     momentum                  mss_ob_m5
+2022-08-25 07:10:00+00:00 2022-08-25 07:15:00+00:00 NSXUSD          1        1 12970.787 13025.287000      5   50.412500             stop     momentum                 mss_fvg_m5
+2022-08-26 13:30:00+00:00 2022-08-26 13:55:00+00:00 NSXUSD          1        1 13121.809 13131.309000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-08-26 13:30:00+00:00 2022-08-26 14:30:00+00:00 SPXUSD          1        1  4194.939  4194.439000      4   -0.370000             stop     momentum                  mss_ob_m5
+2022-08-30 08:00:00+00:00 2022-08-30 08:05:00+00:00 NSXUSD          1        1 12536.809 12536.309000      3   -0.277500             stop        judas                 mss_fvg_h1
+2022-08-30 08:00:00+00:00 2022-08-30 12:55:00+00:00 SPXUSD          1        1  4044.739  4054.239000     10   17.575000             stop        judas                 mss_fvg_h1
+2022-09-09 08:00:00+00:00 2022-09-09 08:10:00+00:00 NSXUSD          1        1 12392.809 12427.309000      1    6.382500             stop        judas                 mss_fvg_m5
+2022-09-09 08:00:00+00:00 2022-09-09 13:10:00+00:00 SPXUSD          1        1  4021.348  4030.848000      5    8.787500             stop        judas                  mss_ob_m5
+2022-09-12 08:15:00+00:00 2022-09-12 11:10:00+00:00 SPXUSD          1        1  4074.036  4083.536000      7   12.302500             stop     momentum                  mss_ob_m5
+2022-09-13 11:15:00+00:00 2022-09-13 12:05:00+00:00 NSXUSD          1        1 12793.409 12825.818280      3   17.987150           target     momentum                 mss_ob_m15
+2022-09-13 11:15:00+00:00 2022-09-13 13:30:00+00:00 SPXUSD          1        1  4130.554  4130.054000     10   -0.925000             stop     momentum                  mss_ob_m5
+2022-09-19 07:00:00+00:00 2022-09-19 07:10:00+00:00 NSXUSD         -1        1 11773.339 11763.839000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-09-20 13:00:00+00:00 2022-09-20 13:05:00+00:00 NSXUSD         -1        1 11876.869 11877.369000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2022-09-20 13:00:00+00:00 2022-09-20 16:50:00+00:00 SPXUSD         -1        1  3879.199  3869.699000      2    3.515000             stop     momentum                 mss_fvg_h1
+2022-09-21 07:30:00+00:00 2022-09-21 08:15:00+00:00 NSXUSD         -1        1 11814.299 11814.799000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-09-21 07:30:00+00:00 2022-09-21 10:45:00+00:00 SPXUSD         -1        1  3845.346  3867.454000      3  -12.269940             stop     momentum                 mss_fvg_m5
+2022-09-29 08:00:00+00:00 2022-09-29 08:30:00+00:00 NSXUSD         -1        1 11357.579 11323.079000      1    6.382500             stop     momentum                 mss_fvg_m5
+2022-09-29 08:20:00+00:00 2022-09-29 08:30:00+00:00 NSXUSD         -1        2 11332.889 11323.389000      2    3.515000             stop      no_open       pyramid_im0.8_fvg_m5
+2022-09-29 08:00:00+00:00 2022-09-29 10:05:00+00:00 SPXUSD         -1        1  3683.245  3683.745000      2   -0.185000             stop     momentum                mss_fvg_m15
+2022-09-30 08:00:00+00:00 2022-09-30 08:05:00+00:00 NSXUSD          1        1 11239.369 11238.869000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-09-30 08:00:00+00:00 2022-09-30 10:15:00+00:00 SPXUSD          1        1  3657.241  3666.741000      4    7.030000             stop     momentum                 mss_fvg_h1
+2022-10-04 07:30:00+00:00 2022-10-04 14:45:00+00:00 SPXUSD          1        1  3719.110  3765.755000      7   60.405275           target     momentum                 mss_fvg_h1
+2022-10-13 12:15:00+00:00 2022-10-13 12:35:00+00:00 NSXUSD          1        1 10831.109 10840.609000      2    3.515000             stop     momentum                 mss_fvg_h1
+2022-10-13 12:15:00+00:00 2022-10-13 13:30:00+00:00 SPXUSD          1        1  3600.642  3600.142000      7   -0.647500             stop     momentum                 mss_fvg_h1
+2022-10-17 13:30:00+00:00 2022-10-17 13:40:00+00:00 NSXUSD          1        1 10869.999 10879.499000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-10-19 07:30:00+00:00 2022-10-19 07:40:00+00:00 NSXUSD         -1        1 11210.239 11210.739000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-10-19 07:30:00+00:00 2022-10-19 08:50:00+00:00 SPXUSD         -1        1  3729.625  3730.125000      4   -0.370000             stop     momentum                 mss_fvg_h1
+2022-10-19 12:00:00+00:00 2022-10-19 13:30:00+00:00 SPXUSD         -1        1  3725.132  3692.500000      5   30.184600           target     momentum                  mss_ob_m5
+2022-10-20 11:30:00+00:00 2022-10-20 12:40:00+00:00 SPXUSD          1        1  3688.696  3698.196000     10   17.575000             stop     momentum                 mss_fvg_m5
+2022-10-26 08:15:00+00:00 2022-10-26 08:20:00+00:00 NSXUSD          1        1 11470.139 11469.639000      2   -0.185000             stop     momentum                  mss_ob_m5
+2022-10-26 08:15:00+00:00 2022-10-26 10:30:00+00:00 SPXUSD          1        1  3828.441  3827.941000      9   -0.832500             stop     momentum                  mss_ob_m5
+2022-10-28 08:15:00+00:00 2022-10-28 09:45:00+00:00 SPXUSD         -1        1  3773.716  3783.291000      9  -15.942375             stop     momentum                 mss_fvg_h1
+2022-10-31 08:00:00+00:00 2022-10-31 08:05:00+00:00 NSXUSD         -1        1 11479.699 11480.199000      1   -0.092500             stop     momentum                 mss_ob_m15
+2022-10-31 08:00:00+00:00 2022-10-31 11:00:00+00:00 SPXUSD         -1        1  3885.431  3885.931000      6   -0.555000             stop     momentum                 mss_ob_m15
+2022-10-31 13:15:00+00:00 2022-10-31 14:15:00+00:00 SPXUSD         -1        1  3876.969  3877.469000      5   -0.462500             stop     momentum                  mss_ob_m5
+2022-11-07 08:10:00+00:00 2022-11-07 08:15:00+00:00 NSXUSD          1        1 10811.189 10810.689000      1   -0.092500             stop        judas                 mss_ob_m15
+2022-11-07 08:10:00+00:00 2022-11-07 14:35:00+00:00 SPXUSD          1        1  3760.625  3770.125000      4    7.030000             stop        judas                 mss_ob_m15
+2022-11-09 09:15:00+00:00 2022-11-09 09:20:00+00:00 NSXUSD         -1        2 11029.809 11040.309000      2   -3.885000             stop      no_open     pyramid_wamd1.0_fvg_m5
+2022-11-09 09:05:00+00:00 2022-11-09 09:45:00+00:00 NSXUSD         -1        1 11050.159 11015.659000      1    6.382500             stop        judas                 mss_fvg_m5
+2022-11-09 09:05:00+00:00 2022-11-09 11:10:00+00:00 SPXUSD         -1        1  3822.151  3822.651000      6   -0.555000             stop        judas                  mss_ob_m5
+2022-11-09 14:30:00+00:00 2022-11-09 20:35:00+00:00 SPXUSD         -1        1  3795.341  3760.841000      2   12.765000             stop     momentum                 mss_fvg_m5
+2022-11-10 13:10:00+00:00 2022-11-10 13:30:00+00:00 SPXUSD          1        1  3765.169  3839.669000      7   96.477500             stop     momentum                  mss_ob_m5
+2022-11-10 13:10:00+00:00 2022-11-10 13:30:00+00:00 NSXUSD          1        1 10863.049 11137.549000      2  101.565000             stop     momentum             mss_breaker_m5
+2022-11-11 08:45:00+00:00 2022-11-11 09:00:00+00:00 NSXUSD          1        1 11720.729 11720.229000      1   -0.092500             stop     momentum                 mss_fvg_h1
+2022-11-11 08:45:00+00:00 2022-11-11 09:30:00+00:00 SPXUSD          1        1  3986.775  3972.300000      7  -18.745125             stop     momentum                 mss_fvg_h1
+2022-11-15 13:00:00+00:00 2022-11-15 13:05:00+00:00 NSXUSD          1        1 11887.499 11886.999000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2022-11-15 13:00:00+00:00 2022-11-15 13:30:00+00:00 SPXUSD          1        1  3998.303  4007.803000      5    8.787500             stop     momentum                 mss_fvg_m5
+2022-11-17 12:30:00+00:00 2022-11-17 12:35:00+00:00 NSXUSD         -1        1 11618.989 11619.489000      3   -0.277500             stop     momentum                 mss_fvg_m5
+2022-11-17 12:30:00+00:00 2022-11-17 14:45:00+00:00 SPXUSD         -1        1  3929.048  3919.548000      8   14.060000             stop     momentum                 mss_fvg_m5
+2022-11-21 09:00:00+00:00 2022-11-21 14:20:00+00:00 SPXUSD         -1        1  3944.318  3956.781000      8  -18.445240             stop     momentum                  mss_ob_m5
+2022-11-23 14:30:00+00:00 2022-11-23 14:35:00+00:00 NSXUSD          1        1 11741.819 11751.319000      3    5.272500             stop        judas                 mss_ob_m15
+2022-11-23 14:30:00+00:00 2022-11-23 16:50:00+00:00 SPXUSD          1        1  4008.475  4007.975000      7   -0.647500             stop        judas                  mss_ob_m5
+2022-11-25 09:30:00+00:00 2022-11-25 09:40:00+00:00 NSXUSD         -1        1 11857.279 11857.779000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2022-11-25 13:05:00+00:00 2022-11-25 14:25:00+00:00 NSXUSD         -1        1 11811.219 11776.719000      5   31.912500             stop     momentum                  mss_ob_m5
+2022-11-25 13:40:00+00:00 2022-11-25 14:30:00+00:00 NSXUSD         -1        2 11791.469 11756.969000      2   12.765000             stop      no_open       pyramid_im0.8_fvg_m5
+2022-11-29 13:00:00+00:00 2022-11-29 13:10:00+00:00 NSXUSD         -1        1 11641.799 11632.299000      7   12.302500             stop     momentum                  mss_ob_m5
+2022-12-12 09:30:00+00:00 2022-12-12 14:35:00+00:00 SPXUSD          1        1  3936.491  3935.991000     12   -1.110000             stop     momentum                 mss_ob_m15
+2022-12-15 08:15:00+00:00 2022-12-15 09:00:00+00:00 NSXUSD         -1        1 11608.209 11598.709000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-12-15 09:40:00+00:00 2022-12-15 10:40:00+00:00 SPXUSD         -1        2  3948.426  3957.916000      2   -3.511300             stop      no_open     pyramid_wamd1.0_fvg_m5
+2022-12-15 13:15:00+00:00 2022-12-15 14:30:00+00:00 SPXUSD         -1        2  3947.203  3947.703000      2   -0.185000             stop      no_open pyramid_wamd1.0_breaker_m5
+2022-12-15 08:15:00+00:00 2022-12-15 14:55:00+00:00 SPXUSD         -1        1  3964.558  3911.535000      2   19.618510           target     momentum                 mss_fvg_m5
+2022-12-19 08:00:00+00:00 2022-12-19 08:10:00+00:00 NSXUSD          1        1 11259.199 11268.699000      2    3.515000             stop        judas                mss_fvg_m15
+2022-12-22 13:30:00+00:00 2022-12-22 13:40:00+00:00 NSXUSD         -1        1 11151.909 11142.409000      1    1.757500             stop     momentum                 mss_fvg_m5
+2022-12-22 13:30:00+00:00 2022-12-22 15:00:00+00:00 SPXUSD         -1        1  3858.223  3823.723000      7   44.677500             stop     momentum                 mss_fvg_h1
+2022-12-27 12:00:00+00:00 2022-12-27 12:05:00+00:00 NSXUSD         -1        1 11032.399 11032.899000      5   -0.462500             stop     momentum                  mss_ob_m5
+2022-12-27 12:00:00+00:00 2022-12-27 14:35:00+00:00 SPXUSD         -1        1  3866.496  3827.586000     18  129.570300           target     momentum                  mss_ob_m5
+2023-01-10 12:00:00+00:00 2023-01-10 14:30:00+00:00 SPXUSD         -1        1  3879.852  3894.533000      8  -21.727880             stop        judas                mss_fvg_m15
+2023-01-12 13:00:00+00:00 2023-01-12 13:15:00+00:00 NSXUSD          1        1 11421.109 11420.609000      2   -0.185000             stop     momentum                mss_fvg_m15
+2023-01-12 13:00:00+00:00 2023-01-12 13:30:00+00:00 SPXUSD          1        1  3981.246  3965.076000      7  -20.940150             stop     momentum                  mss_ob_m5
+2023-01-13 13:05:00+00:00 2023-01-13 18:40:00+00:00 SPXUSD         -1        1  3944.319  3987.659000      2  -16.035800             stop     momentum                 mss_fvg_m5
+2023-01-17 14:00:00+00:00 2023-01-17 14:30:00+00:00 NSXUSD          1        1 11503.679 11513.179000      3    5.272500             stop     momentum                mss_fvg_m15
+2023-01-17 14:05:00+00:00 2023-01-17 15:40:00+00:00 SPXUSD          1        1  3994.372  3993.872000      8   -0.740000             stop     momentum                  mss_ob_m5
+2023-01-20 09:10:00+00:00 2023-01-20 09:15:00+00:00 NSXUSD         -1        2 11307.839 11318.339000      2   -3.885000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-01-20 09:00:00+00:00 2023-01-20 09:20:00+00:00 NSXUSD         -1        1 11325.869 11326.369000      2   -0.185000             stop     momentum                mss_fvg_m15
+2023-01-31 08:30:00+00:00 2023-01-31 10:20:00+00:00 NSXUSD         -1        1 11890.189 11855.689000      2   12.765000             stop        judas                mss_fvg_m15
+2023-02-06 09:00:00+00:00 2023-02-06 09:25:00+00:00 NSXUSD         -1        1 12476.259 12476.759000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2023-02-09 08:15:00+00:00 2023-02-09 08:20:00+00:00 NSXUSD          1        2 12605.629 12605.129000      2   -0.185000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-02-09 08:25:00+00:00 2023-02-09 08:45:00+00:00 NSXUSD          1        2 12609.189 12608.689000      2   -0.185000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-02-09 08:00:00+00:00 2023-02-09 09:35:00+00:00 NSXUSD          1        1 12587.369 12621.869000      2   12.765000             stop     momentum                 mss_fvg_m5
+2023-02-09 08:45:00+00:00 2023-02-09 09:35:00+00:00 NSXUSD          1        2 12606.869 12616.369000      2    3.515000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-02-09 08:00:00+00:00 2023-02-09 14:40:00+00:00 SPXUSD          1        1  4143.183  4142.683000      9   -0.832500             stop     momentum                  mss_ob_m5
+2023-02-10 12:05:00+00:00 2023-02-10 17:20:00+00:00 NSXUSD         -1        1 12224.779 12225.279000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2023-02-13 12:10:00+00:00 2023-02-13 12:15:00+00:00 NSXUSD          1        2 12369.799 12369.299000      2   -0.185000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-02-13 12:00:00+00:00 2023-02-13 13:15:00+00:00 NSXUSD          1        1 12353.429 12362.929000      9   15.817500             stop        judas                 mss_fvg_m5
+2023-02-13 12:00:00+00:00 2023-02-13 19:25:00+00:00 SPXUSD          1        1  4095.278  4129.778000     11   70.207500             stop     momentum                  mss_ob_m5
+2023-02-14 09:00:00+00:00 2023-02-14 10:25:00+00:00 NSXUSD          1        1 12522.709 12522.209000      2   -0.185000             stop     momentum                  mss_ob_m5
+2023-02-14 09:00:00+00:00 2023-02-14 13:30:00+00:00 SPXUSD          1        1  4144.876  4144.376000      8   -0.740000             stop     momentum                  mss_ob_m5
+2023-02-16 13:20:00+00:00 2023-02-16 13:25:00+00:00 NSXUSD         -1        2 12613.147 12623.647000      2   -3.885000             stop      no_open     pyramid_wamd1.0_fvg_m5
+2023-02-16 13:00:00+00:00 2023-02-16 13:30:00+00:00 NSXUSD         -1        1 12635.769 12601.269000      2   12.765000             stop     momentum                 mss_fvg_m5
+2023-02-16 13:00:00+00:00 2023-02-16 13:45:00+00:00 SPXUSD         -1        1  4132.951  4103.356000      8   43.800600           target     momentum                 mss_fvg_h1
+2023-02-22 08:15:00+00:00 2023-02-22 08:25:00+00:00 NSXUSD         -1        1 12090.239 12080.739000      5    8.787500             stop        judas                 mss_ob_m15
+2023-02-22 08:15:00+00:00 2023-02-22 09:05:00+00:00 SPXUSD         -1        1  4003.044  4003.544000     18   -1.665000             stop        judas                 mss_ob_m15
+2023-02-24 08:00:00+00:00 2023-02-24 09:10:00+00:00 NSXUSD         -1        1 12128.079 12118.579000      4    7.030000             stop     momentum                 mss_fvg_m5
+2023-02-24 14:00:00+00:00 2023-02-24 14:15:00+00:00 NSXUSD         -1        1 11971.319 11961.819000      1    1.757500             stop      no_open                 mss_fvg_m5
+2023-02-24 08:00:00+00:00 2023-02-24 18:00:00+00:00 SPXUSD         -1        1  4004.719  3969.213000     17  111.666370           target     momentum                  mss_ob_m5
+2023-03-09 14:00:00+00:00 2023-03-09 20:00:00+00:00 SPXUSD          1        1  4004.352  3976.316000      4  -20.746640             stop     momentum                 amd_fvg_m5
+2023-03-09 14:00:00+00:00 2023-03-10 00:00:00+00:00 NSXUSD          1        1 12208.589 12133.459000      1  -13.899050             stop      no_open                 mss_fvg_m5
+2023-03-21 11:00:00+00:00 2023-03-21 11:20:00+00:00 NSXUSD          1        1 12603.399 12612.899000      2    3.515000             stop     momentum                 mss_fvg_m5
+2023-03-21 11:00:00+00:00 2023-03-21 14:25:00+00:00 SPXUSD          1        1  3976.364  3975.864000      5   -0.462500             stop      no_open                 mss_fvg_h1
+2023-03-30 07:00:00+00:00 2023-03-30 12:00:00+00:00 NSXUSD          1        1 12852.409 12897.263160      5   41.490098           target     momentum                mss_fvg_m15
+2023-04-10 13:00:00+00:00 2023-04-11 00:00:00+00:00 NSXUSD         -1        1 12995.719 13051.609000      2  -20.679300             stop      no_open                  mss_ob_m5
+2023-04-18 07:00:00+00:00 2023-04-18 08:10:00+00:00 NSXUSD          1        1 13081.489 13080.989000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2023-04-19 07:20:00+00:00 2023-04-19 09:10:00+00:00 NSXUSD         -1        1 13020.249 13020.749000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2023-04-19 07:20:00+00:00 2023-04-19 15:05:00+00:00 SPXUSD         -1        1  4139.760  4140.260000     11   -1.017500             stop     momentum                mss_fvg_m15
+2023-04-25 08:00:00+00:00 2023-04-25 08:25:00+00:00 NSXUSD         -1        1 12914.819 12915.319000      5   -0.462500             stop     momentum                 mss_fvg_h1
+2023-04-25 08:00:00+00:00 2023-04-26 01:00:00+00:00 SPXUSD         -1        1  4121.404  4089.651246     15   88.113892           target     momentum                  mss_ob_m5
+2023-05-09 08:05:00+00:00 2023-05-09 19:00:00+00:00 SPXUSD         -1        1  4129.157  4129.657000     13   -1.202500             stop     momentum                  mss_ob_m5
+2023-05-15 07:00:00+00:00 2023-05-15 14:30:00+00:00 SPXUSD          1        1  4133.076  4122.064000     12  -24.446640             stop     momentum                 mss_fvg_h1
+2023-05-16 08:00:00+00:00 2023-05-16 08:05:00+00:00 SPXUSD          1        1  4126.004  4121.504000     32  -26.640000             stop        judas                  mss_ob_m5
+2023-05-16 08:30:00+00:00 2023-05-16 09:40:00+00:00 NSXUSD          1        2 13413.889 13413.389000      2   -0.185000             stop      no_open       pyramid_im1.0_fvg_m5
+2023-05-16 08:05:00+00:00 2023-05-16 10:25:00+00:00 NSXUSD          1        1 13395.509 13405.009000      3    5.272500             stop        judas             mss_breaker_m5
+2023-05-26 12:00:00+00:00 2023-05-26 16:00:00+00:00 SPXUSD          1        1  4160.211  4197.839368      6   41.767488           target      no_open                 mss_fvg_m5
+2023-05-26 12:00:00+00:00 2023-05-26 16:05:00+00:00 NSXUSD          1        1 13985.067 14199.567000      2   79.365000             stop      no_open                 mss_fvg_m5
+2023-06-07 13:00:00+00:00 2023-06-07 15:40:00+00:00 SPXUSD          1        1  4291.409  4277.840000     10  -25.102650             stop      no_open                 amd_fvg_m5
+2023-06-12 08:30:00+00:00 2023-06-12 10:10:00+00:00 NSXUSD          1        1 14595.699 14630.199000      3   19.147500             stop     momentum                 mss_fvg_m5
+2023-06-12 08:30:00+00:00 2023-06-12 13:20:00+00:00 SPXUSD          1        1  4313.811  4307.073000     21  -26.177130             stop     momentum                  mss_ob_m5
+2023-07-11 07:00:00+00:00 2023-07-11 08:00:00+00:00 NSXUSD          1        1 15078.649 15078.149000      3   -0.277500             stop     momentum                 mss_fvg_m5
+2023-07-11 07:00:00+00:00 2023-07-11 09:00:00+00:00 SPXUSD          1        1  4417.879  4407.674000     13  -24.543025             stop     momentum                  mss_ob_m5
+2023-07-17 08:05:00+00:00 2023-07-17 10:50:00+00:00 SPXUSD          1        1  4502.867  4497.577000     27  -26.423550             stop        judas             mss_breaker_m5
+2023-07-27 08:10:00+00:00 2023-07-27 08:15:00+00:00 NSXUSD          1        1 15620.989 15620.489000      6   -0.555000             stop     momentum                 mss_fvg_m5
+2023-07-27 08:10:00+00:00 2023-07-27 20:00:00+00:00 SPXUSD          1        1  4582.971  4582.471000     32   -2.960000             stop     momentum                  amd_ob_m5
+2023-08-01 08:00:00+00:00 2023-08-01 08:05:00+00:00 NSXUSD         -1        1 15741.579 15742.079000      3   -0.277500             stop     momentum                 mss_fvg_h1
+2023-08-01 13:25:00+00:00 2023-08-01 14:30:00+00:00 SPXUSD         -1        2  4569.966  4578.159000      2   -3.031410             stop      no_open    pyramid_wamd1.0_fvg_m15
+2023-08-01 13:05:00+00:00 2023-08-01 15:10:00+00:00 NSXUSD         -1        1 15670.829 15671.329000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2023-08-01 08:00:00+00:00 2023-08-02 09:15:00+00:00 SPXUSD         -1        1  4587.634  4532.632000     32  325.611840           target     momentum                  mss_ob_m5
+2023-08-08 11:30:00+00:00 2023-08-08 12:30:00+00:00 NSXUSD         -1        1 15319.419 15284.919000      4   25.530000             stop     momentum                 mss_fvg_m5
+2023-08-08 12:05:00+00:00 2023-08-08 13:05:00+00:00 NSXUSD         -1        2 15301.659 15267.159000      2   12.765000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-08-08 12:00:00+00:00 2023-08-08 13:40:00+00:00 SPXUSD         -1        1  4490.444  4490.944000     12   -1.110000             stop     momentum                mss_fvg_m15
+2023-08-10 08:00:00+00:00 2023-08-10 08:15:00+00:00 NSXUSD          1        1 15186.219 15195.719000      5    8.787500             stop     momentum                 mss_fvg_m5
+2023-08-10 13:10:00+00:00 2023-08-10 13:30:00+00:00 NSXUSD          1        1 15209.289 15208.789000      3   -0.277500             stop     momentum                  mss_ob_m5
+2023-08-11 13:30:00+00:00 2023-08-11 13:45:00+00:00 NSXUSD         -1        1 15047.139 15037.639000      2    3.515000             stop     momentum                 mss_fvg_h1
+2023-08-11 13:30:00+00:00 2023-08-11 15:20:00+00:00 SPXUSD         -1        1  4454.376  4471.379000      9  -28.309995             stop     momentum                 mss_ob_m15
+2023-08-14 08:15:00+00:00 2023-08-14 08:20:00+00:00 NSXUSD          1        1 15027.419 15026.919000      3   -0.277500             stop     momentum             mss_breaker_m5
+2023-08-14 08:20:00+00:00 2023-08-14 13:15:00+00:00 SPXUSD          1        1  4467.123  4466.623000      9   -0.832500             stop     momentum             mss_breaker_m5
+2023-08-16 13:20:00+00:00 2023-08-16 13:50:00+00:00 NSXUSD         -1        1 15020.059 15020.559000      3   -0.277500             stop     momentum                 mss_fvg_m5
+2023-08-16 13:20:00+00:00 2023-08-16 18:45:00+00:00 SPXUSD         -1        1  4433.627  4434.127000      7   -0.647500             stop     momentum                 mss_fvg_h1
+2023-08-17 07:35:00+00:00 2023-08-17 08:20:00+00:00 NSXUSD          1        2 14883.479 14882.979000      2   -0.185000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-08-17 07:05:00+00:00 2023-08-17 08:45:00+00:00 NSXUSD          1        1 14863.927 14873.427000      3    5.272500             stop        judas                 mss_fvg_m5
+2023-08-17 12:20:00+00:00 2023-08-17 13:30:00+00:00 NSXUSD          1        1 14908.349 14917.849000      5    8.787500             stop     momentum                  mss_ob_m5
+2023-08-18 13:15:00+00:00 2023-08-18 13:20:00+00:00 NSXUSD         -1        1 14581.339 14581.839000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2023-08-21 12:20:00+00:00 2023-08-21 13:35:00+00:00 SPXUSD          1        1  4391.423  4385.417000     27  -29.999970             stop        judas                 mss_fvg_h1
+2023-08-22 07:00:00+00:00 2023-08-22 08:05:00+00:00 NSXUSD          1        1 14919.399 14953.899000      5   31.912500             stop     momentum                  mss_ob_m5
+2023-09-05 07:00:00+00:00 2023-09-05 07:25:00+00:00 NSXUSD         -1        1 15469.277 15469.777000      8   -0.740000             stop     momentum                  mss_ob_m5
+2023-09-05 07:00:00+00:00 2023-09-05 10:10:00+00:00 SPXUSD         -1        1  4506.611  4507.111000     25   -2.312500             stop     momentum                  amd_ob_m5
+2023-09-07 13:15:00+00:00 2023-09-07 13:25:00+00:00 NSXUSD         -1        2 15235.189 15245.689000      2   -3.885000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-09-07 13:00:00+00:00 2023-09-07 13:30:00+00:00 NSXUSD         -1        1 15254.299 15219.799000      3   19.147500             stop     momentum                  mss_ob_m5
+2023-09-07 13:00:00+00:00 2023-09-07 14:40:00+00:00 SPXUSD         -1        1  4443.944  4444.444000     13   -1.202500             stop     momentum                  mss_ob_m5
+2023-09-12 08:00:00+00:00 2023-09-12 08:10:00+00:00 NSXUSD         -1        1 15454.019 15444.519000     12   21.090000             stop        judas             mss_breaker_m5
+2023-09-12 08:00:00+00:00 2023-09-12 18:20:00+00:00 SPXUSD         -1        1  4481.776  4482.276000     30   -2.775000             stop        judas             mss_breaker_m5
+2023-09-15 13:30:00+00:00 2023-09-15 13:35:00+00:00 NSXUSD         -1        1 15440.289 15440.789000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2023-09-15 13:30:00+00:00 2023-09-15 15:50:00+00:00 SPXUSD         -1        1  4503.171  4468.731000     15   95.571000           target     momentum             mss_breaker_m5
+2023-09-26 07:00:00+00:00 2023-09-26 08:05:00+00:00 NSXUSD         -1        1 14692.889 14658.389000      6   38.295000             stop     momentum                 mss_fvg_m5
+2023-09-26 07:00:00+00:00 2023-09-26 09:10:00+00:00 SPXUSD         -1        1  4319.093  4319.593000     22   -2.035000             stop     momentum                 mss_ob_m15
+2023-09-29 07:00:00+00:00 2023-09-29 08:10:00+00:00 NSXUSD          1        1 14738.899 14748.399000      2    3.515000             stop     momentum                 mss_fvg_m5
+2023-09-29 08:15:00+00:00 2023-09-29 08:20:00+00:00 NSXUSD          1        2 14771.219 14770.719000      2   -0.185000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-09-29 07:45:00+00:00 2023-09-29 09:05:00+00:00 NSXUSD          1        2 14755.089 14789.589000      2   12.765000             stop      no_open       pyramid_im1.0_fvg_m5
+2023-09-29 08:20:00+00:00 2023-09-29 09:50:00+00:00 NSXUSD          1        2 14785.869 14795.369000      2    3.515000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-09-29 07:00:00+00:00 2023-09-29 16:05:00+00:00 SPXUSD          1        1  4305.141  4314.641000     17   29.877500             stop     momentum                 mss_fvg_h1
+2023-10-02 12:30:00+00:00 2023-10-02 12:40:00+00:00 NSXUSD         -1        1 14740.719 14741.219000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2023-10-02 12:30:00+00:00 2023-10-02 14:35:00+00:00 SPXUSD         -1        1  4289.376  4289.876000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2023-10-12 07:00:00+00:00 2023-10-12 08:25:00+00:00 NSXUSD          1        1 15304.739 15285.819000      8  -28.001600             stop     momentum                  mss_ob_m5
+2023-10-12 07:00:00+00:00 2023-10-12 08:35:00+00:00 SPXUSD          1        1  4393.317  4386.321000     24  -31.062240             stop     momentum                 mss_ob_m15
+2023-10-16 13:35:00+00:00 2023-10-16 14:25:00+00:00 NSXUSD          1        1 15040.539 15050.039000      2    3.515000             stop     momentum                  mss_ob_m5
+2023-10-18 13:35:00+00:00 2023-10-18 15:15:00+00:00 SPXUSD         -1        1  4353.449  4362.133000     19  -30.524260             stop     momentum                  mss_ob_m5
+2023-10-24 07:00:00+00:00 2023-10-24 08:35:00+00:00 NSXUSD          1        1 14694.149 14703.649000      3    5.272500             stop     momentum                 mss_fvg_m5
+2023-10-24 07:00:00+00:00 2023-10-24 09:30:00+00:00 SPXUSD          1        1  4233.487  4224.354000     18  -30.412890             stop     momentum                  mss_ob_m5
+2023-10-25 08:00:00+00:00 2023-10-25 08:20:00+00:00 NSXUSD         -1        1 14651.819 14642.319000      5    8.787500             stop     momentum                 mss_fvg_m5
+2023-10-25 08:00:00+00:00 2023-10-25 15:45:00+00:00 SPXUSD         -1        1  4228.647  4219.147000     12   21.090000             stop     momentum                  mss_ob_m5
+2023-10-27 12:00:00+00:00 2023-10-27 12:30:00+00:00 NSXUSD         -1        1 14227.999 14218.499000      5    8.787500             stop     momentum                 mss_fvg_m5
+2023-10-27 12:20:00+00:00 2023-10-27 12:50:00+00:00 NSXUSD         -1        2 14210.899 14211.399000      2   -0.185000             stop      no_open     pyramid_wamd1.0_fvg_m5
+2023-10-31 08:15:00+00:00 2023-10-31 09:05:00+00:00 NSXUSD          1        1 14281.789 14316.289000      3   19.147500             stop     momentum                 mss_fvg_m5
+2023-10-31 08:35:00+00:00 2023-10-31 09:05:00+00:00 NSXUSD          1        2 14307.229 14316.729000      2    3.515000             stop      no_open       pyramid_im1.0_fvg_m5
+2023-10-31 08:15:00+00:00 2023-10-31 13:35:00+00:00 SPXUSD          1        1  4161.209  4160.709000     10   -0.925000             stop     momentum                 mss_fvg_h1
+2023-11-08 14:00:00+00:00 2023-11-08 14:30:00+00:00 NSXUSD          1        1 15304.739 15314.239000     10   17.575000             stop     momentum                 mss_fvg_m5
+2023-11-08 14:00:00+00:00 2023-11-08 15:35:00+00:00 SPXUSD          1        1  4384.149  4375.851000     20  -30.702600             stop     momentum                 mss_ob_m15
+2023-11-09 14:00:00+00:00 2023-11-09 14:35:00+00:00 SPXUSD          1        1  4393.207  4384.881000     20  -30.806200             stop     momentum                  amd_ob_m5
+2023-11-14 09:00:00+00:00 2023-11-14 09:30:00+00:00 NSXUSD          1        1 15529.309 15528.809000      7   -0.647500             stop     momentum                 mss_fvg_m5
+2023-11-14 13:50:00+00:00 2023-11-14 13:55:00+00:00 NSXUSD          1        1 15743.269 15742.769000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2023-11-14 13:50:00+00:00 2023-11-15 09:15:00+00:00 SPXUSD          1        1  4472.019  4506.519000      2   12.765000             stop     momentum                 amd_fvg_m5
+2023-11-16 13:35:00+00:00 2023-11-16 14:00:00+00:00 NSXUSD          1        1 15804.959 15804.459000      3   -0.277500             stop     momentum                 mss_fvg_m5
+2023-11-16 13:30:00+00:00 2023-11-16 16:10:00+00:00 SPXUSD          1        1  4501.177  4490.999000     16  -30.126880             stop        judas             amd_breaker_m5
+2023-11-20 09:15:00+00:00 2023-11-20 10:35:00+00:00 NSXUSD          1        2 15854.639 15854.139000      2   -0.185000             stop      no_open       pyramid_im0.8_fvg_m5
+2023-11-20 09:00:00+00:00 2023-11-20 12:35:00+00:00 NSXUSD          1        1 15834.209 15843.709000      3    5.272500             stop     momentum                 mss_fvg_m5
+2023-11-20 09:00:00+00:00 2023-11-20 20:50:00+00:00 SPXUSD          1        1  4512.876  4547.376000     33  210.622500             stop     momentum                 mss_ob_m15
+2023-12-04 14:10:00+00:00 2023-12-04 14:15:00+00:00 NSXUSD         -1        2 15845.089 15845.589000      5   -0.462500             stop      no_open       pyramid_im0.8_fvg_m5
+2023-12-04 14:00:00+00:00 2023-12-04 14:20:00+00:00 NSXUSD         -1        1 15862.119 15827.619000      5   31.912500             stop     momentum                 mss_fvg_m5
+2023-12-04 14:15:00+00:00 2023-12-04 14:20:00+00:00 NSXUSD         -1        2 15834.049 15834.549000      5   -0.462500             stop      no_open       pyramid_im0.8_fvg_m5
+2023-12-04 14:00:00+00:00 2023-12-04 17:05:00+00:00 SPXUSD         -1        1  4563.876  4564.376000     11   -1.017500             stop     momentum                mss_fvg_m15
+2023-12-07 13:00:00+00:00 2023-12-07 13:35:00+00:00 NSXUSD          1        1 15842.179 15841.679000      6   -0.555000             stop     momentum                  mss_ob_m5
+2023-12-07 09:30:00+00:00 2023-12-07 19:20:00+00:00 SPXUSD          1        1  4549.129  4589.279000     23  170.838250           target     momentum                 mss_fvg_m5
+2023-12-12 09:35:00+00:00 2023-12-12 13:25:00+00:00 NSXUSD          1        1 16245.399 16279.899000     34  217.005000             stop        judas                 mss_ob_m15
+2023-12-12 14:30:00+00:00 2023-12-12 19:45:00+00:00 NSXUSD         -1        1 16189.109 16320.939000      1  -24.388550             stop     momentum                mss_fvg_m15
+2023-12-13 13:30:00+00:00 2023-12-13 14:25:00+00:00 SPXUSD          1        1  4650.902  4646.381000     57  -47.673945             stop        judas                  mss_ob_m5
+2023-12-13 13:30:00+00:00 2023-12-13 14:25:00+00:00 NSXUSD          1        1 16387.939 16397.439000     36   63.270000             stop        judas                  mss_ob_m5
+2023-12-14 13:45:00+00:00 2023-12-14 14:05:00+00:00 NSXUSD          1        1 16624.739 16624.239000      8   -0.740000             stop     momentum                 mss_fvg_m5
+2023-12-19 12:00:00+00:00 2023-12-19 12:10:00+00:00 NSXUSD          1        1 16743.749 16743.249000     10   -0.925000             stop        judas                 mss_fvg_m5
+2023-12-19 12:00:00+00:00 2023-12-20 14:20:00+00:00 SPXUSD          1        1  4746.169  4755.669000     39   68.542500             stop     momentum                  mss_ob_m5
+2023-12-21 13:30:00+00:00 2023-12-21 13:35:00+00:00 NSXUSD          1        1 16717.519 16717.019000      3   -0.277500             stop     momentum                 mss_ob_m15
+2023-12-21 13:30:00+00:00 2023-12-21 15:25:00+00:00 SPXUSD          1        1  4732.111  4731.611000     26   -2.405000             stop     momentum                 mss_ob_m15
+2023-12-22 14:30:00+00:00 2023-12-22 14:40:00+00:00 NSXUSD          1        1 16800.279 16809.779000      4    7.030000             stop     momentum                 mss_fvg_m5
+2023-12-22 14:30:00+00:00 2023-12-22 19:20:00+00:00 SPXUSD          1        1  4762.864  4740.111000     16  -67.348880             stop     momentum                 mss_fvg_h1
+2024-01-02 12:45:00+00:00 2024-01-02 12:55:00+00:00 NSXUSD         -1        2 16657.189 16647.689000      5    8.787500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-01-02 12:30:00+00:00 2024-01-02 13:10:00+00:00 NSXUSD         -1        1 16674.129 16639.629000      1    6.382500             stop     momentum                 mss_fvg_m5
+2024-01-02 12:55:00+00:00 2024-01-02 13:30:00+00:00 NSXUSD         -1        2 16634.169 16644.669000      5   -9.712500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-01-02 12:30:00+00:00 2024-01-02 15:00:00+00:00 SPXUSD         -1        1  4741.126  4741.626000     83   -7.677500             stop     momentum                 mss_fvg_m5
+2024-01-08 14:25:00+00:00 2024-01-08 14:30:00+00:00 NSXUSD          1        1 16352.889 16362.389000      8   14.060000             stop     momentum                 mss_fvg_m5
+2024-01-08 14:25:00+00:00 2024-01-09 00:00:00+00:00 SPXUSD          1        1  4701.487  4745.382000     55  446.631625           target     momentum                  mss_ob_m5
+2024-01-10 09:00:00+00:00 2024-01-10 09:05:00+00:00 NSXUSD          1        1 16711.199 16720.699000      6   10.545000             stop     momentum                 mss_fvg_m5
+2024-01-10 09:00:00+00:00 2024-01-10 11:50:00+00:00 SPXUSD          1        1  4757.759  4750.790000    120 -154.711800             stop     momentum                  mss_ob_m5
+2024-01-16 08:00:00+00:00 2024-01-16 12:30:00+00:00 NSXUSD         -1        1 16682.819 16759.399000      2  -28.334600             stop     momentum                 mss_fvg_m5
+2024-01-17 14:30:00+00:00 2024-01-17 14:40:00+00:00 NSXUSD         -1        1 16625.109 16615.609000      2    3.515000             stop     momentum                 mss_fvg_m5
+2024-01-17 14:30:00+00:00 2024-01-17 19:20:00+00:00 SPXUSD         -1        1  4726.563  4727.063000      7   -0.647500             stop     momentum                mss_fvg_m15
+2024-01-24 09:05:00+00:00 2024-01-24 13:00:00+00:00 NSXUSD          1        1 17530.499 17539.999000      5    8.787500             stop     momentum                 mss_fvg_m5
+2024-01-24 13:00:00+00:00 2024-01-24 13:40:00+00:00 NSXUSD          1        1 17552.408 17551.908000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2024-01-24 09:05:00+00:00 2024-01-24 15:00:00+00:00 SPXUSD          1        1  4885.082  4880.582000    125 -104.062500             stop     momentum                  amd_ob_m5
+2024-02-13 13:50:00+00:00 2024-02-13 14:05:00+00:00 NSXUSD         -1        1 17573.721 17564.221000      2    3.515000             stop     momentum                 mss_fvg_m5
+2024-02-13 13:50:00+00:00 2024-02-13 15:25:00+00:00 SPXUSD         -1        1  4957.841  4958.341000      3   -0.277500             stop     momentum                 mss_fvg_m5
+2024-02-16 13:15:00+00:00 2024-02-16 13:20:00+00:00 NSXUSD         -1        1 17937.898 17938.398000     16   -1.480000             stop     momentum                  mss_ob_m5
+2024-02-21 08:10:00+00:00 2024-02-21 08:15:00+00:00 NSXUSD         -1        1 17494.499 17494.999000      6   -0.555000             stop     momentum                 mss_ob_m15
+2024-02-22 08:00:00+00:00 2024-02-22 08:05:00+00:00 NSXUSD          1        1 17804.042 17803.542000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2024-02-22 08:00:00+00:00 2024-02-22 15:30:00+00:00 SPXUSD          1        1  5035.210  5064.743888     22  120.202924           target     momentum                  mss_ob_m5
+2024-03-06 08:00:00+00:00 2024-03-06 08:50:00+00:00 NSXUSD          1        1 17978.687 17988.187000      5    8.787500             stop     momentum                 mss_fvg_m5
+2024-03-06 08:20:00+00:00 2024-03-06 08:50:00+00:00 NSXUSD          1        2 17996.408 17985.908000      5   -9.712500             stop      no_open       pyramid_im0.8_fvg_m5
+2024-03-06 13:00:00+00:00 2024-03-06 14:00:00+00:00 NSXUSD          1        1 18053.976 18053.476000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2024-03-07 14:15:00+00:00 2024-03-07 14:30:00+00:00 NSXUSD          1        1 18151.454 18150.954000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2024-03-07 14:15:00+00:00 2024-03-08 13:30:00+00:00 SPXUSD          1        1  5136.049  5145.549000     11   19.332500             stop     momentum                mss_fvg_m15
+2024-03-14 13:20:00+00:00 2024-03-14 13:45:00+00:00 SPXUSD         -1        1  5169.932  5170.432000     16   -1.480000             stop     momentum                  amd_ob_m5
+2024-03-14 13:20:00+00:00 2024-03-14 13:45:00+00:00 NSXUSD         -1        1 18099.686 18045.186000      6   60.495000             stop     momentum                 mss_fvg_m5
+2024-04-01 13:00:00+00:00 2024-04-01 16:15:00+00:00 SPXUSD         -1        1  5265.870  5235.571584     46  257.839520           target     momentum                 mss_fvg_h1
+2024-04-09 13:00:00+00:00 2024-04-09 13:10:00+00:00 NSXUSD          1        1 18151.508 18151.008000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2024-04-11 13:35:00+00:00 2024-04-11 14:05:00+00:00 NSXUSD          1        1 18075.931 18075.431000      1   -0.092500             stop     momentum                 mss_fvg_m5
+2024-04-12 11:45:00+00:00 2024-04-12 11:50:00+00:00 NSXUSD         -1        1 18213.909 18214.409000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2024-04-12 11:45:00+00:00 2024-04-12 14:00:00+00:00 SPXUSD         -1        1  5179.364  5149.835656     18   98.329386           target     momentum                 mss_ob_m15
+2024-04-23 08:00:00+00:00 2024-04-23 13:15:00+00:00 SPXUSD          1        1  5016.362  5015.862000     19   -1.757500             stop     momentum                  mss_ob_m5
+2024-04-25 13:30:00+00:00 2024-04-25 13:35:00+00:00 NSXUSD         -1        1 17286.489 17286.989000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2024-04-25 13:35:00+00:00 2024-04-25 15:10:00+00:00 SPXUSD         -1        1  5014.117  5004.617000     22   38.665000             stop     momentum                 mss_fvg_m5
+2024-04-30 13:30:00+00:00 2024-04-30 15:00:00+00:00 NSXUSD         -1        1 17681.253 17772.375000      4  -67.430280             stop     momentum                 mss_fvg_m5
+2024-04-30 13:30:00+00:00 2024-04-30 20:50:00+00:00 SPXUSD         -1        1  5092.536  5058.036000     20  127.650000             stop     momentum                 mss_fvg_m5
+2024-05-06 13:05:00+00:00 2024-05-06 14:25:00+00:00 NSXUSD          1        1 17940.489 17949.989000     16   28.120000             stop     momentum                 mss_fvg_h1
+2024-05-09 07:00:00+00:00 2024-05-09 08:25:00+00:00 NSXUSD         -1        1 18043.319 18043.819000     18   -1.665000             stop     momentum                  mss_ob_m5
+2024-05-09 13:30:00+00:00 2024-05-09 14:05:00+00:00 NSXUSD          1        1 18086.086 18095.586000      3    5.272500             stop     momentum                 mss_fvg_m5
+2024-05-09 13:30:00+00:00 2024-05-10 10:05:00+00:00 SPXUSD          1        1  5188.427  5232.277000     16  129.796000           target     momentum                  mss_ob_m5
+2024-05-13 12:00:00+00:00 2024-05-13 13:20:00+00:00 NSXUSD          1        1 18203.719 18203.219000     20   -1.850000             stop     momentum                 mss_fvg_m5
+2024-05-13 12:00:00+00:00 2024-05-13 14:40:00+00:00 SPXUSD          1        1  5230.487  5225.611000    110  -99.226600             stop     momentum                  mss_ob_m5
+2024-05-16 13:00:00+00:00 2024-05-16 13:30:00+00:00 NSXUSD         -1        1 18618.221 18631.808000     18  -45.244710             stop     momentum                  mss_ob_m5
+2024-05-20 13:30:00+00:00 2024-05-20 14:50:00+00:00 SPXUSD         -1        1  5309.629  5315.623000     42  -46.573380             stop     momentum                 mss_ob_m15
+2024-05-22 11:25:00+00:00 2024-05-22 14:00:00+00:00 NSXUSD         -1        1 18678.889 18726.186000      4  -34.999780             stop     momentum                mss_fvg_m15
+2024-05-24 11:05:00+00:00 2024-05-24 12:25:00+00:00 NSXUSD          1        1 18669.908 18669.408000      3   -0.277500             stop     momentum                 mss_fvg_m5
+2024-05-31 13:05:00+00:00 2024-05-31 13:30:00+00:00 NSXUSD          1        1 18506.299 18540.799000      2   12.765000             stop     momentum                 mss_fvg_m5
+2024-06-12 13:00:00+00:00 2024-06-12 13:25:00+00:00 NSXUSD          1        1 19240.886 19240.386000     16   -1.480000             stop     momentum                 mss_ob_m15
+2024-06-12 13:00:00+00:00 2024-06-12 13:30:00+00:00 SPXUSD          1        1  5384.532  5419.500000     41  265.232280           target     momentum                  mss_ob_m5
+2024-06-19 11:45:00+00:00 2024-06-19 15:30:00+00:00 SPXUSD          1        1  5493.686  5489.186000    122 -101.565000             stop     momentum                  mss_ob_m5
+2024-06-19 11:45:00+00:00 2024-06-19 15:30:00+00:00 NSXUSD          1        1 19951.254 19940.775000     60 -116.316900             stop     momentum                mss_fvg_m15
+2024-06-21 08:20:00+00:00 2024-06-21 08:25:00+00:00 NSXUSD         -1        2 19751.864 19762.364000      5   -9.712500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-06-21 08:00:00+00:00 2024-06-21 08:30:00+00:00 NSXUSD         -1        1 19780.408 19745.908000      6   38.295000             stop     momentum                mss_fvg_m15
+2024-06-21 08:25:00+00:00 2024-06-21 08:30:00+00:00 NSXUSD         -1        2 19759.319 19749.819000      5    8.787500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-06-21 08:00:00+00:00 2024-06-21 12:05:00+00:00 SPXUSD         -1        1  5474.661  5475.161000     54   -4.995000             stop     momentum                  mss_ob_m5
+2024-06-26 13:00:00+00:00 2024-06-26 16:50:00+00:00 SPXUSD         -1        1  5470.039  5470.539000     40   -3.700000             stop     momentum                 amd_fvg_h1
+2024-06-27 11:15:00+00:00 2024-06-27 13:35:00+00:00 NSXUSD          1        1 19720.399 19719.899000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2024-06-27 11:15:00+00:00 2024-06-27 16:25:00+00:00 SPXUSD          1        1  5472.564  5472.064000     24   -2.220000             stop     momentum                  mss_ob_m5
+2024-07-01 07:00:00+00:00 2024-07-01 08:25:00+00:00 NSXUSD          1        1 19762.865 19729.087000     14  -87.485020             stop     momentum                 mss_fvg_m5
+2024-07-02 08:00:00+00:00 2024-07-02 08:35:00+00:00 NSXUSD         -1        1 19730.676 19721.176000      5    8.787500             stop     momentum                 mss_fvg_m5
+2024-07-08 13:00:00+00:00 2024-07-08 14:35:00+00:00 NSXUSD          1        1 20397.498 20370.920000      8  -39.335440             stop     momentum                 mss_fvg_m5
+2024-07-29 08:05:00+00:00 2024-07-29 08:10:00+00:00 NSXUSD         -1        1 19145.387 19145.887000     10   -0.925000             stop     momentum             mss_breaker_m5
+2024-08-28 13:00:00+00:00 2024-08-28 13:15:00+00:00 NSXUSD         -1        2 19547.042 19557.542000      5   -9.712500             stop      no_open       pyramid_im0.8_fvg_m5
+2024-08-28 13:15:00+00:00 2024-08-28 13:25:00+00:00 NSXUSD         -1        2 19554.954 19565.454000      5   -9.712500             stop      no_open       pyramid_im0.8_fvg_m5
+2024-08-28 13:25:00+00:00 2024-08-28 13:30:00+00:00 NSXUSD         -1        2 19564.509 19569.009000      5   -4.162500             stop      no_open       pyramid_im0.8_fvg_m5
+2024-08-28 12:00:00+00:00 2024-08-28 14:05:00+00:00 NSXUSD         -1        1 19581.099 19571.599000     18   31.635000             stop     momentum                 mss_fvg_m5
+2024-09-17 08:15:00+00:00 2024-09-17 08:50:00+00:00 NSXUSD          1        1 19470.854 19480.354000     10   17.575000             stop     momentum                mss_fvg_m15
+2024-09-17 08:35:00+00:00 2024-09-17 08:50:00+00:00 NSXUSD          1        2 19490.021 19479.521000      5   -9.712500             stop      no_open       pyramid_im0.8_fvg_m5
+2024-09-17 08:15:00+00:00 2024-09-17 17:05:00+00:00 SPXUSD          1        1  5641.831  5651.331000     26   45.695000             stop     momentum                  amd_ob_m5
+2024-09-20 11:45:00+00:00 2024-09-20 13:10:00+00:00 SPXUSD         -1        1  5701.626  5708.611000     35  -45.227875             stop     momentum                  mss_ob_m5
+2024-09-20 11:45:00+00:00 2024-09-20 13:10:00+00:00 NSXUSD         -1        1 19753.119 19802.597000      4  -36.613720             stop     momentum                 mss_fvg_m5
+2024-09-26 11:30:00+00:00 2024-09-26 11:40:00+00:00 NSXUSD          1        1 20253.231 20252.731000     16   -1.480000             stop     momentum                 mss_fvg_h1
+2024-09-27 13:00:00+00:00 2024-09-27 13:30:00+00:00 NSXUSD          1        1 20136.420 20135.920000      8   -0.740000             stop     momentum                 mss_fvg_m5
+2024-09-27 13:00:00+00:00 2024-09-27 18:05:00+00:00 SPXUSD          1        1  5751.314  5739.561000     50 -108.715250             stop     momentum                  mss_ob_m5
+2024-10-18 07:00:00+00:00 2024-10-18 14:30:00+00:00 SPXUSD          1        1  5846.111  5845.611000     55   -5.087500             stop     momentum                  mss_ob_m5
+2024-10-21 07:30:00+00:00 2024-10-21 14:30:00+00:00 SPXUSD         -1        1  5859.123  5859.623000     27   -2.497500             stop     momentum                  mss_ob_m5
+2024-10-23 11:00:00+00:00 2024-10-23 11:05:00+00:00 SPXUSD         -1        1  5838.764  5840.337000     45  -13.095225 session_handover     momentum                  mss_ob_m5
+2024-10-23 11:00:00+00:00 2024-10-23 12:00:00+00:00 NSXUSD         -1        1 20315.099 20305.599000      4    7.030000             stop     momentum                 mss_fvg_m5
+2024-10-23 11:45:00+00:00 2024-10-23 12:00:00+00:00 NSXUSD         -1        2 20297.387 20307.887000      5   -9.712500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-10-25 13:00:00+00:00 2024-10-25 13:05:00+00:00 NSXUSD          1        1 20310.853 20310.353000      8   -0.740000             stop     momentum                 mss_fvg_m5
+2024-10-25 13:00:00+00:00 2024-10-25 15:20:00+00:00 SPXUSD          1        1  5829.367  5862.887000     23  142.627600           target     momentum                  mss_ob_m5
+2024-10-28 08:25:00+00:00 2024-10-28 08:35:00+00:00 NSXUSD          1        1 20505.665 20505.165000     12   -1.110000             stop     momentum                 mss_fvg_m5
+2024-10-28 08:25:00+00:00 2024-10-28 12:00:00+00:00 SPXUSD          1        1  5842.132  5830.484000     20  -43.097600             stop     momentum                  mss_ob_m5
+2024-11-05 14:30:00+00:00 2024-11-05 14:35:00+00:00 NSXUSD          1        1 20094.331 20093.831000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2024-11-07 12:00:00+00:00 2024-11-07 12:45:00+00:00 NSXUSD          1        1 20833.089 20830.589000      6   -2.775000             stop     momentum                 news_ob_m5
+2024-11-07 12:00:00+00:00 2024-11-07 20:10:00+00:00 SPXUSD          1        1  5946.177  5977.500000     17   98.510835           target     momentum                 news_ob_m5
+2024-11-19 09:15:00+00:00 2024-11-19 09:20:00+00:00 NSXUSD         -1        1 20498.397 20498.897000      2   -0.185000             stop     momentum                mss_fvg_m15
+2024-11-19 09:15:00+00:00 2024-11-19 10:15:00+00:00 SPXUSD         -1        1  5883.040  5873.540000     13   22.847500             stop     momentum                 mss_fvg_m5
+2024-11-20 14:00:00+00:00 2024-11-20 14:20:00+00:00 NSXUSD         -1        1 20684.887 20675.387000      4    7.030000             stop     momentum                 mss_fvg_m5
+2024-11-22 09:00:00+00:00 2024-11-22 09:05:00+00:00 NSXUSD         -1        1 20718.764 20709.264000     10   17.575000             stop     momentum             mss_breaker_m5
+2024-11-22 09:00:00+00:00 2024-11-22 09:55:00+00:00 SPXUSD         -1        1  5947.576  5938.076000     35   61.512500             stop     momentum                 mss_ob_m15
+2024-11-25 13:30:00+00:00 2024-11-25 13:35:00+00:00 NSXUSD          1        1 20877.154 20876.654000     37   -3.422500             stop        judas             mss_breaker_m5
+2024-11-25 13:30:00+00:00 2024-11-25 14:50:00+00:00 SPXUSD          1        1  5999.176  5998.676000     47   -4.347500             stop        judas                  mss_ob_m5
+2024-11-26 14:05:00+00:00 2024-11-26 14:10:00+00:00 NSXUSD          1        2 20891.008 20890.508000      5   -0.462500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-11-26 14:10:00+00:00 2024-11-26 14:15:00+00:00 NSXUSD          1        2 20905.110 20894.610000      5   -9.712500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-11-26 14:15:00+00:00 2024-11-26 14:20:00+00:00 NSXUSD          1        2 20894.954 20884.454000      5   -9.712500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-11-26 12:00:00+00:00 2024-11-26 14:25:00+00:00 NSXUSD          1        1 20870.009 20869.509000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2024-11-26 12:00:00+00:00 2024-11-27 08:20:00+00:00 SPXUSD          1        1  6001.142  6010.642000     11   19.332500             stop        judas                 mss_fvg_h1
+2024-12-12 12:45:00+00:00 2024-12-12 13:30:00+00:00 SPXUSD         -1        1  6070.169  6080.051000     31  -56.673270             stop        judas            news_breaker_m5
+2024-12-13 12:15:00+00:00 2024-12-13 13:40:00+00:00 NSXUSD          1        2 21791.898 21801.398000      5    8.787500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-12-13 13:10:00+00:00 2024-12-13 13:40:00+00:00 NSXUSD          1        3 21811.243 21800.743000      5   -9.712500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-12-13 13:40:00+00:00 2024-12-13 13:45:00+00:00 NSXUSD          1        2 21807.932 21802.054000      5   -5.437150             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-12-13 13:45:00+00:00 2024-12-13 13:50:00+00:00 NSXUSD          1        2 21797.108 21792.608000      5   -4.162500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-12-13 13:50:00+00:00 2024-12-13 13:55:00+00:00 NSXUSD          1        2 21803.508 21793.008000      5   -9.712500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-12-13 13:55:00+00:00 2024-12-13 14:00:00+00:00 NSXUSD          1        2 21797.486 21787.731000      5   -9.023375             stop      no_open     pyramid_wamd1.0_fvg_m5
+2024-12-13 12:00:00+00:00 2024-12-13 14:10:00+00:00 NSXUSD          1        1 21774.054 21773.554000      8   -0.740000             stop     momentum                 mss_fvg_h1
+2024-12-13 12:00:00+00:00 2024-12-13 14:25:00+00:00 SPXUSD          1        1  6073.727  6065.047000     35  -56.203000             stop     momentum                 mss_fvg_h1
+2024-12-30 13:30:00+00:00 2024-12-30 13:35:00+00:00 NSXUSD         -1        1 21227.097 21192.597000      1    6.382500             stop     momentum                 mss_fvg_m5
+2024-12-30 13:55:00+00:00 2024-12-30 14:05:00+00:00 SPXUSD         -1        2  5894.276  5904.776000      5   -9.712500             stop      no_open       pyramid_im0.8_fvg_m5
+2024-12-30 13:30:00+00:00 2024-12-30 15:20:00+00:00 SPXUSD         -1        1  5910.390  5875.890000     15   95.737500             stop     momentum                 mss_fvg_m5
+2025-01-06 08:00:00+00:00 2025-01-06 08:15:00+00:00 NSXUSD          1        1 21382.876 21382.376000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2025-01-06 08:00:00+00:00 2025-01-06 14:15:00+00:00 SPXUSD          1        1  5954.611  5989.111000     18  114.885000             stop     momentum                  mss_ob_m5
+2025-01-10 13:30:00+00:00 2025-01-10 14:45:00+00:00 NSXUSD         -1        1 20892.387 20882.887000      1    1.757500             stop     momentum                 mss_fvg_m5
+2025-01-10 13:30:00+00:00 2025-01-10 15:00:00+00:00 SPXUSD         -1        1  5853.279  5843.779000     10   17.575000             stop     momentum                  amd_ob_m5
+2025-01-13 09:00:00+00:00 2025-01-13 09:10:00+00:00 NSXUSD         -1        1 20567.021 20567.521000      2   -0.185000             stop     momentum                 mss_fvg_m5
+2025-01-13 09:00:00+00:00 2025-01-13 15:40:00+00:00 SPXUSD         -1        1  5772.281  5807.769000     12  -78.783360             stop     momentum                mss_fvg_m15
+2025-01-14 12:00:00+00:00 2025-01-14 13:30:00+00:00 SPXUSD         -1        1  5857.710  5858.210000     52   -4.810000             stop        judas                  mss_ob_m5
+2025-01-20 13:30:00+00:00 2025-01-20 13:50:00+00:00 NSXUSD          1        1 21498.719 21508.219000      2    3.515000             stop     momentum                 mss_fvg_m5
+2025-01-20 13:35:00+00:00 2025-01-20 15:30:00+00:00 SPXUSD          1        1  6005.176  6014.676000     13   22.847500             stop     momentum                 mss_fvg_m5
+2025-01-22 09:00:00+00:00 2025-01-22 09:10:00+00:00 NSXUSD          1        1 21734.709 21734.209000      6   -0.555000             stop     momentum                 mss_fvg_m5
+2025-01-29 13:00:00+00:00 2025-01-29 13:05:00+00:00 NSXUSD         -1        1 21519.597 21510.097000      8   14.060000             stop     momentum                 mss_fvg_m5
+2025-02-04 14:35:00+00:00 2025-02-04 14:45:00+00:00 NSXUSD          1        1 21399.565 21399.065000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2025-02-04 14:35:00+00:00 2025-02-04 19:20:00+00:00 SPXUSD          1        1  6002.853  6040.132000     18  124.139070           target     momentum                  mss_ob_m5
+2025-02-27 14:30:00+00:00 2025-02-27 14:40:00+00:00 SPXUSD         -1        1  5984.216  5984.716000     45   -4.162500             stop     momentum                  mss_ob_m5
+2025-02-27 14:35:00+00:00 2025-02-27 14:40:00+00:00 NSXUSD         -1        1 21251.519 21157.019000      7  122.377500             stop     momentum                 mss_fvg_m5
+2025-03-19 07:00:00+00:00 2025-03-19 07:05:00+00:00 NSXUSD         -1        1 19505.542 19506.042000     22   -2.035000             stop     momentum                 mss_fvg_m5
+2025-03-19 07:00:00+00:00 2025-03-19 08:05:00+00:00 SPXUSD         -1        1  5616.989  5617.489000     37   -3.422500             stop     momentum                  mss_ob_m5
+2025-03-26 13:15:00+00:00 2025-03-26 13:25:00+00:00 NSXUSD         -1        1 20256.019 20256.519000      6   -0.555000             stop     momentum                 mss_fvg_m5
+2025-03-26 13:15:00+00:00 2025-03-26 13:40:00+00:00 SPXUSD         -1        1  5776.113  5783.866000     42  -60.240810             stop        judas                 mss_ob_m15
+2025-04-14 07:10:00+00:00 2025-04-14 07:35:00+00:00 NSXUSD          1        1 18962.099 18971.599000      4    7.030000             stop        judas                  mss_ob_m5
+2025-04-29 11:30:00+00:00 2025-04-29 11:45:00+00:00 NSXUSD         -1        1 19414.510 19380.010000      2   12.765000             stop     momentum                mss_fvg_m15
+2025-04-29 11:30:00+00:00 2025-04-29 14:40:00+00:00 SPXUSD         -1        1  5525.133  5515.633000     11   19.332500             stop     momentum                  mss_ob_m5
+2025-05-13 13:00:00+00:00 2025-05-13 13:05:00+00:00 NSXUSD          1        1 20859.308 20858.808000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2025-06-11 13:00:00+00:00 2025-06-11 13:30:00+00:00 SPXUSD          1        1  6037.381  6046.881000     26   45.695000             stop     momentum                 mss_fvg_m5
+2025-06-11 13:00:00+00:00 2025-06-11 13:30:00+00:00 NSXUSD          1        1 21930.097 22024.597000      6  104.895000             stop     momentum                 mss_fvg_m5
+2025-06-16 07:50:00+00:00 2025-06-16 08:10:00+00:00 NSXUSD          1        1 21735.797 21745.297000      5    8.787500             stop     momentum                 mss_fvg_m5
+2025-06-16 07:50:00+00:00 2025-06-16 14:30:00+00:00 SPXUSD          1        1  6000.978  6010.478000     19   33.392500             stop     momentum                 mss_fvg_h1
+2025-06-18 07:20:00+00:00 2025-06-18 07:35:00+00:00 NSXUSD          1        1 21776.242 21775.742000      8   -0.740000             stop     momentum                 mss_fvg_m5
+2025-07-21 07:00:00+00:00 2025-07-21 07:55:00+00:00 NSXUSD          1        1 23114.198 23113.698000     14   -1.295000             stop     momentum                 mss_fvg_m5
+2025-08-12 13:00:00+00:00 2025-08-12 13:20:00+00:00 NSXUSD          1        1 23546.520 23546.020000     12   -1.110000             stop     momentum                 mss_fvg_m5
+2025-08-13 08:00:00+00:00 2025-08-13 09:00:00+00:00 NSXUSD          1        1 23875.910 23875.410000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2025-08-14 13:30:00+00:00 2025-08-14 15:45:00+00:00 SPXUSD         -1        1  6435.754  6471.029000      8  -52.207000             stop     momentum                  mss_ob_m5
+2025-08-25 11:15:00+00:00 2025-08-25 11:40:00+00:00 NSXUSD         -1        1 23417.943 23418.443000      5   -0.462500             stop     momentum                 mss_fvg_m5
+2025-09-02 08:00:00+00:00 2025-09-02 08:05:00+00:00 NSXUSD         -1        1 23401.805 23402.305000     16   -1.480000             stop        judas                 mss_ob_m15
+2025-09-02 08:00:00+00:00 2025-09-02 08:50:00+00:00 SPXUSD         -1        1  6458.598  6419.525000     45  325.282725           target        judas                 amd_ob_m15
+2025-09-02 13:00:00+00:00 2025-09-02 14:50:00+00:00 SPXUSD         -1        1  6403.078  6393.578000     23   40.422500             stop     momentum                amd_fvg_m15
+2025-09-15 13:00:00+00:00 2025-09-15 13:20:00+00:00 NSXUSD          1        1 24134.533 24134.033000     13   -1.202500             stop     momentum                 mss_fvg_m5
+2025-09-15 13:00:00+00:00 2025-09-16 00:10:00+00:00 SPXUSD          1        1  6600.384  6599.884000     39   -3.607500             stop     momentum                 mss_fvg_h1
+2025-09-16 08:10:00+00:00 2025-09-16 13:25:00+00:00 SPXUSD          1        1  6623.641  6623.141000     39   -3.607500             stop     momentum                  mss_ob_m5
+2025-09-19 07:15:00+00:00 2025-09-19 07:20:00+00:00 NSXUSD         -1        1 24456.279 24456.779000     12   -1.110000             stop     momentum                  mss_ob_m5
+2025-09-19 07:15:00+00:00 2025-09-19 13:00:00+00:00 SPXUSD         -1        1  6632.128  6642.179000     56 -104.128360             stop     momentum                  mss_ob_m5
+2025-09-25 13:30:00+00:00 2025-09-25 13:40:00+00:00 NSXUSD         -1        1 24353.161 24353.661000      6   -0.555000             stop     momentum                 mss_fvg_m5
+2025-09-25 13:30:00+00:00 2025-09-25 15:05:00+00:00 SPXUSD         -1        1  6607.833  6598.333000     27   47.452500             stop     momentum                 mss_fvg_m5
+2025-10-13 12:00:00+00:00 2025-10-13 12:05:00+00:00 NSXUSD         -1        1 24648.558 24614.058000      5   31.912500             stop     momentum                 mss_fvg_m5
+2025-10-14 08:00:00+00:00 2025-10-14 08:45:00+00:00 NSXUSD         -1        1 24482.392 24472.892000      6   10.545000             stop     momentum                 mss_fvg_m5
+2025-10-14 08:00:00+00:00 2025-10-14 09:00:00+00:00 SPXUSD         -1        1  6597.933  6598.433000     26   -2.405000             stop     momentum                 mss_fvg_m5
+2025-10-24 13:30:00+00:00 2025-10-24 14:30:00+00:00 NSXUSD          1        1 25331.099 25330.599000      1   -0.092500             stop     momentum                  mss_ob_m5
+2025-10-24 13:30:00+00:00 2025-10-24 15:30:00+00:00 SPXUSD          1        1  6784.099  6783.599000      9   -0.832500             stop     momentum                  mss_ob_m5
+2025-10-30 12:05:00+00:00 2025-10-30 12:10:00+00:00 NSXUSD         -1        1 26103.088 26068.588000     10   63.825000             stop        judas                  mss_ob_m5
+2025-10-30 12:05:00+00:00 2025-10-30 13:35:00+00:00 SPXUSD         -1        1  6885.699  6851.199000     42  268.065000             stop        judas                  mss_ob_m5
+2025-10-31 13:05:00+00:00 2025-10-31 13:30:00+00:00 NSXUSD         -1        1 26061.870 26052.370000      6   10.545000             stop        judas                 mss_fvg_m5
+2025-10-31 13:05:00+00:00 2025-10-31 14:35:00+00:00 SPXUSD         -1        1  6870.245  6860.745000     30   52.725000             stop        judas                 mss_fvg_m5
+2025-10-31 13:40:00+00:00 2025-10-31 14:40:00+00:00 SPXUSD         -1        2  6853.445  6863.945000      5   -9.712500             stop      no_open       pyramid_im0.8_fvg_m5
+2025-11-17 13:00:00+00:00 2025-11-17 13:05:00+00:00 NSXUSD         -1        1 25027.414 25027.914000      4   -0.370000             stop     momentum                 mss_fvg_m5
+2025-11-17 13:00:00+00:00 2025-11-17 14:30:00+00:00 SPXUSD         -1        1  6733.151  6723.651000     22   38.665000             stop     momentum                 mss_fvg_m5
+2025-12-08 14:25:00+00:00 2025-12-08 14:30:00+00:00 NSXUSD         -1        1 25754.381 25797.649000     15 -120.068700             stop        judas                  mss_ob_m5
+2025-12-08 14:25:00+00:00 2025-12-08 20:55:00+00:00 SPXUSD         -1        1  6875.799  6841.299000     92  587.190000             stop        judas             mss_breaker_m5
+2025-12-11 12:15:00+00:00 2025-12-11 12:20:00+00:00 NSXUSD          1        2 25630.925 25630.425000      5   -0.462500             stop      no_open       pyramid_im0.8_fvg_m5
+2025-12-11 12:00:00+00:00 2025-12-11 12:30:00+00:00 NSXUSD          1        1 25611.175 25645.675000      6   38.295000             stop     momentum                 mss_fvg_m5
+2025-12-11 12:20:00+00:00 2025-12-11 12:30:00+00:00 NSXUSD          1        2 25648.399 25657.899000      5    8.787500             stop      no_open       pyramid_im0.8_fvg_m5
+2025-12-22 12:25:00+00:00 2025-12-22 13:35:00+00:00 NSXUSD          1        1 25491.055 25500.555000     25   43.937500             stop     momentum                 mss_fvg_m5
+2025-12-22 12:25:00+00:00 2025-12-23 06:25:00+00:00 SPXUSD          1        1  6860.454  6869.954000     30   52.725000             stop     momentum                  mss_ob_m5
+2025-12-26 13:20:00+00:00 2025-12-26 13:45:00+00:00 NSXUSD          1        1 25681.529 25681.029000     22   -2.035000             stop     momentum                 mss_fvg_m5
+2025-12-26 13:40:00+00:00 2025-12-26 13:45:00+00:00 NSXUSD          1        2 25698.870 25688.370000      9  -17.482500             stop      no_open     pyramid_wamd1.0_fvg_m5
+2025-12-31 08:25:00+00:00 2025-12-31 08:30:00+00:00 NSXUSD         -1        1 25370.719 25371.219000     27   -2.497500             stop     momentum                 mss_fvg_m5
+2025-12-31 08:25:00+00:00 2025-12-31 12:15:00+00:00 SPXUSD         -1        1  6879.999  6887.651000    112 -158.549440             stop     momentum                  amd_ob_m5
+
+=== Per-pair P&L (ZAR) ===
+  NSXUSD: 260 trades  wins=117  losses=143  P&L=R1078.11
+  SPXUSD: 200 trades  wins=83  losses=117  P&L=R3863.53
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2022       148    80  54.1%      1102.33    -2.0%
+  2023       135    52  38.5%      1377.60    -3.8%
+  2024       111    38  34.2%       830.80   -10.3%
+  2025        66    30  45.5%      1630.91    -4.9%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  NSXUSD   2022        68    41  60.3%
+  NSXUSD   2023        82    39  47.6%
+  NSXUSD   2024        72    22  30.6%
+  NSXUSD   2025        38    15  39.5%
+  SPXUSD   2022        80    39  48.8%
+  SPXUSD   2023        53    13  24.5%
+  SPXUSD   2024        39    16  41.0%
+  SPXUSD   2025        28    15  53.6%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  amd_breaker_m5             1     0   0.0%     -30.13
+  amd_fvg_h1                 1     0   0.0%      -3.70
+  amd_fvg_m15                1     1 100.0%      40.42
+  amd_fvg_m5                 3     1  33.3%     -11.03
+  amd_ob_m15                 1     1 100.0%     325.28
+  amd_ob_m5                  8     2  25.0%     -29.61
+  mss_breaker_m5            16     8  50.0%      50.52
+  mss_fvg_h1                37    17  45.9%       9.66
+  mss_fvg_m15               29    14  48.3%      -3.74
+  mss_fvg_m5               165    85  51.5%       9.21
+  mss_ob_m15                38    18  47.4%      13.11
+  mss_ob_m5                105    39  37.1%      17.79
+  news_breaker_m5            1     0   0.0%     -56.67
+  news_ob_m15                1     0   0.0%     -14.25
+  news_ob_m5                 3     2  66.7%      32.84
+  pyramid_im0.8_fvg_m5      25     7  28.0%      -0.43
+  pyramid_im1.0_fvg_m5       3     2  66.7%       5.36
+  pyramid_wamd1.0_breaker_m5       1     0   0.0%      -0.18
+  pyramid_wamd1.0_fvg_m15       2     0   0.0%      -3.11
+  pyramid_wamd1.0_fvg_m5      19     3  15.8%      -4.72
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  FVG            285   130  45.6%      1681.10       5.90   2.54
+  OB             156    62  39.7%      2539.21      16.28   2.41
+  BREAKER         19     8  42.1%       721.33      37.96   6.91
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  BREAKER M5            19     8  42.1%   6.91
+  FVG H1                38    17  44.7%   2.56
+  FVG M15               32    15  46.9%   0.74
+  FVG M5               215    98  45.6%   3.42
+  OB M15                40    19  47.5%   4.41
+  OB M5                116    43  37.1%   2.11
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  BREAKER NSXUSD             8     5  62.5%  32.84
+  BREAKER SPXUSD            11     3  27.3%   5.89
+  FVG NSXUSD               209    93  44.5%   1.99
+  FVG SPXUSD                76    37  48.7%   3.34
+  OB NSXUSD                 43    19  44.2%   2.26
+  OB SPXUSD                113    43  38.1%   2.44
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  session_range           16     5  31.2%   1.16
+  (no AMD)               444   195  43.9%   2.86
+
+  Session-range widths (n=422): median=43.5 p75=79.4 p90=129.0 pips (cap=35.0)
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  1/3              243   108  44.4%      1753.34       7.22   2.50
+  2/3              184    79  42.9%      2925.81      15.90   2.79
+  3/3               33    13  39.4%       262.49       7.95   2.27
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  judas            460   200  43.5%        4941.64       10.74   2.64
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  london     judas            207    92  44.4%        1637.52   2.36
+  ny         judas            253   108  42.7%        3304.12   2.83
+  ----------------------------------------------------------------
+  london     TOTAL            207    92  44.4%        1637.52   2.36
+  ny         TOTAL            253   108  42.7%        3304.12   2.83
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  london_watch                 9     6  66.7%          36.72  19.90
+  london_judas               185    78  42.2%        1381.72   2.21
+  london_breakout             13     8  61.5%         219.07   4.81
+  ny_judas                   225    97  43.1%        2687.39   2.81
+  ny_extend                   28    11  39.3%         616.74   2.89
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  yes                   18    10  55.6%         172.17  69.94
+  no                   442   190  43.0%        4769.47   2.59
+  -- captured NY continuations by entry_model --
+     judas          18 trades  WR 55.6%  P&L R      172.17
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG               6     2  33.3%          -6.27   0.81
+  D1 FVG              10     4  40.0%         209.07   3.33
+  H4 FVG              14     7  50.0%         528.45   4.47
+  none               430   187  43.5%        4210.39   2.54
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG              18     7  38.9%          79.94   1.46
+  D1 FVG              26     8  30.8%         -97.60   0.58
+  H4 FVG              19    10  52.6%          92.29   1.48
+  none               397   175  44.1%        4867.02   3.02
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1      100    47  47.0%         518.07   1.63       5.18
+  score=2      158    73  46.2%        1192.93   2.28       7.55
+  score=3      150    62  41.3%        2116.24   3.97      14.11
+  score=4       44    16  36.4%        1164.61   3.55      26.47
+  score=5        7     2  28.6%         -19.67   0.60      -2.81
+  score=6        1     0   0.0%         -30.52   0.00     -30.52
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct agrees         317   129  40.7%        3405.59    2.47
+  HTF struct disagrees      143    71  49.7%        1536.06    3.23
+  minor-sweep (Judas)        92    39  42.4%         990.20    2.50
+  no minor-sweep            368   161  43.8%        3951.44    2.68
+  ── highest intact-structure timeframe ──
+  intact @ W                146    57  39.0%        1478.53    2.41
+  intact @ D                 97    39  40.2%         689.12    2.05
+  intact @ 240T              61    21  34.4%         651.23    4.15
+  intact @ 60T               54    34  63.0%         619.55   13.28
+  intact @ 15T               31    15  48.4%         245.21    1.55
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range           129    57  44.2%        2528.00   5.46
+  H4 range            60    21  35.0%         -87.54   0.84
+  no sweep           271   122  45.0%        2501.18   2.33
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  1             18     8  44.4%         305.06  38.91
+  2             85    39  45.9%         746.78   2.23
+  3            207    82  39.6%        1549.78   2.03
+  4            119    55  46.2%        1305.67   2.77
+  5             31    16  51.6%        1034.35   8.03
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile           326  42.6%   2.51       134  45.5%   3.02
+  NFP week Mon/Tue          47  51.1%   6.59       413  42.6%   2.30
+  Rate decision             38  31.6%   0.97       422  44.5%   2.85
+  PD prov (sweep)          457  43.8%   2.64         3   0.0%   0.00
+  Seasonal lean              0   0.0%   0.00       460  43.5%   2.64
+  HTF OB Context           191  46.1%   3.64       269  41.6%   2.06
+  D1 Draw                  381  44.4%   2.70        79  39.2%   2.36
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  inside                 5     0   0.0%        -2.59   0.00    -0.52
+  continuation         186    88  47.3%      2922.64   3.64    15.71
+  (none)               269   112  41.6%      2021.59   2.06     7.52
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  breaker               21  61.9%  36.03
+  d1_fvg               131  43.5%   2.92
+  ob                     8  37.5%   2.52
+  pdhl                  14  35.7%   6.95
+  w_fvg                 17  58.8%   2.68
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  d1_fvg                 5     2  40.0%        -2.53   0.90
+  equal_hl             376   167  44.4%      4267.14   2.71
+  (none)                79    31  39.2%       677.03   2.36
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  fib_extension          153    73  47.7%      1805.79      11.80
+  ith_liquidity           27     9  33.3%       159.03       5.89
+  itl_liquidity           25     9  36.0%         5.04       0.20
+  pdh_pdl                105    47  44.8%      2162.16      20.59
+  pwh_pwl                 34    14  41.2%       256.00       7.53
+  round_number            78    30  38.5%       224.44       2.88
+  swing                   38    18  47.4%       329.18       8.66
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  fib_extension         73      36.5%      2838.47
+  ith_liquidity          9       4.5%       555.02
+  itl_liquidity          9       4.5%       146.25
+  pdh_pdl               47      23.5%      2749.72
+  pwh_pwl               14       7.0%       410.07
+  round_number          30      15.0%       784.76
+  swing                 18       9.0%       467.65
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   fib_extension         70  47.3%      2804.16
+  initial (L1)   ith_liquidity          9  34.6%       555.02
+  initial (L1)   itl_liquidity          9  45.0%       146.25
+  initial (L1)   pdh_pdl               44  50.6%      2720.25
+  initial (L1)   pwh_pwl               12  42.9%       393.79
+  initial (L1)   round_number          27  40.3%       763.67
+  initial (L1)   swing                 17  50.0%       464.13
+  pyramid (L2+)  fib_extension          3  60.0%        34.32
+  pyramid (L2+)  pdh_pdl                3  16.7%        29.47
+  pyramid (L2+)  pwh_pwl                2  33.3%        16.28
+  pyramid (L2+)  round_number           3  27.3%        21.09
+  pyramid (L2+)  swing                  1  25.0%         3.52
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  London Open   fib_extension         37      1406.16
+  London Open   ith_liquidity          4       222.93
+  London Open   itl_liquidity          1        19.62
+  London Open   pdh_pdl               19       749.51
+  London Open   pwh_pwl                8        90.23
+  London Open   round_number          14       217.93
+  London Open   swing                  9       131.26
+  New York AM   fib_extension         36      1432.31
+  New York AM   ith_liquidity          5       332.09
+  New York AM   itl_liquidity          8       126.63
+  New York AM   pdh_pdl               28      2000.21
+  New York AM   pwh_pwl                6       319.84
+  New York AM   round_number          16       566.83
+  New York AM   swing                  9       336.39
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  London Open      92      46.0%      2837.63
+  New York AM     108      54.0%      5114.31
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  below open        55    29      26  52.7%     1335.39      24.28
+  above open       348   156     192  44.8%     3634.15      10.44
+  no session        57    15      42  26.3%      -27.90      -0.49
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)          191    83  43.5%       1843.99   2.80
+  SOJ single reference (+1)          217    91  41.9%       1924.94   2.22
+  no SOJ pattern                      52    26  50.0%       1172.71   3.86

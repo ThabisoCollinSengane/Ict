@@ -1,0 +1,58 @@
+name: Instrument selector study — FX / gold / indices (HistData M1)
+
+# P106: can we tell in advance which market (EURUSD/GBPUSD, XAUUSD, SPXUSD/NSXUSD) will
+# deliver in the London or NY session? Pure price. Random-walk null run alongside.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/instrument-selector.yml"
+      - "scripts/instrument_selector_study.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: instrument-selector
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download M1 2022-2026
+        run: |
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
+                 --pairs EURUSD GBPUSD XAUUSD SPXUSD NSXUSD --dest /tmp/hd 2>&1 | tail -20
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 \
+                 --pairs EURUSD GBPUSD XAUUSD SPXUSD NSXUSD --dest /tmp/hd 2>&1 | tail -20
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+          ls data/histdata | head -40
+      - name: Study + null
+        run: |
+          python scripts/instrument_selector_study.py --selftest
+          python scripts/instrument_selector_study.py --null --out data/instrument_selector_null.md > /dev/null
+          python scripts/instrument_selector_study.py --out data/instrument_selector_report.md 2>&1 | tee /tmp/sel.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in data/instrument_selector_report.md data/instrument_selector_null.md; do [ -f "$f" ] && git add -f "$f"; done
+          git diff --cached --quiet && exit 0
+          git commit -m "Instrument selector study (P106) [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1

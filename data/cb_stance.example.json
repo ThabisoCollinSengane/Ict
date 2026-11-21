@@ -1,0 +1,26 @@
+{
+  "_README": [
+    "Central-bank stance, MAINTAINED BY HAND. Rates move 4-8 times a year, so a",
+    "hand-kept file beats a scraper and never breaks.",
+    "",
+    "FILL THIS IN YOURSELF, from each bank's own site or a rates table you trust.",
+    "Every 'stance' ships as null on purpose: the brief withholds all rate leans",
+    "until you have set real values AND set \"verified\": true. That is not",
+    "bureaucracy — a lean computed off numbers nobody checked is worse than no",
+    "lean, because it feels like information.",
+    "",
+    "allowed stance values, most currency-positive first:",
+    "  hiking | hawkish | hawkish_hold | neutral | dovish_hold | dovish | cutting",
+    "",
+    "Update after each FOMC / ECB / BOE / RBNZ decision, re-stamp last_verified,",
+    "and copy this file to data/cb_stance.json (which is the one actually read)."
+  ],
+  "verified": false,
+  "last_verified": null,
+  "banks": {
+    "USD": {"bank": "Fed",  "rate": null, "stance": null, "next_meeting": null},
+    "EUR": {"bank": "ECB",  "rate": null, "stance": null, "next_meeting": null},
+    "GBP": {"bank": "BOE",  "rate": null, "stance": null, "next_meeting": null},
+    "NZD": {"bank": "RBNZ", "rate": null, "stance": null, "next_meeting": null}
+  }
+}

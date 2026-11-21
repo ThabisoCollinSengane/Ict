@@ -1,0 +1,67 @@
+name: P85 — M1-skipped MM trades (shadow run + late-catch study)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/m1-skip-study.yml"
+      - ".github/m1-skip.trigger"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      NO_PUSH: "1"
+      MM_GOLDEN_ENABLED: "1"
+      MM_GOLDEN_M1_SHADOW: "1"
+      MM_GOLDEN_M1_MSS: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download HistData M1 2022-2025 (all pairs)
+        run: |
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
+                 --pairs EURUSD GBPUSD NZDUSD EURGBP AUDNZD UDXUSD AUDUSD --dest /tmp/hd 2>&1 | tail -30
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+      - name: Selftest
+        run: python scripts/m1_skip_study.py --selftest
+      - name: Shadow backtests (IS, OOS)
+        continue-on-error: true
+        run: |
+          for A in is oos; do
+            case $A in is) Y="2022 2023";; oos) Y="2024 2025";; esac
+            python run_backtest_histdata.py --years $Y > data/mm_golden_${A}_shadow_run.txt 2>&1 || true
+            tail -60 data/mm_golden_${A}_shadow_run.txt
+            for d in data/histdata/trades_dump.csv data/trades_dump.csv; do
+              [ -f "$d" ] && { cp "$d" data/mm_golden_${A}_shadow_trades.csv; break; }
+            done
+          done
+      - name: Late-catch study
+        continue-on-error: true
+        run: python scripts/m1_skip_study.py 2>&1 | tee data/m1_skip_console.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- data/backtest_report.md data/backtest_console.txt 2>/dev/null || true
+          for f in data/m1_skip_report.md data/m1_skip_console.txt data/mm_golden_*_shadow_*; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git diff --cached --quiet && exit 0
+          git commit -m "P85 M1-skip shadow study [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1

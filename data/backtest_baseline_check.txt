@@ -1,0 +1,400 @@
+2025-12-22 08:30:00+00:00 2025-12-22 14:25:00+00:00 GBPUSD          1        1 1.341450 1.344580  11250  651.431250           target     momentum             mss_fvg_m5
+2025-12-22 13:35:00+00:00 2025-12-22 16:50:00+00:00 EURUSD          1        1 1.174870 1.174830  42187  -31.218380             stop     momentum             amd_fvg_h1
+2025-12-23 08:00:00+00:00 2025-12-23 09:20:00+00:00 GBPUSD          1        1 1.350760 1.349710  11250 -218.531250             stop     momentum             amd_fvg_h1
+2025-12-26 13:00:00+00:00 2025-12-26 14:45:00+00:00 GBPUSD          1        1 1.349840 1.350790  11250  197.718750             stop     momentum              amd_ob_m5
+2025-12-30 13:00:00+00:00 2025-12-30 15:10:00+00:00 GBPUSD         -1        1 1.349510 1.346310  14062  832.470400           target     momentum             amd_fvg_m5
+2025-12-30 12:00:00+00:00 2025-12-30 16:20:00+00:00 EURUSD         -1        1 1.176260 1.176300   9000   -6.660000             stop     momentum              amd_ob_m5
+2025-12-31 08:15:00+00:00 2025-12-31 11:15:00+00:00 GBPUSD         -1        1 1.345710 1.344760  14062  247.139650             stop        judas         amd_breaker_m5
+2025-12-31 12:00:00+00:00 2025-12-31 13:50:00+00:00 EURUSD          1        1 1.175150 1.174110  14062 -270.552880             stop     momentum             amd_fvg_h1
+
+=== Per-pair P&L (ZAR) ===
+  EURUSD: 402 trades  wins=166  losses=236  P&L=R68694.71
+  GBPUSD: 280 trades  wins=137  losses=143  P&L=R59352.76
+  NZDUSD: 54 trades  wins=20  losses=34  P&L=R11528.25
+
+=== Per-year breakdown ===
+  Year    Trades  Wins    WR%      P&L ZAR   MaxDD%
+  --------------------------------------------------
+  2022       181    80  44.2%     16171.69   -13.8%
+  2023       174    73  42.0%     31249.28    -6.8%
+  2024       193    85  44.0%     43984.49    -2.2%
+  2025       188    85  45.2%     48170.25    -1.1%
+
+=== Per-pair × year ===
+  Pair     Year    Trades  Wins    WR%
+  -----------------------------------
+  EURUSD   2022        87    37  42.5%
+  EURUSD   2023        88    31  35.2%
+  EURUSD   2024       115    48  41.7%
+  EURUSD   2025       112    50  44.6%
+  GBPUSD   2022        83    38  45.8%
+  GBPUSD   2023        77    38  49.4%
+  GBPUSD   2024        64    33  51.6%
+  GBPUSD   2025        56    28  50.0%
+  NZDUSD   2022        11     5  45.5%
+  NZDUSD   2023         9     4  44.4%
+  NZDUSD   2024        14     4  28.6%
+  NZDUSD   2025        20     7  35.0%
+
+=== Entry-type breakdown ===
+  Entry type            Trades  Wins    WR%    Avg P&L
+  --------------------------------------------------
+  amd_breaker_m15            2     1  50.0%     224.77
+  amd_breaker_m5            13     9  69.2%     195.24
+  amd_fvg_h1                69    32  46.4%     225.64
+  amd_fvg_m15               60    21  35.0%     192.28
+  amd_fvg_m5               282   119  42.2%     132.94
+  amd_ob_m15                21    12  57.1%     182.59
+  amd_ob_m5                158    69  43.7%     206.84
+  mss_breaker_h1             1     1 100.0%      64.20
+  mss_breaker_m15            2     2 100.0%     587.03
+  mss_breaker_m5             6     2  33.3%       4.70
+  mss_fvg_h1                18     7  38.9%     486.20
+  mss_fvg_m15               14     8  57.1%     416.73
+  mss_fvg_m5                24    11  45.8%     122.87
+  mss_ob_m15                10     6  60.0%     468.55
+  mss_ob_m5                 38    18  47.4%     296.46
+  news_fvg_m15               1     0   0.0%      -9.25
+  news_fvg_m5                3     1  33.3%     118.60
+  pyramid_im0.8_fvg_m15       1     1 100.0%     603.06
+  pyramid_im0.8_fvg_m5       4     1  25.0%     -46.94
+  pyramid_im0.8_ob_m15       1     1 100.0%     159.84
+  pyramid_im1.0_fvg_m15       1     0   0.0%    -173.16
+  pyramid_im1.0_fvg_m5       3     1  33.3%      13.87
+  pyramid_wamd1.0_fvg_h1       1     0   0.0%      -8.33
+  pyramid_wamd1.0_fvg_m5       3     0   0.0%     -18.38
+
+=== PD array setup type (FVG / OB / breaker) ===
+  Setup       Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  ----------------------------------------------------------
+  FVG            484   202  41.7%     82696.09     170.86   3.54
+  OB             228   106  46.5%     52625.47     230.81   5.17
+  BREAKER         24    15  62.5%      4254.16     177.26   4.49
+
+  --- Setup type × timeframe ---
+  Setup × TF        Trades  Wins    WR%     PF
+  ------------------------------------------
+  BREAKER H1             1     1 100.0%    inf
+  BREAKER M15            4     3  75.0%   4.00
+  BREAKER M5            19    11  57.9%   4.79
+  FVG H1                88    39  44.3%   5.70
+  FVG M15               77    30  39.0%   4.33
+  FVG M5               319   133  41.7%   2.84
+  OB M15                32    19  59.4%   7.72
+  OB M5                196    87  44.4%   4.88
+
+  --- Setup type × pair ---
+  Setup × pair          Trades  Wins    WR%     PF
+  ----------------------------------------------
+  BREAKER EURUSD            15     9  60.0%   4.34
+  BREAKER GBPUSD             5     4  80.0%   7.01
+  BREAKER NZDUSD             4     2  50.0%   3.36
+  FVG EURUSD               239    99  41.4%   3.86
+  FVG GBPUSD               219    97  44.3%   3.56
+  FVG NZDUSD                26     6  23.1%   1.08
+  OB EURUSD                148    58  39.2%   3.36
+  OB GBPUSD                 56    36  64.3%  10.71
+  OB NZDUSD                 24    12  50.0%   9.80
+
+=== AMD consolidation source ===
+  Source              Trades  Wins    WR%     PF
+  --------------------------------------------
+  m15_range              664   293  44.1%   4.08
+  session_range           54    24  44.4%   3.92
+  (no AMD)                18     6  33.3%   1.68
+
+  Session-range widths (n=84): median=44.8 p75=61.5 p90=85.0 pips (cap=35.0)
+
+=== HTF Draw cascade (W→D→H4 agreement) — all trades ===
+  draw_score = how many of Weekly/Daily/H4 agreed with trade direction
+  Draw score    Trades  Wins    WR%      P&L ZAR    Avg P&L     PF
+  --------------------------------------------------------------
+  0/3               99    35  35.4%      6044.96      61.06   2.17
+  1/3              308   140  45.5%     40210.15     130.55   4.09
+  2/3              266   121  45.5%     63171.74     237.49   4.08
+  3/3               63    27  42.9%     30148.86     478.55   4.89
+
+=== ICT Intermarket Cheat Sheet validation ===
+  Checks whether each scenario's predicted pair+direction matches the actual trade.
+  _h4 = H1 EURGBP flat, H4 used  |  _ip = H1+H4 both flat, individual pair momentum used
+  Scenario     Description                         Trades  Wins    WR%      P&L ZAR     PF
+  ------------------------------------------------------------------------------------
+  1a           DXY↑ + H1 EUR>GBP → GBPUSD short        61    32  52.5%     16063.48   6.07
+  1b           DXY↑ + H1 GBP>EUR → EURUSD short        84    38  45.2%     14266.69   3.70
+  2a           DXY↓ + H1 EUR>GBP → EURUSD long         27    14  51.9%      3962.61   7.06
+  2b           DXY↓ + H1 GBP>EUR → GBPUSD long         52    31  59.6%     10525.04   8.55
+  3a           DXY↑ + cross flat → EURUSD short       134    47  35.1%     17379.67   3.11
+  3b           DXY↓ + cross flat → EURUSD long        113    50  44.2%     26015.35   4.05
+  1a_h4        DXY↑ + H4 EUR>GBP → GBPUSD short        30    15  50.0%      8371.78   3.49
+  1b_h4        DXY↑ + H4 GBP>EUR → EURUSD short        22     9  40.9%      3573.34   3.52
+  2b_h4        DXY↓ + H4 GBP>EUR → GBPUSD long         23     9  39.1%       992.70   1.52
+  1a_ip        DXY↑ + IP EUR>GBP → GBPUSD short        53    29  54.7%     15101.83   5.63
+  1b_ip        DXY↑ + IP GBP>EUR → EURUSD short        22     8  36.4%      3497.05   3.48
+  2b_ip        DXY↓ + IP GBP>EUR → GBPUSD long         61    21  34.4%      8297.93   3.08
+  N-long       DXY↓ + NZD strong → NZDUSD long         21     8  38.1%      3665.52   3.78
+  N-short      DXY↑ + NZD weak  → NZDUSD short         20     7  35.0%      1430.93   1.74
+  N-short_h4   DXY↑ + H4 NZD weak  → NZDUSD short      13     5  38.5%      6431.80  13.54
+
+=== Entry model (Judas reversal vs intermarket breakout) ===
+  breakout = EURUSD + GBPUSD + DXY all cleared M15 ranges in agreement (continuation)
+  Model         Trades  Wins    WR%        P&L ZAR     Avg P&L     PF
+  ----------------------------------------------------------------
+  breakout         410   181  44.1%       73674.22      179.69   4.03
+  judas            326   142  43.6%       65901.49      202.15   3.99
+
+=== Session profile breakdown (London vs NY — independent AMD cycles) ===
+  London profile: 03:00–05:00 ET — Judas sweep → reversal distribution
+  NY profile:     07:00–10:00 ET — handover consolidation → continuation
+  Profile    Model         Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------
+  london     breakout         203    94  46.3%       38921.42   3.98
+  london     judas            160    73  45.6%       31052.77   3.97
+  ny         breakout         207    87  42.0%       34752.80   4.09
+  ny         judas            166    69  41.6%       34848.72   4.01
+  ----------------------------------------------------------------
+  london     TOTAL            363   167  46.0%       69974.19   3.97
+  ny         TOTAL            373   156  41.8%       69601.52   4.05
+
+=== Session phase at entry (per-profile AMD cycle position) ===
+  London profile phases:
+    london_watch    = 03:00–03:30 ET — prime Judas sweep window
+    london_judas    = London sweep detected → reversal distribution
+    london_breakout = 03:30–05:00 ET, no sweep → breakout fallback
+  NY profile phases:
+    ny_judas        = NY own sweep detected → NY reversal/continuation
+    ny_extend       = NY AM, no own sweep → handover continuation
+  Phase                   Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------------
+  london_judas               363   167  46.0%       69974.19   3.97
+  ny_judas                   373   156  41.8%       69601.52   4.05
+
+=== NY-AM continuation of London/DXY direction (P11) ===
+  NY-AM entry in the same direction London set that day (DXY-wide).
+  NY continuation   Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------
+  yes                   21    10  47.6%        3131.87   2.33
+  no                   715   313  43.8%      136443.84   4.10
+  -- captured NY continuations by entry_model --
+     judas          21 trades  WR 47.6%  P&L R     3131.87
+
+=== HTF FVG 50% draw-on-liquidity conviction (P9) ===
+  Unmitigated H4/D1/W1 FVG midpoint within tolerance of entry → +1 conviction.
+  HTF FVG draw    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG              16     6  37.5%        3620.06   5.19
+  D1 FVG               4     0   0.0%        -208.08   0.00
+  H4 FVG               9     2  22.2%        -426.55   0.40
+  none               707   315  44.6%      136590.28   4.06
+
+=== DXY level context — room to run (P13) ===
+  DXY sitting at its own unmitigated W/D/H4 FVG mid → dollar has HTF draw room.
+  DXY FVG TF      Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  W1 FVG              22    13  59.1%        7385.45   4.93
+  D1 FVG              42    17  40.5%        6132.19   2.82
+  H4 FVG              58    14  24.1%        1611.36   1.29
+  none               614   279  45.4%      124446.71   4.50
+
+=== Target confluence scoring — TP area source agreement ===
+  Score = # distinct source families (fib/fvg/ob/swing/round/pdh/pwh) within tolerance of chosen TP.
+  Higher score → more independent reasons price should reach that level.
+  Score     Trades  Wins    WR%        P&L ZAR     PF    Avg P&L
+  ------------------------------------------------------------
+  score=1       64    29  45.3%        5156.53   2.56      80.57
+  score=2      187    82  43.9%       28221.05   3.73     150.91
+  score=3      223   105  47.1%       51076.50   4.57     229.04
+  score=4      157    60  38.2%       34788.13   4.44     221.58
+  score=5       80    36  45.0%       13997.15   2.98     174.96
+  score=6       24    11  45.8%        6367.58   6.16     265.32
+  score=7        1     0   0.0%         -31.22   0.00     -31.22
+
+=== Market structure (Ep 12 LTH/ITH/STH fractal) ===
+  Couples the fractal swing-tier read with the draw cascade. HTF
+  intermediate structure agreeing with the trade = bigger draw in our favour.
+  Bucket                 Trades  Wins    WR%        P&L ZAR      PF
+  ----------------------------------------------------------------
+  HTF struct agrees         471   203  43.1%       93503.66    3.86
+  HTF struct disagrees      265   120  45.3%       46072.05    4.38
+  minor-sweep (Judas)        96    30  31.2%        8647.41    2.05
+  no minor-sweep            640   293  45.8%      130928.30    4.43
+  ── highest intact-structure timeframe ──
+  intact @ W                124    52  41.9%       25151.50    3.96
+  intact @ D                183    81  44.3%       38852.70    4.24
+  intact @ 240T             114    52  45.6%       27513.08    4.75
+  intact @ 60T              105    44  41.9%       12811.41    2.79
+  intact @ 15T               68    28  41.2%       14208.71    5.26
+
+=== HTF CRT Turtle Soup timing (P19) ===
+  Prior H4/D range high/low swept on a wick + close back inside = HTF Judas.
+  D1 sweep = +2 conviction, H4 sweep = +1 conviction.
+  CRT sweep TF    Trades  Wins    WR%        P&L ZAR     PF
+  --------------------------------------------------------
+  D1 range           220    95  43.2%       38387.32   3.54
+  H4 range           121    62  51.2%       33432.90   4.46
+  no sweep           395   166  42.0%       67755.49   4.13
+
+=== Intraday SMT pair preference (P44) — EURUSD/GBPUSD only ===
+  'confirmed' = traded pair FAILED to confirm partner's sweep (weaker = bigger distribution)
+  'opposing'  = traded pair LED the sweep (stronger = smaller distribution)
+  SMT signal      Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  ------------------------------------------------------------------
+  confirmed          197    85  43.1%       37846.49   4.02       21.8
+  opposing            84    44  52.4%       16740.27   5.00       22.8
+  no divergence      401   174  43.4%       73460.71   3.84       21.1
+
+  --- SMT confirmed by pair ---
+    EURUSD       103 trades  WR  39.8%  PF   4.30  P&L     17476.70
+    GBPUSD        94 trades  WR  46.8%  PF   3.81  P&L     20369.79
+
+  --- SMT confirmed by direction ---
+    LONG          81 trades  WR  44.4%  PF   4.59  P&L     14447.95
+    SHORT        116 trades  WR  42.2%  PF   3.75  P&L     23398.54
+
+=== Golden rule: SELL GBP / BUY EUR (P44) — EURUSD/GBPUSD only ===
+  GBP is structurally weaker (trends bearish) → SELL GBPUSD for shorts
+  EUR is structurally stronger (trends bullish) → BUY EURUSD for longs
+  Rule              Trades  Wins    WR%        P&L ZAR     PF   Avg pips
+  --------------------------------------------------------------------
+  follows rule         284   140  49.3%       69515.05   4.66       22.9
+  against rule         398   163  41.0%       58532.42   3.48       20.5
+
+  --- Pair × direction breakdown ---
+    Setup                  Trades    WR%     PF      P&L ZAR       Rule
+    ----------------------------------------------------------------
+    EURUSD LONG              140  45.7%   4.26     29977.96     GOLDEN
+    EURUSD SHORT             262  38.9%   3.37     38716.75    against
+    GBPUSD LONG              136  44.9%   3.72     19815.67    against
+    GBPUSD SHORT             144  52.8%   5.04     39537.09     GOLDEN
+
+  --- Golden rule × SMT pair pref (cross-tab) ---
+    Golden × SMT                 Trades    WR%     PF
+    ------------------------------------------------
+    golden + confirmed              83  45.8%   4.47
+    golden + opposing               33  66.7%   8.40
+    golden + no div                168  47.6%   4.23
+    against + confirmed            114  41.2%   3.58
+    against + opposing              51  43.1%   2.88
+    against + no div               233  40.3%   3.53
+
+=== Narrative context scoring (P47) ===
+  Factors: Weekly Profile, NFP-week, rate decision, PD array provenance, seasonal
+  Score     Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------
+  0              1     1 100.0%         116.62    inf
+  1             39    13  33.3%         787.56   1.34
+  2            176    75  42.6%       27363.43   3.71
+  3            333   144  43.2%       67539.96   4.13
+  4            165    75  45.5%       34520.55   4.14
+  5             22    15  68.2%        9247.59   7.44
+
+  --- Per-factor breakdown ---
+  Factor                 Fired    WR%     PF    Absent    WR%     PF
+  ----------------------------------------------------------------------
+  Weekly Profile           507  45.4%   4.39       229  40.6%   3.12
+  NFP week Mon/Tue          81  56.8%   6.80       655  42.3%   3.73
+  Rate decision             57  43.9%   3.69       679  43.9%   4.03
+  PD prov (sweep)          639  42.7%   3.54        97  51.5%   7.97
+  Seasonal lean              0   0.0%   0.00       736  43.9%   4.01
+  HTF OB Context           213  47.9%   5.31       523  42.3%   3.39
+  D1 Draw                  663  44.3%   4.08        73  39.7%   3.38
+
+=== HTF OB context breakdown (P48) ===
+  Context           Trades  Wins    WR%      P&L ZAR     PF   Mean R
+  --------------------------------------------------------------
+  inside                 5     1  20.0%        73.77   1.36    14.75
+  continuation         208   101  48.6%     64150.51   5.37   308.42
+  (none)               523   221  42.3%     75351.44   3.39   144.08
+
+  Liq type          Trades    WR%     PF
+  ----------------------------------------
+  breaker               36  47.2%   3.64
+  d1_fvg               120  45.8%   4.77
+  ob                     9  66.7%  49.21
+  pdhl                  16  37.5%   1.77
+  w_fvg                 32  56.2%  12.08
+
+=== D1 narrative draw breakdown (P48) ===
+  Draw type         Trades  Wins    WR%      P&L ZAR     PF
+  --------------------------------------------------------
+  d1_fvg                 3     1  33.3%         5.83   1.03
+  equal_hl             660   293  44.4%    128772.44   4.09
+  (none)                73    29  39.7%     10797.45   3.38
+
+=== Draw on liquidity (target type) — all trades ===
+  Draw on liquidity   Trades  Wins    WR%      P&L ZAR    Avg P&L
+  --------------------------------------------------------------
+  equal_hl                85    42  49.4%     28055.43     330.06
+  fib_extension          391   178  45.5%     79921.18     204.40
+  ith_liquidity            7     2  28.6%       239.74      34.25
+  itl_liquidity           15     4  26.7%      1653.32     110.22
+  pdh_pdl                 78    31  39.7%     12034.68     154.29
+  pwh_pwl                 12     2  16.7%     -1847.68    -153.97
+  round_number            46    21  45.7%      6209.41     134.99
+  swing                  102    43  42.2%     13309.64     130.49
+
+=== Winning trades only — by draw on liquidity ===
+  Draw on liquidity   Wins  % of wins      P&L ZAR
+  ------------------------------------------------
+  equal_hl              42      13.0%     33116.56
+  fib_extension        178      55.1%    105813.75
+  ith_liquidity          2       0.6%      1109.31
+  itl_liquidity          4       1.2%      2909.68
+  pdh_pdl               31       9.6%     16920.52
+  pwh_pwl                2       0.6%       442.26
+  round_number          21       6.5%      7286.17
+  swing                 43      13.3%     18366.94
+
+=== Draw on liquidity — initial vs pyramid legs (winners) ===
+  Leg            Draw on liquidity   Wins    WR%      P&L ZAR
+  ------------------------------------------------------------
+  initial (L1)   equal_hl              41  49.4%     32956.72
+  initial (L1)   fib_extension        176  46.0%    105122.82
+  initial (L1)   ith_liquidity          2  28.6%      1109.31
+  initial (L1)   itl_liquidity          4  28.6%      2909.68
+  initial (L1)   pdh_pdl               30  39.5%     16831.72
+  initial (L1)   pwh_pwl                2  16.7%       442.26
+  initial (L1)   round_number          21  45.7%      7286.17
+  initial (L1)   swing                 43  42.6%     18366.94
+  pyramid (L2+)  equal_hl               1  50.0%       159.84
+  pyramid (L2+)  fib_extension          2  25.0%       690.93
+  pyramid (L2+)  pdh_pdl                1  50.0%        88.80
+
+=== Winning trades — by session × draw on liquidity ===
+  Session       Draw on liquidity   Wins      P&L ZAR
+  ----------------------------------------------------
+  London Open   equal_hl              23     15857.47
+  London Open   fib_extension         92     55145.87
+  London Open   ith_liquidity          1       709.71
+  London Open   itl_liquidity          4      2909.68
+  London Open   pdh_pdl               13      5403.55
+  London Open   pwh_pwl                2       442.26
+  London Open   round_number           7      2366.08
+  London Open   swing                 24     10521.57
+  New York AM   equal_hl              19     17259.09
+  New York AM   fib_extension         86     50667.88
+  New York AM   ith_liquidity          1       399.60
+  New York AM   pdh_pdl               18     11516.97
+  New York AM   round_number          14      4920.09
+  New York AM   swing                 19      7845.37
+
+=== Winning trades — totals by session ===
+  Session        Wins  % of wins      P&L ZAR
+  --------------------------------------------
+  London Open     166      51.4%     93356.18
+  New York AM     157      48.6%     92609.00
+
+=== Session-open side breakdown (above/below open) ===
+  Category      Trades  Wins  Losses    WR%      P&L ZAR    Avg P&L
+  -----------------------------------------------------------------
+  below open        69    31      38  44.9%    19116.49     277.05
+  above open       643   286     357  44.5%   120204.55     186.94
+  no session        24     6      18  25.0%      254.68      10.61
+
+=== P26 — Session-open + daily-open pattern ===
+  +1 per reference (session open / daily open) showing Judas sweep or
+  pullback retest. Dual (+2) = both references fired.
+  Bucket                          Trades  Wins    WR%        P&L ZAR     PF
+  ----------------------------------------------------------------------
+  SOJ dual (sess+daily, +2)          222   101  45.5%      39660.95   3.37
+  SOJ single reference (+1)          431   187  43.4%      80733.26   4.19
+  no SOJ pattern                      83    35  42.2%      19181.50   5.45

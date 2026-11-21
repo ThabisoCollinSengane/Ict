@@ -1,0 +1,110 @@
+/home/runner/work/Ict/Ict/scripts/fx_clock_study.py:311: Pandas4Warning: Sorting by default when concatenating all DatetimeIndex is deprecated.  In the future, pandas will respect the default of `sort=False`. Specify `sort=True` or `sort=False` to silence this message. If you see this warnings when not directly calling concat, report a bug to pandas.
+  basket = pd.concat(rets, axis=1).mean(axis=1).dropna()
+# P78 — the institutional FX clock (real data)
+
+_coverage: EURUSD 2022-01-02→2025-12-31 (289,268 bars), GBPUSD 2022-01-02→2025-12-31 (289,020 bars), NZDUSD 2022-01-02→2025-12-31 (288,780 bars); trading days IS 492 / OOS 519; window ±2h around each anchor_
+
+## §2 The fix reversal — the verdict
+
+R = dollar move into the anchor minus dollar move after it, USD basket, bp/day. Positive = dollar bid into the fix, offered after. `pctl` = share of placebo clock times this fix beats (needs ≥95 in BOTH halves).
+
+| fix | R IS | t IS | pctl IS | R OOS | t OOS | pctl OOS | pooled t | verdict |
+|---|---|---|---|---|---|---|---|---|
+| ECB | +0.83 | +0.5 | 85 | +0.38 | +0.4 | 58 | +0.6 | **RED** |
+| WMR | +1.01 | +0.6 | 88 | -0.94 | -0.8 | 10 | -0.0 | **RED** |
+| TOKYO | -1.20 | -1.5 | 10 | -1.40 | -2.3 | 6 | -2.6 | **RED** |
+
+> ⚠️ **ECB and WMR windows overlap** (±2h each, fixes 2.75h apart). A real ECB effect leaks into WMR with the OPPOSITE sign — the planted-effect drive showed WMR at t −3.5 with nothing planted there. Narrowing the window (`--window 1.375`) cut that to t −2.5 but did NOT remove it: the effect itself lasts hours, longer than the gap. **ECB and WMR are not independent tests.** If ECB is GREEN, a negative WMR is the expected echo, not a second finding.
+
+**VERDICT: RED** (ECB RED · WMR RED · Tokyo RED — Tokyo is reported but not counted; it is outside every killzone).
+
+_placebo: 52 clock times, every 15 min ET, excluding ±90 min around the real fixes._
+
+### §2a The two legs separately — did the dollar rise INTO the fix, fall AFTER?
+
+USD basket bp per day, `+` = dollar up. The research says BEFORE > 0 and AFTER < 0. R above is simply BEFORE − AFTER.
+
+| fix | before IS (t) | after IS (t) | before OOS (t) | after OOS (t) |
+|---|---|---|---|---|
+| ECB | +1.30 (+1.7) | +0.47 (+0.4) | +0.15 (+0.3) | -0.24 (-0.3) |
+| WMR | +0.80 (+0.6) | -0.21 (-0.2) | -0.67 (-0.8) | +0.28 (+0.4) |
+| TOKYO | -1.59 (-3.4) | -0.40 (-0.6) | -1.62 (-4.0) | -0.22 (-0.4) |
+
+### §2b Direction-free: does price REVERSE at the fix, whichever way it was going?
+
+giveback = bp the after-window gives back against the before-window's move (> 0 = reversal). A dollar that ran UP into the fix one day and DOWN the next cancels out in R but counts here both times. Same 52-placebo control.
+
+| fix | giveback IS (t) | pctl IS | giveback OOS (t) | pctl OOS | pooled t | verdict |
+|---|---|---|---|---|---|---|
+| ECB | -0.02 (-0.0) | 17 | +0.13 (+0.1) | 44 | +0.1 | **RED** |
+| WMR | +1.04 (+0.9) | 96 | +0.41 (+0.6) | 75 | +1.1 | **RED** |
+| TOKYO | -1.25 (-1.9) | 0 | -0.45 (-0.9) | 8 | -2.0 | **RED** |
+
+_Real FX mean-reverts a little at ANY time of day; the placebo percentile is what separates 'the fix' from 'any two-hour window'._
+
+## §1 Average dollar move by ET hour (USD basket)
+
+Mean bp per hour; positive = dollar up. t = mean / SE.
+
+| ET hour | IS bp | t | OOS bp | t | clock |
+|---|---|---|---|---|---|
+| 00:00 | +0.24 | +0.7 | -0.26 | -1.0 |  |
+| 01:00 | +0.00 | +0.0 | +0.05 | +0.2 | CLS window opens |
+| 02:00 | -0.45 | -1.0 | -0.15 | -0.5 |  |
+| 03:00 | +0.53 | +0.9 | -0.11 | -0.3 | London open / CLS settle target · **London KZ** |
+| 04:00 | +0.07 | +0.1 | +0.33 | +0.7 | London KZ |
+| 05:00 | +0.17 | +0.3 | -0.06 | -0.2 |  |
+| 06:00 | +0.64 | +1.3 | -0.38 | -1.0 | CLS window closes |
+| 07:00 | +0.14 | +0.3 | +0.77 | +2.3 | **NY AM KZ** |
+| 08:00 | +0.48 | +0.6 | +0.00 | +0.0 | ECB fix 08:15 · US data 08:30 · NY AM |
+| 09:00 | +0.56 | +0.6 | -0.14 | -0.2 | NY AM |
+| 10:00 | -0.18 | -0.2 | -0.05 | -0.1 | NY option cut 10:00 |
+| 11:00 | -0.08 | -0.1 | -0.02 | -0.0 | WMR fix 11:00 |
+| 12:00 | -0.26 | -0.4 | -0.32 | -0.8 | noon block |
+| 13:00 | +0.48 | +0.9 | +0.67 | +1.9 |  |
+| 14:00 | -0.56 | -1.1 | -0.60 | -1.5 |  |
+| 15:00 | -0.21 | -0.4 | +0.12 | +0.3 |  |
+| 16:00 | +0.07 | +0.2 | -0.32 | -1.1 |  |
+| 17:00 | +0.73 | +3.8 | +0.61 | +3.3 | NY close / rollover |
+| 18:00 | -0.08 | -0.4 | +0.88 | +4.3 |  |
+| 19:00 | -0.41 | -1.2 | -0.78 | -2.3 |  |
+| 20:00 | -0.80 | -2.1 | -0.47 | -1.6 | Tokyo fix 20:55 |
+| 21:00 | +0.02 | +0.0 | +0.31 | +0.7 |  |
+| 22:00 | -0.14 | -0.3 | +0.53 | +1.5 |  |
+| 23:00 | -0.01 | -0.0 | +0.30 | +0.9 |  |
+
+_Home-hours claim (Ranaldo): dollar up during European hours (~03-09 ET), down during US hours (~11-15 ET). Read sign AND both halves._
+
+## §3 Daylight-saving natural experiment
+
+68 mismatch days (Europe 5h ahead of New York, not 6). On those days the European fixes sit one hour LATER in ET. If the effect follows the European clock, `at Euro clock` carries it and `at usual ET` does not.
+
+| fix | at Euro clock R (n) | MDE | at usual ET R | MDE | normal days R |
+|---|---|---|---|---|---|
+| ECB | -0.09 (68) | 7.59 | -1.54 | 6.42 | +0.65 (943) |
+| WMR | -1.78 (67) | 5.64 | -3.75 | 5.88 | +0.10 (912) |
+
+_MDE = minimum detectable effect (2 SE). Where |R| < MDE the comparison is UNDERPOWERED — that is a statement about sample size, not about the clock._
+
+## §4 Our trades — with / against the fix flow
+
+_dump: data/histdata/trades_dump.csv; base legs only. 'with' = trade direction matches the expected pair move in the ±2h around the ECB/WMR fix._
+
+**§2 is not GREEN, so this table is DESCRIPTIVE ONLY** — there is no established flow to be with or against.
+
+| split | bucket | n | WR% | PF |
+|---|---|---|---|---|
+| IS | with | 85 | 45.9 | 3.83 |
+| IS | against | 78 | 38.5 | 3.18 |
+| IS | outside | 183 | 44.8 | 3.24 |
+| OOS | with | 99 | 41.4 | 5.01 |
+| OOS | against | 94 | 44.7 | 3.79 |
+| OOS | outside | 183 | 46.4 | 4.79 |
+
+_IS: with − against = +7.4pp (+0.96 SE); a gap that size needs ~355 trades per bucket to reach 2 SE (have 85/78)._
+
+_OOS: with − against = -3.3pp (-0.46 SE); a gap that size needs ~1838 trades per bucket to reach 2 SE (have 99/94)._
+
+_Trades opened on daylight-saving mismatch days: 54 (WR 50.0%, PF 7.11). These are the days London opens at 04:00 ET and the WMR fix lands at 12:00 ET, inside the noon block._
+
+

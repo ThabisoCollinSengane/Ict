@@ -1,0 +1,34 @@
+============================================================
+ICT Intermarket Backtest — HistData.com M1 data (2022–2023)
+============================================================
+  Optional pairs available: AUDUSD, NZDUSD, AUDNZD, XAUUSD, XAGUSD
+
+Loading and resampling to 5-minute bars (2022 + 2023)...
+  GBPUSD: 694,841 M1 → 139,494 M5 bars  2022-01-02 – 2023-12-29  close 1.27305
+  EURUSD: 695,383 M1 → 139,717 M5 bars  2022-01-02 – 2023-12-29  close 1.10361
+  EURGBP: 694,588 M1 → 139,602 M5 bars  2022-01-02 – 2023-12-29  close 0.86671
+  UDXUSD: 601,836 M1 → 121,828 M5 bars  2022-01-03 – 2023-12-29  close 101.04500
+  AUDUSD: 693,584 M1 → 139,626 M5 bars  2022-01-02 – 2023-12-29  close 0.68082
+  NZDUSD: 691,331 M1 → 139,417 M5 bars  2022-01-02 – 2023-12-29  close 0.63174
+  AUDNZD: 693,115 M1 → 139,235 M5 bars  2022-01-02 – 2023-12-29  close 1.07787
+  XAUUSD: 663,320 M1 → 132,722 M5 bars  2022-01-02 – 2023-12-29  close 2062.72800
+  XAGUSD: 655,797 M1 → 132,562 M5 bars  2022-01-02 – 2023-12-29  close 23.78100
+
+Running backtest...
+  News CSV: 354 events loaded from data/news_events.csv
+  Iterating 139494 5-min bars...
+    bar 2000/139494 (2022-01-11 20:50:00+00:00) - active=0 trades=0 equity=10000
+Traceback (most recent call last):
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 1749, in <module>
+    main()
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 160, in main
+    _main(_real_stdout)
+  File "/home/runner/work/Ict/Ict/run_backtest_histdata.py", line 283, in _main
+    backtester.run()
+  File "/home/runner/work/Ict/Ict/backtest.py", line 306, in run
+    self._gold_pullback_entry(pair, t)   # P110 gold's own model
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/Ict/Ict/backtest.py", line 5460, in _gold_pullback_entry
+    if config.GOLD_PB_DXY and self._dxy_bias(t) == d:
+                              ^^^^^^^^^^^^^^^^^
+TypeError: HistdataBacktester._dxy_bias() missing 1 required positional argument: 't'

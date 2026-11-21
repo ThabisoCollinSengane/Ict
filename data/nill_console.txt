@@ -1,0 +1,48 @@
+EURUSD: M1 1,733,278  setups 1706
+GBPUSD: M1 1,731,150  setups 1631
+NZDUSD: M1 1,726,276  setups 1841
+XAUUSD: M1 1,653,254  setups 1600
+SPXUSD: M1 1,577,039  setups 1644
+NSXUSD: M1 1,594,272  setups 1678
+# P116 — Patrick Nill P/b impulse->range at the weekly value area (pure price)
+
+n / win rate / average R per trade (spread included) / PF in R. **AT VA** = the range sits on last week's value area high or low; **ELSE** = the same pattern anywhere else (control). `fade` = range edge faded to the opposite edge (with_imp = the fade runs in the impulse direction, i.e. bought the bottom of a P / sold the top of a b); `bopb` = breakout in the impulse direction, entered on the pullback to the broken edge.
+
+| setup | split | AT VA | ELSE | gap avg R |
+|---|---|---|---|---|
+| fade, all | IS | 618 / 17% / -0.29 / 0.65 | 2053 / 15% / -0.36 / 0.57 | +0.07 |
+| fade, all | OOS | 676 / 16% / -0.37 / 0.57 | 2160 / 15% / -0.38 / 0.55 | +0.01 |
+| fade, all | 2026 | 276 / 15% / -0.38 / 0.55 | 849 / 15% / -0.40 / 0.53 | +0.01 |
+| fade, toward impulse | IS | 305 / 18% / -0.27 / 0.67 | 1037 / 16% / -0.36 / 0.58 | +0.09 |
+| fade, toward impulse | OOS | 355 / 17% / -0.31 / 0.62 | 1075 / 16% / -0.36 / 0.58 | +0.04 |
+| fade, toward impulse | 2026 | 140 / 14% / -0.40 / 0.53 | 456 / 15% / -0.40 / 0.53 | -0.00 |
+| fade, against impulse | IS | 313 / 17% / -0.30 / 0.64 | 1016 / 15% / -0.36 / 0.57 | +0.06 |
+| fade, against impulse | OOS | 321 / 14% / -0.42 / 0.50 | 1085 / 15% / -0.40 / 0.53 | -0.03 |
+| fade, against impulse | 2026 | 136 / 15% / -0.37 / 0.56 | 393 / 14% / -0.40 / 0.53 | +0.03 |
+| breakout-pullback | IS | 331 / 31% / -0.15 / 0.78 | 1071 / 33% / -0.10 / 0.84 | -0.04 |
+| breakout-pullback | OOS | 343 / 32% / -0.14 / 0.79 | 1135 / 33% / -0.10 / 0.85 | -0.04 |
+| breakout-pullback | 2026 | 144 / 34% / -0.08 / 0.88 | 444 / 33% / -0.10 / 0.84 | +0.02 |
+
+## By instrument (all setups, AT VA | ELSE)
+
+| symbol | split | AT VA | ELSE |
+|---|---|---|---|
+| EURUSD | IS | 168 / 23% / -0.15 / 0.80 | 513 / 20% / -0.30 / 0.62 |
+| EURUSD | OOS | 167 / 19% / -0.31 / 0.62 | 576 / 19% / -0.35 / 0.57 |
+| EURUSD | 2026 | 65 / 20% / -0.32 / 0.59 | 217 / 22% / -0.28 / 0.64 |
+| GBPUSD | IS | 169 / 21% / -0.33 / 0.59 | 483 / 22% / -0.24 / 0.70 |
+| GBPUSD | OOS | 177 / 23% / -0.23 / 0.70 | 540 / 25% / -0.14 / 0.82 |
+| GBPUSD | 2026 | 74 / 22% / -0.23 / 0.70 | 188 / 23% / -0.22 / 0.71 |
+| NSXUSD | IS | 144 / 22% / -0.16 / 0.80 | 525 / 21% / -0.23 / 0.70 |
+| NSXUSD | OOS | 176 / 22% / -0.22 / 0.72 | 521 / 20% / -0.29 / 0.64 |
+| NSXUSD | 2026 | 70 / 23% / -0.11 / 0.86 | 242 / 22% / -0.18 / 0.77 |
+| NZDUSD | IS | 188 / 23% / -0.29 / 0.62 | 575 / 23% / -0.31 / 0.60 |
+| NZDUSD | OOS | 198 / 26% / -0.26 / 0.65 | 575 / 21% / -0.41 / 0.48 |
+| NZDUSD | 2026 | 79 / 25% / -0.31 / 0.59 | 226 / 23% / -0.38 / 0.51 |
+| SPXUSD | IS | 137 / 23% / -0.19 / 0.76 | 526 / 21% / -0.25 / 0.68 |
+| SPXUSD | OOS | 166 / 16% / -0.44 / 0.48 | 528 / 22% / -0.23 / 0.71 |
+| SPXUSD | 2026 | 76 / 16% / -0.49 / 0.42 | 211 / 19% / -0.32 / 0.60 |
+| XAUUSD | IS | 143 / 20% / -0.30 / 0.63 | 502 / 21% / -0.30 / 0.62 |
+| XAUUSD | OOS | 135 / 20% / -0.31 / 0.61 | 555 / 22% / -0.27 / 0.65 |
+| XAUUSD | 2026 | 56 / 23% / -0.19 / 0.75 | 209 / 16% / -0.41 / 0.51 |
+wrote data/nill_report.md

@@ -1,0 +1,91 @@
+name: Fix clock — full 4-year test (HistData M1, on GitHub's runner)
+
+# The decisive P78 test: ~1,000 trading days per pair, 2022-23 vs 2024-25.
+# Stage 1 answers the fix-clock question and commits it immediately.
+# Stage 2 runs the full backtest (baseline check: 736 / 43.9% / 4.01 / -13.24%)
+# and re-runs the clock so §4 (our trades with/against the fix flow) fills in.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/fix-clock-4yr.yml"
+      - ".github/fix-clock-4yr.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-clock-4yr
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # ───────────── Stage 1: the fix clock itself ─────────────
+      - name: 1a) Download EURUSD / GBPUSD / NZDUSD M1, 2022-2025
+        run: |
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
+                 --pairs EURUSD GBPUSD NZDUSD --dest /tmp/hd 2>&1 | tail -40
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -20
+          ls -la data/histdata | head -30
+
+      - name: 1b) Fix-clock study on 4 years
+        run: python scripts/fx_clock_study.py --no-push 2>&1 | tee data/fx_clock_console.txt
+
+      - name: 1c) Commit the fix-clock answer now
+        run: |
+          git add -f data/fx_clock_report.md data/fx_clock_console.txt
+          git diff --cached --quiet || git commit -m "Fix clock — 4-year result (stage 1) [$(date -u +%F)]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      # ───────────── Stage 2: baseline backtest + trades vs the flow ─────────────
+      - name: 2a) Download the rest (EURGBP / AUDNZD / UDXUSD / AUDUSD)
+        continue-on-error: true
+        run: |
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 \
+                 --pairs EURGBP AUDNZD UDXUSD AUDUSD --dest /tmp/hd2 2>&1 | tail -40
+          python scripts/prepare_histdata.py /tmp/hd2 --dest data/histdata 2>&1 | tail -20
+
+      - name: 2b) Full 4-year backtest (must reproduce 736 / 43.9% / 4.01 / -13.24%)
+        continue-on-error: true
+        run: python run_backtest_histdata.py 2>&1 | tail -400 > data/backtest_baseline_check.txt
+
+      - name: 2c) Fix clock again, now with our trades (§4)
+        continue-on-error: true
+        run: python scripts/fx_clock_study.py --no-push 2>&1 | tee data/fx_clock_console.txt
+
+      - name: 2d) Commit stage 2
+        if: always()
+        run: |
+          for f in data/fx_clock_report.md data/fx_clock_console.txt \
+                   data/backtest_baseline_check.txt data/backtest_report.md \
+                   data/backtest_console.txt; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git diff --cached --quiet && { echo "nothing new"; exit 0; }
+          git commit -m "Fix clock §4 + baseline backtest check (stage 2) [$(date -u +%F)]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

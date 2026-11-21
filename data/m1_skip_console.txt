@@ -1,0 +1,47 @@
+# P85 — the trades the M1 shift skips, and catching them late
+
+Shadow run: every MM trade below is the UNGATED P81 trade, labelled with what the M1 gate would have said. Late window 60 M1 bars, hold 480 M1 bars. R = result / initial risk.
+
+## §1 Original trade outcome by M1 diagnosis
+
+| half | m1_diag | n | WR | PF (R) | sum R | med MFE pips |
+|---|---|---|---|---|---|---|
+| IS | blew_through | 49 | 28.6% | 1.05 | +1.1 | 12.6 |
+| IS | no_break | 14 | 28.6% | 1.04 | +0.4 | 5.4 |
+| IS | no_swing | 10 | 20.0% | 0.22 | -6.7 | 5.6 |
+| IS | no_touch | 9 | 44.4% | 1.42 | +1.8 | 15.1 |
+| IS | ok | 9 | 55.6% | 2.76 | +5.7 | 20.8 |
+| IS | stale | 13 | 23.1% | 2.55 | +1.7 | 14.9 |
+| OOS | blew_through | 48 | 29.2% | 1.19 | +3.5 | 14.4 |
+| OOS | no_break | 19 | 15.8% | 0.35 | -9.2 | 2.5 |
+| OOS | no_swing | 17 | 23.5% | 0.46 | -7.1 | 4.3 |
+| OOS | no_touch | 17 | 17.6% | 0.20 | -11.2 | 1.8 |
+| OOS | ok | 6 | 50.0% | 0.92 | -0.3 | 19.5 |
+| OOS | stale | 16 | 18.8% | 0.52 | -4.6 | 4.4 |
+
+`ok` = the M1 gate would have taken it at the same moment. Everything else was skipped.
+
+## §2 Late catch — does a valid M1 shift form AFTER the original entry?
+
+| half | m1_diag | skipped | shift found | target first | no shift | late WR | late PF (R) | late sum R | orig sum R (same trades) |
+|---|---|---|---|---|---|---|---|---|---|
+| IS | blew_through | 49 | 10 | 7 | 32 | 40% | 1.87 | +5.2 | -3.5 |
+| IS | no_break | 14 | 9 | 1 | 4 | 44% | 2.64 | +8.2 | +0.5 |
+| IS | no_swing | 10 | 6 | 0 | 4 | 17% | 1.12 | +0.6 | -6.5 |
+| IS | no_touch | 9 | 2 | 0 | 7 | 50% | 1.98 | +1.0 | +2.0 |
+| IS | stale | 13 | 2 | 5 | 6 | 0% | 0.00 | -2.0 | -1.1 |
+| IS | ALL | 95 | 29 | 13 | 53 | 34% | 1.69 | +13.0 | -8.6 |
+| OOS | blew_through | 48 | 5 | 6 | 37 | 40% | 2.00 | +3.0 | -0.2 |
+| OOS | no_break | 19 | 11 | 1 | 7 | 27% | 1.95 | +7.6 | -1.5 |
+| OOS | no_swing | 17 | 9 | 2 | 6 | 33% | 2.26 | +7.6 | -7.6 |
+| OOS | no_touch | 17 | 3 | 0 | 13 | 33% | 1.58 | +1.2 | -3.3 |
+| OOS | stale | 16 | 6 | 0 | 10 | 17% | 0.85 | -0.7 | -3.3 |
+| OOS | ALL | 117 | 34 | 9 | 73 | 29% | 1.77 | +18.6 | -16.0 |
+
+`target first` = price reached the original target before any M1 shift formed — the move left without us. That is the continuation case the gate cannot catch.
+
+## §3 Verdict
+
+- **IS**: skipped 95 (orig sum -1.6R). Late shift on 29: late +13.0R vs original -8.6R on those same setups. 13 ran to target before any shift (orig +7.8R).
+- **OOS**: skipped 117 (orig sum -28.6R). Late shift on 34: late +18.6R vs original -16.0R on those same setups. 9 ran to target before any shift (orig +3.8R).
+

@@ -1,0 +1,63 @@
+name: P126 dollar-hour forecast — can the CURRENT hour's DXY move be forecast honestly?
+
+# Stage 0 + Stage 1 of research/specs/P126_dollar_hour_forecast.md. Every 5 min in the killzones,
+# 7 pre-registered rules on COMPLETED bars predict sign(DXY hour close - DXY now). Nulls A/B first,
+# then the real run (merges the null numbers into the same tables). Stage 0 reads the committed
+# P125 mleaky / mdxyH1 trade dumps.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/algorithm-ict-2022-alignment-9kkLi"]
+    paths:
+      - ".github/workflows/dollar-hour-forecast.yml"
+      - "scripts/dollar_hour_forecast.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dollar-hour-forecast
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      NO_PUSH: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Download M1 2022-2026
+        run: |
+          P="UDXUSD EURUSD GBPUSD NZDUSD EURGBP AUDNZD XAUUSD SPXUSD NSXUSD"
+          python scripts/fetch_histdata.py --years 2022 2023 2024 2025 --pairs $P --dest /tmp/hd 2>&1 | tail -40
+          python scripts/fetch_histdata.py --years 2026 --months 1 2 3 4 5 6 7 8 9 10 --pairs $P --dest /tmp/hd 2>&1 | tail -40
+          python scripts/prepare_histdata.py /tmp/hd --dest data/histdata 2>&1 | tail -30
+          ls -la data/histdata
+      - name: Study
+        run: |
+          python scripts/dollar_hour_forecast.py --selftest
+          rm -f data/dollar_hour_forecast_null.json
+          python scripts/dollar_hour_forecast.py --null > /dev/null
+          python scripts/dollar_hour_forecast.py 2>&1 | tee data/dollar_hour_forecast_console.txt
+      - name: Commit
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/dollar_hour_forecast_report.md data/dollar_hour_forecast_null.md \
+                     data/dollar_hour_forecast_null.json data/dollar_hour_forecast_console.txt 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "P126 dollar-hour forecast study [$(date -u +%F)]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((i*7))
+          done
+          exit 1
