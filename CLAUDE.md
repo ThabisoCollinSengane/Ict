@@ -59,7 +59,9 @@ reads and the rest of the stack add almost nothing. MM trades 27-38% WR in every
 DXY read predicts the next 1-4h, so recovering 42% needs a new honest forecast of the hour's dollar move.
 
 ## 🤖 AI RESEARCH TEAM (set up 2026-11-07) — how every new idea is now handled
-Four subagents in `.claude/agents/`: **spec-writer** (idea -> falsifiable spec, pass rule fixed first,
+Five subagents in `.claude/agents/`: **researcher** (added 2026-11-21: finds NEW untested edge sources —
+papers, practitioners, non-price data — checks them against CLAUDE.md, returns a ranked list, rows in
+`research/ideas.md` as "proposed") -> **spec-writer** (idea -> falsifiable spec, pass rule fixed first,
 `research/specs/P<n>_*.md`, from `research/SPEC_TEMPLATE.md`) -> **trader approves** -> **builder**
 (study / default-OFF flag + workflow, random-walk null first) -> **auditor** (assumes a bug: lookahead,
 circularity, baseline, geometry, multiple comparisons, costs, plumbing, defaults) -> **reporter**
