@@ -7,6 +7,15 @@ const CLEAN = Boolean((getInputProps() as { clean?: boolean }).clean);
 import { ThreeCanvas } from '@remotion/three';
 import { Puppet, Rig } from './Puppet';
 import S from './scene1.json';
+import KLING from './kling.json';
+import { OffthreadVideo } from 'remotion';
+
+// When public/s1/kling/<id>.mp4 exists and kling.json marks it true, that AI-generated clip replaces the
+// drawn base layers of the shot; subtitles, UI overlays, eyelids, shake and title text stay on top.
+const Base: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) =>
+  (KLING as Record<string, boolean>)[id]
+    ? <OffthreadVideo src={staticFile(`s1/kling/${id}.mp4`)} muted style={{ position: 'absolute', inset: 0, width: W, height: H, objectFit: 'cover' }} />
+    : <>{children}</>;
 
 const W = 1920, H = 1080;
 const RIG: Record<string, Rig> = {
@@ -88,9 +97,11 @@ const shake = (f: number, amp: number) => `translate(${(random(`x${f}`) - 0.5) *
 const N1: React.FC = () => {
   const f = useCurrentFrame();
   return (<AbsoluteFill style={{ background: '#000' }}>
+    <Base id="N1">
     <Plate src={plate('N1', Math.min(f, 99))} filter="contrast(1.15) saturate(1.2)" />
     <RedPulse rate={0.55} a={0.18} />
     <AbsoluteFill style={{ background: 'linear-gradient(180deg, rgba(20,0,4,.0) 30%, rgba(30,0,6,.75) 100%)' }} />
+    </Base>
     <div style={{ position: 'absolute', left: 120, top: 120, fontFamily: 'DejaVu Sans Mono, monospace', color: '#ff6a7a', fontSize: 26, letterSpacing: 6, opacity: interpolate(f, [8, 20, 70, 85], [0, 1, 1, 0], clamp) }}>
       UMHLANGA · 03:12 AM<br /><span style={{ opacity: 0.6 }}>QUEUE: 999+ CALLERS WAITING</span>
     </div>
@@ -102,6 +113,7 @@ const N2: React.FC = () => {
   const f = useCurrentFrame();
   const twitch = f > 52 && f < 60 ? 0.09 * sin((f - 52) * 2.4) : 0;
   return (<AbsoluteFill style={{ background: '#000', transform: shake(f, f > 50 ? 6 : 1.5) }}>
+    <Base id="N2">
     <Plate src={plate('N2', Math.min(f, 99))} filter="brightness(.8) contrast(1.2)" />
     <Stage>
       <Puppet src={art('andile_body')} x={560} y={120 - f * 0.4} h={1300} rig={RIG.andile_body}
@@ -115,6 +127,7 @@ const N2: React.FC = () => {
     </svg>
     <RedPulse rate={0.9} a={0.22} />
     <Vignette a={0.9} />
+    </Base>
     <Sequence from={8} durationInFrames={90}><Sub robot text={S.lines.hold} dur={90} /></Sequence>
   </AbsoluteFill>);
 };
@@ -124,6 +137,7 @@ const N3: React.FC = () => {
   const grow = interpolate(f, [0, 90], [1, 1.25], { easing: ez, ...clamp });
   const flick = random(`fl${f}`) > 0.92 ? 0.4 : 1;
   return (<AbsoluteFill style={{ background: '#000' }}>
+    <Base id="N3">
     <Plate src={plate('N3', 0)} scale={1 + f * 0.0015} filter="brightness(.7)" />
     <AbsoluteFill style={{ transform: `scale(${grow})`, transformOrigin: '50% 40%', opacity: interpolate(f, [0, 22], [0, 1], clamp) * flick }}>
       <Stage>
@@ -133,6 +147,7 @@ const N3: React.FC = () => {
     </AbsoluteFill>
     <AbsoluteFill style={{ background: 'radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 30%, rgba(10,0,2,.95) 85%)' }} />
     <RedPulse rate={0.25} a={0.2} />
+    </Base>
     <Sequence from={24} durationInFrames={66}><Sub who="LEE" text={S.lines.leeDream} dur={66} /></Sequence>
   </AbsoluteFill>);
 };
@@ -142,6 +157,7 @@ const N4: React.FC = () => {
   const beat = Math.max(0, sin(f * 0.42)) ** 8;
   const amp = interpolate(f, [0, 119], [2, 22], clamp);
   return (<AbsoluteFill style={{ background: '#000', transform: shake(f, amp) }}>
+    <Base id="N4">
     <Plate src={plate('N4', Math.min(f, 119))} filter="contrast(1.25)" />
     <SpeedLines o={interpolate(f, [20, 70], [0, 0.85], clamp)} />
     <AbsoluteFill style={{ transform: `scale(${1 + 0.02 * beat + f * 0.0012})`, transformOrigin: '50% 30%' }}>
@@ -152,6 +168,7 @@ const N4: React.FC = () => {
     </AbsoluteFill>
     <AbsoluteFill style={{ background: '#ff0030', mixBlendMode: 'multiply', opacity: 0.35 + 0.25 * beat }} />
     <Vignette a={0.95} color="20,0,4" />
+    </Base>
     <Sequence from={30} durationInFrames={85}><Sub who="ANDILE" text={S.lines.andileDream} dur={85} /></Sequence>
   </AbsoluteFill>);
 };
@@ -198,11 +215,13 @@ const W1: React.FC = () => {
   const blur = interpolate(f, [0, 50], [22, 0], { easing: ez, ...clamp });
   return (<AbsoluteFill style={{ background: '#000' }}>
     <AbsoluteFill style={{ filter: `blur(${blur}px)` }}>
+      <Base id="W1">
       <Plate src={plate('W1', 0)} filter="brightness(1.05)" />
       <Stage>
         <Puppet src={art('lee_body')} x={1040} y={30} h={1750} rig={RIG.lee_body}
           pose={{ lean: -0.12 + 0.01 * sin(f * 0.1), headRot: 0.18 + 0.03 * sin(f * 0.08), breath: sin(f * 0.25) }} />
       </Stage>
+      </Base>
     </AbsoluteFill>
     <AbsoluteFill style={{ background: 'linear-gradient(200deg, rgba(255,240,210,.35), rgba(255,255,255,0) 50%)', mixBlendMode: 'screen' }} />
     <Eyelids open={open} />
@@ -232,6 +251,7 @@ const W2: React.FC = () => {
   const jolt = interpolate(f, [8, 13, 30], [0, 1, 0.35], { easing: Easing.out(Easing.cubic), ...clamp });
   const look = interpolate(f, [26, 40], [0, 1], { easing: ez, ...clamp });
   return (<AbsoluteFill style={{ background: '#000', transform: f > 8 && f < 18 ? shake(f, 10) : undefined }}>
+    <Base id="W2">
     <Plate src={plate('W2', 0)} />
     <Stage>
       <Puppet src={art('lee_body')} x={1330} y={130} h={1060} rig={RIG.lee_body}
@@ -241,6 +261,7 @@ const W2: React.FC = () => {
     </Stage>
     <Desk y={800} />
     <Papers t={Math.max(0, f - 10) * 0.9} />
+    </Base>
     {f > 9 && f < 22 ? <div style={{ position: 'absolute', left: 470, top: 90, fontFamily: 'DejaVu Sans, sans-serif', fontWeight: 900, fontSize: 90, color: '#fff', WebkitTextStroke: '4px #000', transform: `rotate(-8deg) scale(${interpolate(f, [9, 14], [0.6, 1.1], clamp)})` }}>!!</div> : null}
     <Sequence from={44} durationInFrames={76}><Sub who="LEE" text={S.lines.leeLine4} dur={76} /></Sequence>
   </AbsoluteFill>);
@@ -251,11 +272,13 @@ const W3: React.FC = () => {
   const sigh = interpolate(f, [10, 40, 70], [0, 1, 0.3], clamp);
   const blink = f > 62 && f < 66;
   return (<AbsoluteFill style={{ background: '#000' }}>
+    <Base id="W3">
     <Plate src={plate('W3', 0)} blur={7} scale={1.06} />
     <Stage>
       <Puppet src={art('andile_h2')} x={300} y={-60 + sigh * 18} h={1150} rig={RIG.andile_h2}
         pose={{ headRot: -0.05 * sigh + 0.015 * sin(f * 0.1), headY: -0.01 * sigh, bright: blink ? 0.92 : 1 }} />
     </Stage>
+    </Base>
     {CLEAN ? null : <div style={{ position: 'absolute', right: 150, top: 180, width: 470, padding: '22px 30px', background: 'rgba(8,20,32,.82)', border: '2px solid #2fd0ff', borderRadius: 10, fontFamily: 'DejaVu Sans Mono, monospace', color: '#bfefff', fontSize: 26, boxShadow: '0 0 40px rgba(47,208,255,.35)', transform: `translateY(${interpolate(f, [0, 12], [40, 0], { easing: ez, ...clamp })}px)`, opacity: interpolate(f, [0, 10], [0, 1], clamp) }}>
       <div style={{ color: '#fff', fontWeight: 700, letterSpacing: 4 }}>SHAKA CONNECT · CX</div>
       <div style={{ marginTop: 14 }}><span style={{ color: f % 20 < 10 ? '#ff4d5e' : '#5a1a22' }}>●</span> LINE 4 — ON HOLD</div>
