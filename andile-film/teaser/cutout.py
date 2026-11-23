@@ -7,6 +7,7 @@ SHEET = Image.open('../cast/cast_sheet_v2_locked.png').convert('RGB')
 PARTS = {  # name: (box, upscale)
     'andile_body': ((2, 2, 186, 505), 3), 'andile_h1': ((183, 4, 333, 212), 4), 'andile_h2': ((183, 212, 333, 362), 4), 'andile_h3': ((183, 362, 333, 505), 4),
     'lee_body': ((941, 2, 1077, 505), 3), 'lee_h1': ((1074, 20, 1235, 220), 4), 'lee_h2': ((1074, 220, 1235, 390), 4), 'lee_h3': ((1074, 390, 1235, 506), 4),
+    'bouncer_body': ((1237, 2, 1396, 506), 3), 'bouncer_h1': ((1393, 4, 1533, 185), 4), 'bouncer_h2': ((1393, 185, 1533, 345), 4), 'bouncer_h3': ((1393, 345, 1533, 506), 4),
 }
 def cut(img, step=34, far=150):
     a = np.asarray(img).astype(np.int32); h, w, _ = a.shape
@@ -28,7 +29,10 @@ def cut(img, step=34, far=150):
     alpha = Image.fromarray(np.where(seen, 0, 255).astype(np.uint8))
     alpha = alpha.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
     rgba = img.convert('RGBA'); rgba.putalpha(alpha); return rgba
+import sys
+ONLY = sys.argv[1:]  # optional: names to (re)cut
 for name, (box, k) in PARTS.items():
+    if ONLY and name not in ONLY: continue
     c = cut(SHEET.crop(box))
     c = c.resize((c.width * k, c.height * k), Image.LANCZOS)
     rgb = c.convert('RGB').filter(ImageFilter.UnsharpMask(radius=2, percent=110, threshold=2)); rgb.putalpha(c.split()[3])

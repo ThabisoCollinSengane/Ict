@@ -12,6 +12,7 @@ import { SHOTS } from './shots.js';
 import { EASE, clamp, lerp, CEL } from './toon.js';
 
 const q = new URLSearchParams(location.search);
+const EMPTY = q.get('empty') === '1'; // ?empty=1 renders the sets with no characters (background plates)
 const W = +(q.get('w') || 1280), H = +(q.get('h') || 720), portrait = H > W, SS = +(q.get('ss') || 1);
 document.documentElement.style.setProperty('--u', Math.min(W, H) / 100 + 'px');
 document.body.classList.toggle('portrait', portrait);
@@ -209,7 +210,7 @@ window.renderAt = (frame) => {
   const ctx = { tg: t, period, bpm: TL.bpm, floorY: def.floorY || 0 };
   for (const k in cast) {
     const c = cast[k], tr = def.chars[k];
-    c.root.visible = c.blob.visible = !!tr;
+    c.root.visible = c.blob.visible = !!tr && !EMPTY;
     if (tr) { if (c.isVRM) evalVRM(c, tr, ctx, shot.start, t, (x) => (def.remap ? remap(def.remap, x) : x)); else evalChar(c, tr, at, ctx); }
   }
 

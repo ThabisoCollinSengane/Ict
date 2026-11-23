@@ -1,7 +1,7 @@
 // Deterministic frame renderer: node render.js --w=1280 --h=720 --out=frames/16x9 [--from=0 --to=720 | --frames=1,2,3]
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
-const A = Object.fromEntries(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=')));
+const A = Object.fromEntries(process.argv.slice(2).map((a) => { const s = a.replace(/^--/, ''), i = s.indexOf('='); return i < 0 ? [s, ''] : [s.slice(0, i), s.slice(i + 1)]; }));
 const W = +(A.w || 1280), H = +(A.h || 720), SS = +(A.ss || 1), out = A.out || 'frames/16x9';
 const frames = A.frames ? A.frames.split(',').map(Number) : Array.from({ length: (+(A.to ?? 720)) - (+(A.from || 0)) }, (_, i) => i + (+(A.from || 0)));
 const root = __dirname;
@@ -18,7 +18,7 @@ srv.listen(0, '127.0.0.1', async () => {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: SS });
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) console.log('[page]', m.text().slice(0, 300)); });
   page.on('pageerror', (e) => console.log('[pageerror]', e.message));
-  await page.goto(`http://127.0.0.1:${srv.address().port}/index.html?w=${W}&h=${H}&ss=${SS}`);
+  await page.goto(`http://127.0.0.1:${srv.address().port}/index.html?w=${W}&h=${H}&ss=${SS}${A.q ? '&' + A.q : ''}`);
   await page.waitForFunction('window.READY === true', null, { timeout: 300000 });
   fs.mkdirSync(out, { recursive: true });
   const t0 = Date.now();
