@@ -12,10 +12,14 @@ import { OffthreadVideo } from 'remotion';
 
 // When public/s1/kling/<id>.mp4 exists and kling.json marks it true, that AI-generated clip replaces the
 // drawn base layers of the shot; subtitles, UI overlays, eyelids, shake and title text stay on top.
-const Base: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) =>
-  (KLING as Record<string, boolean>)[id]
-    ? <OffthreadVideo src={staticFile(`s1/kling/${id}.mp4`)} muted style={{ position: 'absolute', inset: 0, width: W, height: H, objectFit: 'cover' }} />
+// kling.json: false = keep the drawn shot; a number = use the clip at that playback rate (e.g. 1.5 squeezes a
+// 5 s clip into a 3.3 s slot).
+const Base: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const rate = (KLING as Record<string, number | false>)[id];
+  return rate
+    ? <OffthreadVideo src={staticFile(`s1/kling/${id}.mp4`)} muted playbackRate={rate} style={{ position: 'absolute', inset: 0, width: W, height: H, objectFit: 'cover' }} />
     : <>{children}</>;
+};
 
 const W = 1920, H = 1080;
 const RIG: Record<string, Rig> = {

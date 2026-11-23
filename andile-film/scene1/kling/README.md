@@ -12,3 +12,9 @@ characters stay on-model with the locked cast sheet.
     npx remotion still src/index.ts Scene1 ../scene1/kling/start_$id.png --frame=$fr --gl=swangle --props='{"clean":true}'; done
   ```
   `clean` hides subtitles, grain, letterbox, eyelids and UI overlays so only the drawn scene goes to the model.
+
+## Using generated clips
+Put each clip at `andile-film/teaser/public/s1/kling/<id>.mp4` (gitignored) and set its value in
+`andile-film/teaser/src/kling.json` to a playback rate (e.g. `1.5` fits a 5 s clip into a 3.3 s slot), or `false`
+to keep the drawn shot. If a clip file is missing, set its entry back to `false` before rendering.
+Generated so far (kie.ai, `kling-3.0/video`, std, 5 s, ~75 credits each): N2.
