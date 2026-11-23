@@ -1,6 +1,9 @@
 // ANDILE — Episode 1, Scene 1 "Bad Dream": Andile's call-centre nightmare, then waking at his desk with Lee.
 import React from 'react';
-import { AbsoluteFill, Audio, Img, interpolate, Sequence, staticFile, useCurrentFrame, Easing, random } from 'remotion';
+import { AbsoluteFill, Audio, Img, interpolate, Sequence, staticFile, useCurrentFrame, Easing, random, getInputProps } from 'remotion';
+
+// `--props='{"clean":true}'` renders without subtitles, grain, letterbox or audio (start frames for AI video).
+const CLEAN = Boolean((getInputProps() as { clean?: boolean }).clean);
 import { ThreeCanvas } from '@remotion/three';
 import { Puppet, Rig } from './Puppet';
 import S from './scene1.json';
@@ -52,6 +55,7 @@ const Bars: React.FC = () => (<>
 
 // Subtitles: speaker tag + line, typed on, isiZulu in amber
 const Sub: React.FC<{ who?: string; text: string; dur: number; robot?: boolean }> = ({ who, text, dur, robot }) => {
+  if (CLEAN) return null;
   const f = useCurrentFrame();
   const n = Math.floor(interpolate(f, [0, Math.min(18, dur * 0.4)], [0, text.length], clamp));
   const o = interpolate(f, [0, 4, dur - 6, dur], [0, 1, 1, 0], clamp);
@@ -180,6 +184,7 @@ const N5: React.FC = () => {
 };
 
 const Eyelids: React.FC<{ open: number }> = ({ open }) => {
+  if (CLEAN) return null;
   const g = (1 - open) * 560;
   return (<svg width={W} height={H} style={{ position: 'absolute' }}>
     <path d={`M0 0 H${W} V${g - 80} Q${W / 2} ${g + 120} 0 ${g - 80} Z`} fill="#000" />
@@ -251,11 +256,11 @@ const W3: React.FC = () => {
       <Puppet src={art('andile_h2')} x={300} y={-60 + sigh * 18} h={1150} rig={RIG.andile_h2}
         pose={{ headRot: -0.05 * sigh + 0.015 * sin(f * 0.1), headY: -0.01 * sigh, bright: blink ? 0.92 : 1 }} />
     </Stage>
-    <div style={{ position: 'absolute', right: 150, top: 180, width: 470, padding: '22px 30px', background: 'rgba(8,20,32,.82)', border: '2px solid #2fd0ff', borderRadius: 10, fontFamily: 'DejaVu Sans Mono, monospace', color: '#bfefff', fontSize: 26, boxShadow: '0 0 40px rgba(47,208,255,.35)', transform: `translateY(${interpolate(f, [0, 12], [40, 0], { easing: ez, ...clamp })}px)`, opacity: interpolate(f, [0, 10], [0, 1], clamp) }}>
+    {CLEAN ? null : <div style={{ position: 'absolute', right: 150, top: 180, width: 470, padding: '22px 30px', background: 'rgba(8,20,32,.82)', border: '2px solid #2fd0ff', borderRadius: 10, fontFamily: 'DejaVu Sans Mono, monospace', color: '#bfefff', fontSize: 26, boxShadow: '0 0 40px rgba(47,208,255,.35)', transform: `translateY(${interpolate(f, [0, 12], [40, 0], { easing: ez, ...clamp })}px)`, opacity: interpolate(f, [0, 10], [0, 1], clamp) }}>
       <div style={{ color: '#fff', fontWeight: 700, letterSpacing: 4 }}>SHAKA CONNECT · CX</div>
       <div style={{ marginTop: 14 }}><span style={{ color: f % 20 < 10 ? '#ff4d5e' : '#5a1a22' }}>●</span> LINE 4 — ON HOLD</div>
       <div style={{ marginTop: 6, fontSize: 44, color: '#ffcf5a' }}>10:{String(3 + Math.floor(f / 30)).padStart(2, '0')}</div>
-    </div>
+    </div>}
     <Vignette a={0.45} />
     <Sequence from={14} durationInFrames={92}><Sub who="ANDILE" text={S.lines.andileWake} dur={92} /></Sequence>
   </AbsoluteFill>);
@@ -289,8 +294,6 @@ export const Scene1: React.FC = () => (
       const C = SHOTS[s.id];
       return <Sequence key={s.id} from={s.from} durationInFrames={s.to - s.from}><C /></Sequence>;
     })}
-    <Grain o={0.08} />
-    <Bars />
-    <Audio src={staticFile('s1/scene1.wav')} />
+    {CLEAN ? null : <><Grain o={0.08} /><Bars /><Audio src={staticFile('s1/scene1.wav')} /></>}
   </AbsoluteFill>
 );
